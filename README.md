@@ -33,9 +33,15 @@ Bot Discord complet pour serveur Roleplay Roblox : cartes d'identité, permis de
 - XP **texte** par message (anti-spam avec cooldown) et XP **vocal** par minute en vocal
 - Niveaux séparés écrit/vocal, annonces de montée de niveau, `/niveau voir`, `/niveau classement`
 
-### 🧑‍💼 Service RP (`/service`)
+### 🧑‍💼 Service RP (`/service` et `/temps`)
 - `/service prise` / `/service fin` — annonce en embed, rôle « En service » automatique, durée calculée
 - `/service liste` — **[Staff]** liste des membres en service
+- `/temps faction:…` — **[Gérant]** temps de service des membres de **sa** faction (7 derniers jours + total, membres en service signalés 🟢). Une faction = une **entreprise** (gérants = patrons) ou un **rôle métier** de la whitelist (gérants = rôles gérants configurés). Le menu s'adapte automatiquement à chaque entreprise créée ou métier configuré ; plusieurs gérants possibles ; le staff voit toutes les factions
+
+### 🚨 Anti-scam par images échantillons (`/scamimage`)
+- `/scamimage ajouter image:… [nom]` — **[Staff]** enregistre une image scam échantillon
+- Toute image postée **identique ou quasi identique** (empreinte SHA-256 + empreinte perceptuelle dHash, tolérante aux recompressions/légères retouches) est **supprimée** et son auteur **banni automatiquement** (messages des dernières 24 h purgés)
+- `/scamimage liste`, `/scamimage retirer` — gestion des échantillons
 
 ### 📋 Whitelist métiers (`/whitelist`)
 - Exemple : le **gérant Police** recrute un policier → `/whitelist ajouter utilisateur:@recrue role:@Policier` → le bot **attribue automatiquement le rôle**
@@ -48,6 +54,11 @@ Bot Discord complet pour serveur Roleplay Roblox : cartes d'identité, permis de
 - `/arrivee`, `/depart` — annonces d'arrivée/départ staff (enregistrées en base)
 - `/ban`, `/kick`, `/mute` (timeout), `/unmute`
 - `/banglobal` — **[Admin]** bannit sur **tous les serveurs** du bot + **auto-ban à toute arrivée future**
+- `/update` — **[Admin]** redémarre le bot pour charger la dernière mise à jour publiée
+- `/stop` — **[Propriétaire du bot uniquement]** éteint complètement le bot, depuis n'importe quel serveur (propriétaire = owner de l'application Discord, ou `OWNER_ID` dans le `.env`)
+
+### 📜 Logs de sécurité étendus
+Dans le salon de logs configuré : toutes les actions staff et accès refusés, plus les **connexions/déconnexions/changements de salon vocal**, les **messages supprimés** (auteur, salon, contenu, pièces jointes) et les **messages modifiés** (avant/après)
 
 ### ⚙️ Configuration (`/config`) — panneau central
 - `/config` ouvre un **panneau interactif unique** (éphémère) avec la vue d'ensemble et toutes les catégories :

@@ -104,7 +104,7 @@ async function start() {
       GatewayIntentBits.GuildVoiceStates,
       GatewayIntentBits.GuildModeration,
     ],
-    partials: [Partials.GuildMember],
+    partials: [Partials.GuildMember, Partials.Message, Partials.Channel],
   });
 
   client.commands = new Collection();

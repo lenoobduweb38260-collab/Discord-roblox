@@ -138,6 +138,16 @@ CREATE TABLE IF NOT EXISTS global_bans (
   banned_by TEXT NOT NULL,
   banned_at TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS scam_images (
+  id       INTEGER PRIMARY KEY AUTOINCREMENT,
+  guild_id TEXT NOT NULL,
+  name     TEXT,
+  sha256   TEXT NOT NULL,
+  dhash    TEXT,
+  added_by TEXT NOT NULL,
+  added_at TEXT NOT NULL
+);
 `);
 
 const DEFAULT_CONFIG = {
