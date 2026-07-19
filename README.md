@@ -68,6 +68,10 @@ Dans le salon de logs configuré : toutes les actions staff et accès refusés, 
   - 📋 **Whitelist métiers** — vue des autorisations gérants
 - Accessible au **staff** ; le rôle **Administration** ne peut être modifié que par un admin (sécurité grade élevé) ; chaque changement est tracé dans les logs
 
+## 🤫 Anti-flood
+
+Toutes les réponses de commandes sont **éphémères** (« lecture seule » : visibles uniquement par la personne qui tape la commande) — les salons textuels ne sont jamais inondés. Les messages publics passent exclusivement par les **salons dédiés** configurés dans `/config` : annonces de service, arrivées/départs staff, montées de niveau et journal de sécurité (qui garde la trace publique des actions de modération pour le staff).
+
 ## 🔐 Sécurité
 
 - **3 grades** : Membre (0) → **Staff** (2) → **Administration** (3)

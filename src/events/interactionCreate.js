@@ -80,6 +80,22 @@ module.exports = {
       return interaction.reply({ content: '⛔ Cette commande s\'utilise sur un serveur.', flags: MessageFlags.Ephemeral });
     }
 
+    // Réponses en « lecture seule » : toutes les réponses de commandes sont
+    // éphémères par défaut (visibles uniquement par leur auteur) pour ne pas
+    // inonder les salons textuels. Les annonces publiques passent par les
+    // salons dédiés configurés (service, staff, niveaux, logs).
+    const makeEphemeral = (options) => {
+      if (typeof options === 'string') options = { content: options };
+      if (options && typeof options === 'object' && options.flags === undefined) {
+        options = { ...options, flags: MessageFlags.Ephemeral };
+      }
+      return options;
+    };
+    for (const method of ['reply', 'deferReply', 'followUp']) {
+      const original = interaction[method].bind(interaction);
+      interaction[method] = (options = {}) => original(makeEphemeral(options));
+    }
+
     // Sécurité centralisée : chaque commande déclare son grade minimum, le
     // contrôle est fait ici (impossible de contourner via l'interface Discord).
     const requiredGrade = command.grade ?? GRADES.EVERYONE;
