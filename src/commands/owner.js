@@ -34,10 +34,14 @@ module.exports = [
       .setName('update')
       .setDescription('[Admin] Redémarre le bot pour charger la dernière mise à jour publiée'),
     async execute(interaction) {
-      await interaction.reply(
-        '🔄 **Redémarrage pour mise à jour…** Le bot vérifie la dernière version publiée sur GitHub, ' +
-          'l\'installe si besoin et revient en ligne dans quelques instants.'
-      );
+      // Même si la réponse Discord échoue (interaction expirée, doublon
+      // d'instance…), le redémarrage doit avoir lieu quand même.
+      await interaction
+        .reply(
+          '🔄 **Redémarrage pour mise à jour…** Le bot vérifie la dernière version publiée sur GitHub, ' +
+            'l\'installe si besoin et revient en ligne dans quelques instants.'
+        )
+        .catch(() => null);
       await sendLog(
         interaction.guild,
         logEmbed('🔄 Update', `Redémarrage pour mise à jour demandé par <@${interaction.user.id}>.`, COLORS.INFO)
@@ -63,7 +67,7 @@ module.exports = [
           flags: MessageFlags.Ephemeral,
         });
       }
-      await interaction.reply('🛑 **Arrêt du bot.** À bientôt !');
+      await interaction.reply('🛑 **Arrêt du bot.** À bientôt !').catch(() => null);
       await sendLog(
         interaction.guild,
         logEmbed('🛑 Bot éteint', `Arrêt demandé par le propriétaire <@${interaction.user.id}>.`, COLORS.DANGER)

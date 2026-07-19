@@ -1,6 +1,7 @@
 node_modules/
 dist/
 .env
+bot.lock
 data.sqlite
 data.sqlite-journal
 data.sqlite-wal

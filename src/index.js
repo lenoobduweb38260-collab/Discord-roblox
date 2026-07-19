@@ -71,7 +71,56 @@ if (mode === 'check') {
   start();
 }
 
+// ----- Verrou d'instance unique -----
+// Empêche de lancer deux fois le bot : deux instances connectées avec le même
+// token se disputent les interactions (erreurs « Unknown interaction ») et une
+// ancienne instance peut rester en ligne avec du vieux code après une mise à
+// jour. Au redémarrage (update), la nouvelle instance patiente le temps que
+// l'ancienne se ferme.
+const lockPath = path.join(baseDir, 'bot.lock');
+
+function pidAlive(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function acquireLock() {
+  for (let attempt = 0; attempt < 16; attempt++) {
+    let existing = null;
+    try {
+      existing = parseInt(fs.readFileSync(lockPath, 'utf8'), 10);
+    } catch {}
+    if (existing && existing !== process.pid && pidAlive(existing)) {
+      if (attempt === 0) console.log('⏳ Une autre instance se ferme peut-être, patientez…');
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      continue;
+    }
+    fs.writeFileSync(lockPath, String(process.pid));
+    process.on('exit', () => {
+      try {
+        if (parseInt(fs.readFileSync(lockPath, 'utf8'), 10) === process.pid) fs.unlinkSync(lockPath);
+      } catch {}
+    });
+    return true;
+  }
+  return false;
+}
+
 async function start() {
+  console.log(`🤖 Bot Discord RP — version v${(() => { try { return require('../package.json').version; } catch { return '?'; } })()}`);
+
+  if (!(await acquireLock())) {
+    fatal(
+      '❌ Le bot est déjà lancé (une autre fenêtre/instance est en cours d\'exécution).\n' +
+        'Fermez l\'autre fenêtre du bot puis relancez, ou utilisez la commande /update sur Discord pour le redémarrer.'
+    );
+    return;
+  }
+
   // Mise à jour automatique depuis les releases GitHub (exécutable uniquement).
   if (process.pkg && process.env.AUTO_UPDATE !== 'off' && !process.env.BOT_JUST_UPDATED) {
     try {
