@@ -1,1 +1,107 @@
-# Discord-roblox
+# 🎭 Bot Discord RP — Roblox
+
+Bot Discord complet pour serveur Roleplay Roblox : cartes d'identité, permis de conduire, entreprises et assurances, niveaux (écrit + vocal), prise de service, whitelist et modération staff — le tout stocké en base de données SQLite et entièrement configurable par le staff.
+
+## ✨ Fonctionnalités
+
+### 🪪 Carte d'identité (`/carte`)
+- **ID de carte généré automatiquement** (format `CNI-XXXXXXXX`)
+- Champs : nom & prénom RP, sexe, lieu de naissance, date de naissance, pseudo Roblox, pseudo Discord, ID Discord, nationalité, background, photo
+- Stockée en **base de données**, créée par le **staff** (`/carte creer`)
+- `/carte voir` — afficher une carte (embed avec photo)
+- `/carte chercher` — **[Staff]** retrouver une carte par **ID Discord**, **ID de carte** ou **nom Discord**
+- `/carte modifier`, `/carte supprimer` — **[Staff]**
+
+### 🚗 Permis de conduire (`/permis`)
+- `/permis delivrer` — **[Staff]** délivre un permis : **valide**, **numéro généré** (12 chiffres), **12/12 points**, **délivrance à la date et l'heure du jour**
+- `/permis voir`, `/permis retirer-points` (0 point → permis automatiquement invalidé), `/permis ajouter-points`, `/permis invalider`, `/permis revalider`, `/permis supprimer`
+
+### 🏢 Entreprises (`/entreprise`)
+- Création/modification/suppression par le **staff**
+- **2 questions obligatoires à la création** :
+  1. **Assurance : Oui ou Non** (option obligatoire)
+  2. Si **Oui** → menu de sélection **multi-choix** : 🏥 Maladie / 🚗 Véhicule / 🏠 Habitation / 🏢 Entreprise
+- Le staff peut mettre **un ou plusieurs membres à la tête** de l'entreprise (`/entreprise patron`)
+- Gestion des employés (`/entreprise employe`, accessible aussi aux patrons)
+- Les embeds acceptent **photos, vidéos et GIF** (fichier ou URL — les vidéos sont jointes au message pour être lisibles)
+
+### 🛡️ Assurance véhicule (`/assurance`)
+- `/assurance assigner` — un assureur ne peut assigner un véhicule **que si l'entreprise dont il fait partie (patron ou employé) a coché "Assurance Véhicule"**
+- `/assurance retirer`, `/assurance liste` (par entreprise ou par assuré)
+
+### 📈 Niveaux écrit + vocal (`/niveau`)
+- XP **texte** par message (anti-spam avec cooldown) et XP **vocal** par minute en vocal
+- Niveaux séparés écrit/vocal, annonces de montée de niveau, `/niveau voir`, `/niveau classement`
+
+### 🧑‍💼 Service RP (`/service`)
+- `/service prise` / `/service fin` — annonce en embed, rôle « En service » automatique, durée calculée
+- `/service liste` — **[Staff]** liste des membres en service
+
+### 📋 Whitelist (`/whitelist`)
+- `ajouter` / `retirer` / `liste` — **[Staff]**
+- `activer` / `desactiver` — **[Admin]** : une fois activée, tout nouveau membre non whitelisté est expulsé automatiquement (avec message privé)
+
+### 🔨 Modération staff
+- `/arrivee`, `/depart` — annonces d'arrivée/départ staff (enregistrées en base)
+- `/ban`, `/kick`, `/mute` (timeout), `/unmute`
+- `/banglobal` — **[Admin]** bannit sur **tous les serveurs** du bot + **auto-ban à toute arrivée future**
+
+### ⚙️ Configuration (`/config`) — sécurité grade élevé
+- `/config roles` — rôles **staff**, **admin**, **en service**
+- `/config salons` — salons **logs**, **niveaux**, **service**, **staff**
+- `/config xp` — XP texte/vocal et cooldown
+- `/config voir` — état de la configuration
+
+## 🔐 Sécurité
+
+- **3 grades** : Membre (0) → **Staff** (2) → **Administration** (3)
+- Le grade est vérifié **côté bot, de façon centralisée** pour chaque commande — impossible à contourner même si les permissions Discord de la commande sont mal réglées
+- Repli sans configuration : permission Discord **Modérer les membres** = staff, **Administrateur** = admin
+- Les actions sensibles (`/config`, `/banglobal`, activation de whitelist) exigent le grade **Administration**
+- **Journal de sécurité** : toutes les actions staff (et les tentatives d'accès refusées) sont tracées dans le salon de logs configuré
+
+## 🚀 Installation
+
+### 1. Créer l'application Discord
+1. [Portail développeur Discord](https://discord.com/developers/applications) → **New Application**
+2. Onglet **Bot** : copier le **token**, puis activer les **Privileged Gateway Intents** :
+   - ✅ **Server Members Intent** (whitelist, ban global)
+   - ✅ **Message Content Intent** (XP texte)
+3. Onglet **OAuth2 → URL Generator** : cocher `bot` + `applications.commands`, permissions : **Administrator** (ou au minimum : Gérer les rôles, Bannir, Expulser, Modérer les membres, Envoyer des messages, Liens intégrés)
+4. Inviter le bot avec l'URL générée
+
+### 2. Installer et lancer
+```bash
+git clone <ce dépôt>
+cd Discord-roblox
+npm install
+cp .env.example .env   # puis remplir DISCORD_TOKEN, CLIENT_ID (et GUILD_ID pour un déploiement instantané)
+npm run deploy         # enregistre les commandes slash
+npm start              # démarre le bot
+```
+
+### 3. Première configuration (sur le serveur)
+```
+/config roles staff:@Staff admin:@Administration service:@En service
+/config salons logs:#logs niveaux:#niveaux service:#service staff:#staff
+/config voir
+```
+
+## 🗃️ Données
+
+Toutes les données sont stockées dans `data.sqlite` (SQLite, mode WAL) : cartes d'identité, permis, entreprises (+ direction, employés, véhicules assurés), niveaux, services, présences staff, whitelist, bans globaux et configuration par serveur. Pensez à sauvegarder ce fichier.
+
+## 📁 Structure
+
+```
+src/
+├── index.js              # démarrage, chargement commandes/événements
+├── deploy-commands.js    # enregistrement des commandes slash
+├── database.js           # schéma SQLite + accès configuration
+├── commands/             # carte, permis, entreprise, assurance, niveau,
+│                         # service, whitelist, config, staff, moderation
+├── events/               # interactions (sécurité centralisée), XP texte,
+│                         # XP vocal, whitelist/ban global à l'arrivée
+└── utils/                # grades de sécurité, embeds (photo/vidéo/GIF),
+                          # générateurs d'ID, calculs de niveaux
+```
