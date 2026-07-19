@@ -17,6 +17,9 @@ const insertSample = db.prepare(
 );
 const deleteSample = db.prepare('DELETE FROM scam_images WHERE id = ? AND guild_id = ?');
 const getSample = db.prepare('SELECT * FROM scam_images WHERE id = ? AND guild_id = ?');
+const insertGlobalBan = db.prepare(
+  'INSERT OR REPLACE INTO global_bans (user_id, reason, banned_by, banned_at) VALUES (?, ?, ?, ?)'
+);
 
 // jimp est optionnel : sans lui, la détection retombe sur l'empreinte exacte.
 let Jimp = null;
@@ -81,20 +84,28 @@ async function scanMessage(message) {
     if (!match) continue;
 
     await message.delete().catch(() => null);
-    const banned = await message.guild.members
-      .ban(message.author.id, {
-        reason: `Image scam détectée (échantillon n°${match.id}${match.name ? ` « ${match.name} »` : ''})`,
-        deleteMessageSeconds: 86400,
-      })
-      .then(() => true)
-      .catch(() => false);
+
+    // Ban GLOBAL : enregistré en base (auto-ban à toute arrivée future) puis
+    // appliqué sur tous les serveurs du bot, avec suppression de ses messages
+    // des dernières 24 h sur chacun.
+    const reason = `Image scam détectée (échantillon n°${match.id}${match.name ? ` « ${match.name} »` : ''})`;
+    insertGlobalBan.run(message.author.id, reason, message.client.user.id, new Date().toISOString());
+    let banCount = 0;
+    for (const guild of message.client.guilds.cache.values()) {
+      const ok = await guild.members
+        .ban(message.author.id, { reason: `Ban global anti-scam : ${reason}`, deleteMessageSeconds: 86400 })
+        .then(() => true)
+        .catch(() => false);
+      if (ok) banCount++;
+    }
     await sendLog(
       message.guild,
       logEmbed(
-        '🚨 Image scam détectée',
+        '🚨 Image scam détectée — ban global',
         `<@${message.author.id}> (\`${message.author.id}\`) a posté une image correspondant à l'échantillon ` +
           `n°${match.id}${match.name ? ` « ${match.name} »` : ''} dans <#${message.channelId}>.\n` +
-          `Message supprimé — ${banned ? '**membre banni** (messages des dernières 24 h purgés)' : '⚠️ ban impossible (permissions/hiérarchie)'}.`,
+          `🌍🔨 **Ban global** appliqué sur **${banCount}** serveur(s) (+ auto-ban à toute arrivée future), ` +
+          `messages des dernières 24 h supprimés.\nAnnulable avec \`/banglobal retirer\`.`,
         COLORS.DANGER
       )
     );

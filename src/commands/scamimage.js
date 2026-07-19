@@ -46,7 +46,8 @@ module.exports = {
       );
       await interaction.editReply(
         `✅ Échantillon **n°${result.lastInsertRowid}**${nom ? ` « ${nom} »` : ''} enregistré.\n` +
-          `🔍 Toute image **identique ou quasi identique** postée sur le serveur sera supprimée et son auteur **banni** automatiquement.` +
+          `🔍 Toute image **identique ou quasi identique** postée sera supprimée, son auteur recevra un **ban global** ` +
+          `(tous les serveurs + auto-ban à l'arrivée) et ses messages des dernières 24 h seront supprimés.` +
           (dhash ? '' : '\n⚠️ Empreinte perceptuelle indisponible pour ce format : seules les copies strictement identiques seront détectées.')
       );
       await sendLog(
@@ -69,7 +70,7 @@ module.exports = {
         .setColor(COLORS.WARNING)
         .setTitle(`🚨 Échantillons scam (${samples.length})`)
         .setDescription(lines.join('\n'))
-        .setFooter({ text: 'Image identique ou quasi identique postée → suppression + ban automatique' });
+        .setFooter({ text: 'Image identique ou quasi identique postée → suppression + ban global + purge 24 h' });
       return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
     }
 

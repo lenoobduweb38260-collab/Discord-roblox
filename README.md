@@ -40,7 +40,7 @@ Bot Discord complet pour serveur Roleplay Roblox : cartes d'identité, permis de
 
 ### 🚨 Anti-scam par images échantillons (`/scamimage`)
 - `/scamimage ajouter image:… [nom]` — **[Staff]** enregistre une image scam échantillon
-- Toute image postée **identique ou quasi identique** (empreinte SHA-256 + empreinte perceptuelle dHash, tolérante aux recompressions/légères retouches) est **supprimée** et son auteur **banni automatiquement** (messages des dernières 24 h purgés)
+- Toute image postée **identique ou quasi identique** (empreinte SHA-256 + empreinte perceptuelle dHash, tolérante aux recompressions/légères retouches) est **supprimée** et son auteur reçoit un **ban global automatique** (tous les serveurs du bot + auto-ban à toute arrivée future), avec suppression de ses messages des dernières 24 h — annulable via `/banglobal retirer`
 - `/scamimage liste`, `/scamimage retirer` — gestion des échantillons
 
 ### 📋 Whitelist métiers (`/whitelist`)
