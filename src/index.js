@@ -113,6 +113,23 @@ async function acquireLock() {
 async function start() {
   console.log(`🤖 Bot Discord RP — version v${(() => { try { return require('../package.json').version; } catch { return '?'; } })()}`);
 
+  // Lancement manuel = prise de main : sur Windows, on ferme d'office toutes
+  // les autres instances du même exécutable (anciennes versions comprises),
+  // pour éviter les doublons connectés avec le même token. Les instances
+  // issues d'un redémarrage automatique (update/restart) ne balaient pas :
+  // elles attendent le verrou, ce qui évite qu'elles s'entretuent.
+  const isRespawn = Boolean(process.env.BOT_JUST_UPDATED || process.env.BOT_RESTARTED);
+  if (!isRespawn && process.pkg && process.platform === 'win32') {
+    try {
+      const { spawnSync } = require('child_process');
+      spawnSync(
+        'taskkill',
+        ['/F', '/FI', `PID ne ${process.pid}`, '/IM', path.basename(process.execPath)],
+        { stdio: 'ignore' }
+      );
+    } catch {}
+  }
+
   if (!(await acquireLock())) {
     fatal(
       '❌ Le bot est déjà lancé (une autre fenêtre/instance est en cours d\'exécution).\n' +
