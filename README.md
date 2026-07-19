@@ -37,9 +37,12 @@ Bot Discord complet pour serveur Roleplay Roblox : cartes d'identité, permis de
 - `/service prise` / `/service fin` — annonce en embed, rôle « En service » automatique, durée calculée
 - `/service liste` — **[Staff]** liste des membres en service
 
-### 📋 Whitelist (`/whitelist`)
-- `ajouter` / `retirer` / `liste` — **[Staff]**
-- `activer` / `desactiver` — **[Admin]** : une fois activée, tout nouveau membre non whitelisté est expulsé automatiquement (avec message privé)
+### 📋 Whitelist métiers (`/whitelist`)
+- Exemple : le **gérant Police** recrute un policier → `/whitelist ajouter utilisateur:@recrue role:@Policier` → le bot **attribue automatiquement le rôle**
+- Un gérant **ne peut attribuer que les rôles métier qui lui ont été autorisés** — toute tentative non autorisée est refusée et tracée dans les logs
+- `/whitelist config ajouter role:@Policier gerant:@GérantPolice` — **[Admin]** autorise un rôle gérant à whitelister un rôle métier (plusieurs gérants possibles par métier)
+- `/whitelist retirer` — retire la whitelist **et** le rôle ; `/whitelist liste` — membres whitelistés d'un métier ; `/whitelist roles` — rôles que vous pouvez attribuer
+- Le **staff** peut whitelister tous les rôles métier configurés
 
 ### 🔨 Modération staff
 - `/arrivee`, `/depart` — annonces d'arrivée/départ staff (enregistrées en base)
@@ -57,7 +60,7 @@ Bot Discord complet pour serveur Roleplay Roblox : cartes d'identité, permis de
 - **3 grades** : Membre (0) → **Staff** (2) → **Administration** (3)
 - Le grade est vérifié **côté bot, de façon centralisée** pour chaque commande — impossible à contourner même si les permissions Discord de la commande sont mal réglées
 - Repli sans configuration : permission Discord **Modérer les membres** = staff, **Administrateur** = admin
-- Les actions sensibles (`/config`, `/banglobal`, activation de whitelist) exigent le grade **Administration**
+- Les actions sensibles (`/config`, `/banglobal`, configuration des autorisations de whitelist) exigent le grade **Administration**
 - **Journal de sécurité** : toutes les actions staff (et les tentatives d'accès refusées) sont tracées dans le salon de logs configuré
 
 ## 🚀 Installation
@@ -65,7 +68,7 @@ Bot Discord complet pour serveur Roleplay Roblox : cartes d'identité, permis de
 ### 1. Créer l'application Discord
 1. [Portail développeur Discord](https://discord.com/developers/applications) → **New Application**
 2. Onglet **Bot** : copier le **token**, puis activer les **Privileged Gateway Intents** :
-   - ✅ **Server Members Intent** (whitelist, ban global)
+   - ✅ **Server Members Intent** (whitelist métiers, ban global)
    - ✅ **Message Content Intent** (XP texte)
 3. Onglet **OAuth2 → URL Generator** : cocher `bot` + `applications.commands`, permissions : **Administrator** (ou au minimum : Gérer les rôles, Bannir, Expulser, Modérer les membres, Envoyer des messages, Liens intégrés)
 4. Inviter le bot avec l'URL générée
@@ -84,12 +87,15 @@ npm start              # démarre le bot
 ```
 /config roles staff:@Staff admin:@Administration service:@En service
 /config salons logs:#logs niveaux:#niveaux service:#service staff:#staff
+/whitelist config ajouter role:@Policier gerant:@GérantPolice
 /config voir
 ```
 
+> ⚠️ Pour la whitelist métiers, le rôle du bot doit être **au-dessus** des rôles métier dans la hiérarchie des rôles du serveur, avec la permission **Gérer les rôles**.
+
 ## 🗃️ Données
 
-Toutes les données sont stockées dans `data.sqlite` (SQLite, mode WAL) : cartes d'identité, permis, entreprises (+ direction, employés, véhicules assurés), niveaux, services, présences staff, whitelist, bans globaux et configuration par serveur. Pensez à sauvegarder ce fichier.
+Toutes les données sont stockées dans `data.sqlite` (SQLite, mode WAL) : cartes d'identité, permis, entreprises (+ direction, employés, véhicules assurés), niveaux, services, présences staff, whitelist métiers (autorisations + inscriptions), bans globaux et configuration par serveur. Pensez à sauvegarder ce fichier.
 
 ## 📁 Structure
 

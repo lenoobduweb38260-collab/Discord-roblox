@@ -130,8 +130,8 @@ module.exports = {
           inline: false,
         },
         {
-          name: '📋 Whitelist',
-          value: cfg.whitelist_enabled ? '🟢 Activée' : '🔴 Désactivée',
+          name: '📋 Whitelist métiers',
+          value: 'Voir `/whitelist roles` — configuration via `/whitelist config ajouter`',
           inline: false,
         }
       );

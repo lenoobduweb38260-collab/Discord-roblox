@@ -15,7 +15,6 @@ CREATE TABLE IF NOT EXISTS guild_config (
   level_channel_id   TEXT,
   service_channel_id TEXT,
   staff_channel_id   TEXT,
-  whitelist_enabled  INTEGER NOT NULL DEFAULT 0,
   xp_text            INTEGER NOT NULL DEFAULT 20,
   xp_voice           INTEGER NOT NULL DEFAULT 10,
   xp_cooldown        INTEGER NOT NULL DEFAULT 60
@@ -114,12 +113,20 @@ CREATE TABLE IF NOT EXISTS staff_presence (
   at       TEXT NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS whitelist (
+CREATE TABLE IF NOT EXISTS whitelist_managers (
+  guild_id        TEXT NOT NULL,
+  role_id         TEXT NOT NULL,
+  manager_role_id TEXT NOT NULL,
+  PRIMARY KEY (guild_id, role_id, manager_role_id)
+);
+
+CREATE TABLE IF NOT EXISTS whitelist_entries (
   guild_id TEXT NOT NULL,
   user_id  TEXT NOT NULL,
+  role_id  TEXT NOT NULL,
   added_by TEXT NOT NULL,
   added_at TEXT NOT NULL,
-  PRIMARY KEY (guild_id, user_id)
+  PRIMARY KEY (guild_id, user_id, role_id)
 );
 
 CREATE TABLE IF NOT EXISTS global_bans (
@@ -138,7 +145,6 @@ const DEFAULT_CONFIG = {
   level_channel_id: null,
   service_channel_id: null,
   staff_channel_id: null,
-  whitelist_enabled: 0,
   xp_text: 20,
   xp_voice: 10,
   xp_cooldown: 60,
