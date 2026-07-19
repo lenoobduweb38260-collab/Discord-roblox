@@ -49,11 +49,13 @@ Bot Discord complet pour serveur Roleplay Roblox : cartes d'identité, permis de
 - `/ban`, `/kick`, `/mute` (timeout), `/unmute`
 - `/banglobal` — **[Admin]** bannit sur **tous les serveurs** du bot + **auto-ban à toute arrivée future**
 
-### ⚙️ Configuration (`/config`) — sécurité grade élevé
-- `/config roles` — rôles **staff**, **admin**, **en service**
-- `/config salons` — salons **logs**, **niveaux**, **service**, **staff**
-- `/config xp` — XP texte/vocal et cooldown
-- `/config voir` — état de la configuration
+### ⚙️ Configuration (`/config`) — panneau central
+- `/config` ouvre un **panneau interactif unique** (éphémère) avec la vue d'ensemble et toutes les catégories :
+  - 👮 **Rôles** — staff, administration, en service (sélecteurs de rôles)
+  - 📢 **Salons** — logs, niveaux, service, staff (sélecteurs de salons)
+  - 📈 **XP & niveaux** — formulaire XP texte/vocal et cooldown
+  - 📋 **Whitelist métiers** — vue des autorisations gérants
+- Accessible au **staff** ; le rôle **Administration** ne peut être modifié que par un admin (sécurité grade élevé) ; chaque changement est tracé dans les logs
 
 ## 🔐 Sécurité
 
@@ -96,10 +98,8 @@ npm start              # démarre le bot
 
 ### 3. Première configuration (sur le serveur)
 ```
-/config roles staff:@Staff admin:@Administration service:@En service
-/config salons logs:#logs niveaux:#niveaux service:#service staff:#staff
+/config                    → panneau central : rôles, salons, XP, whitelist
 /whitelist config ajouter role:@Policier gerant:@GérantPolice
-/config voir
 ```
 
 > ⚠️ Pour la whitelist métiers, le rôle du bot doit être **au-dessus** des rôles métier dans la hiérarchie des rôles du serveur, avec la permission **Gérer les rôles**.

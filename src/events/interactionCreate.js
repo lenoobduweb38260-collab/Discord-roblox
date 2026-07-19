@@ -2,6 +2,7 @@ const { Events, MessageFlags } = require('discord.js');
 const { db, getGuildConfig } = require('../database');
 const { getGrade, GRADES, GRADE_NAMES } = require('../utils/permissions');
 const { buildEnterpriseEmbed, sendLog, logEmbed, COLORS } = require('../utils/embeds');
+const { handleConfigInteraction } = require('../utils/configPanel');
 
 const getEnterprise = db.prepare('SELECT * FROM enterprises WHERE id = ?');
 const setInsuranceTypes = db.prepare('UPDATE enterprises SET insurance_types = ? WHERE id = ?');
@@ -22,6 +23,15 @@ module.exports = {
         }
       }
       return;
+    }
+
+    // ----- Panneau central de configuration (/config) -----
+    if (
+      (interaction.isButton() || interaction.isAnySelectMenu() || interaction.isModalSubmit()) &&
+      interaction.customId?.startsWith('cfg')
+    ) {
+      if (!interaction.inGuild()) return;
+      return handleConfigInteraction(interaction);
     }
 
     // ----- Menu de sélection des types d'assurance (création/modif d'entreprise) -----
