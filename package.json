@@ -14,7 +14,10 @@
   },
   "pkg": {
     "scripts": "src/**/*.js",
-    "assets": "node_modules/better-sqlite3/build/Release/*.node"
+    "assets": [
+      "node_modules/better-sqlite3/build/Release/*.node",
+      "package.json"
+    ]
   },
   "dependencies": {
     "better-sqlite3": "^11.9.1",

@@ -71,7 +71,16 @@ if (mode === 'check') {
   start();
 }
 
-function start() {
+async function start() {
+  // Mise à jour automatique depuis les releases GitHub (exécutable uniquement).
+  if (process.pkg && process.env.AUTO_UPDATE !== 'off' && !process.env.BOT_JUST_UPDATED) {
+    try {
+      if (await require('./updater').autoUpdate()) return; // redémarrage en cours
+    } catch (err) {
+      console.warn(`⚠️ Mise à jour automatique ignorée : ${err.message}`);
+    }
+  }
+
   if (!process.env.DISCORD_TOKEN?.trim()) {
     fatal(
       `❌ DISCORD_TOKEN manquant.\n\n` +

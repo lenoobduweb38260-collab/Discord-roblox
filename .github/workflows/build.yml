@@ -1,14 +1,13 @@
 name: Build des exécutables
 
+# Chaque push compile les exécutables et publie automatiquement une release
+# versionnée v1.0.<n° de run>. Les exécutables déjà installés détectent la
+# nouvelle version au lancement et se mettent à jour tout seuls.
+
 on:
   push:
     branches: ['**']
   workflow_dispatch:
-    inputs:
-      tag:
-        description: 'Tag de la release (ex : v1.0.0)'
-        required: true
-        default: 'v1.0.0'
 
 permissions:
   contents: write
@@ -37,6 +36,9 @@ jobs:
       - name: Installer les dépendances
         run: npm install
 
+      - name: Versionner le build (v1.0.${{ github.run_number }})
+        run: npm version --no-git-tag-version "1.0.${{ github.run_number }}"
+
       - name: Compiler l'exécutable
         run: npx --yes @yao-pkg/pkg . --targets ${{ matrix.target }} --output dist/${{ matrix.output }}
 
@@ -50,8 +52,7 @@ jobs:
           path: dist/${{ matrix.output }}
 
   release:
-    name: Publier la release
-    if: github.event_name == 'workflow_dispatch'
+    name: Publier la release v1.0.${{ github.run_number }}
     needs: build
     runs-on: ubuntu-latest
     steps:
@@ -62,9 +63,9 @@ jobs:
 
       - uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ inputs.tag }}
+          tag_name: v1.0.${{ github.run_number }}
           target_commitish: ${{ github.sha }}
-          name: Bot Discord RP ${{ inputs.tag }}
+          name: Bot Discord RP v1.0.${{ github.run_number }}
           body: |
             ## 📦 Exécutables du bot (aucune installation de Node.js nécessaire)
 
@@ -73,10 +74,14 @@ jobs:
             | 🪟 Windows | `discord-roblox-bot-win-x64.exe` |
             | 🐧 Linux | `discord-roblox-bot-linux-x64` |
 
+            ### 🔄 Mise à jour automatique
+            Si vous avez déjà l'exécutable (v1.0.3 ou plus récente), **rien à faire** :
+            au prochain lancement il détecte cette version, se télécharge et redémarre tout seul.
+
             ### 🚀 Premier lancement
             1. Téléchargez le fichier pour votre système (ci-dessous) et placez-le dans un dossier dédié
             2. Lancez-le une première fois : un fichier `.env` est créé à côté de l'exécutable
-            3. Ouvrez ce `.env` et remplissez `DISCORD_TOKEN`, `CLIENT_ID` (et `GUILD_ID` recommandé pour des commandes instantanées)
+            3. Ouvrez ce `.env` et remplissez `DISCORD_TOKEN`, `CLIENT_ID` (et `GUILD_ID` recommandé)
             4. Relancez : le bot se connecte et **enregistre automatiquement les commandes slash**
 
             La base de données `data.sqlite` est créée à côté de l'exécutable — sauvegardez-la !

@@ -74,7 +74,10 @@ Des exécutables autonomes (Windows `.exe` et Linux) sont compilés automatiquem
 3. Ouvrez ce `.env` et remplissez `DISCORD_TOKEN` et `CLIENT_ID` (+ `GUILD_ID` recommandé pour des commandes instantanées) — voir « Créer l'application Discord » ci-dessous
 4. Relancez : le bot se connecte et **enregistre automatiquement les commandes slash**
 
-La base `data.sqlite` est créée à côté de l'exécutable. Pour publier une nouvelle release : onglet **Actions** → « Build des exécutables » → **Run workflow** (avec un tag, ex : `v1.0.1`). Chaque push compile aussi les exécutables, récupérables dans les artefacts du run.
+La base `data.sqlite` est créée à côté de l'exécutable.
+
+### 🔄 Mise à jour automatique
+L'exécutable est **relié aux releases GitHub** : à chaque lancement, il compare sa version à la dernière release, télécharge la nouvelle version si besoin, se remplace et redémarre tout seul. Chaque push sur le dépôt publie automatiquement une nouvelle release `v1.0.<n>` — les modifications du code arrivent donc chez vous **sans rien faire**. Pour désactiver : ajoutez `AUTO_UPDATE=off` dans le `.env`.
 
 ## 🚀 Installation
 
