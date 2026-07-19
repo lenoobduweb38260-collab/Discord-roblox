@@ -3,12 +3,18 @@
   "version": "1.0.0",
   "description": "Bot Discord RP (Roblox) : cartes d'identité, permis, entreprises, assurances, niveaux, service, whitelist et modération staff.",
   "main": "src/index.js",
+  "bin": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
-    "deploy": "node src/deploy-commands.js"
+    "deploy": "node src/deploy-commands.js",
+    "build": "pkg . --targets node22-win-x64 --output dist/discord-roblox-bot-win-x64.exe"
   },
   "engines": {
     "node": ">=18.0.0"
+  },
+  "pkg": {
+    "scripts": "src/**/*.js",
+    "assets": "node_modules/better-sqlite3/build/Release/*.node"
   },
   "dependencies": {
     "better-sqlite3": "^11.9.1",

@@ -1,0 +1,83 @@
+name: Build des exécutables
+
+on:
+  push:
+    branches: ['**']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag de la release (ex : v1.0.0)'
+        required: true
+        default: 'v1.0.0'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.output }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            target: node22-win-x64
+            output: discord-roblox-bot-win-x64.exe
+          - os: ubuntu-latest
+            target: node22-linux-x64
+            output: discord-roblox-bot-linux-x64
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Installer les dépendances
+        run: npm install
+
+      - name: Compiler l'exécutable
+        run: npx --yes @yao-pkg/pkg . --targets ${{ matrix.target }} --output dist/${{ matrix.output }}
+
+      - name: Auto-test de l'exécutable (SQLite + chargement des commandes)
+        run: ./dist/${{ matrix.output }} check
+        shell: bash
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.output }}
+          path: dist/${{ matrix.output }}
+
+  release:
+    name: Publier la release
+    if: github.event_name == 'workflow_dispatch'
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.tag }}
+          target_commitish: ${{ github.sha }}
+          name: Bot Discord RP ${{ inputs.tag }}
+          body: |
+            ## 📦 Exécutables du bot (aucune installation de Node.js nécessaire)
+
+            | Système | Fichier |
+            |---|---|
+            | 🪟 Windows | `discord-roblox-bot-win-x64.exe` |
+            | 🐧 Linux | `discord-roblox-bot-linux-x64` |
+
+            ### 🚀 Premier lancement
+            1. Téléchargez le fichier pour votre système (ci-dessous) et placez-le dans un dossier dédié
+            2. Lancez-le une première fois : un fichier `.env` est créé à côté de l'exécutable
+            3. Ouvrez ce `.env` et remplissez `DISCORD_TOKEN`, `CLIENT_ID` (et `GUILD_ID` recommandé pour des commandes instantanées)
+            4. Relancez : le bot se connecte et **enregistre automatiquement les commandes slash**
+
+            La base de données `data.sqlite` est créée à côté de l'exécutable — sauvegardez-la !
+          files: dist/*

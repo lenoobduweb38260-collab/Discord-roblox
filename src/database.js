@@ -1,7 +1,10 @@
 const Database = require('better-sqlite3');
 const path = require('path');
 
-const db = new Database(path.join(__dirname, '..', 'data.sqlite'));
+// En exécutable packagé (pkg), la base vit à côté de l'exécutable ;
+// en mode Node classique, à la racine du projet. DATA_FILE permet de forcer un chemin.
+const baseDir = process.pkg ? path.dirname(process.execPath) : path.join(__dirname, '..');
+const db = new Database(process.env.DATA_FILE || path.join(baseDir, 'data.sqlite'));
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
 

@@ -63,6 +63,17 @@ Bot Discord complet pour serveur Roleplay Roblox : cartes d'identité, permis de
 - Les actions sensibles (`/config`, `/banglobal`, configuration des autorisations de whitelist) exigent le grade **Administration**
 - **Journal de sécurité** : toutes les actions staff (et les tentatives d'accès refusées) sont tracées dans le salon de logs configuré
 
+## 📦 Exécutable téléchargeable (sans installer Node.js)
+
+Des exécutables autonomes (Windows `.exe` et Linux) sont compilés automatiquement par GitHub Actions et publiés dans les **[Releases](../../releases)** du dépôt.
+
+1. Téléchargez le fichier pour votre système depuis la [dernière release](../../releases/latest) et placez-le dans un dossier dédié
+2. Lancez-le une première fois : un fichier **`.env` est créé automatiquement** à côté de l'exécutable
+3. Ouvrez ce `.env` et remplissez `DISCORD_TOKEN` et `CLIENT_ID` (+ `GUILD_ID` recommandé pour des commandes instantanées) — voir « Créer l'application Discord » ci-dessous
+4. Relancez : le bot se connecte et **enregistre automatiquement les commandes slash**
+
+La base `data.sqlite` est créée à côté de l'exécutable. Pour publier une nouvelle release : onglet **Actions** → « Build des exécutables » → **Run workflow** (avec un tag, ex : `v1.0.1`). Chaque push compile aussi les exécutables, récupérables dans les artefacts du run.
+
 ## 🚀 Installation
 
 ### 1. Créer l'application Discord

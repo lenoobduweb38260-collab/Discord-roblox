@@ -1,50 +1,143 @@
-require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
-const { Client, Collection, GatewayIntentBits, Partials } = require('discord.js');
-require('./database'); // initialise la base de données au démarrage
 
-if (!process.env.DISCORD_TOKEN) {
-  console.error('❌ DISCORD_TOKEN manquant. Copiez .env.example vers .env et remplissez-le.');
+// En exécutable packagé (pkg), les fichiers de l'utilisateur (.env, data.sqlite)
+// vivent à côté de l'exécutable ; en mode Node classique, à la racine du projet.
+const baseDir = process.pkg ? path.dirname(process.execPath) : path.join(__dirname, '..');
+const envPath = path.join(baseDir, '.env');
+
+const ENV_TEMPLATE = `# Token du bot (Portail développeur Discord > Bot > Token)
+DISCORD_TOKEN=
+
+# ID de l'application (Portail développeur Discord > General Information > Application ID)
+CLIENT_ID=
+
+# Optionnel : ID de votre serveur pour un enregistrement instantané des commandes.
+# Laissez vide pour un enregistrement global (propagation jusqu'à 1 h).
+GUILD_ID=
+`;
+
+// Premier lancement de l'exécutable : on crée un .env à remplir à côté de l'exe.
+if (process.pkg && !fs.existsSync(envPath)) {
+  try {
+    fs.writeFileSync(envPath, ENV_TEMPLATE, { flag: 'wx' });
+  } catch {
+    // impossible d'écrire : on continuera avec les variables d'environnement
+  }
+}
+require('dotenv').config({ path: envPath });
+
+// En exécutable lancé par double-clic, la fenêtre se ferme dès la fin du
+// processus : on attend Entrée pour que l'utilisateur puisse lire l'erreur.
+function fatal(message) {
+  console.error(message);
+  if (process.pkg && process.stdin.isTTY) {
+    console.log('\nAppuyez sur Entrée pour fermer cette fenêtre…');
+    const rl = require('readline').createInterface({ input: process.stdin, output: process.stdout });
+    rl.question('', () => process.exit(1));
+    return;
+  }
   process.exit(1);
 }
 
-const client = new Client({
-  intents: [
-    GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMembers,
-    GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent,
-    GatewayIntentBits.GuildVoiceStates,
-    GatewayIntentBits.GuildModeration,
-  ],
-  partials: [Partials.GuildMember],
-});
-
-// Chargement des commandes (un fichier peut exporter une commande ou un tableau).
-client.commands = new Collection();
-const commandsPath = path.join(__dirname, 'commands');
-for (const file of fs.readdirSync(commandsPath).filter((f) => f.endsWith('.js'))) {
-  const mod = require(path.join(commandsPath, file));
-  const commands = Array.isArray(mod) ? mod : [mod];
-  for (const command of commands) {
-    if (command?.data && command?.execute) {
-      client.commands.set(command.data.name, command);
-    } else {
-      console.warn(`⚠️ Commande invalide ignorée dans ${file}`);
+function loadCommandFiles() {
+  const commandsPath = path.join(__dirname, 'commands');
+  const commands = [];
+  for (const file of fs.readdirSync(commandsPath).filter((f) => f.endsWith('.js'))) {
+    const mod = require(path.join(commandsPath, file));
+    for (const command of Array.isArray(mod) ? mod : [mod]) {
+      if (command?.data && command?.execute) commands.push(command);
+      else console.warn(`⚠️ Commande invalide ignorée dans ${file}`);
     }
   }
-}
-console.log(`📦 ${client.commands.size} commande(s) chargée(s) : ${[...client.commands.keys()].join(', ')}`);
-
-// Chargement des événements.
-const eventsPath = path.join(__dirname, 'events');
-for (const file of fs.readdirSync(eventsPath).filter((f) => f.endsWith('.js'))) {
-  const event = require(path.join(eventsPath, file));
-  if (event.once) client.once(event.name, (...args) => event.execute(...args));
-  else client.on(event.name, (...args) => event.execute(...args));
+  return commands;
 }
 
-process.on('unhandledRejection', (err) => console.error('Unhandled rejection :', err));
+const mode = (process.argv[2] || 'start').toLowerCase();
 
-client.login(process.env.DISCORD_TOKEN);
+if (mode === 'check') {
+  // Auto-test (utilisé par la CI) : initialise la base SQLite (module natif)
+  // et charge toutes les commandes, sans se connecter à Discord.
+  require('./database');
+  const commands = loadCommandFiles();
+  console.log(`✅ Auto-test OK : base de données initialisée, ${commands.length} commande(s) chargée(s).`);
+  process.exit(0);
+} else if (mode === 'deploy') {
+  require('./deploy-commands')
+    .deployCommands()
+    .then(() => process.exit(0))
+    .catch((err) => fatal(`❌ Échec de l'enregistrement des commandes : ${err.message}`));
+} else {
+  start();
+}
+
+function start() {
+  if (!process.env.DISCORD_TOKEN?.trim()) {
+    fatal(
+      `❌ DISCORD_TOKEN manquant.\n\n` +
+        `1. Ouvrez le fichier .env ici : ${envPath}\n` +
+        `2. Collez le token de votre bot (Portail développeur Discord > Bot > Reset Token)\n` +
+        `   ainsi que le CLIENT_ID (General Information > Application ID).\n` +
+        `3. Relancez le bot.`
+    );
+    return;
+  }
+
+  const { Client, Collection, GatewayIntentBits, Partials } = require('discord.js');
+  require('./database'); // initialise la base de données au démarrage
+
+  const client = new Client({
+    intents: [
+      GatewayIntentBits.Guilds,
+      GatewayIntentBits.GuildMembers,
+      GatewayIntentBits.GuildMessages,
+      GatewayIntentBits.MessageContent,
+      GatewayIntentBits.GuildVoiceStates,
+      GatewayIntentBits.GuildModeration,
+    ],
+    partials: [Partials.GuildMember],
+  });
+
+  client.commands = new Collection();
+  for (const command of loadCommandFiles()) {
+    client.commands.set(command.data.name, command);
+  }
+  console.log(`📦 ${client.commands.size} commande(s) chargée(s) : ${[...client.commands.keys()].join(', ')}`);
+
+  const eventsPath = path.join(__dirname, 'events');
+  for (const file of fs.readdirSync(eventsPath).filter((f) => f.endsWith('.js'))) {
+    const event = require(path.join(eventsPath, file));
+    if (event.once) client.once(event.name, (...args) => event.execute(...args));
+    else client.on(event.name, (...args) => event.execute(...args));
+  }
+
+  process.on('unhandledRejection', (err) => console.error('Unhandled rejection :', err));
+
+  // En exécutable : enregistrement automatique des commandes slash au démarrage,
+  // pour que tout fonctionne sans étape supplémentaire.
+  const autoDeploy = async () => {
+    if (!process.pkg) return;
+    if (!process.env.CLIENT_ID?.trim()) {
+      console.warn('⚠️ CLIENT_ID manquant dans le .env : les commandes slash ne seront pas enregistrées automatiquement.');
+      return;
+    }
+    try {
+      await require('./deploy-commands').deployCommands();
+    } catch (err) {
+      console.error(`⚠️ Enregistrement automatique des commandes impossible : ${err.message}`);
+    }
+  };
+
+  autoDeploy().then(() =>
+    client
+      .login(process.env.DISCORD_TOKEN)
+      .catch((err) =>
+        fatal(
+          `❌ Connexion à Discord impossible : ${err.message}\n\n` +
+            `Vérifiez le DISCORD_TOKEN dans ${envPath}\n` +
+            `et que les intents "Server Members" et "Message Content" sont activés\n` +
+            `(Portail développeur Discord > Bot > Privileged Gateway Intents).`
+        )
+      )
+  );
+}
