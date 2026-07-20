@@ -103,8 +103,6 @@ if (mode === 'check') {
 // ancienne instance peut rester en ligne avec du vieux code après une mise à
 // jour. Au redémarrage (update), la nouvelle instance patiente le temps que
 // l'ancienne se ferme.
-const lockPath = path.join(baseDir, 'bot.lock');
-
 function pidAlive(pid) {
   try {
     process.kill(pid, 0);
@@ -115,6 +113,10 @@ function pidAlive(pid) {
 }
 
 async function acquireLock() {
+  // Défini ICI (et pas au niveau du module) : start() s'exécute avant la fin
+  // du chargement du module, une constante déclarée plus bas serait encore
+  // dans sa « zone morte » (ReferenceError).
+  const lockPath = path.join(baseDir, 'bot.lock');
   for (let attempt = 0; attempt < 16; attempt++) {
     let existing = null;
     try {

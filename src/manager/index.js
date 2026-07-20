@@ -461,6 +461,10 @@ const server = http.createServer(async (req, res) => {
       if (req.method === 'POST' && action === 'demarrer') return sendJson(res, 200, startBot(name));
       if (req.method === 'POST' && action === 'arreter') return sendJson(res, 200, stopBot(name));
       if (req.method === 'POST' && action === 'signaler') {
+        const cfgRapport = config.rapport || {};
+        if (!cfgRapport.actif || !cfgRapport.token) {
+          return sendJson(res, 200, { nonConfigure: true });
+        }
         sendReport(name, 'signalement manuel', true);
         return sendJson(res, 200, { ok: true });
       }
@@ -557,13 +561,57 @@ server.on('error', (err) => {
   }
 });
 
-server.listen(PORT, '127.0.0.1', () => {
-  console.log(`🤖 Gestionnaire de bots v${VERSION}`);
-  console.log(`📁 Données : ${dataDir}`);
-  console.log(`🌐 Interface : http://localhost:${PORT}  (cette fenêtre doit rester ouverte)`);
-  adoptOrphans();
-  openBrowser();
-});
+// ----- Mise à jour automatique du gestionnaire lui-même -----
+const MANAGER_ASSET = process.platform === 'win32' ? 'gestionnaire-bots-win-x64.exe' : 'gestionnaire-bots-linux-x64';
+
+async function selfUpdate() {
+  if (!process.pkg || process.env.AUTO_UPDATE === 'off' || process.env.MGR_JUST_UPDATED) return false;
+  try {
+    const res = await fetch(`https://api.github.com/repos/${DEFAULT_REPO}/releases/latest`, {
+      headers: { 'User-Agent': 'gestionnaire-bots', Accept: 'application/vnd.github+json' },
+    });
+    if (!res.ok) return false;
+    const release = await res.json();
+    const latest = (release.tag_name || '').replace(/^v/, '');
+    if (!latest || latest === VERSION) return false;
+    const asset = (release.assets || []).find((a) => a.name === MANAGER_ASSET);
+    if (!asset) return false;
+    console.log(`🔄 Mise à jour du gestionnaire : v${VERSION} → v${latest} — téléchargement…`);
+    const dl = await fetch(asset.browser_download_url, { headers: { 'User-Agent': 'gestionnaire-bots' } });
+    if (!dl.ok) return false;
+    const newPath = `${process.execPath}.update`;
+    fs.writeFileSync(newPath, Buffer.from(await dl.arrayBuffer()));
+    if (process.platform !== 'win32') fs.chmodSync(newPath, 0o755);
+    fs.renameSync(process.execPath, `${process.execPath}.old`);
+    fs.renameSync(newPath, process.execPath);
+    console.log('✅ Gestionnaire mis à jour — redémarrage…');
+    const env = { ...process.env, MGR_JUST_UPDATED: '1' };
+    const child =
+      process.platform === 'win32'
+        ? spawn('cmd.exe', ['/c', 'start', '', process.execPath], { detached: true, stdio: 'ignore', env })
+        : spawn(process.execPath, [], { detached: true, stdio: 'ignore', env });
+    child.on('error', () => {});
+    child.unref();
+    setTimeout(() => process.exit(0), 800);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+(async () => {
+  try {
+    fs.unlinkSync(`${process.execPath}.old`);
+  } catch {}
+  if (await selfUpdate()) return; // redémarrage en cours avec la nouvelle version
+  server.listen(PORT, '127.0.0.1', () => {
+    console.log(`🤖 Gestionnaire de bots v${VERSION}`);
+    console.log(`📁 Données : ${dataDir}`);
+    console.log(`🌐 Interface : http://localhost:${PORT}  (cette fenêtre doit rester ouverte)`);
+    adoptOrphans();
+    openBrowser();
+  });
+})();
 
 // ----- Interface web (page unique, sans dépendance) -----
 const HTML = `<!DOCTYPE html>
@@ -637,8 +685,9 @@ const HTML = `<!DOCTYPE html>
   <h2>⚙️ Rapports d'erreurs automatiques</h2>
   <p style="font-size:12.5px;color:#a9aab3;line-height:1.5">Quand un bot plante, le gestionnaire poste son diagnostic en commentaire de la PR GitHub. <b>Claude le reçoit automatiquement</b>, corrige le code et publie une mise à jour que vos bots récupèrent tout seuls. Le rapport n'inclut jamais votre .env ni vos tokens.</p>
   <label style="display:flex;align-items:center;gap:8px;margin-top:12px"><input type="checkbox" id="s_actif" style="width:auto"> Activer les rapports automatiques</label>
-  <label>Token GitHub (PAT — Issues + Pull requests en écriture sur le dépôt)</label>
-  <input id="s_token" type="password" placeholder="laisser vide pour conserver l'actuel">
+  <p style="font-size:12.5px;margin-top:10px"><a href="https://github.com/settings/tokens/new?scopes=repo&description=Gestionnaire-de-bots" target="_blank" style="color:#7a86ff">🔑 Créer le token en un clic</a> — la page s'ouvre pré-remplie : descendez, cliquez le bouton vert <b>Generate token</b>, copiez le code <code>ghp_…</code> et collez-le ci-dessous.</p>
+  <label>Token GitHub</label>
+  <input id="s_token" type="password" placeholder="ghp_…">
   <label>Dépôt (proprietaire/depot)</label><input id="s_repo">
   <label>Numéro de la PR (où poster les rapports)</label><input id="s_issue">
   <div class="row"><button class="gray" onclick="dlgSet.close()">Annuler</button><button onclick="saveSettings()">Enregistrer</button></div>
@@ -684,7 +733,10 @@ function renderActions() {
     });
   });
   btn('📨 Signaler à Claude', 'gray', function(){
-    api('POST', '/api/bots/' + sel + '/signaler').then(function(){ toast('📨 Rapport en cours d\\'envoi — regardez la console du bot.'); });
+    api('POST', '/api/bots/' + sel + '/signaler').then(function(j){
+      if (j && j.nonConfigure) { toast('⚙️ Configurez d\\'abord le token GitHub (une seule fois).'); openSettings(); return; }
+      if (j && j.ok) toast('📨 Rapport en cours d\\'envoi — regardez la console du bot.');
+    });
   });
   btn('🗑 Supprimer', 'gray', function(){
     if (!confirm('Retirer « ' + sel + ' » du gestionnaire ? (le dossier et ses données restent sur le disque)')) return;
