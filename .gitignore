@@ -2,6 +2,7 @@ node_modules/
 dist/
 .env
 bot.lock
+erreur.log
 data.sqlite
 data.sqlite-journal
 data.sqlite-wal

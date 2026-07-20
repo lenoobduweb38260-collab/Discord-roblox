@@ -27,10 +27,19 @@ if (process.pkg && !fs.existsSync(envPath)) {
 }
 require('dotenv').config({ path: envPath });
 
+// Toute erreur fatale est aussi consignée dans erreur.log à côté de
+// l'exécutable, pour pouvoir diagnostiquer même si la fenêtre s'est fermée.
+function logErrorFile(message) {
+  try {
+    fs.appendFileSync(path.join(baseDir, 'erreur.log'), `[${new Date().toISOString()}] ${message}\n`);
+  } catch {}
+}
+
 // En exécutable lancé par double-clic, la fenêtre se ferme dès la fin du
 // processus : on attend Entrée pour que l'utilisateur puisse lire l'erreur.
 function fatal(message) {
   console.error(message);
+  logErrorFile(message);
   if (process.pkg && process.stdin.isTTY) {
     console.log('\nAppuyez sur Entrée pour fermer cette fenêtre…');
     const rl = require('readline').createInterface({ input: process.stdin, output: process.stdout });
@@ -39,6 +48,16 @@ function fatal(message) {
   }
   process.exit(1);
 }
+
+// Garde-fous : la fenêtre ne doit jamais se fermer sans explication.
+process.on('uncaughtException', (err) => {
+  logErrorFile(`uncaughtException : ${err?.stack || err}`);
+  fatal(`❌ Erreur inattendue : ${err?.message || err}`);
+});
+process.on('unhandledRejection', (err) => {
+  console.error('Unhandled rejection :', err);
+  logErrorFile(`unhandledRejection : ${err?.stack || err}`);
+});
 
 function loadCommandFiles() {
   const commandsPath = path.join(__dirname, 'commands');
@@ -68,7 +87,10 @@ if (mode === 'check') {
     .then(() => process.exit(0))
     .catch((err) => fatal(`❌ Échec de l'enregistrement des commandes : ${err.message}`));
 } else {
-  start();
+  start().catch((err) => {
+    logErrorFile(`start() : ${err?.stack || err}`);
+    fatal(`❌ Démarrage impossible : ${err?.message || err}`);
+  });
 }
 
 // ----- Verrou d'instance unique -----
@@ -99,12 +121,16 @@ async function acquireLock() {
       await new Promise((resolve) => setTimeout(resolve, 500));
       continue;
     }
-    fs.writeFileSync(lockPath, String(process.pid));
-    process.on('exit', () => {
-      try {
-        if (parseInt(fs.readFileSync(lockPath, 'utf8'), 10) === process.pid) fs.unlinkSync(lockPath);
-      } catch {}
-    });
+    try {
+      fs.writeFileSync(lockPath, String(process.pid));
+      process.on('exit', () => {
+        try {
+          if (parseInt(fs.readFileSync(lockPath, 'utf8'), 10) === process.pid) fs.unlinkSync(lockPath);
+        } catch {}
+      });
+    } catch {
+      console.warn('⚠️ Impossible d\'écrire bot.lock — démarrage sans verrou d\'instance.');
+    }
     return true;
   }
   return false;
@@ -185,8 +211,6 @@ async function start() {
     if (event.once) client.once(event.name, (...args) => event.execute(...args));
     else client.on(event.name, (...args) => event.execute(...args));
   }
-
-  process.on('unhandledRejection', (err) => console.error('Unhandled rejection :', err));
 
   // En exécutable : enregistrement automatique des commandes slash au démarrage,
   // pour que tout fonctionne sans étape supplémentaire.

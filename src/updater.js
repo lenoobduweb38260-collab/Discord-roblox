@@ -19,6 +19,22 @@ function currentVersion() {
   }
 }
 
+// Relance le bot dans une NOUVELLE FENÊTRE VISIBLE sous Windows (via
+// `cmd /c start`). Un spawn détaché classique crée un processus sans console :
+// le bot tournait alors en fantôme invisible, ce qui poussait à relancer
+// l'exécutable à la main et créait des doublons.
+function relaunch(env) {
+  if (process.platform === 'win32' && process.pkg) {
+    spawn('cmd.exe', ['/c', 'start', '', process.execPath, ...process.argv.slice(2)], {
+      detached: true,
+      stdio: 'ignore',
+      env,
+    }).unref();
+  } else {
+    spawn(process.argv[0], process.argv.slice(1), { detached: true, stdio: 'ignore', env }).unref();
+  }
+}
+
 // Renvoie true si une mise à jour a été installée (le processus va redémarrer).
 async function autoUpdate() {
   if (!process.pkg) return false;
@@ -64,14 +80,10 @@ async function autoUpdate() {
   // être renommé : on écarte l'ancien, on installe le nouveau, on relance.
   fs.renameSync(execPath, `${execPath}.old`);
   fs.renameSync(newPath, execPath);
-  console.log(`✅ Mise à jour ${latest} installée — redémarrage du bot…`);
-  spawn(execPath, process.argv.slice(2), {
-    detached: true,
-    stdio: 'ignore',
-    env: { ...process.env, BOT_JUST_UPDATED: '1' },
-  }).unref();
-  setTimeout(() => process.exit(0), 500);
+  console.log(`✅ Mise à jour ${latest} installée — le bot redémarre dans une nouvelle fenêtre…`);
+  relaunch({ ...process.env, BOT_JUST_UPDATED: '1' });
+  setTimeout(() => process.exit(0), 1000);
   return true;
 }
 
-module.exports = { autoUpdate };
+module.exports = { autoUpdate, relaunch };

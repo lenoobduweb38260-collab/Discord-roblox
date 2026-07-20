@@ -1,7 +1,7 @@
 const { SlashCommandBuilder, MessageFlags } = require('discord.js');
-const { spawn } = require('child_process');
 const { GRADES } = require('../utils/permissions');
 const { sendLog, logEmbed, COLORS } = require('../utils/embeds');
+const { relaunch } = require('../updater');
 
 // Renvoie les IDs autorisés comme « propriétaire du bot » : OWNER_ID du .env
 // et le(s) propriétaire(s) de l'application Discord (utilisateur ou équipe).
@@ -24,7 +24,7 @@ function restartProcess() {
   const env = { ...process.env };
   delete env.BOT_JUST_UPDATED; // force la vérification de mise à jour
   env.BOT_RESTARTED = '1'; // le processus relancé attend le verrou au lieu de balayer les instances
-  spawn(process.argv[0], process.argv.slice(1), { detached: true, stdio: 'ignore', env }).unref();
+  relaunch(env); // nouvelle fenêtre visible sous Windows
   setTimeout(() => process.exit(0), 1000);
 }
 
