@@ -810,7 +810,7 @@ function refresh() {
     if (sel) renderActions();
   });
 }
-function selectBot(name) { sel = name; tab = 'console'; renderActions(); renderTabs(); loadTab(); refresh(); }
+function selectBot(name) { sel = name; tab = 'dash'; renderActions(); renderTabs(); loadTab(); refresh(); }
 function botSel() { for (var i = 0; i < state.bots.length; i++) if (state.bots[i].name === sel) return state.bots[i]; return null; }
 function renderActions() {
   var b = botSel(); var a = $('actions'); if (!b) { a.innerHTML = ''; return; }
@@ -851,7 +851,7 @@ function renderActions() {
 }
 function renderTabs() {
   var t = $('tabs'); t.innerHTML = '';
-  [['console', '🖥️ Console'], ['erreurs', '🚨 Erreurs'], ['dash', '🎛️ Dashboard'], ['embed', '🖼️ Embed'], ['env', '⚙️ .env']].forEach(function(p){
+  [['dash', '🎛️ Dashboard'], ['embed', '🖼️ Embed'], ['console', '🖥️ Console'], ['erreurs', '🚨 Erreurs'], ['env', '⚙️ .env']].forEach(function(p){
     var d = document.createElement('div');
     d.textContent = p[1];
     d.className = tab === p[0] ? 'on' : '';
@@ -900,7 +900,8 @@ function loadTab() {
         ['roles', '👮 Rôles & sécurité'],
         ['salons', '📢 Salons & logs'],
         ['whitelist', '📋 Whitelist métiers'],
-        ['tickets', '🎫 Tickets']
+        ['tickets', '🎫 Tickets'],
+        ['moderation', '🔨 Modération']
       ];
       var h = '<div style="display:flex;height:100%;min-height:340px">';
       h += '<div class="dbside">';
@@ -1061,22 +1062,62 @@ function renderDashPage(page, gid) {
       h += dashSelect('service_channel_id', 'Salon des services RP', 'Annonces de prise et fin de service.', p.channels, cfg.service_channel_id, '#');
     } else if (page === 'whitelist') {
       h += '<h2 class="dbtitle">📋 Whitelist métiers</h2>';
-      if (!p.whitelist.length) h += '<p class="dbp">Aucun métier configuré. Sur Discord : <code>/whitelist config ajouter role:@Métier gerant:@Gérant</code></p>';
-      else {
-        h += '<p class="dbp">Rôles métier et gérants autorisés (gestion via <code>/whitelist config</code> sur Discord) :</p>';
-        p.whitelist.forEach(function(w){ h += '<div class="dbrow">👮 <b>@' + w.role + '</b> — géré par @' + w.manager + '</div>'; });
-      }
+      h += '<p class="dbp">Un gérant peut whitelister des recrues sur son rôle métier (le bot attribue le rôle automatiquement).</p>';
+      p.whitelist.forEach(function(w){
+        h += '<div class="dbrow" style="display:flex;align-items:center;gap:8px">👮 <b>@' + w.role + '</b> — géré par @' + w.manager +
+          '<button class="wl-del" data-r="' + w.roleId + '" data-m="' + w.managerId + '" style="margin-left:auto;padding:3px 10px;font-size:12px">🗑</button></div>';
+      });
+      if (!p.whitelist.length) h += '<p class="dbp"><i>Aucune autorisation configurée.</i></p>';
+      h += '<div class="dsec" style="margin-top:14px"><h3>➕ Ajouter une autorisation</h3>';
+      h += '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">';
+      h += '<select id="dw_role" style="max-width:220px"><option value="">— Rôle métier —</option>' + p.roles.map(function(r){ return '<option value="' + r.id + '">@' + r.name + '</option>'; }).join('') + '</select>';
+      h += '<select id="dw_mgr" style="max-width:220px"><option value="">— Rôle gérant —</option>' + p.roles.map(function(r){ return '<option value="' + r.id + '">@' + r.name + '</option>'; }).join('') + '</select>';
+      h += '<button id="dw_add" class="accent">Ajouter</button></div></div>';
     } else if (page === 'tickets') {
       h += '<h2 class="dbtitle">🎫 Tickets</h2>';
-      if (!p.tickets.length) h += '<p class="dbp">Aucun type de ticket. Sur Discord : <code>/ticket type-ajouter</code> puis <code>/ticket panneau</code></p>';
-      else {
-        h += '<p class="dbp">Types configurés (gestion via <code>/ticket</code> sur Discord, panneau personnalisable via <code>/ticket panneau-modifier</code>) :</p>';
-        p.tickets.forEach(function(t){
-          h += '<div class="dbrow">' + (t.emoji ? t.emoji + ' ' : '') + '<b>' + t.label + '</b> — catégorie « ' + t.categorie + ' »' + (t.support ? ' — support @' + t.support : '') + '</div>';
-        });
-      }
+      h += '<p class="dbp">Chaque type crée ses salons dans sa catégorie Discord. Après un ajout ou une suppression, republiez le panneau : <code>/ticket panneau-modifier</code> sur Discord.</p>';
+      p.tickets.forEach(function(t){
+        h += '<div class="dbrow" style="display:flex;align-items:center;gap:8px">' + (t.emoji ? t.emoji + ' ' : '') + '<b>' + t.label + '</b> — catégorie « ' + t.categorie + ' »' + (t.support ? ' — support @' + t.support : '') +
+          '<button class="tk-del" data-id="' + t.id + '" style="margin-left:auto;padding:3px 10px;font-size:12px">🗑</button></div>';
+      });
+      if (!p.tickets.length) h += '<p class="dbp"><i>Aucun type de ticket.</i></p>';
+      h += '<div class="dsec" style="margin-top:14px"><h3>➕ Nouveau type de ticket</h3>';
+      h += '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">';
+      h += '<input id="dt_nom" placeholder="Nom (ex : Support)" style="max-width:170px">';
+      h += '<input id="dt_emoji" placeholder="Emoji" style="max-width:80px">';
+      h += '<select id="dt_cat" style="max-width:200px"><option value="">— Catégorie —</option>' + p.categories.map(function(c){ return '<option value="' + c.id + '">' + c.name + '</option>'; }).join('') + '</select>';
+      h += '<select id="dt_role" style="max-width:200px"><option value="">— Rôle support (optionnel) —</option>' + p.roles.map(function(r){ return '<option value="' + r.id + '">@' + r.name + '</option>'; }).join('') + '</select>';
+      h += '<button id="dt_add" class="accent">Ajouter</button></div></div>';
+    } else if (page === 'moderation') {
+      h += '<h2 class="dbtitle">🔨 Modération — bans globaux</h2>';
+      h += '<p class="dbp">Membres bannis sur tous les serveurs du bot (auto-ban à toute arrivée future). Le débannissement s\\'applique partout.</p>';
+      p.bans.forEach(function(b){
+        h += '<div class="dbrow" style="display:flex;align-items:center;gap:8px">🔨 <b>' + (b.name || b.userId) + '</b>' + (b.name ? ' <span style="color:var(--muted)">(' + b.userId + ')</span>' : '') +
+          (b.reason ? ' — ' + b.reason : '') +
+          '<button class="ban-del" data-u="' + b.userId + '" style="margin-left:auto;padding:3px 10px;font-size:12px">Débannir</button></div>';
+      });
+      if (!p.bans.length) h += '<p class="dbp"><i>Aucun ban global.</i></p>';
     }
     m.innerHTML = h;
+    var proxy = function(route, body){ return api('POST', '/api/bots/' + sel + '/proxy/' + route, body); };
+    var rerender = function(j){ if (j && j.ok) { toast('✅ ' + (j.note || 'Enregistré')); renderDashPage(page, gid); } };
+    if ($('dw_add')) $('dw_add').onclick = function(){
+      if (!$('dw_role').value || !$('dw_mgr').value) { toast('⚠️ Choisissez les deux rôles.'); return; }
+      proxy('whitelist-ajouter', { guildId: gid, roleId: $('dw_role').value, managerRoleId: $('dw_mgr').value }).then(rerender);
+    };
+    Array.prototype.forEach.call(m.querySelectorAll('.wl-del'), function(el){
+      el.onclick = function(){ proxy('whitelist-retirer', { guildId: gid, roleId: el.getAttribute('data-r'), managerRoleId: el.getAttribute('data-m') }).then(rerender); };
+    });
+    if ($('dt_add')) $('dt_add').onclick = function(){
+      if (!$('dt_nom').value.trim() || !$('dt_cat').value) { toast('⚠️ Nom et catégorie requis.'); return; }
+      proxy('tickets-type', { guildId: gid, label: $('dt_nom').value, emoji: $('dt_emoji').value, categoryId: $('dt_cat').value, supportRoleId: $('dt_role').value || null }).then(rerender);
+    };
+    Array.prototype.forEach.call(m.querySelectorAll('.tk-del'), function(el){
+      el.onclick = function(){ if (confirm('Supprimer ce type de ticket ?')) proxy('tickets-type-suppr', { guildId: gid, id: el.getAttribute('data-id') }).then(rerender); };
+    });
+    Array.prototype.forEach.call(m.querySelectorAll('.ban-del'), function(el){
+      el.onclick = function(){ if (confirm('Débannir ce membre sur tous les serveurs ?')) proxy('ban-retirer', { userId: el.getAttribute('data-u') }).then(rerender); };
+    });
     Array.prototype.forEach.call(m.querySelectorAll('.dsave'), function(el){
       el.onchange = function(){ dashSave(gid, el.getAttribute('data-k'), el.value || null); };
     });

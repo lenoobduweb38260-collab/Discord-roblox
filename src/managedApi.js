@@ -8,8 +8,36 @@ const path = require('path');
 // écrit dans api.port à côté de l'exécutable pour que le gestionnaire le trouve.
 
 function startManagedApi(client, baseDir) {
-  const { EmbedBuilder } = require('discord.js');
+  const { EmbedBuilder, ChannelType } = require('discord.js');
   const { db, getGuildConfig, setGuildConfig } = require('./database');
+
+  const readBody = (req) =>
+    new Promise((resolve) => {
+      let raw = '';
+      req.on('data', (c) => (raw += c));
+      req.on('end', () => {
+        try {
+          resolve(JSON.parse(raw || '{}'));
+        } catch {
+          resolve({});
+        }
+      });
+    });
+
+  const insertTicketType = db.prepare(
+    'INSERT INTO ticket_types (guild_id, label, emoji, category_id, support_role_id) VALUES (?, ?, ?, ?, ?)'
+  );
+  const deleteTicketType = db.prepare('DELETE FROM ticket_types WHERE id = ? AND guild_id = ?');
+  const getTicketTypeByLabel = db.prepare('SELECT * FROM ticket_types WHERE guild_id = ? AND label = ?');
+  const countTicketTypes = db.prepare('SELECT COUNT(*) AS n FROM ticket_types WHERE guild_id = ?');
+  const insertWl = db.prepare(
+    'INSERT OR IGNORE INTO whitelist_managers (guild_id, role_id, manager_role_id) VALUES (?, ?, ?)'
+  );
+  const deleteWl = db.prepare(
+    'DELETE FROM whitelist_managers WHERE guild_id = ? AND role_id = ? AND manager_role_id = ?'
+  );
+  const listBans = db.prepare('SELECT * FROM global_bans ORDER BY banned_at DESC');
+  const deleteBanStmt = db.prepare('DELETE FROM global_bans WHERE user_id = ?');
 
   // Clés de configuration modifiables depuis le dashboard ('s' = id, 'n' = nombre).
   const CONFIG_KEYS = {
@@ -107,17 +135,83 @@ function startManagedApi(client, baseDir) {
         const channels = [...guild.channels.cache.filter((c) => c.isTextBased() && !c.isThread()).values()]
           .map((c) => ({ id: c.id, name: c.name }))
           .sort((a, b) => a.name.localeCompare(b.name));
+        const categories = [...guild.channels.cache.filter((c) => c.type === ChannelType.GuildCategory).values()]
+          .map((c) => ({ id: c.id, name: c.name }))
+          .sort((a, b) => a.name.localeCompare(b.name));
         const whitelist = listWhitelist.all(guild.id).map((m) => ({
+          roleId: m.role_id,
+          managerId: m.manager_role_id,
           role: guild.roles.cache.get(m.role_id)?.name || m.role_id,
           manager: guild.roles.cache.get(m.manager_role_id)?.name || m.manager_role_id,
         }));
         const tickets = listTicketTypes.all(guild.id).map((t) => ({
+          id: t.id,
           label: t.label,
           emoji: t.emoji,
           categorie: guild.channels.cache.get(t.category_id)?.name || t.category_id || '?',
           support: t.support_role_id ? guild.roles.cache.get(t.support_role_id)?.name || t.support_role_id : null,
         }));
-        return send(200, { config: getGuildConfig(guild.id), roles, channels, whitelist, tickets });
+        const bans = listBans.all().map((b) => ({
+          userId: b.user_id,
+          name: client.users.cache.get(b.user_id)?.tag || null,
+          reason: b.reason,
+          at: b.banned_at,
+        }));
+        return send(200, { config: getGuildConfig(guild.id), roles, channels, categories, whitelist, tickets, bans });
+      }
+
+      // Gestion des types de tickets depuis le dashboard.
+      if (req.method === 'POST' && url.pathname === '/tickets-type') {
+        const body = await readBody(req);
+        const guild = client.guilds.cache.get(body.guildId);
+        if (!guild) return send(404, { error: 'Serveur introuvable.' });
+        const label = String(body.label || '').trim().slice(0, 60);
+        if (!label) return send(400, { error: 'Nom du type requis.' });
+        if (getTicketTypeByLabel.get(guild.id, label)) return send(400, { error: 'Ce type existe déjà.' });
+        if (countTicketTypes.get(guild.id).n >= 25) return send(400, { error: 'Maximum 25 types (limite des boutons Discord).' });
+        const category = guild.channels.cache.get(body.categoryId);
+        if (!category || category.type !== ChannelType.GuildCategory) return send(400, { error: 'Catégorie invalide.' });
+        const supportRole = body.supportRoleId ? guild.roles.cache.get(body.supportRoleId) : null;
+        insertTicketType.run(guild.id, label, String(body.emoji || '').trim() || null, category.id, supportRole?.id || null);
+        return send(200, { ok: true, note: 'Republiez le panneau (/ticket panneau-modifier) pour afficher le nouveau bouton.' });
+      }
+      if (req.method === 'POST' && url.pathname === '/tickets-type-suppr') {
+        const body = await readBody(req);
+        if (!client.guilds.cache.has(body.guildId)) return send(404, { error: 'Serveur introuvable.' });
+        deleteTicketType.run(parseInt(body.id, 10), body.guildId);
+        return send(200, { ok: true });
+      }
+
+      // Gestion des autorisations de whitelist métiers depuis le dashboard.
+      if (req.method === 'POST' && url.pathname === '/whitelist-ajouter') {
+        const body = await readBody(req);
+        const guild = client.guilds.cache.get(body.guildId);
+        if (!guild) return send(404, { error: 'Serveur introuvable.' });
+        if (!guild.roles.cache.has(body.roleId) || !guild.roles.cache.has(body.managerRoleId)) {
+          return send(400, { error: 'Rôle invalide.' });
+        }
+        insertWl.run(guild.id, body.roleId, body.managerRoleId);
+        return send(200, { ok: true });
+      }
+      if (req.method === 'POST' && url.pathname === '/whitelist-retirer') {
+        const body = await readBody(req);
+        if (!client.guilds.cache.has(body.guildId)) return send(404, { error: 'Serveur introuvable.' });
+        deleteWl.run(body.guildId, String(body.roleId), String(body.managerRoleId));
+        return send(200, { ok: true });
+      }
+
+      // Retrait d'un ban global (débannit sur tous les serveurs du bot).
+      if (req.method === 'POST' && url.pathname === '/ban-retirer') {
+        const body = await readBody(req);
+        const userId = String(body.userId || '').trim();
+        if (!userId) return send(400, { error: 'ID utilisateur requis.' });
+        deleteBanStmt.run(userId);
+        let count = 0;
+        for (const guild of client.guilds.cache.values()) {
+          const ok = await guild.members.unban(userId, 'Retrait du ban global via le dashboard').then(() => true).catch(() => false);
+          if (ok) count++;
+        }
+        return send(200, { ok: true, count });
       }
 
       // Écriture d'un réglage depuis le dashboard.
