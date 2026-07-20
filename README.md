@@ -38,6 +38,11 @@ Bot Discord complet pour serveur Roleplay Roblox : cartes d'identité, permis de
 - `/service liste` — **[Staff]** liste des membres en service
 - `/temps faction:…` — **[Gérant]** temps de service des membres de **sa** faction (7 derniers jours + total, membres en service signalés 🟢). Une faction = une **entreprise** (gérants = patrons) ou un **rôle métier** de la whitelist (gérants = rôles gérants configurés). Le menu s'adapte automatiquement à chaque entreprise créée ou métier configuré ; plusieurs gérants possibles ; le staff voit toutes les factions
 
+### 🎫 Système de tickets (`/ticket`)
+- **Types de tickets multiples**, chacun relié à une **catégorie Discord** (`/ticket type-ajouter nom:Support categorie:… role_support:@Support emoji:🛠️`) — les salons de tickets se créent dans la catégorie du type
+- **Panneau à boutons** publié en **message basique ou embed entièrement personnalisable** (`/ticket panneau mode:… texte / titre / description / couleur hex / image / miniature / footer`, `\n` pour les sauts de ligne) et **modifiable à souhait** après coup (`/ticket panneau-modifier` — fusionne vos changements et resynchronise les boutons avec les types)
+- Clic sur un bouton → salon privé (membre + rôle support + staff), 1 ticket ouvert max par membre et par type, bouton 🔒 **Fermer** (auteur/support/staff) puis 🗑️ **Supprimer** (support/staff) avec **transcript** envoyé dans le salon de logs
+
 ### 🚨 Anti-scam par images échantillons (`/scamimage`)
 - `/scamimage ajouter image:… [nom]` — **[Staff]** enregistre une image scam échantillon
 - Toute image postée **identique ou quasi identique** (empreinte SHA-256 + empreinte perceptuelle dHash, tolérante aux recompressions/légères retouches) est **supprimée** et son auteur reçoit un **ban global automatique** (tous les serveurs du bot + auto-ban à toute arrivée future), avec suppression de ses messages des dernières 24 h — annulable via `/banglobal retirer`

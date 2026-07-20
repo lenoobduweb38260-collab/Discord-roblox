@@ -139,6 +139,36 @@ CREATE TABLE IF NOT EXISTS global_bans (
   banned_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS ticket_types (
+  id              INTEGER PRIMARY KEY AUTOINCREMENT,
+  guild_id        TEXT NOT NULL,
+  label           TEXT NOT NULL,
+  emoji           TEXT,
+  category_id     TEXT,
+  support_role_id TEXT,
+  UNIQUE (guild_id, label)
+);
+
+CREATE TABLE IF NOT EXISTS tickets (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  guild_id   TEXT NOT NULL,
+  type_id    INTEGER,
+  channel_id TEXT NOT NULL,
+  user_id    TEXT NOT NULL,
+  status     TEXT NOT NULL DEFAULT 'ouvert',
+  opened_at  TEXT NOT NULL,
+  closed_at  TEXT,
+  closed_by  TEXT
+);
+
+CREATE TABLE IF NOT EXISTS ticket_panels (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  guild_id   TEXT NOT NULL,
+  channel_id TEXT NOT NULL,
+  message_id TEXT NOT NULL,
+  options    TEXT NOT NULL DEFAULT '{}'
+);
+
 CREATE TABLE IF NOT EXISTS scam_images (
   id       INTEGER PRIMARY KEY AUTOINCREMENT,
   guild_id TEXT NOT NULL,

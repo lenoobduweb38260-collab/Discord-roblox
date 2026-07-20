@@ -3,6 +3,7 @@ const { db, getGuildConfig } = require('../database');
 const { getGrade, GRADES, GRADE_NAMES } = require('../utils/permissions');
 const { buildEnterpriseEmbed, sendLog, logEmbed, COLORS } = require('../utils/embeds');
 const { handleConfigInteraction } = require('../utils/configPanel');
+const { handleTicketButton } = require('../utils/tickets');
 
 const getEnterprise = db.prepare('SELECT * FROM enterprises WHERE id = ?');
 const setInsuranceTypes = db.prepare('UPDATE enterprises SET insurance_types = ? WHERE id = ?');
@@ -23,6 +24,12 @@ module.exports = {
         }
       }
       return;
+    }
+
+    // ----- Boutons du système de tickets -----
+    if (interaction.isButton() && interaction.customId.startsWith('tkt')) {
+      if (!interaction.inGuild()) return;
+      return handleTicketButton(interaction);
     }
 
     // ----- Panneau central de configuration (/config) -----
