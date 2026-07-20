@@ -31,6 +31,7 @@ const CHANNEL_COLUMNS = {
   level_channel_id: '📈 Salon des annonces de niveau',
   service_channel_id: '🧑‍💼 Salon des prises/fins de service',
   staff_channel_id: '📣 Salon des arrivées/départs staff',
+  member_channel_id: '👋 Salon des arrivées/départs des membres',
 };
 
 const show = (id, kind) => (id ? (kind === 'role' ? `<@&${id}>` : `<#${id}>`) : '*Non configuré*');
@@ -135,8 +136,8 @@ function rolesView(guild) {
   return { embeds: [embed], components };
 }
 
-// ----- Catégorie : salons -----
-function salonsView(guild) {
+// ----- Catégorie : salons (choix du réglage, puis choix du salon) -----
+function salonsView(guild, selectedCol = null) {
   const cfg = getGuildConfig(guild.id);
   const embed = new EmbedBuilder()
     .setColor(COLORS.INFO)
@@ -144,18 +145,30 @@ function salonsView(guild) {
     .setDescription(
       Object.entries(CHANNEL_COLUMNS)
         .map(([col, label]) => `${label} : ${show(cfg[col], 'channel')}`)
-        .join('\n') + '\n\nSélectionnez un salon dans chaque menu pour le définir.'
+        .join('\n') + '\n\n1️⃣ Choisissez le réglage, 2️⃣ puis le salon.'
     );
-  const components = Object.entries(CHANNEL_COLUMNS).map(([col, label]) => {
+  const picker = new StringSelectMenuBuilder()
+    .setCustomId('cfgchansel')
+    .setPlaceholder('1️⃣ Quel salon voulez-vous configurer ?')
+    .addOptions(
+      Object.entries(CHANNEL_COLUMNS).map(([col, label]) => ({
+        label: label.replace(/^\S+\s/, ''),
+        value: col,
+        emoji: label.split(' ')[0],
+        default: col === selectedCol,
+      }))
+    );
+  const components = [new ActionRowBuilder().addComponents(picker)];
+  if (selectedCol && CHANNEL_COLUMNS[selectedCol]) {
     const menu = new ChannelSelectMenuBuilder()
-      .setCustomId(`cfgchan:${col}`)
-      .setPlaceholder(label)
+      .setCustomId(`cfgchan:${selectedCol}`)
+      .setPlaceholder(`2️⃣ ${CHANNEL_COLUMNS[selectedCol]}`)
       .setChannelTypes(ChannelType.GuildText)
       .setMinValues(1)
       .setMaxValues(1);
-    if (cfg[col]) menu.setDefaultChannels(cfg[col]);
-    return new ActionRowBuilder().addComponents(menu);
-  });
+    if (cfg[selectedCol]) menu.setDefaultChannels(cfg[selectedCol]);
+    components.push(new ActionRowBuilder().addComponents(menu));
+  }
   components.push(backRow());
   return { embeds: [embed], components };
 }
@@ -259,12 +272,16 @@ async function handleConfigInteraction(interaction) {
       return;
     }
 
+    if (id === 'cfgchansel') {
+      return await interaction.update(salonsView(interaction.guild, interaction.values[0]));
+    }
+
     if (id.startsWith('cfgchan:')) {
       const col = id.split(':')[1];
       if (!(col in CHANNEL_COLUMNS)) return;
       const channelId = interaction.values[0];
       setGuildConfig(interaction.guildId, col, channelId);
-      await interaction.update(salonsView(interaction.guild));
+      await interaction.update(salonsView(interaction.guild, col));
       await sendLog(
         interaction.guild,
         logEmbed('⚙️ Configuration modifiée', `${CHANNEL_COLUMNS[col]} → <#${channelId}>\nPar <@${interaction.user.id}>`, COLORS.INFO)

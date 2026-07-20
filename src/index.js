@@ -194,7 +194,7 @@ async function start() {
     return;
   }
 
-  const { Client, Collection, GatewayIntentBits, Partials } = require('discord.js');
+  const { Client, Collection, GatewayIntentBits, Partials, Events } = require('discord.js');
   require('./database'); // initialise la base de données au démarrage
 
   const client = new Client({
@@ -220,6 +220,17 @@ async function start() {
     const event = require(path.join(eventsPath, file));
     if (event.once) client.once(event.name, (...args) => event.execute(...args));
     else client.on(event.name, (...args) => event.execute(...args));
+  }
+
+  // API locale pour le Gestionnaire de bots (dashboard + créateur d'embed).
+  if (process.env.BOT_MANAGED === '1') {
+    client.once(Events.ClientReady, () => {
+      try {
+        require('./managedApi').startManagedApi(client, baseDir);
+      } catch (err) {
+        console.warn(`⚠️ API locale non démarrée : ${err.message}`);
+      }
+    });
   }
 
   // En exécutable : enregistrement automatique des commandes slash au démarrage,

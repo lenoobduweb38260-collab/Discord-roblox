@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS guild_config (
   level_channel_id   TEXT,
   service_channel_id TEXT,
   staff_channel_id   TEXT,
+  member_channel_id  TEXT,
   xp_text            INTEGER NOT NULL DEFAULT 20,
   xp_voice           INTEGER NOT NULL DEFAULT 10,
   xp_cooldown        INTEGER NOT NULL DEFAULT 60
@@ -180,6 +181,12 @@ CREATE TABLE IF NOT EXISTS scam_images (
 );
 `);
 
+// Migration : ajoute les colonnes manquantes aux bases créées avant leur
+// introduction (CREATE TABLE IF NOT EXISTS ne modifie pas une table existante).
+try {
+  db.exec('ALTER TABLE guild_config ADD COLUMN member_channel_id TEXT');
+} catch {}
+
 const DEFAULT_CONFIG = {
   staff_role_id: null,
   admin_role_id: null,
@@ -188,6 +195,7 @@ const DEFAULT_CONFIG = {
   level_channel_id: null,
   service_channel_id: null,
   staff_channel_id: null,
+  member_channel_id: null,
   xp_text: 20,
   xp_voice: 10,
   xp_cooldown: 60,

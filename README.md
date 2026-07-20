@@ -62,6 +62,9 @@ Bot Discord complet pour serveur Roleplay Roblox : cartes d'identité, permis de
 - `/update` — **[Admin]** redémarre le bot pour charger la dernière mise à jour publiée
 - `/stop` — **[Propriétaire du bot uniquement]** éteint complètement le bot, depuis n'importe quel serveur (propriétaire = owner de l'application Discord, ou `OWNER_ID` dans le `.env`)
 
+### 👋 Arrivées et départs des membres
+Dans le salon membres configuré (`/config` → Salons → 👋) : **embed d'arrivée** (nom Discord, ID, photo de profil, date de création du compte, n° de membre) et **embed de départ** (nom, ID, photo de profil, **depuis quand il avait rejoint le serveur**, membres restants)
+
 ### 📜 Logs de sécurité étendus
 Dans le salon de logs configuré : toutes les actions staff et accès refusés, plus les **connexions/déconnexions/changements de salon vocal**, les **messages supprimés** (auteur, salon, contenu, pièces jointes) et les **messages modifiés** (avant/après)
 
@@ -109,6 +112,9 @@ L'exécutable est **relié aux releases GitHub** : à chaque lancement, il compa
 - 📋 **« Copier le diagnostic »** : un bloc prêt à coller pour faire déboguer le bot
 - L'application est **relançable à volonté** : si elle tourne déjà, un nouveau lancement rouvre simplement l'interface (http://localhost:43550). La fenêtre console du gestionnaire doit rester ouverte ; sa fermeture arrête proprement les bots lancés (ils sont repris automatiquement au prochain lancement s'ils tournent encore)
 - La commande Discord `/update` d'un bot géré délègue la mise à jour au gestionnaire (téléchargement + redémarrage automatiques)
+- 🎛️ **Dashboard par serveur** (bot démarré) : membres, statistiques (cartes, permis, entreprises, tickets ouverts, whitelist, véhicules assurés), configuration résolue et top niveaux
+- 🖼️ **Créateur d'embed avec prévisualisation en direct** façon DraftBot : auteur + icône, titre, description, couleur (pipette), grande image, miniature, pied de page — aperçu identique à Discord pendant la frappe, puis envoi dans le salon choisi
+- 🔗 **Bouton « Inviter sur un serveur »** : génère le lien d'invitation du bot à partir du CLIENT_ID de son `.env`
 
 ## 🚀 Installation
 

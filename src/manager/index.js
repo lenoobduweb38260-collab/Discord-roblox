@@ -460,6 +460,40 @@ const server = http.createServer(async (req, res) => {
 
       if (req.method === 'POST' && action === 'demarrer') return sendJson(res, 200, startBot(name));
       if (req.method === 'POST' && action === 'arreter') return sendJson(res, 200, stopBot(name));
+      // Proxy vers l'API locale du bot (dashboard, créateur d'embed).
+      if (action === 'proxy') {
+        let port = null;
+        try {
+          port = parseInt(fs.readFileSync(path.join(botFolder(name), 'api.port'), 'utf8'), 10);
+        } catch {}
+        if (!port) return sendJson(res, 400, { error: 'Démarrez le bot pour accéder à cette fonction.' });
+        const subPath = '/' + parts.slice(4).join('/') + (url.search || '');
+        try {
+          const upstream = await fetch(`http://127.0.0.1:${port}${subPath}`, {
+            method: req.method,
+            headers: { 'Content-Type': 'application/json' },
+            body: ['POST', 'PUT'].includes(req.method) ? JSON.stringify(await jsonBody(req)) : undefined,
+          });
+          const data = await upstream.json().catch(() => ({}));
+          return sendJson(res, upstream.status, data);
+        } catch {
+          return sendJson(res, 502, { error: 'Bot injoignable — est-il bien démarré (et à jour) ?' });
+        }
+      }
+
+      // Lien d'invitation du bot, construit depuis le CLIENT_ID de son .env.
+      if (req.method === 'GET' && action === 'invitation') {
+        let envContent = '';
+        try {
+          envContent = fs.readFileSync(path.join(botFolder(name), '.env'), 'utf8');
+        } catch {}
+        const m = envContent.match(/^\s*CLIENT_ID\s*=\s*(\d+)/m);
+        if (!m) return sendJson(res, 400, { error: 'CLIENT_ID manquant dans le .env de ce bot (onglet ⚙️ .env).' });
+        return sendJson(res, 200, {
+          url: `https://discord.com/oauth2/authorize?client_id=${m[1]}&scope=bot+applications.commands&permissions=8`,
+        });
+      }
+
       if (req.method === 'POST' && action === 'signaler') {
         const cfgRapport = config.rapport || {};
         if (!cfgRapport.actif || !cfgRapport.token) {
@@ -653,6 +687,22 @@ const HTML = `<!DOCTYPE html>
   dialog label { display: block; font-size: 12px; color: #a9aab3; margin: 10px 0 4px; }
   dialog input { width: 100%; background: #1b1c21; border: 1px solid #35363f; color: #e6e6e9; border-radius: 6px; padding: 8px; font-size: 13px; }
   dialog .row { display: flex; gap: 8px; justify-content: flex-end; margin-top: 18px; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+  .tile { background: #1b1c21; border: 1px solid #35363f; border-radius: 10px; padding: 12px; }
+  .tile .tv { font-size: 22px; font-weight: 700; }
+  .tile .tl { color: #8a8b94; font-size: 12px; margin-top: 2px; }
+  .cfgt { border-collapse: collapse; font-size: 13px; }
+  .cfgt td { padding: 4px 14px 4px 0; border-bottom: 1px solid #26272e; }
+  .frm label { display: block; font-size: 12px; color: #a9aab3; margin: 8px 0 3px; }
+  .frm input, .frm textarea, .frm select { width: 100%; background: #1b1c21; border: 1px solid #35363f; color: #e6e6e9; border-radius: 6px; padding: 7px; font-size: 13px; font-family: inherit; }
+  .dcard { position: relative; background: #2b2d31; border-left: 4px solid #5865f2; border-radius: 4px; padding: 12px 16px; max-width: 480px; font-size: 13.5px; }
+  .dauth { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 13px; margin-bottom: 6px; }
+  .dauth img { width: 22px; height: 22px; border-radius: 50%; }
+  .dtitle { font-weight: 700; font-size: 15px; margin-bottom: 6px; }
+  .ddesc { white-space: pre-wrap; color: #dbdee1; }
+  .dthumb { position: absolute; top: 12px; right: 12px; width: 72px; height: 72px; border-radius: 6px; object-fit: cover; }
+  .dimg { max-width: 100%; border-radius: 6px; margin-top: 10px; display: block; }
+  .dfoot { color: #8a8b94; font-size: 11.5px; margin-top: 10px; }
   #toast { position: fixed; bottom: 18px; right: 18px; background: #2f3040; border: 1px solid #5865f2; padding: 10px 16px; border-radius: 8px; font-size: 13px; display: none; max-width: 420px; }
   .empty { color: #8a8b94; padding: 30px; text-align: center; font-family: 'Segoe UI', sans-serif; }
 </style>
@@ -738,6 +788,13 @@ function renderActions() {
       if (j && j.ok) toast('📨 Rapport en cours d\\'envoi — regardez la console du bot.');
     });
   });
+  btn('🔗 Inviter sur un serveur', 'gray', function(){
+    fetch('/api/bots/' + sel + '/invitation').then(function(r){ return r.json(); }).then(function(j){
+      if (j.error) { toast('⚠️ ' + j.error); return; }
+      window.open(j.url, '_blank');
+      toast('🔗 Lien ouvert — choisissez le serveur puis Autoriser.');
+    });
+  });
   btn('🗑 Supprimer', 'gray', function(){
     if (!confirm('Retirer « ' + sel + ' » du gestionnaire ? (le dossier et ses données restent sur le disque)')) return;
     api('DELETE', '/api/bots/' + sel).then(function(){ sel = null; $('tabs').innerHTML = ''; $('content').innerHTML = '<div class="empty">Bot retiré.</div>'; refresh(); });
@@ -748,7 +805,7 @@ function renderActions() {
 }
 function renderTabs() {
   var t = $('tabs'); t.innerHTML = '';
-  [['console', '🖥️ Console'], ['erreurs', '🚨 Erreurs'], ['env', '⚙️ .env']].forEach(function(p){
+  [['console', '🖥️ Console'], ['erreurs', '🚨 Erreurs'], ['dash', '🎛️ Dashboard'], ['embed', '🖼️ Embed'], ['env', '⚙️ .env']].forEach(function(p){
     var d = document.createElement('div');
     d.textContent = p[1];
     d.className = tab === p[0] ? 'on' : '';
@@ -760,6 +817,7 @@ function loadTab() {
   clearInterval(logTimer);
   var c = $('content');
   if (!sel) return;
+  c.style.fontFamily = ''; // police console par défaut (les onglets dash/embed la changent)
   if (tab === 'console') {
     var pull = function(){
       fetch('/api/bots/' + sel + '/logs').then(function(r){ return r.json(); }).then(function(j){
@@ -779,6 +837,96 @@ function loadTab() {
       });
     };
     pullE(); logTimer = setInterval(pullE, 2500);
+  } else if (tab === 'dash') {
+    c.style.display = 'block';
+    c.style.fontFamily = "'Segoe UI', system-ui, sans-serif";
+    c.innerHTML = '<div class="empty">Chargement du dashboard…</div>';
+    fetch('/api/bots/' + sel + '/proxy/infos').then(function(r){ return r.json(); }).then(function(info){
+      if (info.error) { c.innerHTML = '<div class="empty">⚠️ ' + info.error + '</div>'; return; }
+      if (!info.guilds || !info.guilds.length) { c.innerHTML = '<div class="empty">Le bot n\\'est sur aucun serveur — utilisez le bouton 🔗 Inviter.</div>'; return; }
+      var gid = window.dashGuild || info.guilds[0].id;
+      var gsel = '<select id="dash_g" style="background:#1b1c21;color:#e6e6e9;border:1px solid #35363f;border-radius:6px;padding:6px">' +
+        info.guilds.map(function(g){ return '<option value="' + g.id + '"' + (g.id === gid ? ' selected' : '') + '>' + g.name + '</option>'; }).join('') + '</select>';
+      fetch('/api/bots/' + sel + '/proxy/dashboard?guild=' + gid).then(function(r){ return r.json(); }).then(function(d){
+        if (d.error) { c.innerHTML = '<div class="empty">⚠️ ' + d.error + '</div>'; return; }
+        var h = '<div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">' +
+          (d.serveur.icon ? '<img src="' + d.serveur.icon + '" style="width:48px;height:48px;border-radius:12px">' : '') +
+          '<div><div style="font-size:17px;font-weight:600">' + d.serveur.name + '</div>' +
+          '<div style="color:#8a8b94;font-size:13px">' + d.serveur.membres + ' membres</div></div>' +
+          '<div style="margin-left:auto">' + gsel + '</div></div>';
+        var labels = { cartes: "🪪 Cartes d'identité", permis: '🚗 Permis', entreprises: '🏢 Entreprises', ticketsOuverts: '🎫 Tickets ouverts', whitelist: '📋 Whitelist métiers', vehicules: '🛡️ Véhicules assurés' };
+        h += '<div class="tiles">';
+        Object.keys(labels).forEach(function(k){ h += '<div class="tile"><div class="tv">' + (d.stats[k] || 0) + '</div><div class="tl">' + labels[k] + '</div></div>'; });
+        h += '</div><h3 style="margin:16px 0 8px;font-size:14px">⚙️ Configuration du serveur</h3><table class="cfgt">';
+        Object.keys(d.config).forEach(function(k){ h += '<tr><td>' + k + '</td><td>' + (d.config[k] || '<span style="color:#8a8b94">non configuré</span>') + '</td></tr>'; });
+        h += '</table>';
+        if (d.top && d.top.length) {
+          h += '<h3 style="margin:16px 0 8px;font-size:14px">🏆 Top niveaux (écrit)</h3>';
+          d.top.forEach(function(t, i){ h += '<div style="padding:3px 0">' + (i + 1) + '. <b>' + t.user + '</b> — niveau ' + t.level + ' (' + t.xp + ' XP)</div>'; });
+        }
+        c.innerHTML = h;
+        $('dash_g').onchange = function(){ window.dashGuild = this.value; loadTab(); };
+      });
+    });
+    return;
+  } else if (tab === 'embed') {
+    c.style.display = 'block';
+    c.style.fontFamily = "'Segoe UI', system-ui, sans-serif";
+    c.innerHTML = '<div class="empty">Chargement…</div>';
+    fetch('/api/bots/' + sel + '/proxy/infos').then(function(r){ return r.json(); }).then(function(info){
+      if (info.error) { c.innerHTML = '<div class="empty">⚠️ ' + info.error + '</div>'; return; }
+      if (!info.guilds || !info.guilds.length) { c.innerHTML = '<div class="empty">Le bot n\\'est sur aucun serveur — utilisez le bouton 🔗 Inviter.</div>'; return; }
+      var fld = function(id, label, ph){ return '<label>' + label + '</label><input id="' + id + '" placeholder="' + (ph || '') + '">'; };
+      var h = '<div style="display:flex;gap:18px;align-items:flex-start">';
+      h += '<div class="frm" style="flex:0 0 330px">';
+      h += '<label>Serveur</label><select id="eb_g"></select>';
+      h += '<label>Salon de destination</label><select id="eb_c"></select>';
+      h += fld('eb_msg', 'Message (au-dessus de l\\'embed)');
+      h += fld('eb_auth', 'Auteur (en-tête de l\\'embed)');
+      h += fld('eb_authicon', 'Icône de l\\'auteur (URL)');
+      h += fld('eb_t', 'Titre');
+      h += '<label>Description</label><textarea id="eb_d" rows="5"></textarea>';
+      h += '<label>Couleur</label><input id="eb_col" type="color" value="#5865f2" style="height:34px;padding:2px">';
+      h += fld('eb_img', 'Grande image (URL — photo/GIF)', 'https://…');
+      h += fld('eb_th', 'Miniature (URL)', 'https://…');
+      h += fld('eb_f', 'Pied de page');
+      h += '<button id="eb_send" style="margin-top:12px;width:100%">📤 Envoyer dans le salon</button>';
+      h += '</div>';
+      h += '<div style="flex:1"><div style="color:#8a8b94;font-size:12px;margin-bottom:8px">Prévisualisation en direct</div><div id="eb_pv"></div></div>';
+      h += '</div>';
+      c.innerHTML = h;
+      var esc = function(s){ var d = document.createElement('div'); d.textContent = s; return d.innerHTML; };
+      $('eb_g').innerHTML = info.guilds.map(function(g){ return '<option value="' + g.id + '">' + g.name + '</option>'; }).join('');
+      var fillChannels = function(){
+        var g = info.guilds.filter(function(x){ return x.id === $('eb_g').value; })[0];
+        $('eb_c').innerHTML = g.channels.map(function(ch){ return '<option value="' + ch.id + '">#' + ch.name + '</option>'; }).join('');
+      };
+      var updPv = function(){
+        var h2 = '';
+        if ($('eb_msg').value) h2 += '<div style="margin-bottom:6px;white-space:pre-wrap">' + esc($('eb_msg').value) + '</div>';
+        h2 += '<div class="dcard" style="border-left-color:' + $('eb_col').value + '">';
+        if ($('eb_auth').value) h2 += '<div class="dauth">' + ($('eb_authicon').value ? '<img src="' + esc($('eb_authicon').value) + '">' : '') + esc($('eb_auth').value) + '</div>';
+        if ($('eb_t').value) h2 += '<div class="dtitle">' + esc($('eb_t').value) + '</div>';
+        if ($('eb_d').value) h2 += '<div class="ddesc">' + esc($('eb_d').value) + '</div>';
+        if ($('eb_th').value) h2 += '<img class="dthumb" src="' + esc($('eb_th').value) + '">';
+        if ($('eb_img').value) h2 += '<img class="dimg" src="' + esc($('eb_img').value) + '">';
+        if ($('eb_f').value) h2 += '<div class="dfoot">' + esc($('eb_f').value) + '</div>';
+        h2 += '</div>';
+        $('eb_pv').innerHTML = h2;
+      };
+      ['eb_msg','eb_auth','eb_authicon','eb_t','eb_d','eb_col','eb_img','eb_th','eb_f'].forEach(function(id){ $(id).addEventListener('input', updPv); });
+      $('eb_g').onchange = fillChannels;
+      fillChannels(); updPv();
+      $('eb_send').onclick = function(){
+        api('POST', '/api/bots/' + sel + '/proxy/embed', {
+          guildId: $('eb_g').value, channelId: $('eb_c').value, content: $('eb_msg').value,
+          embed: { auteur: $('eb_auth').value, auteur_icone: $('eb_authicon').value, titre: $('eb_t').value,
+                   description: $('eb_d').value, couleur: $('eb_col').value, image: $('eb_img').value,
+                   miniature: $('eb_th').value, footer: $('eb_f').value }
+        }).then(function(j){ if (j && j.ok) toast('✅ Embed envoyé !'); });
+      };
+    });
+    return;
   } else if (tab === 'env') {
     fetch('/api/bots/' + sel + '/env').then(function(r){ return r.json(); }).then(function(j){
       c.innerHTML = '';

@@ -5,6 +5,7 @@ bot.lock
 erreur.log
 gestionnaire/
 src/manager/version.gen.js
+api.port
 data.sqlite
 data.sqlite-journal
 data.sqlite-wal
