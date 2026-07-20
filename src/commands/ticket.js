@@ -23,15 +23,22 @@ function readPanelOptions(interaction) {
   return opts;
 }
 
-function addPanelOptions(sub, modeRequired) {
+// Important : Discord exige que les options OBLIGATOIRES précèdent les
+// facultatives — le mode (requis pour /ticket panneau) vient donc en premier.
+function addPanelOptions(sub, modeRequired, withSalon) {
+  sub.addStringOption((o) =>
+    o
+      .setName('mode')
+      .setDescription('Format du message du panneau')
+      .setRequired(modeRequired)
+      .addChoices({ name: 'Message basique', value: 'basique' }, { name: 'Embed personnalisable', value: 'embed' })
+  );
+  if (withSalon) {
+    sub.addChannelOption((o) =>
+      o.setName('salon').setDescription('Salon du panneau (défaut : ici)').addChannelTypes(ChannelType.GuildText).setRequired(false)
+    );
+  }
   return sub
-    .addStringOption((o) =>
-      o
-        .setName('mode')
-        .setDescription('Format du message du panneau')
-        .setRequired(modeRequired)
-        .addChoices({ name: 'Message basique', value: 'basique' }, { name: 'Embed personnalisable', value: 'embed' })
-    )
     .addStringOption((o) => o.setName('texte').setDescription('Texte du message (\\n = saut de ligne)').setRequired(false))
     .addStringOption((o) => o.setName('titre').setDescription('Titre de l\'embed').setRequired(false))
     .addStringOption((o) => o.setName('description').setDescription('Description de l\'embed (\\n = saut de ligne)').setRequired(false))
@@ -66,19 +73,12 @@ module.exports = {
       )
       .addSubcommand((sub) => sub.setName('types').setDescription('Voir les types de tickets configurés'));
     builder.addSubcommand((sub) =>
-      addPanelOptions(
-        sub
-          .setName('panneau')
-          .setDescription('Publier le panneau de tickets dans un salon')
-          .addChannelOption((o) =>
-            o.setName('salon').setDescription('Salon du panneau (défaut : ici)').addChannelTypes(ChannelType.GuildText).setRequired(false)
-          ),
-        true
-      )
+      addPanelOptions(sub.setName('panneau').setDescription('Publier le panneau de tickets dans un salon'), true, true)
     );
     builder.addSubcommand((sub) =>
       addPanelOptions(
         sub.setName('panneau-modifier').setDescription('Modifier le dernier panneau publié (texte, embed, boutons)'),
+        false,
         false
       )
     );

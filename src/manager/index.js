@@ -183,18 +183,24 @@ async function updateBot(name) {
 // ----- Rapports d'erreurs vers GitHub (reçus par Claude) -----
 const reportState = new Map(); // name -> { sig, at } (anti-doublon)
 
+const HTTP_HINTS = {
+  401: 'token invalide ou expiré — recréez-le',
+  403: 'droits insuffisants — le token doit avoir le scope « repo » (token classique) ou Issues + Pull requests en écriture',
+  404: 'dépôt ou numéro de PR introuvable — vérifiez les champs dans ⚙️ Paramètres',
+};
+
 async function sendReport(name, motif, force = false) {
   const cfg = config.rapport || {};
   const r = rt(name);
   if (!cfg.actif || !cfg.token) {
     if (force) addLine(r, '⚠️ Rapports non configurés : ouvrez ⚙️ Paramètres et renseignez un token GitHub.', true);
-    return false;
+    return { nonConfigure: true };
   }
   const sig = (r.errors[r.errors.length - 1] || motif).replace(/^\[[^\]]+\]\s*/, '');
   const prev = reportState.get(name);
   if (!force && prev && prev.sig === sig && Date.now() - prev.at < 6 * 3600 * 1000) {
     addLine(r, 'ℹ️ Rapport non renvoyé (même erreur déjà signalée il y a moins de 6 h).');
-    return false;
+    return { error: 'Même erreur déjà signalée il y a moins de 6 h.' };
   }
   try {
     // Le diagnostic n'inclut JAMAIS le .env (donc jamais le token du bot).
@@ -215,13 +221,15 @@ async function sendReport(name, motif, force = false) {
     if (res.ok) {
       reportState.set(name, { sig, at: Date.now() });
       addLine(r, '📨 Rapport envoyé à Claude (commentaire GitHub) — correction automatique en route.');
-      return true;
+      return { ok: true };
     }
-    addLine(r, `⚠️ Envoi du rapport impossible (HTTP ${res.status}) — vérifiez le token dans ⚙️ Paramètres.`, true);
+    const message = `Envoi refusé (HTTP ${res.status}) : ${HTTP_HINTS[res.status] || 'erreur GitHub'}`;
+    addLine(r, `⚠️ ${message}`, true);
+    return { error: message };
   } catch (err) {
     addLine(r, `⚠️ Envoi du rapport impossible : ${err.message}`, true);
+    return { error: `Envoi impossible : ${err.message}` };
   }
-  return false;
 }
 
 // ----- Démarrage / arrêt -----
@@ -246,6 +254,7 @@ function startBot(name) {
   r.proc = proc;
   r.pid = proc.pid;
   r.status = 'demarre';
+  r.startedAt = Date.now();
   addLine(r, `▶️ Bot démarré (PID ${proc.pid}, version ${bot.version || '?'}).`);
   wireOutput(r, proc.stdout, false);
   wireOutput(r, proc.stderr, true);
@@ -264,7 +273,21 @@ function startBot(name) {
     const wasStopping = r.stopping;
     r.stopping = false;
     r.status = 'arrete';
+    const uptime = Date.now() - (r.startedAt || 0);
+    if (uptime > 60_000) r.bootRetries = 0; // le bot a tourné : compteur de crashs au démarrage remis à zéro
     addLine(r, `⏹️ Processus terminé (code ${code}).`, code !== 0 && code !== null);
+    // Bug connu pkg/libuv sous Windows (« Assertion failed: process_title »,
+    // code 3221226505) : plantage aléatoire au tout premier démarrage sans
+    // console — on relance automatiquement.
+    if (!wasStopping && code === 3221226505 && uptime < 20_000 && (r.bootRetries || 0) < 2) {
+      r.bootRetries = (r.bootRetries || 0) + 1;
+      addLine(r, `🔁 Plantage au démarrage (bug pkg/libuv connu) — nouvel essai automatique ${r.bootRetries}/2…`);
+      setTimeout(() => {
+        const result = startBot(name);
+        if (result?.error) addLine(r, `❌ Relance impossible : ${result.error}`, true);
+      }, 1500);
+      return;
+    }
     // Plantage (arrêt non demandé, code d'erreur) → rapport automatique.
     if (!wasStopping && code !== 0 && code !== null) {
       sendReport(name, `plantage — code de sortie ${code}`);
@@ -433,6 +456,29 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, 200, { ok: true });
     }
 
+    // Test du token : vérifie l'authentification GitHub puis l'accès au dépôt.
+    if (req.method === 'POST' && parts[1] === 'rapport-test') {
+      const cfg = config.rapport || {};
+      if (!cfg.token) return sendJson(res, 200, { error: 'Aucun token enregistré — collez-le puis Enregistrer d\'abord.' });
+      try {
+        const headers = { 'User-Agent': 'gestionnaire-bots', Authorization: `Bearer ${cfg.token}`, Accept: 'application/vnd.github+json' };
+        const userRes = await fetch('https://api.github.com/user', { headers });
+        if (!userRes.ok) {
+          return sendJson(res, 200, { error: `Token refusé par GitHub (HTTP ${userRes.status}) — recréez-le via le lien 🔑.` });
+        }
+        const user = await userRes.json();
+        const repoRes = await fetch(`https://api.github.com/repos/${cfg.repo || DEFAULT_REPO}`, { headers });
+        if (!repoRes.ok) {
+          return sendJson(res, 200, {
+            error: `Token valide (${user.login}) mais dépôt « ${cfg.repo || DEFAULT_REPO} » inaccessible (HTTP ${repoRes.status}) — vérifiez le champ Dépôt et les droits du token.`,
+          });
+        }
+        return sendJson(res, 200, { ok: true, message: `Token valide — connecté en tant que ${user.login}, dépôt accessible. Les rapports fonctionneront.` });
+      } catch (err) {
+        return sendJson(res, 200, { error: `Test impossible : ${err.message}` });
+      }
+    }
+
     // POST /api/bots — création
     if (req.method === 'POST' && parts[1] === 'bots' && parts.length === 2) {
       const body = await jsonBody(req);
@@ -495,12 +541,8 @@ const server = http.createServer(async (req, res) => {
       }
 
       if (req.method === 'POST' && action === 'signaler') {
-        const cfgRapport = config.rapport || {};
-        if (!cfgRapport.actif || !cfgRapport.token) {
-          return sendJson(res, 200, { nonConfigure: true });
-        }
-        sendReport(name, 'signalement manuel', true);
-        return sendJson(res, 200, { ok: true });
+        const result = await sendReport(name, 'signalement manuel', true);
+        return sendJson(res, 200, result);
       }
       if (req.method === 'POST' && action === 'maj') {
         if (r.status === 'maj') return sendJson(res, 200, { error: 'Mise à jour déjà en cours.' });
@@ -569,13 +611,23 @@ function openBrowser() {
   try {
     let child;
     if (process.platform === 'win32') {
-      // Fenêtre d'application dédiée (sans onglets ni barre d'adresse) via le
-      // mode --app d'Edge, présent sur tous les Windows 10/11 : l'interface
-      // s'ouvre comme une vraie application PC.
-      child = spawn('cmd.exe', ['/c', 'start', '', 'msedge', `--app=${url}`], {
-        detached: true,
-        stdio: 'ignore',
+      // Opera GX en priorité s'il est installé, sinon fenêtre d'application
+      // dédiée via le mode --app d'Edge (présent sur tous les Windows 10/11).
+      const operaPaths = [
+        path.join(process.env.LOCALAPPDATA || '', 'Programs', 'Opera GX', 'launcher.exe'),
+        path.join(process.env.LOCALAPPDATA || '', 'Programs', 'Opera GX', 'opera.exe'),
+        path.join(process.env.LOCALAPPDATA || '', 'Programs', 'Opera', 'launcher.exe'),
+      ];
+      const opera = operaPaths.find((p) => {
+        try {
+          return fs.existsSync(p);
+        } catch {
+          return false;
+        }
       });
+      child = opera
+        ? spawn(opera, [url], { detached: true, stdio: 'ignore' })
+        : spawn('cmd.exe', ['/c', 'start', '', 'msedge', `--app=${url}`], { detached: true, stdio: 'ignore' });
     } else {
       child = spawn('xdg-open', [url], { detached: true, stdio: 'ignore' });
     }
@@ -777,7 +829,7 @@ const HTML = `<!DOCTYPE html>
   <input id="s_token" type="password" placeholder="ghp_…">
   <label>Dépôt (proprietaire/depot)</label><input id="s_repo">
   <label>Numéro de la PR (où poster les rapports)</label><input id="s_issue">
-  <div class="row"><button class="gray" onclick="dlgSet.close()">Annuler</button><button onclick="saveSettings()">Enregistrer</button></div>
+  <div class="row"><button class="gray" onclick="dlgSet.close()">Annuler</button><button class="gray" onclick="testSettings()">🧪 Tester le token</button><button class="accent" onclick="saveSettings()">Enregistrer</button></div>
 </dialog>
 <div id="toast"></div>
 <script>
@@ -831,7 +883,7 @@ function renderActions() {
   btn('📨 Signaler à Claude', 'gray', function(){
     api('POST', '/api/bots/' + sel + '/signaler').then(function(j){
       if (j && j.nonConfigure) { toast('⚙️ Configurez d\\'abord le token GitHub (une seule fois).'); openSettings(); return; }
-      if (j && j.ok) toast('📨 Rapport en cours d\\'envoi — regardez la console du bot.');
+      if (j && j.ok) toast('📨 Rapport envoyé — Claude le reçoit dans quelques secondes !');
     });
   });
   btn('🔗 Inviter sur un serveur', 'gray', function(){
@@ -1144,7 +1196,18 @@ function saveSettings() {
   api('PUT', '/api/rapport', {
     actif: $('s_actif').checked, token: $('s_token').value,
     repo: $('s_repo').value, issue: $('s_issue').value
-  }).then(function(j){ if (j && j.ok) { dlgSet.close(); toast('✅ Paramètres enregistrés.'); } });
+  }).then(function(j){ if (j && j.ok) { dlgSet.close(); toast('✅ Paramètres enregistrés. Utilisez 🧪 Tester pour vérifier le token.'); } });
+}
+function testSettings() {
+  // Enregistre d'abord les champs saisis, puis teste le token contre GitHub.
+  api('PUT', '/api/rapport', {
+    actif: $('s_actif').checked, token: $('s_token').value,
+    repo: $('s_repo').value, issue: $('s_issue').value
+  }).then(function(){
+    return api('POST', '/api/rapport-test');
+  }).then(function(j){
+    if (j && j.ok) toast('✅ ' + j.message);
+  });
 }
 refresh(); setInterval(refresh, 2500);
 </script>
