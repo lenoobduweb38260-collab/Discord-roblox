@@ -1,3 +1,7 @@
+// Masque les avertissements de dépréciation de Node (ex : punycode DEP0040)
+// qui polluent la console sans être des erreurs.
+process.noDeprecation = true;
+
 const fs = require('fs');
 const path = require('path');
 
@@ -128,8 +132,11 @@ async function acquireLock() {
           if (parseInt(fs.readFileSync(lockPath, 'utf8'), 10) === process.pid) fs.unlinkSync(lockPath);
         } catch {}
       });
-    } catch {
-      console.warn('⚠️ Impossible d\'écrire bot.lock — démarrage sans verrou d\'instance.');
+    } catch (err) {
+      // Non bloquant : on continue sans verrou, mais on affiche la cause réelle
+      // (EPERM = droits/antivirus, EROFS = dossier en lecture seule, etc.)
+      console.warn(`⚠️ Verrou bot.lock non écrit (${err.code || err.message}) — démarrage sans verrou d'instance.`);
+      logErrorFile(`bot.lock non écrit : ${err.stack || err}`);
     }
     return true;
   }

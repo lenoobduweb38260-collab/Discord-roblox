@@ -42,6 +42,12 @@ function saveConfig(cfg) {
   fs.writeFileSync(configPath, JSON.stringify(cfg, null, 2));
 }
 let config = loadConfig();
+// Rapports d'erreurs automatiques : quand un bot plante, le diagnostic est
+// posté en commentaire de la PR GitHub — Claude le reçoit automatiquement,
+// corrige, et publie une mise à jour que les bots récupèrent tout seuls.
+if (!config.rapport) {
+  config.rapport = { actif: false, token: '', repo: DEFAULT_REPO, issue: 1 };
+}
 
 function getBot(name) {
   return config.bots.find((b) => b.name === name) || null;
@@ -174,6 +180,50 @@ async function updateBot(name) {
   }
 }
 
+// ----- Rapports d'erreurs vers GitHub (reçus par Claude) -----
+const reportState = new Map(); // name -> { sig, at } (anti-doublon)
+
+async function sendReport(name, motif, force = false) {
+  const cfg = config.rapport || {};
+  const r = rt(name);
+  if (!cfg.actif || !cfg.token) {
+    if (force) addLine(r, '⚠️ Rapports non configurés : ouvrez ⚙️ Paramètres et renseignez un token GitHub.', true);
+    return false;
+  }
+  const sig = (r.errors[r.errors.length - 1] || motif).replace(/^\[[^\]]+\]\s*/, '');
+  const prev = reportState.get(name);
+  if (!force && prev && prev.sig === sig && Date.now() - prev.at < 6 * 3600 * 1000) {
+    addLine(r, 'ℹ️ Rapport non renvoyé (même erreur déjà signalée il y a moins de 6 h).');
+    return false;
+  }
+  try {
+    // Le diagnostic n'inclut JAMAIS le .env (donc jamais le token du bot).
+    const body = `## 🚨 Rapport automatique — bot « ${name} » (${motif})\n\n\`\`\`\n${diagnosticText(name).slice(0, 6000)}\n\`\`\``;
+    const res = await fetch(
+      `https://api.github.com/repos/${cfg.repo || DEFAULT_REPO}/issues/${cfg.issue || 1}/comments`,
+      {
+        method: 'POST',
+        headers: {
+          'User-Agent': 'gestionnaire-bots',
+          Authorization: `Bearer ${cfg.token}`,
+          Accept: 'application/vnd.github+json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ body }),
+      }
+    );
+    if (res.ok) {
+      reportState.set(name, { sig, at: Date.now() });
+      addLine(r, '📨 Rapport envoyé à Claude (commentaire GitHub) — correction automatique en route.');
+      return true;
+    }
+    addLine(r, `⚠️ Envoi du rapport impossible (HTTP ${res.status}) — vérifiez le token dans ⚙️ Paramètres.`, true);
+  } catch (err) {
+    addLine(r, `⚠️ Envoi du rapport impossible : ${err.message}`, true);
+  }
+  return false;
+}
+
 // ----- Démarrage / arrêt -----
 function startBot(name) {
   const bot = getBot(name);
@@ -186,6 +236,9 @@ function startBot(name) {
   if (!exePath || !fs.existsSync(exePath)) {
     return { error: 'Exécutable absent : cliquez d\'abord sur « Mettre à jour ».' };
   }
+  // Nouvelle session = console propre (l'onglet Erreurs conserve l'historique).
+  r.logs = [];
+  r.logSeq++;
   const env = { ...process.env, AUTO_UPDATE: 'off', BOT_MANAGED: '1' };
   delete env.BOT_JUST_UPDATED;
   delete env.BOT_RESTARTED;
@@ -208,8 +261,14 @@ function startBot(name) {
       });
       return;
     }
+    const wasStopping = r.stopping;
+    r.stopping = false;
     r.status = 'arrete';
     addLine(r, `⏹️ Processus terminé (code ${code}).`, code !== 0 && code !== null);
+    // Plantage (arrêt non demandé, code d'erreur) → rapport automatique.
+    if (!wasStopping && code !== 0 && code !== null) {
+      sendReport(name, `plantage — code de sortie ${code}`);
+    }
   });
   proc.on('error', (err) => {
     r.proc = null;
@@ -224,6 +283,7 @@ function stopBot(name) {
   const r = rt(name);
   if (r.proc?.pid) {
     addLine(r, '⏹️ Arrêt demandé…');
+    r.stopping = true; // arrêt volontaire : pas de rapport d'erreur
     killPid(r.proc.pid);
     return { ok: true };
   }
@@ -351,6 +411,28 @@ const server = http.createServer(async (req, res) => {
     // GET /api/etat
     if (req.method === 'GET' && parts[1] === 'etat') return sendJson(res, 200, stateSnapshot());
 
+    // Paramètres des rapports automatiques (le token n'est jamais renvoyé).
+    if (req.method === 'GET' && parts[1] === 'rapport') {
+      const cfg = config.rapport || {};
+      return sendJson(res, 200, {
+        actif: Boolean(cfg.actif),
+        repo: cfg.repo || DEFAULT_REPO,
+        issue: cfg.issue || 1,
+        tokenDefini: Boolean(cfg.token),
+      });
+    }
+    if (req.method === 'PUT' && parts[1] === 'rapport') {
+      const body = await jsonBody(req);
+      const cfg = config.rapport || (config.rapport = {});
+      cfg.actif = Boolean(body.actif);
+      if (typeof body.token === 'string' && body.token.trim()) cfg.token = body.token.trim();
+      if (typeof body.repo === 'string' && REPO_RE.test(body.repo.trim())) cfg.repo = body.repo.trim();
+      const issue = parseInt(body.issue, 10);
+      if (issue > 0) cfg.issue = issue;
+      saveConfig(config);
+      return sendJson(res, 200, { ok: true });
+    }
+
     // POST /api/bots — création
     if (req.method === 'POST' && parts[1] === 'bots' && parts.length === 2) {
       const body = await jsonBody(req);
@@ -378,6 +460,10 @@ const server = http.createServer(async (req, res) => {
 
       if (req.method === 'POST' && action === 'demarrer') return sendJson(res, 200, startBot(name));
       if (req.method === 'POST' && action === 'arreter') return sendJson(res, 200, stopBot(name));
+      if (req.method === 'POST' && action === 'signaler') {
+        sendReport(name, 'signalement manuel', true);
+        return sendJson(res, 200, { ok: true });
+      }
       if (req.method === 'POST' && action === 'maj') {
         if (r.status === 'maj') return sendJson(res, 200, { error: 'Mise à jour déjà en cours.' });
         const wasRunning = r.status === 'demarre';
@@ -443,10 +529,18 @@ const server = http.createServer(async (req, res) => {
 function openBrowser() {
   const url = `http://localhost:${PORT}`;
   try {
-    const child =
-      process.platform === 'win32'
-        ? spawn('cmd.exe', ['/c', 'start', '', url], { detached: true, stdio: 'ignore' })
-        : spawn('xdg-open', [url], { detached: true, stdio: 'ignore' });
+    let child;
+    if (process.platform === 'win32') {
+      // Fenêtre d'application dédiée (sans onglets ni barre d'adresse) via le
+      // mode --app d'Edge, présent sur tous les Windows 10/11 : l'interface
+      // s'ouvre comme une vraie application PC.
+      child = spawn('cmd.exe', ['/c', 'start', '', 'msedge', `--app=${url}`], {
+        detached: true,
+        stdio: 'ignore',
+      });
+    } else {
+      child = spawn('xdg-open', [url], { detached: true, stdio: 'ignore' });
+    }
     child.on('error', () => {});
     child.unref();
   } catch {}
@@ -518,6 +612,7 @@ const HTML = `<!DOCTYPE html>
 <body>
 <header>
   <h1>🤖 Gestionnaire de bots</h1><span class="ver" id="ver"></span>
+  <button onclick="openSettings()">⚙️ Paramètres</button>
   <button onclick="dlgNew.showModal()">➕ Nouveau bot</button>
 </header>
 <main>
@@ -537,6 +632,16 @@ const HTML = `<!DOCTYPE html>
   <label>GUILD_ID (ID du serveur, facultatif)</label><input id="f_guild">
   <label>OWNER_ID (votre ID Discord, facultatif)</label><input id="f_owner">
   <div class="row"><button class="gray" onclick="dlgNew.close()">Annuler</button><button onclick="createBot()">Créer</button></div>
+</dialog>
+<dialog id="dlgSet">
+  <h2>⚙️ Rapports d'erreurs automatiques</h2>
+  <p style="font-size:12.5px;color:#a9aab3;line-height:1.5">Quand un bot plante, le gestionnaire poste son diagnostic en commentaire de la PR GitHub. <b>Claude le reçoit automatiquement</b>, corrige le code et publie une mise à jour que vos bots récupèrent tout seuls. Le rapport n'inclut jamais votre .env ni vos tokens.</p>
+  <label style="display:flex;align-items:center;gap:8px;margin-top:12px"><input type="checkbox" id="s_actif" style="width:auto"> Activer les rapports automatiques</label>
+  <label>Token GitHub (PAT — Issues + Pull requests en écriture sur le dépôt)</label>
+  <input id="s_token" type="password" placeholder="laisser vide pour conserver l'actuel">
+  <label>Dépôt (proprietaire/depot)</label><input id="s_repo">
+  <label>Numéro de la PR (où poster les rapports)</label><input id="s_issue">
+  <div class="row"><button class="gray" onclick="dlgSet.close()">Annuler</button><button onclick="saveSettings()">Enregistrer</button></div>
 </dialog>
 <div id="toast"></div>
 <script>
@@ -577,6 +682,9 @@ function renderActions() {
     fetch('/api/bots/' + sel + '/diagnostic').then(function(r){ return r.text(); }).then(function(t){
       navigator.clipboard.writeText(t).then(function(){ toast('✅ Diagnostic copié — collez-le dans la conversation avec Claude.'); });
     });
+  });
+  btn('📨 Signaler à Claude', 'gray', function(){
+    api('POST', '/api/bots/' + sel + '/signaler').then(function(){ toast('📨 Rapport en cours d\\'envoi — regardez la console du bot.'); });
   });
   btn('🗑 Supprimer', 'gray', function(){
     if (!confirm('Retirer « ' + sel + ' » du gestionnaire ? (le dossier et ses données restent sur le disque)')) return;
@@ -639,6 +747,22 @@ function createBot() {
   }).then(function(j){
     if (j && j.ok) { dlgNew.close(); toast('✅ Bot créé — téléchargement de l\\'exécutable en cours…'); selectBot($('f_name').value.trim()); }
   });
+}
+function openSettings() {
+  fetch('/api/rapport').then(function(r){ return r.json(); }).then(function(j){
+    $('s_actif').checked = !!j.actif;
+    $('s_token').value = '';
+    $('s_token').placeholder = j.tokenDefini ? 'token enregistré — laisser vide pour le conserver' : 'ghp_… ou github_pat_…';
+    $('s_repo').value = j.repo || '';
+    $('s_issue').value = j.issue || 1;
+    dlgSet.showModal();
+  });
+}
+function saveSettings() {
+  api('PUT', '/api/rapport', {
+    actif: $('s_actif').checked, token: $('s_token').value,
+    repo: $('s_repo').value, issue: $('s_issue').value
+  }).then(function(j){ if (j && j.ok) { dlgSet.close(); toast('✅ Paramètres enregistrés.'); } });
 }
 refresh(); setInterval(refresh, 2500);
 </script>
