@@ -23,9 +23,11 @@ jobs:
           - os: windows-latest
             target: node22-win-x64
             output: discord-roblox-bot-win-x64.exe
+            manager_output: gestionnaire-bots-win-x64.exe
           - os: ubuntu-latest
             target: node22-linux-x64
             output: discord-roblox-bot-linux-x64
+            manager_output: gestionnaire-bots-linux-x64
     steps:
       - uses: actions/checkout@v4
 
@@ -46,10 +48,26 @@ jobs:
         run: ./dist/${{ matrix.output }} check
         shell: bash
 
+      - name: Versionner le gestionnaire
+        run: echo "module.exports = '1.0.${{ github.run_number }}';" > src/manager/version.gen.js
+        shell: bash
+
+      - name: Compiler le Gestionnaire de bots
+        run: npx --yes @yao-pkg/pkg src/manager/index.js --targets ${{ matrix.target }} --output dist/${{ matrix.manager_output }}
+
+      - name: Auto-test du gestionnaire
+        run: ./dist/${{ matrix.manager_output }} check
+        shell: bash
+
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.output }}
           path: dist/${{ matrix.output }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.manager_output }}
+          path: dist/${{ matrix.manager_output }}
 
   release:
     name: Publier la release v1.0.${{ github.run_number }}
@@ -67,12 +85,18 @@ jobs:
           target_commitish: ${{ github.sha }}
           name: Bot Discord RP v1.0.${{ github.run_number }}
           body: |
-            ## 📦 Exécutables du bot (aucune installation de Node.js nécessaire)
+            ## 📦 Exécutables (aucune installation de Node.js nécessaire)
 
-            | Système | Fichier |
-            |---|---|
-            | 🪟 Windows | `discord-roblox-bot-win-x64.exe` |
-            | 🐧 Linux | `discord-roblox-bot-linux-x64` |
+            | Système | Bot | Gestionnaire de bots (pour le développeur) |
+            |---|---|---|
+            | 🪟 Windows | `discord-roblox-bot-win-x64.exe` | `gestionnaire-bots-win-x64.exe` |
+            | 🐧 Linux | `discord-roblox-bot-linux-x64` | `gestionnaire-bots-linux-x64` |
+
+            ### 🤖 Gestionnaire de bots
+            Application locale pour gérer **plusieurs bots** (chacun relié à son propre dépôt GitHub) :
+            démarrage/arrêt, console en direct, console d'erreurs, éditeur `.env`, mises à jour en un clic
+            et bouton « Copier le diagnostic ». Lancez-la : l'interface s'ouvre sur http://localhost:43550
+            (un second lancement rouvre simplement l'interface).
 
             ### 🔄 Mise à jour automatique
             Si vous avez déjà l'exécutable (v1.0.3 ou plus récente), **rien à faire** :

@@ -94,6 +94,17 @@ La base `data.sqlite` est créée à côté de l'exécutable.
 ### 🔄 Mise à jour automatique
 L'exécutable est **relié aux releases GitHub** : à chaque lancement, il compare sa version à la dernière release, télécharge la nouvelle version si besoin, se remplace et redémarre tout seul. Chaque push sur le dépôt publie automatiquement une nouvelle release `v1.0.<n>` — les modifications du code arrivent donc chez vous **sans rien faire**. Pour désactiver : ajoutez `AUTO_UPDATE=off` dans le `.env`.
 
+## 🤖 Gestionnaire de bots (pour le développeur)
+
+`gestionnaire-bots-win-x64.exe` (dans les mêmes releases) est une **application locale** de gestion multi-bots :
+
+- **Plusieurs bots avec le même code**, chacun dans son dossier isolé (`gestionnaire/bots/<nom>/` avec son `.env`, sa base `data.sqlite`) et **chacun relié à son propre dépôt GitHub** pour ses mises à jour
+- ➕ Création d'un bot en formulaire (nom, dépôt, token, CLIENT_ID…) → le `.env` est **généré automatiquement** et l'exécutable **téléchargé automatiquement** depuis le dépôt configuré
+- ▶ Démarrer / ⏹ Arrêter chaque bot, 🖥️ **console en direct**, 🚨 **console d'erreurs** dédiée (mémoire + `erreur.log`), ⚙️ éditeur `.env` intégré, ⬇ mise à jour en un clic
+- 📋 **« Copier le diagnostic »** : un bloc prêt à coller pour faire déboguer le bot
+- L'application est **relançable à volonté** : si elle tourne déjà, un nouveau lancement rouvre simplement l'interface (http://localhost:43550). La fenêtre console du gestionnaire doit rester ouverte ; sa fermeture arrête proprement les bots lancés (ils sont repris automatiquement au prochain lancement s'ils tournent encore)
+- La commande Discord `/update` d'un bot géré délègue la mise à jour au gestionnaire (téléchargement + redémarrage automatiques)
+
 ## 🚀 Installation
 
 ### 1. Créer l'application Discord

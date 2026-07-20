@@ -21,6 +21,13 @@ async function ownerIds(client) {
 // Relance le processus (exécutable ou node) : la nouvelle instance vérifie
 // les mises à jour au démarrage et charge donc la dernière version publiée.
 function restartProcess() {
+  // Sous le Gestionnaire de bots : le code de sortie 42 signifie
+  // « télécharge la dernière version puis relance-moi » — c'est le
+  // gestionnaire qui s'en charge, pas le bot lui-même.
+  if (process.env.BOT_MANAGED === '1') {
+    setTimeout(() => process.exit(42), 800);
+    return;
+  }
   const env = { ...process.env };
   delete env.BOT_JUST_UPDATED; // force la vérification de mise à jour
   env.BOT_RESTARTED = '1'; // le processus relancé attend le verrou au lieu de balayer les instances

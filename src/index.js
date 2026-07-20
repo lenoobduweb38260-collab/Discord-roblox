@@ -145,7 +145,8 @@ async function start() {
   // issues d'un redémarrage automatique (update/restart) ne balaient pas :
   // elles attendent le verrou, ce qui évite qu'elles s'entretuent.
   const isRespawn = Boolean(process.env.BOT_JUST_UPDATED || process.env.BOT_RESTARTED);
-  if (!isRespawn && process.pkg && process.platform === 'win32') {
+  const isManaged = process.env.BOT_MANAGED === '1'; // lancé par le Gestionnaire de bots
+  if (!isRespawn && !isManaged && process.pkg && process.platform === 'win32') {
     try {
       const { spawnSync } = require('child_process');
       spawnSync(

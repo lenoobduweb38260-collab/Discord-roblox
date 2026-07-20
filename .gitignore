@@ -3,6 +3,8 @@ dist/
 .env
 bot.lock
 erreur.log
+gestionnaire/
+src/manager/version.gen.js
 data.sqlite
 data.sqlite-journal
 data.sqlite-wal
