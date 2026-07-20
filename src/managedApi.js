@@ -9,7 +9,25 @@ const path = require('path');
 
 function startManagedApi(client, baseDir) {
   const { EmbedBuilder } = require('discord.js');
-  const { db, getGuildConfig } = require('./database');
+  const { db, getGuildConfig, setGuildConfig } = require('./database');
+
+  // Clés de configuration modifiables depuis le dashboard ('s' = id, 'n' = nombre).
+  const CONFIG_KEYS = {
+    staff_role_id: 's',
+    admin_role_id: 's',
+    service_role_id: 's',
+    log_channel_id: 's',
+    level_channel_id: 's',
+    service_channel_id: 's',
+    staff_channel_id: 's',
+    member_channel_id: 's',
+    xp_text: 'n',
+    xp_voice: 'n',
+    xp_cooldown: 'n',
+  };
+  const NUM_LIMITS = { xp_text: [1, 1000], xp_voice: [1, 1000], xp_cooldown: [5, 3600] };
+  const listWhitelist = db.prepare('SELECT * FROM whitelist_managers WHERE guild_id = ? ORDER BY role_id');
+  const listTicketTypes = db.prepare('SELECT * FROM ticket_types WHERE guild_id = ? ORDER BY id');
 
   const countStmts = {
     cartes: db.prepare('SELECT COUNT(*) AS n FROM identity_cards WHERE guild_id = ?'),
@@ -77,6 +95,50 @@ function startManagedApi(client, baseDir) {
             'XP vocal': `${cfg.xp_voice} XP/minute`,
           },
         });
+      }
+
+      // Données pour les pages de configuration du dashboard.
+      if (req.method === 'GET' && url.pathname === '/parametres') {
+        const guild = client.guilds.cache.get(url.searchParams.get('guild'));
+        if (!guild) return send(404, { error: 'Serveur introuvable.' });
+        const roles = [...guild.roles.cache.filter((r) => r.id !== guild.id && !r.managed).values()]
+          .sort((a, b) => b.position - a.position)
+          .map((r) => ({ id: r.id, name: r.name }));
+        const channels = [...guild.channels.cache.filter((c) => c.isTextBased() && !c.isThread()).values()]
+          .map((c) => ({ id: c.id, name: c.name }))
+          .sort((a, b) => a.name.localeCompare(b.name));
+        const whitelist = listWhitelist.all(guild.id).map((m) => ({
+          role: guild.roles.cache.get(m.role_id)?.name || m.role_id,
+          manager: guild.roles.cache.get(m.manager_role_id)?.name || m.manager_role_id,
+        }));
+        const tickets = listTicketTypes.all(guild.id).map((t) => ({
+          label: t.label,
+          emoji: t.emoji,
+          categorie: guild.channels.cache.get(t.category_id)?.name || t.category_id || '?',
+          support: t.support_role_id ? guild.roles.cache.get(t.support_role_id)?.name || t.support_role_id : null,
+        }));
+        return send(200, { config: getGuildConfig(guild.id), roles, channels, whitelist, tickets });
+      }
+
+      // Écriture d'un réglage depuis le dashboard.
+      if (req.method === 'POST' && url.pathname === '/config') {
+        let raw = '';
+        req.on('data', (c) => (raw += c));
+        await new Promise((resolve) => req.on('end', resolve));
+        const body = JSON.parse(raw || '{}');
+        if (!client.guilds.cache.has(body.guildId)) return send(404, { error: 'Serveur introuvable.' });
+        const key = String(body.key || '');
+        if (!(key in CONFIG_KEYS)) return send(400, { error: `Réglage inconnu : ${key}` });
+        let value = body.value;
+        if (value === '' || value === null || value === undefined) value = null;
+        if (CONFIG_KEYS[key] === 'n') {
+          value = parseInt(value, 10);
+          const [min, max] = NUM_LIMITS[key];
+          if (Number.isNaN(value)) return send(400, { error: 'Valeur numérique attendue.' });
+          value = Math.min(max, Math.max(min, value));
+        }
+        setGuildConfig(body.guildId, key, value);
+        return send(200, { ok: true, value });
       }
 
       if (req.method === 'POST' && url.pathname === '/embed') {

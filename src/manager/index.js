@@ -703,6 +703,19 @@ const HTML = `<!DOCTYPE html>
   .dthumb { position: absolute; top: 12px; right: 12px; width: 72px; height: 72px; border-radius: 6px; object-fit: cover; }
   .dimg { max-width: 100%; border-radius: 6px; margin-top: 10px; display: block; }
   .dfoot { color: #8a8b94; font-size: 11.5px; margin-top: 10px; }
+  .dbside { width: 215px; flex-shrink: 0; border-right: 1px solid #26272e; padding-right: 12px; margin-right: 16px; overflow-y: auto; }
+  .dbside select { width: 100%; margin-bottom: 10px; background: #1b1c21; color: #e6e6e9; border: 1px solid #35363f; border-radius: 6px; padding: 6px; }
+  .dbitem { padding: 8px 10px; border-radius: 6px; cursor: pointer; color: #a9aab3; font-size: 13px; margin-bottom: 2px; }
+  .dbitem:hover { background: #1b1c21; }
+  .dbitem.on { background: #2f3040; color: #fff; }
+  .dbmain { flex: 1; min-width: 0; overflow-y: auto; }
+  .dbtitle { font-size: 17px; margin-bottom: 14px; }
+  .dbp { color: #8a8b94; font-size: 13px; margin-bottom: 10px; }
+  .dbrow { padding: 8px 10px; background: #1b1c21; border: 1px solid #26272e; border-radius: 8px; margin-bottom: 6px; font-size: 13px; }
+  .dsec { margin-bottom: 18px; padding-bottom: 16px; border-bottom: 1px solid #26272e; }
+  .dsec h3 { font-size: 14px; margin-bottom: 3px; }
+  .dsec p { color: #8a8b94; font-size: 12.5px; margin-bottom: 8px; }
+  .dsec select, .dsec input { background: #1b1c21; border: 1px solid #35363f; color: #e6e6e9; border-radius: 6px; padding: 7px; font-size: 13px; max-width: 340px; width: 100%; }
   #toast { position: fixed; bottom: 18px; right: 18px; background: #2f3040; border: 1px solid #5865f2; padding: 10px 16px; border-radius: 8px; font-size: 13px; display: none; max-width: 420px; }
   .empty { color: #8a8b94; padding: 30px; text-align: center; font-family: 'Segoe UI', sans-serif; }
 </style>
@@ -845,28 +858,28 @@ function loadTab() {
       if (info.error) { c.innerHTML = '<div class="empty">⚠️ ' + info.error + '</div>'; return; }
       if (!info.guilds || !info.guilds.length) { c.innerHTML = '<div class="empty">Le bot n\\'est sur aucun serveur — utilisez le bouton 🔗 Inviter.</div>'; return; }
       var gid = window.dashGuild || info.guilds[0].id;
-      var gsel = '<select id="dash_g" style="background:#1b1c21;color:#e6e6e9;border:1px solid #35363f;border-radius:6px;padding:6px">' +
-        info.guilds.map(function(g){ return '<option value="' + g.id + '"' + (g.id === gid ? ' selected' : '') + '>' + g.name + '</option>'; }).join('') + '</select>';
-      fetch('/api/bots/' + sel + '/proxy/dashboard?guild=' + gid).then(function(r){ return r.json(); }).then(function(d){
-        if (d.error) { c.innerHTML = '<div class="empty">⚠️ ' + d.error + '</div>'; return; }
-        var h = '<div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">' +
-          (d.serveur.icon ? '<img src="' + d.serveur.icon + '" style="width:48px;height:48px;border-radius:12px">' : '') +
-          '<div><div style="font-size:17px;font-weight:600">' + d.serveur.name + '</div>' +
-          '<div style="color:#8a8b94;font-size:13px">' + d.serveur.membres + ' membres</div></div>' +
-          '<div style="margin-left:auto">' + gsel + '</div></div>';
-        var labels = { cartes: "🪪 Cartes d'identité", permis: '🚗 Permis', entreprises: '🏢 Entreprises', ticketsOuverts: '🎫 Tickets ouverts', whitelist: '📋 Whitelist métiers', vehicules: '🛡️ Véhicules assurés' };
-        h += '<div class="tiles">';
-        Object.keys(labels).forEach(function(k){ h += '<div class="tile"><div class="tv">' + (d.stats[k] || 0) + '</div><div class="tl">' + labels[k] + '</div></div>'; });
-        h += '</div><h3 style="margin:16px 0 8px;font-size:14px">⚙️ Configuration du serveur</h3><table class="cfgt">';
-        Object.keys(d.config).forEach(function(k){ h += '<tr><td>' + k + '</td><td>' + (d.config[k] || '<span style="color:#8a8b94">non configuré</span>') + '</td></tr>'; });
-        h += '</table>';
-        if (d.top && d.top.length) {
-          h += '<h3 style="margin:16px 0 8px;font-size:14px">🏆 Top niveaux (écrit)</h3>';
-          d.top.forEach(function(t, i){ h += '<div style="padding:3px 0">' + (i + 1) + '. <b>' + t.user + '</b> — niveau ' + t.level + ' (' + t.xp + ' XP)</div>'; });
-        }
-        c.innerHTML = h;
-        $('dash_g').onchange = function(){ window.dashGuild = this.value; loadTab(); };
+      window.dashGuild = gid;
+      var page = window.dashPage || 'apercu';
+      var pages = [
+        ['apercu', '📊 Vue d\\'ensemble'],
+        ['membres', '👋 Arrivées et départs'],
+        ['niveaux', '📈 Niveaux'],
+        ['roles', '👮 Rôles & sécurité'],
+        ['salons', '📢 Salons & logs'],
+        ['whitelist', '📋 Whitelist métiers'],
+        ['tickets', '🎫 Tickets']
+      ];
+      var h = '<div style="display:flex;height:100%;min-height:340px">';
+      h += '<div class="dbside">';
+      h += '<select id="dash_g">' + info.guilds.map(function(g){ return '<option value="' + g.id + '"' + (g.id === gid ? ' selected' : '') + '>' + g.name + '</option>'; }).join('') + '</select>';
+      pages.forEach(function(p){ h += '<div class="dbitem' + (p[0] === page ? ' on' : '') + '" data-p="' + p[0] + '">' + p[1] + '</div>'; });
+      h += '</div><div class="dbmain" id="dbmain"></div></div>';
+      c.innerHTML = h;
+      $('dash_g').onchange = function(){ window.dashGuild = this.value; loadTab(); };
+      Array.prototype.forEach.call(document.querySelectorAll('.dbitem'), function(el){
+        el.onclick = function(){ window.dashPage = el.getAttribute('data-p'); loadTab(); };
       });
+      renderDashPage(page, gid);
     });
     return;
   } else if (tab === 'embed') {
@@ -948,6 +961,101 @@ function createBot() {
     if (j && j.ok) { dlgNew.close(); toast('✅ Bot créé — téléchargement de l\\'exécutable en cours…'); selectBot($('f_name').value.trim()); }
   });
 }
+// ----- Pages du dashboard (style DraftBot) -----
+function dashSave(gid, key, value) {
+  api('POST', '/api/bots/' + sel + '/proxy/config', { guildId: gid, key: key, value: value })
+    .then(function(j){ if (j && j.ok) toast('✅ Enregistré'); });
+}
+function dashSelect(key, label, desc, list, current, prefix) {
+  var h = '<div class="dsec"><h3>' + label + '</h3><p>' + desc + '</p>';
+  h += '<select class="dsave" data-k="' + key + '"><option value="">— Désactivé —</option>';
+  list.forEach(function(x){
+    h += '<option value="' + x.id + '"' + (x.id === current ? ' selected' : '') + '>' + (prefix || '') + x.name + '</option>';
+  });
+  h += '</select></div>';
+  return h;
+}
+function dashNumber(key, label, desc, value, min, max) {
+  return '<div class="dsec"><h3>' + label + '</h3><p>' + desc + '</p>' +
+    '<div style="display:flex;gap:8px"><input type="number" class="dnum" data-k="' + key + '" value="' + value + '" min="' + min + '" max="' + max + '" style="width:120px">' +
+    '<button class="dnumsave" data-k="' + key + '">💾</button></div></div>';
+}
+function renderDashPage(page, gid) {
+  var m = $('dbmain');
+  m.innerHTML = '<div class="empty">Chargement…</div>';
+  if (page === 'apercu') {
+    fetch('/api/bots/' + sel + '/proxy/dashboard?guild=' + gid).then(function(r){ return r.json(); }).then(function(d){
+      if (d.error) { m.innerHTML = '<div class="empty">⚠️ ' + d.error + '</div>'; return; }
+      var h = '<div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">' +
+        (d.serveur.icon ? '<img src="' + d.serveur.icon + '" style="width:48px;height:48px;border-radius:12px">' : '') +
+        '<div><div style="font-size:17px;font-weight:600">' + d.serveur.name + '</div>' +
+        '<div style="color:#8a8b94;font-size:13px">' + d.serveur.membres + ' membres</div></div></div>';
+      var labels = { cartes: "🪪 Cartes d'identité", permis: '🚗 Permis', entreprises: '🏢 Entreprises', ticketsOuverts: '🎫 Tickets ouverts', whitelist: '📋 Whitelist métiers', vehicules: '🛡️ Véhicules assurés' };
+      h += '<div class="tiles">';
+      Object.keys(labels).forEach(function(k){ h += '<div class="tile"><div class="tv">' + (d.stats[k] || 0) + '</div><div class="tl">' + labels[k] + '</div></div>'; });
+      h += '</div>';
+      if (d.top && d.top.length) {
+        h += '<h3 style="margin:16px 0 8px;font-size:14px">🏆 Top niveaux (écrit)</h3>';
+        d.top.forEach(function(t, i){ h += '<div style="padding:3px 0">' + (i + 1) + '. <b>' + t.user + '</b> — niveau ' + t.level + ' (' + t.xp + ' XP)</div>'; });
+      }
+      m.innerHTML = h;
+    });
+    return;
+  }
+  fetch('/api/bots/' + sel + '/proxy/parametres?guild=' + gid).then(function(r){ return r.json(); }).then(function(p){
+    if (p.error) { m.innerHTML = '<div class="empty">⚠️ ' + p.error + '</div>'; return; }
+    var cfg = p.config, h = '';
+    if (page === 'membres') {
+      h += '<h2 class="dbtitle">👋 Arrivées et Départs</h2>';
+      h += dashSelect('member_channel_id', 'Messages d\\'arrivée et de départ',
+        'Embed à chaque arrivée (nom, ID, photo de profil, date de création du compte) et départ (depuis quand le membre avait rejoint le serveur).',
+        p.channels, cfg.member_channel_id, '#');
+    } else if (page === 'niveaux') {
+      h += '<h2 class="dbtitle">📈 Niveaux</h2>';
+      h += dashSelect('level_channel_id', 'Salon des annonces de niveau', 'Salon où sont annoncées les montées de niveau (écrit et vocal).', p.channels, cfg.level_channel_id, '#');
+      h += dashNumber('xp_text', 'XP par message', 'XP gagné à chaque message (anti-spam via le cooldown).', cfg.xp_text, 1, 1000);
+      h += dashNumber('xp_voice', 'XP par minute en vocal', 'XP gagné par minute passée en salon vocal.', cfg.xp_voice, 1, 1000);
+      h += dashNumber('xp_cooldown', 'Cooldown XP texte (secondes)', 'Délai minimum entre deux gains d\\'XP texte.', cfg.xp_cooldown, 5, 3600);
+    } else if (page === 'roles') {
+      h += '<h2 class="dbtitle">👮 Rôles & sécurité</h2>';
+      h += dashSelect('staff_role_id', 'Rôle Staff (grade 2)', 'Accès aux commandes staff : cartes, permis, entreprises, modération, tickets…', p.roles, cfg.staff_role_id, '@');
+      h += dashSelect('admin_role_id', 'Rôle Administration (grade 3)', 'Accès à /banglobal et aux réglages sensibles.', p.roles, cfg.admin_role_id, '@');
+      h += dashSelect('service_role_id', 'Rôle « En service »', 'Ajouté/retiré automatiquement par /service.', p.roles, cfg.service_role_id, '@');
+    } else if (page === 'salons') {
+      h += '<h2 class="dbtitle">📢 Salons & logs</h2>';
+      h += dashSelect('log_channel_id', 'Salon des logs de sécurité', 'Actions staff, accès refusés, vocal, messages supprimés/modifiés, transcripts de tickets.', p.channels, cfg.log_channel_id, '#');
+      h += dashSelect('staff_channel_id', 'Salon staff (arrivées/départs de poste)', 'Annonces /arrivee et /depart du staff.', p.channels, cfg.staff_channel_id, '#');
+      h += dashSelect('service_channel_id', 'Salon des services RP', 'Annonces de prise et fin de service.', p.channels, cfg.service_channel_id, '#');
+    } else if (page === 'whitelist') {
+      h += '<h2 class="dbtitle">📋 Whitelist métiers</h2>';
+      if (!p.whitelist.length) h += '<p class="dbp">Aucun métier configuré. Sur Discord : <code>/whitelist config ajouter role:@Métier gerant:@Gérant</code></p>';
+      else {
+        h += '<p class="dbp">Rôles métier et gérants autorisés (gestion via <code>/whitelist config</code> sur Discord) :</p>';
+        p.whitelist.forEach(function(w){ h += '<div class="dbrow">👮 <b>@' + w.role + '</b> — géré par @' + w.manager + '</div>'; });
+      }
+    } else if (page === 'tickets') {
+      h += '<h2 class="dbtitle">🎫 Tickets</h2>';
+      if (!p.tickets.length) h += '<p class="dbp">Aucun type de ticket. Sur Discord : <code>/ticket type-ajouter</code> puis <code>/ticket panneau</code></p>';
+      else {
+        h += '<p class="dbp">Types configurés (gestion via <code>/ticket</code> sur Discord, panneau personnalisable via <code>/ticket panneau-modifier</code>) :</p>';
+        p.tickets.forEach(function(t){
+          h += '<div class="dbrow">' + (t.emoji ? t.emoji + ' ' : '') + '<b>' + t.label + '</b> — catégorie « ' + t.categorie + ' »' + (t.support ? ' — support @' + t.support : '') + '</div>';
+        });
+      }
+    }
+    m.innerHTML = h;
+    Array.prototype.forEach.call(m.querySelectorAll('.dsave'), function(el){
+      el.onchange = function(){ dashSave(gid, el.getAttribute('data-k'), el.value || null); };
+    });
+    Array.prototype.forEach.call(m.querySelectorAll('.dnumsave'), function(el){
+      el.onclick = function(){
+        var input = m.querySelector('.dnum[data-k="' + el.getAttribute('data-k') + '"]');
+        dashSave(gid, el.getAttribute('data-k'), input.value);
+      };
+    });
+  });
+}
+
 function openSettings() {
   fetch('/api/rapport').then(function(r){ return r.json(); }).then(function(j){
     $('s_actif').checked = !!j.actif;
