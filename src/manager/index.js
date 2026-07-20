@@ -656,36 +656,58 @@ const HTML = `<!DOCTYPE html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Segoe UI', system-ui, sans-serif; background: #1e1f24; color: #e6e6e9; height: 100vh; display: flex; flex-direction: column; }
-  header { background: #26272e; padding: 12px 20px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid #35363f; }
-  header h1 { font-size: 17px; font-weight: 600; }
-  header .ver { color: #8a8b94; font-size: 12px; }
-  header button { margin-left: auto; }
+  :root {
+    --bg: #141519; --panel: #1b1c21; --panel2: #23242b; --border: #2d2f37;
+    --text: #eceded; --muted: #92939e; --accent: #e8593a;
+    --green: #43b581; --red: #f04747; --yellow: #faa61a; --blue: #4d9de0;
+  }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); height: 100vh; display: flex; flex-direction: column; }
+  ::-webkit-scrollbar { width: 9px; height: 9px; }
+  ::-webkit-scrollbar-thumb { background: #33353e; border-radius: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  header { background: var(--panel); padding: 10px 18px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid var(--border); }
+  .logo { width: 34px; height: 34px; border-radius: 9px; background: linear-gradient(135deg, var(--accent), #a33520); display: flex; align-items: center; justify-content: center; font-size: 18px; }
+  header h1 { font-size: 14px; font-weight: 700; letter-spacing: .8px; text-transform: uppercase; }
+  header .ver { color: var(--muted); font-size: 11px; background: var(--panel2); border: 1px solid var(--border); padding: 2px 9px; border-radius: 20px; }
+  header .spacer { margin-left: auto; }
   main { flex: 1; display: flex; min-height: 0; }
-  #sidebar { width: 250px; background: #232429; border-right: 1px solid #35363f; overflow-y: auto; padding: 10px; }
-  .botcard { padding: 10px 12px; border-radius: 8px; cursor: pointer; margin-bottom: 6px; border: 1px solid transparent; }
-  .botcard:hover { background: #2b2c33; }
-  .botcard.sel { background: #2f3040; border-color: #5865f2; }
-  .botcard .nm { font-weight: 600; }
-  .botcard .st { font-size: 12px; margin-top: 2px; }
-  .st-demarre { color: #57f287; } .st-arrete { color: #8a8b94; } .st-maj { color: #fee75e; } .st-externe { color: #3498db; }
+  #sidebar { width: 255px; background: var(--panel); border-right: 1px solid var(--border); overflow-y: auto; padding: 12px 10px; }
+  .sblabel { font-size: 10.5px; letter-spacing: 1.2px; color: var(--muted); text-transform: uppercase; padding: 2px 8px 8px; }
+  .botcard { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; cursor: pointer; margin-bottom: 5px; border: 1px solid transparent; transition: background .12s; }
+  .botcard:hover { background: var(--panel2); }
+  .botcard.sel { background: var(--panel2); border-color: var(--accent); }
+  .bc-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; background: #565863; }
+  .bc-dot.st-demarre { background: var(--green); box-shadow: 0 0 8px rgba(67,181,129,.7); }
+  .bc-dot.st-maj { background: var(--yellow); }
+  .bc-dot.st-externe { background: var(--blue); }
+  .botcard .nm { font-weight: 600; font-size: 13.5px; }
+  .botcard .st { display: block; font-size: 11.5px; margin-top: 1px; color: var(--muted); }
   #panel { flex: 1; display: flex; flex-direction: column; min-width: 0; }
-  #actions { padding: 12px 16px; display: flex; gap: 8px; flex-wrap: wrap; border-bottom: 1px solid #35363f; align-items: center; }
-  #actions .meta { color: #8a8b94; font-size: 13px; margin-left: auto; }
-  button { background: #5865f2; color: #fff; border: 0; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; }
-  button:hover { filter: brightness(1.12); }
-  button.gray { background: #3a3b44; } button.red { background: #ed4245; } button.green { background: #2d7d46; } button.yellow { background: #b8860b; }
-  #tabs { display: flex; gap: 4px; padding: 8px 16px 0; }
-  #tabs div { padding: 7px 14px; cursor: pointer; border-radius: 8px 8px 0 0; background: #26272e; color: #a9aab3; font-size: 13px; }
-  #tabs div.on { background: #111214; color: #fff; }
-  #content { flex: 1; background: #111214; margin: 0 16px 16px; border-radius: 0 8px 8px 8px; overflow: auto; padding: 12px; font-family: Consolas, monospace; font-size: 12.5px; white-space: pre-wrap; word-break: break-word; }
-  #content textarea { width: 100%; height: 100%; background: #111214; color: #e6e6e9; border: 1px solid #35363f; border-radius: 6px; padding: 10px; font-family: Consolas, monospace; font-size: 13px; resize: none; }
-  .err { color: #ff7b7e; }
-  dialog { background: #26272e; color: #e6e6e9; border: 1px solid #35363f; border-radius: 10px; padding: 22px; width: 430px; }
-  dialog::backdrop { background: rgba(0,0,0,.55); }
-  dialog h2 { font-size: 16px; margin-bottom: 14px; }
-  dialog label { display: block; font-size: 12px; color: #a9aab3; margin: 10px 0 4px; }
-  dialog input { width: 100%; background: #1b1c21; border: 1px solid #35363f; color: #e6e6e9; border-radius: 6px; padding: 8px; font-size: 13px; }
+  #actions { padding: 12px 16px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; border-bottom: 1px solid var(--border); background: var(--panel); }
+  .pill { font-size: 12px; padding: 5px 12px; border-radius: 20px; background: var(--panel2); border: 1px solid var(--border); color: var(--muted); }
+  .pill.st-demarre { color: var(--green); border-color: rgba(67,181,129,.45); }
+  .pill.st-maj { color: var(--yellow); border-color: rgba(250,166,26,.45); }
+  .pill.st-externe { color: var(--blue); border-color: rgba(77,157,224,.45); }
+  #actions .meta { color: var(--muted); font-size: 12px; margin-left: auto; }
+  button { background: var(--panel2); color: var(--text); border: 1px solid var(--border); padding: 8px 14px; border-radius: 8px; cursor: pointer; font-size: 13px; transition: filter .12s; }
+  button:hover { filter: brightness(1.18); }
+  button.accent { background: linear-gradient(135deg, var(--accent), #c04426); border: 0; font-weight: 600; }
+  button.green { background: #2d7d46; border: 0; }
+  button.red { background: #c73e3e; border: 0; }
+  button.yellow { background: #96690d; border: 0; }
+  #tabs { display: flex; gap: 18px; padding: 10px 18px 0; background: var(--panel); border-bottom: 1px solid var(--border); }
+  #tabs div { padding: 6px 2px 10px; cursor: pointer; color: var(--muted); font-size: 13px; border-bottom: 2px solid transparent; margin-bottom: -1px; transition: color .12s; }
+  #tabs div:hover { color: var(--text); }
+  #tabs div.on { color: var(--text); border-bottom-color: var(--accent); font-weight: 600; }
+  #content { flex: 1; background: #101114; margin: 14px 16px 16px; border: 1px solid var(--border); border-radius: 12px; overflow: auto; padding: 14px; font-family: Consolas, monospace; font-size: 12.5px; white-space: pre-wrap; word-break: break-word; }
+  #content textarea { width: 100%; height: 100%; background: #101114; color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 10px; font-family: Consolas, monospace; font-size: 13px; resize: none; }
+  .err { color: #ff8285; }
+  dialog { background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 14px; padding: 24px; width: 440px; }
+  dialog::backdrop { background: rgba(0,0,0,.6); }
+  dialog h2 { font-size: 16px; margin-bottom: 12px; }
+  dialog label { display: block; font-size: 12px; color: var(--muted); margin: 10px 0 4px; }
+  dialog input { width: 100%; background: #101114; border: 1px solid var(--border); color: var(--text); border-radius: 8px; padding: 9px; font-size: 13px; }
+  dialog input:focus { outline: none; border-color: var(--accent); }
   dialog .row { display: flex; gap: 8px; justify-content: flex-end; margin-top: 18px; }
   .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
   .tile { background: #1b1c21; border: 1px solid #35363f; border-radius: 10px; padding: 12px; }
@@ -707,7 +729,7 @@ const HTML = `<!DOCTYPE html>
   .dbside select { width: 100%; margin-bottom: 10px; background: #1b1c21; color: #e6e6e9; border: 1px solid #35363f; border-radius: 6px; padding: 6px; }
   .dbitem { padding: 8px 10px; border-radius: 6px; cursor: pointer; color: #a9aab3; font-size: 13px; margin-bottom: 2px; }
   .dbitem:hover { background: #1b1c21; }
-  .dbitem.on { background: #2f3040; color: #fff; }
+  .dbitem.on { background: rgba(232,89,58,.14); color: #fff; border-left: 3px solid var(--accent); padding-left: 7px; }
   .dbmain { flex: 1; min-width: 0; overflow-y: auto; }
   .dbtitle { font-size: 17px; margin-bottom: 14px; }
   .dbp { color: #8a8b94; font-size: 13px; margin-bottom: 10px; }
@@ -716,15 +738,17 @@ const HTML = `<!DOCTYPE html>
   .dsec h3 { font-size: 14px; margin-bottom: 3px; }
   .dsec p { color: #8a8b94; font-size: 12.5px; margin-bottom: 8px; }
   .dsec select, .dsec input { background: #1b1c21; border: 1px solid #35363f; color: #e6e6e9; border-radius: 6px; padding: 7px; font-size: 13px; max-width: 340px; width: 100%; }
-  #toast { position: fixed; bottom: 18px; right: 18px; background: #2f3040; border: 1px solid #5865f2; padding: 10px 16px; border-radius: 8px; font-size: 13px; display: none; max-width: 420px; }
+  #toast { position: fixed; bottom: 18px; right: 18px; background: var(--panel2); border: 1px solid var(--accent); padding: 11px 16px; border-radius: 10px; font-size: 13px; display: none; max-width: 420px; box-shadow: 0 6px 24px rgba(0,0,0,.45); }
   .empty { color: #8a8b94; padding: 30px; text-align: center; font-family: 'Segoe UI', sans-serif; }
 </style>
 </head>
 <body>
 <header>
-  <h1>🤖 Gestionnaire de bots</h1><span class="ver" id="ver"></span>
+  <div class="logo">🤖</div>
+  <h1>Gestionnaire de bots</h1><span class="ver" id="ver"></span>
+  <span class="spacer"></span>
   <button onclick="openSettings()">⚙️ Paramètres</button>
-  <button onclick="dlgNew.showModal()">➕ Nouveau bot</button>
+  <button class="accent" onclick="dlgNew.showModal()">➕ Nouveau bot</button>
 </header>
 <main>
   <div id="sidebar"></div>
@@ -765,16 +789,21 @@ function api(method, url, body) {
     .then(function(r){ return r.json(); })
     .then(function(j){ if (j && j.error) toast('⚠️ ' + j.error); return j; });
 }
-var STATUS_FR = { demarre: '🟢 démarré', arrete: '⚫ arrêté', maj: '🟡 mise à jour…', externe: '🔵 repris (externe)' };
+var STATUS_FR = { demarre: 'démarré', arrete: 'arrêté', maj: 'mise à jour…', externe: 'repris (externe)' };
 function refresh() {
   fetch('/api/etat').then(function(r){ return r.json(); }).then(function(s){
     state = s;
     $('ver').textContent = 'v' + s.version;
-    var sb = $('sidebar'); sb.innerHTML = '';
+    var sb = $('sidebar');
+    sb.innerHTML = '<div class="sblabel">Mes bots</div>';
+    if (!s.bots.length) {
+      sb.innerHTML += '<div style="color:var(--muted);font-size:12.5px;padding:6px 8px">Aucun bot pour le moment.<br>Cliquez sur <b>➕ Nouveau bot</b>.</div>';
+    }
     s.bots.forEach(function(b){
       var d = document.createElement('div');
       d.className = 'botcard' + (b.name === sel ? ' sel' : '');
-      d.innerHTML = '<div class="nm">' + b.name + '</div><div class="st st-' + b.status + '">' + (STATUS_FR[b.status] || b.status) + (b.version ? ' · ' + b.version : '') + '</div>';
+      d.innerHTML = '<span class="bc-dot st-' + b.status + '"></span><span><span class="nm">' + b.name + '</span>' +
+        '<span class="st">' + (STATUS_FR[b.status] || b.status) + (b.version ? ' · ' + b.version : '') + '</span></span>';
       d.onclick = function(){ selectBot(b.name); };
       sb.appendChild(d);
     });
@@ -786,6 +815,10 @@ function botSel() { for (var i = 0; i < state.bots.length; i++) if (state.bots[i
 function renderActions() {
   var b = botSel(); var a = $('actions'); if (!b) { a.innerHTML = ''; return; }
   a.innerHTML = '';
+  var pill = document.createElement('span');
+  pill.className = 'pill st-' + b.status;
+  pill.textContent = '● ' + (STATUS_FR[b.status] || b.status);
+  a.appendChild(pill);
   function btn(label, cls, fn) { var x = document.createElement('button'); x.textContent = label; x.className = cls || ''; x.onclick = fn; a.appendChild(x); }
   if (b.status === 'demarre' || b.status === 'externe') btn('⏹ Arrêter', 'red', function(){ api('POST', '/api/bots/' + sel + '/arreter'); setTimeout(refresh, 600); });
   else btn('▶ Démarrer', 'green', function(){ api('POST', '/api/bots/' + sel + '/demarrer'); setTimeout(refresh, 600); });
