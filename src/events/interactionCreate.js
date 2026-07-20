@@ -26,6 +26,11 @@ module.exports = {
       return;
     }
 
+    // ----- Boutons des interactions Nekotina (/interact) — serveurs ET MP -----
+    if (interaction.isButton() && interaction.customId.startsWith('itx')) {
+      return require('../commands/interact').handleButton(interaction);
+    }
+
     // ----- Boutons du système de tickets -----
     if (interaction.isButton() && interaction.customId.startsWith('tkt')) {
       if (!interaction.inGuild()) return;
@@ -83,24 +88,27 @@ module.exports = {
     const command = interaction.client.commands.get(interaction.commandName);
     if (!command) return;
 
-    if (!interaction.inGuild()) {
+    if (!interaction.inGuild() && !command.allowDm) {
       return interaction.reply({ content: '⛔ Cette commande s\'utilise sur un serveur.', flags: MessageFlags.Ephemeral });
     }
 
     // Réponses en « lecture seule » : toutes les réponses de commandes sont
     // éphémères par défaut (visibles uniquement par leur auteur) pour ne pas
     // inonder les salons textuels. Les annonces publiques passent par les
-    // salons dédiés configurés (service, staff, niveaux, logs).
-    const makeEphemeral = (options) => {
-      if (typeof options === 'string') options = { content: options };
-      if (options && typeof options === 'object' && options.flags === undefined) {
-        options = { ...options, flags: MessageFlags.Ephemeral };
+    // salons dédiés configurés — et les commandes marquées `public`
+    // (ex : /interact) répondent visiblement pour tout le monde.
+    if (!command.public) {
+      const makeEphemeral = (options) => {
+        if (typeof options === 'string') options = { content: options };
+        if (options && typeof options === 'object' && options.flags === undefined) {
+          options = { ...options, flags: MessageFlags.Ephemeral };
+        }
+        return options;
+      };
+      for (const method of ['reply', 'deferReply', 'followUp']) {
+        const original = interaction[method].bind(interaction);
+        interaction[method] = (options = {}) => original(makeEphemeral(options));
       }
-      return options;
-    };
-    for (const method of ['reply', 'deferReply', 'followUp']) {
-      const original = interaction[method].bind(interaction);
-      interaction[method] = (options = {}) => original(makeEphemeral(options));
     }
 
     // Sécurité centralisée : chaque commande déclare son grade minimum, le
@@ -109,14 +117,16 @@ module.exports = {
     const cfg = getGuildConfig(interaction.guildId);
     const memberGrade = getGrade(interaction.member, cfg);
     if (memberGrade < requiredGrade) {
-      await sendLog(
-        interaction.guild,
-        logEmbed(
-          '🛑 Accès refusé',
-          `<@${interaction.user.id}> a tenté \`/${interaction.commandName}\` (grade requis : **${GRADE_NAMES[requiredGrade]}**).`,
-          COLORS.WARNING
-        )
-      );
+      if (interaction.guild) {
+        await sendLog(
+          interaction.guild,
+          logEmbed(
+            '🛑 Accès refusé',
+            `<@${interaction.user.id}> a tenté \`/${interaction.commandName}\` (grade requis : **${GRADE_NAMES[requiredGrade]}**).`,
+            COLORS.WARNING
+          )
+        );
+      }
       return interaction.reply({
         content: `⛔ Sécurité : cette commande est réservée au grade **${GRADE_NAMES[requiredGrade]}**.`,
         flags: MessageFlags.Ephemeral,

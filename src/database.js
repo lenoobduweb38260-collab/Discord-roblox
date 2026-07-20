@@ -140,6 +140,14 @@ CREATE TABLE IF NOT EXISTS global_bans (
   banned_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS interactions (
+  user_a TEXT NOT NULL,
+  user_b TEXT NOT NULL,
+  action TEXT NOT NULL,
+  count  INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (user_a, user_b, action)
+);
+
 CREATE TABLE IF NOT EXISTS ticket_types (
   id              INTEGER PRIMARY KEY AUTOINCREMENT,
   guild_id        TEXT NOT NULL,
