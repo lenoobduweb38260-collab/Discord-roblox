@@ -527,6 +527,32 @@ const server = http.createServer(async (req, res) => {
         }
       }
 
+      // Brouillons d'embeds (page Messages du dashboard) — stockés par bot.
+      if (req.method === 'GET' && action === 'brouillons') {
+        return sendJson(res, 200, { drafts: bot.drafts || [] });
+      }
+      if (req.method === 'PUT' && action === 'brouillons') {
+        const body = await jsonBody(req);
+        const draftName = String(body.name || '').trim().slice(0, 40);
+        if (!draftName) return sendJson(res, 400, { error: 'Donnez un nom au brouillon.' });
+        bot.drafts = bot.drafts || [];
+        const existing = bot.drafts.findIndex((d) => d.name === draftName);
+        const draft = { name: draftName, data: body.data || {} };
+        if (existing >= 0) bot.drafts[existing] = draft;
+        else {
+          if (bot.drafts.length >= 20) return sendJson(res, 400, { error: 'Maximum 20 brouillons.' });
+          bot.drafts.push(draft);
+        }
+        saveConfig(config);
+        return sendJson(res, 200, { ok: true });
+      }
+      if (req.method === 'POST' && action === 'brouillons-suppr') {
+        const body = await jsonBody(req);
+        bot.drafts = (bot.drafts || []).filter((d) => d.name !== body.name);
+        saveConfig(config);
+        return sendJson(res, 200, { ok: true });
+      }
+
       // Lien d'invitation du bot, construit depuis le CLIENT_ID de son .env.
       if (req.method === 'GET' && action === 'invitation') {
         let envContent = '';
@@ -789,7 +815,7 @@ const HTML = `<!DOCTYPE html>
   .dsec { margin-bottom: 18px; padding-bottom: 16px; border-bottom: 1px solid #26272e; }
   .dsec h3 { font-size: 14px; margin-bottom: 3px; }
   .dsec p { color: #8a8b94; font-size: 12.5px; margin-bottom: 8px; }
-  .dsec select, .dsec input { background: #1b1c21; border: 1px solid #35363f; color: #e6e6e9; border-radius: 6px; padding: 7px; font-size: 13px; max-width: 340px; width: 100%; }
+  .dsec select, .dsec input, .dsec textarea { background: #1b1c21; border: 1px solid #35363f; color: #e6e6e9; border-radius: 6px; padding: 7px; font-size: 13px; max-width: 340px; width: 100%; font-family: inherit; resize: vertical; }
   #toast { position: fixed; bottom: 18px; right: 18px; background: var(--panel2); border: 1px solid var(--accent); padding: 11px 16px; border-radius: 10px; font-size: 13px; display: none; max-width: 420px; box-shadow: 0 6px 24px rgba(0,0,0,.45); }
   .empty { color: #8a8b94; padding: 30px; text-align: center; font-family: 'Segoe UI', sans-serif; }
 </style>
@@ -903,7 +929,7 @@ function renderActions() {
 }
 function renderTabs() {
   var t = $('tabs'); t.innerHTML = '';
-  [['dash', '🎛️ Dashboard'], ['embed', '🖼️ Embed'], ['console', '🖥️ Console'], ['erreurs', '🚨 Erreurs'], ['env', '⚙️ .env']].forEach(function(p){
+  [['dash', '🎛️ Dashboard'], ['console', '🖥️ Console'], ['erreurs', '🚨 Erreurs'], ['env', '⚙️ .env']].forEach(function(p){
     var d = document.createElement('div');
     d.textContent = p[1];
     d.className = tab === p[0] ? 'on' : '';
@@ -948,6 +974,7 @@ function loadTab() {
       var pages = [
         ['apercu', '📊 Vue d\\'ensemble'],
         ['membres', '👋 Arrivées et départs'],
+        ['messages', '💬 Messages'],
         ['niveaux', '📈 Niveaux'],
         ['roles', '👮 Rôles & sécurité'],
         ['salons', '📢 Salons & logs'],
@@ -966,64 +993,6 @@ function loadTab() {
         el.onclick = function(){ window.dashPage = el.getAttribute('data-p'); loadTab(); };
       });
       renderDashPage(page, gid);
-    });
-    return;
-  } else if (tab === 'embed') {
-    c.style.display = 'block';
-    c.style.fontFamily = "'Segoe UI', system-ui, sans-serif";
-    c.innerHTML = '<div class="empty">Chargement…</div>';
-    fetch('/api/bots/' + sel + '/proxy/infos').then(function(r){ return r.json(); }).then(function(info){
-      if (info.error) { c.innerHTML = '<div class="empty">⚠️ ' + info.error + '</div>'; return; }
-      if (!info.guilds || !info.guilds.length) { c.innerHTML = '<div class="empty">Le bot n\\'est sur aucun serveur — utilisez le bouton 🔗 Inviter.</div>'; return; }
-      var fld = function(id, label, ph){ return '<label>' + label + '</label><input id="' + id + '" placeholder="' + (ph || '') + '">'; };
-      var h = '<div style="display:flex;gap:18px;align-items:flex-start">';
-      h += '<div class="frm" style="flex:0 0 330px">';
-      h += '<label>Serveur</label><select id="eb_g"></select>';
-      h += '<label>Salon de destination</label><select id="eb_c"></select>';
-      h += fld('eb_msg', 'Message (au-dessus de l\\'embed)');
-      h += fld('eb_auth', 'Auteur (en-tête de l\\'embed)');
-      h += fld('eb_authicon', 'Icône de l\\'auteur (URL)');
-      h += fld('eb_t', 'Titre');
-      h += '<label>Description</label><textarea id="eb_d" rows="5"></textarea>';
-      h += '<label>Couleur</label><input id="eb_col" type="color" value="#5865f2" style="height:34px;padding:2px">';
-      h += fld('eb_img', 'Grande image (URL — photo/GIF)', 'https://…');
-      h += fld('eb_th', 'Miniature (URL)', 'https://…');
-      h += fld('eb_f', 'Pied de page');
-      h += '<button id="eb_send" style="margin-top:12px;width:100%">📤 Envoyer dans le salon</button>';
-      h += '</div>';
-      h += '<div style="flex:1"><div style="color:#8a8b94;font-size:12px;margin-bottom:8px">Prévisualisation en direct</div><div id="eb_pv"></div></div>';
-      h += '</div>';
-      c.innerHTML = h;
-      var esc = function(s){ var d = document.createElement('div'); d.textContent = s; return d.innerHTML; };
-      $('eb_g').innerHTML = info.guilds.map(function(g){ return '<option value="' + g.id + '">' + g.name + '</option>'; }).join('');
-      var fillChannels = function(){
-        var g = info.guilds.filter(function(x){ return x.id === $('eb_g').value; })[0];
-        $('eb_c').innerHTML = g.channels.map(function(ch){ return '<option value="' + ch.id + '">#' + ch.name + '</option>'; }).join('');
-      };
-      var updPv = function(){
-        var h2 = '';
-        if ($('eb_msg').value) h2 += '<div style="margin-bottom:6px;white-space:pre-wrap">' + esc($('eb_msg').value) + '</div>';
-        h2 += '<div class="dcard" style="border-left-color:' + $('eb_col').value + '">';
-        if ($('eb_auth').value) h2 += '<div class="dauth">' + ($('eb_authicon').value ? '<img src="' + esc($('eb_authicon').value) + '">' : '') + esc($('eb_auth').value) + '</div>';
-        if ($('eb_t').value) h2 += '<div class="dtitle">' + esc($('eb_t').value) + '</div>';
-        if ($('eb_d').value) h2 += '<div class="ddesc">' + esc($('eb_d').value) + '</div>';
-        if ($('eb_th').value) h2 += '<img class="dthumb" src="' + esc($('eb_th').value) + '">';
-        if ($('eb_img').value) h2 += '<img class="dimg" src="' + esc($('eb_img').value) + '">';
-        if ($('eb_f').value) h2 += '<div class="dfoot">' + esc($('eb_f').value) + '</div>';
-        h2 += '</div>';
-        $('eb_pv').innerHTML = h2;
-      };
-      ['eb_msg','eb_auth','eb_authicon','eb_t','eb_d','eb_col','eb_img','eb_th','eb_f'].forEach(function(id){ $(id).addEventListener('input', updPv); });
-      $('eb_g').onchange = fillChannels;
-      fillChannels(); updPv();
-      $('eb_send').onclick = function(){
-        api('POST', '/api/bots/' + sel + '/proxy/embed', {
-          guildId: $('eb_g').value, channelId: $('eb_c').value, content: $('eb_msg').value,
-          embed: { auteur: $('eb_auth').value, auteur_icone: $('eb_authicon').value, titre: $('eb_t').value,
-                   description: $('eb_d').value, couleur: $('eb_col').value, image: $('eb_img').value,
-                   miniature: $('eb_th').value, footer: $('eb_f').value }
-        }).then(function(j){ if (j && j.ok) toast('✅ Embed envoyé !'); });
-      };
     });
     return;
   } else if (tab === 'env') {
@@ -1048,6 +1017,80 @@ function createBot() {
   });
 }
 // ----- Pages du dashboard (style DraftBot) -----
+function escHtml(s) { var d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; }
+
+var EM_FIELDS = ['em_msg', 'em_auth', 'em_authicon', 'em_t', 'em_d', 'em_col', 'em_img', 'em_th', 'em_f'];
+function emCollect() { var o = {}; EM_FIELDS.forEach(function(id){ o[id] = $(id).value; }); return o; }
+function emFill(data) { EM_FIELDS.forEach(function(id){ $(id).value = (data && data[id]) || (id === 'em_col' ? '#5865f2' : ''); }); emPreview(); }
+function emPreview() {
+  var h = '';
+  if ($('em_msg').value) h += '<div style="margin-bottom:6px;white-space:pre-wrap">' + escHtml($('em_msg').value) + '</div>';
+  h += '<div class="dcard" style="border-left-color:' + $('em_col').value + '">';
+  if ($('em_auth').value) h += '<div class="dauth">' + ($('em_authicon').value ? '<img src="' + escHtml($('em_authicon').value) + '">' : '') + escHtml($('em_auth').value) + '</div>';
+  if ($('em_t').value) h += '<div class="dtitle">' + escHtml($('em_t').value) + '</div>';
+  if ($('em_d').value) h += '<div class="ddesc">' + escHtml($('em_d').value) + '</div>';
+  if ($('em_th').value) h += '<img class="dthumb" src="' + escHtml($('em_th').value) + '">';
+  if ($('em_img').value) h += '<img class="dimg" src="' + escHtml($('em_img').value) + '">';
+  if ($('em_f').value) h += '<div class="dfoot">' + escHtml($('em_f').value) + '</div>';
+  h += '</div>';
+  $('em_pv').innerHTML = h;
+}
+function emDraftsRender() {
+  fetch('/api/bots/' + sel + '/brouillons').then(function(r){ return r.json(); }).then(function(j){
+    var box = $('em_drafts'); if (!box) return;
+    box.innerHTML = '';
+    (j.drafts || []).forEach(function(d){
+      var row = document.createElement('div');
+      row.className = 'dbrow';
+      row.style.cssText = 'display:flex;align-items:center;gap:6px;cursor:pointer';
+      row.innerHTML = '<span style="flex:1">📄 ' + escHtml(d.name) + '</span><button style="padding:2px 8px;font-size:11px">🗑</button>';
+      row.firstChild.onclick = function(){ $('em_dname').value = d.name; emFill(d.data); toast('📄 Brouillon « ' + d.name + ' » chargé.'); };
+      row.lastChild.onclick = function(ev){ ev.stopPropagation(); api('POST', '/api/bots/' + sel + '/brouillons-suppr', { name: d.name }).then(emDraftsRender); };
+      box.appendChild(row);
+    });
+    if (!(j.drafts || []).length) box.innerHTML = '<div class="dbp"><i>Aucun brouillon.</i></div>';
+  });
+}
+function setupMessagesPage(gid) {
+  EM_FIELDS.forEach(function(id){ $(id).addEventListener('input', emPreview); });
+  emPreview();
+  emDraftsRender();
+  $('em_dsave').onclick = function(){
+    var name = $('em_dname').value.trim();
+    if (!name) { toast('⚠️ Donnez un nom au brouillon.'); return; }
+    api('PUT', '/api/bots/' + sel + '/brouillons', { name: name, data: emCollect() })
+      .then(function(j){ if (j && j.ok) { toast('💾 Brouillon « ' + name + ' » sauvegardé.'); emDraftsRender(); } });
+  };
+  $('em_send').onclick = function(){
+    api('POST', '/api/bots/' + sel + '/proxy/embed', {
+      guildId: gid, channelId: $('em_c').value, content: $('em_msg').value,
+      embed: { auteur: $('em_auth').value, auteur_icone: $('em_authicon').value, titre: $('em_t').value,
+               description: $('em_d').value, couleur: $('em_col').value, image: $('em_img').value,
+               miniature: $('em_th').value, footer: $('em_f').value }
+    }).then(function(j){ if (j && j.ok) toast('✅ Message envoyé !'); });
+  };
+}
+function setupMembresPage(gid) {
+  var pv = function(){
+    var raw = $('dm_wel').value || 'Bienvenue à {user} sur **{server}** ! 🎉';
+    var txt = escHtml(raw)
+      .replace(/\{user\.username\}/g, 'shadow')
+      .replace(/\{user\.mention\}|\{user\}/g, '<span style="color:#7a86ff">@shadow</span>')
+      .replace(/\{server\}/g, 'Mon Serveur RP')
+      .replace(/\{membercount\}/g, '128')
+      .replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>');
+    $('dm_pv').innerHTML = '<div class="dcard" style="border-left-color:#43b581">' +
+      ($('dm_mention').checked ? '<div style="color:#7a86ff;margin-bottom:6px">@shadow</div>' : '') +
+      '<div class="dtitle">📥 Arrivée d&#39;un membre</div><div class="ddesc">' + txt + '</div>' +
+      '<div class="dfoot">💬 shadow · 🔢 123456789 · 👥 Membre n°128 · 📅 Compte créé le 12/01/2023</div></div>';
+  };
+  $('dm_wel').addEventListener('input', pv);
+  $('dm_mention').onchange = function(){ dashSave(gid, 'welcome_mention', $('dm_mention').checked ? 1 : 0); pv(); };
+  $('dm_savew').onclick = function(){ dashSave(gid, 'welcome_message', $('dm_wel').value.trim() || null); };
+  $('dm_saveb').onclick = function(){ dashSave(gid, 'goodbye_message', $('dm_bye').value.trim() || null); };
+  pv();
+}
+
 function dashSave(gid, key, value) {
   api('POST', '/api/bots/' + sel + '/proxy/config', { guildId: gid, key: key, value: value })
     .then(function(j){ if (j && j.ok) toast('✅ Enregistré'); });
@@ -1093,9 +1136,38 @@ function renderDashPage(page, gid) {
     var cfg = p.config, h = '';
     if (page === 'membres') {
       h += '<h2 class="dbtitle">👋 Arrivées et Départs</h2>';
-      h += dashSelect('member_channel_id', 'Messages d\\'arrivée et de départ',
-        'Embed à chaque arrivée (nom, ID, photo de profil, date de création du compte) et départ (depuis quand le membre avait rejoint le serveur).',
+      h += dashSelect('member_channel_id', 'Salon des messages',
+        'Salon des embeds d\\'arrivée (nom, ID, photo de profil, date de création du compte) et de départ (depuis quand le membre avait rejoint le serveur). « — Désactivé — » pour couper.',
         p.channels, cfg.member_channel_id, '#');
+      h += '<div class="dsec"><h3>Mentionner le membre</h3><p>Ajoute une mention @membre au-dessus de l\\'embed de bienvenue.</p>' +
+        '<label style="display:flex;gap:8px;align-items:center;font-size:13px"><input type="checkbox" id="dm_mention"' + (cfg.welcome_mention ? ' checked' : '') + ' style="width:auto"> Activer la mention</label></div>';
+      h += '<div class="dsec"><h3>Message de bienvenue personnalisé</h3><p>Variables : <code>{user}</code> (mention) · <code>{user.username}</code> · <code>{server}</code> · <code>{membercount}</code> — laissez vide pour le message par défaut.</p>' +
+        '<textarea id="dm_wel" rows="3" style="max-width:520px">' + escHtml(cfg.welcome_message || '') + '</textarea><br><button id="dm_savew" style="margin-top:6px">💾 Enregistrer</button></div>';
+      h += '<div class="dsec"><h3>Message d\\'au revoir personnalisé</h3><p>Mêmes variables disponibles.</p>' +
+        '<textarea id="dm_bye" rows="3" style="max-width:520px">' + escHtml(cfg.goodbye_message || '') + '</textarea><br><button id="dm_saveb" style="margin-top:6px">💾 Enregistrer</button></div>';
+      h += '<div class="dsec"><h3>Prévisualisation (arrivée)</h3><div id="dm_pv"></div></div>';
+    } else if (page === 'messages') {
+      h += '<h2 class="dbtitle">💬 Messages</h2>';
+      h += '<p class="dbp">Créez des messages et embeds, prévisualisez en direct, sauvegardez des brouillons et envoyez dans un salon.</p>';
+      h += '<div style="display:flex;gap:18px;align-items:flex-start;flex-wrap:wrap">';
+      h += '<div class="frm" style="flex:0 0 300px">';
+      h += '<label>Salon de destination</label><select id="em_c">' + p.channels.map(function(ch){ return '<option value="' + ch.id + '">#' + ch.name + '</option>'; }).join('') + '</select>';
+      h += '<label>Message (au-dessus de l\\'embed)</label><input id="em_msg">';
+      h += '<label>Auteur</label><input id="em_auth">';
+      h += '<label>Icône de l\\'auteur (URL)</label><input id="em_authicon">';
+      h += '<label>Titre</label><input id="em_t">';
+      h += '<label>Description</label><textarea id="em_d" rows="5"></textarea>';
+      h += '<label>Couleur</label><input id="em_col" type="color" value="#5865f2" style="height:34px;padding:2px">';
+      h += '<label>Grande image (URL — photo/GIF)</label><input id="em_img">';
+      h += '<label>Miniature (URL)</label><input id="em_th">';
+      h += '<label>Pied de page</label><input id="em_f">';
+      h += '<button id="em_send" class="accent" style="margin-top:10px;width:100%">📤 Envoyer dans le salon</button>';
+      h += '</div>';
+      h += '<div style="flex:1;min-width:260px"><div class="dbp">Prévisualisation en direct</div><div id="em_pv"></div></div>';
+      h += '<div style="flex:0 0 215px"><div class="dbp">Brouillons</div><div id="em_drafts"></div>' +
+        '<input id="em_dname" placeholder="Nom du brouillon" style="margin-top:8px;width:100%;background:#101114;border:1px solid var(--border);color:var(--text);border-radius:6px;padding:7px;font-size:13px">' +
+        '<button id="em_dsave" style="margin-top:6px;width:100%">💾 Sauvegarder le brouillon</button></div>';
+      h += '</div>';
     } else if (page === 'niveaux') {
       h += '<h2 class="dbtitle">📈 Niveaux</h2>';
       h += dashSelect('level_channel_id', 'Salon des annonces de niveau', 'Salon où sont annoncées les montées de niveau (écrit et vocal).', p.channels, cfg.level_channel_id, '#');
@@ -1153,6 +1225,8 @@ function renderDashPage(page, gid) {
     m.innerHTML = h;
     var proxy = function(route, body){ return api('POST', '/api/bots/' + sel + '/proxy/' + route, body); };
     var rerender = function(j){ if (j && j.ok) { toast('✅ ' + (j.note || 'Enregistré')); renderDashPage(page, gid); } };
+    if ($('em_pv')) setupMessagesPage(gid);
+    if ($('dm_pv')) setupMembresPage(gid);
     if ($('dw_add')) $('dw_add').onclick = function(){
       if (!$('dw_role').value || !$('dw_mgr').value) { toast('⚠️ Choisissez les deux rôles.'); return; }
       proxy('whitelist-ajouter', { guildId: gid, roleId: $('dw_role').value, managerRoleId: $('dw_mgr').value }).then(rerender);

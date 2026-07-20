@@ -191,9 +191,16 @@ CREATE TABLE IF NOT EXISTS scam_images (
 
 // Migration : ajoute les colonnes manquantes aux bases créées avant leur
 // introduction (CREATE TABLE IF NOT EXISTS ne modifie pas une table existante).
-try {
-  db.exec('ALTER TABLE guild_config ADD COLUMN member_channel_id TEXT');
-} catch {}
+for (const column of [
+  'member_channel_id TEXT',
+  'welcome_message TEXT',
+  'goodbye_message TEXT',
+  'welcome_mention INTEGER',
+]) {
+  try {
+    db.exec(`ALTER TABLE guild_config ADD COLUMN ${column}`);
+  } catch {}
+}
 
 const DEFAULT_CONFIG = {
   staff_role_id: null,
@@ -204,6 +211,9 @@ const DEFAULT_CONFIG = {
   service_channel_id: null,
   staff_channel_id: null,
   member_channel_id: null,
+  welcome_message: null,
+  goodbye_message: null,
+  welcome_mention: 0,
   xp_text: 20,
   xp_voice: 10,
   xp_cooldown: 60,

@@ -15,11 +15,20 @@ module.exports = {
     if (!channel?.isTextBased()) return;
 
     const joinedAt = member.joinedAt; // peut être inconnu si le membre n'était pas en cache
+    const applyVars = (template) =>
+      template
+        .replace(/\{user\.username\}/g, member.user.username)
+        .replace(/\{user\.mention\}|\{user\}/g, `<@${member.id}>`)
+        .replace(/\{server\}/g, member.guild.name)
+        .replace(/\{membercount\}/g, String(member.guild.memberCount));
+    const description = cfg.goodbye_message?.trim()
+      ? applyVars(cfg.goodbye_message)
+      : `<@${member.id}> a quitté **${member.guild.name}**.`;
     const embed = new EmbedBuilder()
       .setColor(COLORS.DANGER)
       .setTitle('📤 Départ d\'un membre')
       .setThumbnail(member.user.displayAvatarURL({ size: 256 }))
-      .setDescription(`<@${member.id}> a quitté **${member.guild.name}**.`)
+      .setDescription(description)
       .addFields(
         { name: '💬 Nom Discord', value: member.user.tag, inline: true },
         { name: '🔢 ID Discord', value: `\`${member.id}\``, inline: true },

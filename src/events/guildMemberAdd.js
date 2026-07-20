@@ -29,11 +29,22 @@ module.exports = {
     if (!cfg.member_channel_id) return;
     const channel = await member.guild.channels.fetch(cfg.member_channel_id).catch(() => null);
     if (!channel?.isTextBased()) return;
+    // Message personnalisé avec variables : {user} (mention), {user.username},
+    // {server}, {membercount} — sinon message par défaut.
+    const applyVars = (template) =>
+      template
+        .replace(/\{user\.username\}/g, member.user.username)
+        .replace(/\{user\.mention\}|\{user\}/g, `<@${member.id}>`)
+        .replace(/\{server\}/g, member.guild.name)
+        .replace(/\{membercount\}/g, String(member.guild.memberCount));
+    const description = cfg.welcome_message?.trim()
+      ? applyVars(cfg.welcome_message)
+      : `Bienvenue à <@${member.id}> sur **${member.guild.name}** ! 🎉`;
     const embed = new EmbedBuilder()
       .setColor(COLORS.SUCCESS)
       .setTitle('📥 Arrivée d\'un membre')
       .setThumbnail(member.user.displayAvatarURL({ size: 256 }))
-      .setDescription(`Bienvenue à <@${member.id}> sur **${member.guild.name}** ! 🎉`)
+      .setDescription(description)
       .addFields(
         { name: '💬 Nom Discord', value: member.user.tag, inline: true },
         { name: '🔢 ID Discord', value: `\`${member.id}\``, inline: true },
@@ -45,6 +56,8 @@ module.exports = {
         }
       )
       .setTimestamp();
-    await channel.send({ embeds: [embed] }).catch(() => null);
+    await channel
+      .send({ content: cfg.welcome_mention ? `<@${member.id}>` : undefined, embeds: [embed] })
+      .catch(() => null);
   },
 };

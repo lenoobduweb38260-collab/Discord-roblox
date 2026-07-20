@@ -49,6 +49,9 @@ function startManagedApi(client, baseDir) {
     service_channel_id: 's',
     staff_channel_id: 's',
     member_channel_id: 's',
+    welcome_message: 't',
+    goodbye_message: 't',
+    welcome_mention: 'b',
     xp_text: 'n',
     xp_voice: 'n',
     xp_cooldown: 'n',
@@ -230,6 +233,10 @@ function startManagedApi(client, baseDir) {
           const [min, max] = NUM_LIMITS[key];
           if (Number.isNaN(value)) return send(400, { error: 'Valeur numérique attendue.' });
           value = Math.min(max, Math.max(min, value));
+        } else if (CONFIG_KEYS[key] === 'b') {
+          value = value ? 1 : 0;
+        } else if (CONFIG_KEYS[key] === 't' && value !== null) {
+          value = String(value).slice(0, 1500);
         }
         setGuildConfig(body.guildId, key, value);
         return send(200, { ok: true, value });
