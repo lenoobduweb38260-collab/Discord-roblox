@@ -34,7 +34,10 @@ INTERACT_GUILDS=
 `;
 
 // Premier lancement de l'exécutable : on crée un .env à remplir à côté de l'exe.
-if (process.pkg && !fs.existsSync(envPath)) {
+// (sauf en mode géré : le gestionnaire ou l'agent hébergeur fournit déjà la
+// configuration par variables d'environnement — un .env modèle vide créerait
+// de la confusion avec le config.env de l'hébergeur)
+if (process.pkg && process.env.BOT_MANAGED !== '1' && !fs.existsSync(envPath)) {
   try {
     fs.writeFileSync(envPath, ENV_TEMPLATE, { flag: 'wx' });
   } catch {

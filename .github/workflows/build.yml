@@ -84,7 +84,7 @@ jobs:
       - name: Créer le pack hébergeur (agent + configuration)
         run: |
           cd hebergeur
-          zip -r ../dist/pack-hebergeur.zip index.js .env.exemple LISEZMOI.md
+          zip -r ../dist/pack-hebergeur.zip index.js config.env LISEZMOI.md
 
       - uses: softprops/action-gh-release@v2
         with:

@@ -21,13 +21,23 @@ const { spawn, spawnSync } = require('child_process');
 
 const baseDir = __dirname;
 
-// Mini-lecteur .env (les variables déjà présentes dans l'environnement priment).
-const envPath = path.join(baseDir, '.env');
-if (fs.existsSync(envPath)) {
-  for (const line of fs.readFileSync(envPath, 'utf8').split(/\r?\n/)) {
+// Configuration : fichier « config.env » (recommandé — beaucoup d'hébergeurs
+// refusent les fichiers cachés commençant par un point) ou « .env ».
+// config.env est prioritaire ; les variables déjà présentes dans
+// l'environnement de l'hébergeur priment sur les deux.
+const configCandidates = ['config.env', '.env'].map((f) => path.join(baseDir, f));
+let configLoaded = null;
+for (const file of configCandidates) {
+  if (!fs.existsSync(file)) continue;
+  if (!configLoaded) configLoaded = path.basename(file);
+  for (const line of fs.readFileSync(file, 'utf8').split(/\r?\n/)) {
     const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*?)\s*$/);
     if (m && !(m[1] in process.env)) process.env[m[1]] = m[2];
   }
+}
+// Fichier de configuration actuel (édité à distance par le panel).
+function configPath() {
+  return configCandidates.find((f) => fs.existsSync(f)) || configCandidates[0];
 }
 
 const AGENT_KEY = (process.env.AGENT_KEY || '').trim();
@@ -40,7 +50,7 @@ const versionPath = path.join(baseDir, 'bot.version');
 const HEADERS = { 'User-Agent': 'discord-roblox-agent-hebergeur', Accept: 'application/vnd.github+json' };
 
 if (!AGENT_KEY) {
-  console.error('❌ AGENT_KEY manquant : définissez une clé d\'accès dans le .env (voir .env.exemple).');
+  console.error(`❌ AGENT_KEY manquant : définissez une clé d'accès dans le fichier config.env${configLoaded ? ` (fichier lu : ${configLoaded})` : ' (aucun fichier de configuration trouvé à côté de index.js)'}.`);
   console.error('   Cette clé sera demandée par votre panel pour se relier à ce bot.');
   process.exit(1);
 }
@@ -280,23 +290,23 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'GET' && action === 'env') {
       let content = '';
       try {
-        content = fs.readFileSync(envPath, 'utf8');
+        content = fs.readFileSync(configPath(), 'utf8');
       } catch {}
       return sendJson(res, 200, { content });
     }
     if (req.method === 'PUT' && action === 'env') {
       const body = await jsonBody(req);
-      fs.writeFileSync(envPath, String(body.content || ''));
-      addLine('📝 Fichier .env enregistré (redémarrez le bot pour appliquer).');
+      fs.writeFileSync(configPath(), String(body.content || ''));
+      addLine(`📝 Fichier ${path.basename(configPath())} enregistré (redémarrez le bot pour appliquer).`);
       return sendJson(res, 200, { ok: true });
     }
     if (req.method === 'GET' && action === 'invitation') {
       let envContent = '';
       try {
-        envContent = fs.readFileSync(envPath, 'utf8');
+        envContent = fs.readFileSync(configPath(), 'utf8');
       } catch {}
       const m = envContent.match(/^\s*CLIENT_ID\s*=\s*(\d+)/m);
-      if (!m) return sendJson(res, 400, { error: 'CLIENT_ID manquant dans le .env.' });
+      if (!m) return sendJson(res, 400, { error: 'CLIENT_ID manquant dans le fichier de configuration.' });
       return sendJson(res, 200, {
         url: `https://discord.com/oauth2/authorize?client_id=${m[1]}&scope=bot+applications.commands&permissions=8`,
         urlPerso: `https://discord.com/oauth2/authorize?client_id=${m[1]}&integration_type=1&scope=applications.commands`,
@@ -344,6 +354,7 @@ for (const sig of ['SIGINT', 'SIGTERM']) {
 server.listen(AGENT_PORT, AGENT_HOST, () => {
   console.log(`🌍 Agent hébergeur prêt : port ${AGENT_PORT} (clé d'accès requise).`);
   console.log(`📁 Dossier : ${baseDir}`);
+  console.log(`⚙️ Configuration lue : ${configLoaded || 'variables d\'environnement de l\'hébergeur uniquement'}`);
   console.log('🔗 Reliez votre panel : ➕ Nouveau bot → « Bot hébergé » → URL http://<ip>:' + AGENT_PORT + ' + clé.');
   // Démarrage automatique : mise à jour depuis GitHub puis lancement du bot.
   updateBot().then(() => {

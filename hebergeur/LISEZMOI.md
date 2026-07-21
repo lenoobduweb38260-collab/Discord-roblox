@@ -8,10 +8,11 @@ Ce pack fait tourner **le bot chez votre hébergeur**, avec :
 ## 1️⃣ Installation chez l'hébergeur
 
 1. **Envoyez le contenu du ZIP** dans un dossier de votre hébergeur
-2. Renommez `.env.exemple` en **`.env`** et remplissez :
+2. Ouvrez **`config.env`** (aucun renommage nécessaire — pas de fichier caché) et remplissez :
    - `AGENT_KEY` — inventez une **longue clé secrète** (c'est le mot de passe du lien avec votre panel)
    - `AGENT_PORT` — le port réseau que votre hébergeur vous a alloué
    - `DISCORD_TOKEN` + `CLIENT_ID` — comme d'habitude (et `OWNER_ID` recommandé)
+   - *(Vous pouvez aussi définir ces variables dans le panneau de votre hébergeur : elles priment sur le fichier. Un fichier `.env` classique fonctionne aussi si votre hébergeur l'accepte.)*
 3. Commande de démarrage à configurer chez l'hébergeur : **`node index.js`**
    (Node.js **18 ou plus récent** requis — aucun `npm install` nécessaire)
 4. Au premier lancement, l'agent télécharge la dernière version du bot depuis GitHub puis le démarre. La base `data.sqlite` est créée dans le même dossier — **sauvegardez-la**.
@@ -32,7 +33,7 @@ Ce pack fait tourner **le bot chez votre hébergeur**, avec :
 ## 🛡️ Sécurité
 
 - **Toutes** les routes de l'agent exigent la clé `AGENT_KEY` — sans elle, réponse 401.
-- Ne partagez jamais votre `.env` (il contient le token du bot ET la clé de l'agent).
+- Ne partagez jamais votre `config.env` (il contient le token du bot ET la clé de l'agent).
 - Si votre hébergeur propose un pare-feu, ouvrez uniquement le port `AGENT_PORT`.
 
 ## ❓ Dépannage

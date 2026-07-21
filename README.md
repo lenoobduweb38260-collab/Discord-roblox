@@ -168,7 +168,7 @@ Quand une **nouvelle version est prête** (release publiée pendant que le bot t
 
 Le fichier **`pack-hebergeur.zip`** (dans chaque release) fait tourner le bot **chez votre hébergeur** tout en gardant votre panel :
 
-1. Envoyez le contenu du zip chez l'hébergeur, renommez `.env.exemple` en `.env` (clé `AGENT_KEY` inventée + `AGENT_PORT` alloué + `DISCORD_TOKEN`/`CLIENT_ID`), commande de démarrage **`node index.js`** (Node 18+, aucun npm install)
+1. Envoyez le contenu du zip chez l'hébergeur et remplissez directement **`config.env`** (pas de fichier caché, aucun renommage : clé `AGENT_KEY` inventée + `AGENT_PORT` alloué + `DISCORD_TOKEN`/`CLIENT_ID`) — les variables du panneau de l'hébergeur priment si vous préférez ; commande de démarrage **`node index.js`** (Node 18+, aucun npm install)
 2. L'**agent** télécharge la dernière version du bot depuis les **releases GitHub**, le lance, capture sa console, le relance en cas de crash, et gère `/update` (mise à jour GitHub + relance)
 3. Sur votre PC : Gestionnaire → **➕ Nouveau bot → 🌍 Bot hébergé** (URL `http://ip:port` + clé) — le bot distant s'utilise ensuite **comme un bot local** : console en direct, ▶/⏹, ⬇ mise à jour, ⚙️ .env distant, 📊 dashboard complet et page **🌐 Serveurs** (chaque serveur qui ajoute le bot)
 4. Sécurité : toutes les routes de l'agent exigent la clé (`401` sinon) ; le panel local peut aussi être exposé (`PANEL_HOST`/`PANEL_PORT`/`PANEL_PASSWORD`, page de connexion intégrée)
