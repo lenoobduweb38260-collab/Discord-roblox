@@ -38,6 +38,13 @@ Ce pack fait tourner **le bot chez votre hébergeur**, avec :
 
 ## ❓ Dépannage
 
+- **Erreur `ts-node` au démarrage (`Cannot read properties of undefined (reading 'fileExists')`)** →
+  votre hébergeur (egg Node.js type Pterodactyl) lance le fichier avec **ts-node** au lieu de **node**.
+  Dans l'onglet **Startup** du panneau : mettez la variable **`MAIN_FILE`** à `index.js` — et si
+  l'erreur persiste, mettez-la littéralement à `*.js` (c'est la valeur exacte que la commande de
+  démarrage compare). Alternative : remplacez la commande de démarrage par `node /home/container/index.js`.
+  Le bon lancement affiche « 🌍 Agent hébergeur prêt ».
+
 - **« Clé d'accès invalide » dans le panel** → l'URL pointe bien vers l'agent, mais la clé saisie diffère de `AGENT_KEY`.
 - **« Agent hébergeur injoignable »** → vérifiez que l'agent tourne, que le port est ouvert/alloué, et que l'URL est `http://ip:port` (sans « / » final).
 - **Le bot ne se connecte pas à Discord** → vérifiez `DISCORD_TOKEN` dans le `.env` (onglet ⚙️ .env du panel, puis redémarrez le bot), et les **intents** (Server Members + Message Content) dans le portail développeur.
