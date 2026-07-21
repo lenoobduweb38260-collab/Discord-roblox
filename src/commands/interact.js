@@ -73,24 +73,45 @@ function incrementCounter(idA, idB, action) {
   return getPair.get(a, b, action).count;
 }
 
-// GIF depuis internet : nekos.best (avec nom de l'anime), waifu.pics en secours.
+// GIF depuis internet : trois sources essayées dans l'ordre, timeout 5 s
+// chacune, et cause d'échec journalisée dans la console pour diagnostic.
 async function fetchGif(category) {
-  try {
-    const res = await fetch(`https://nekos.best/api/v2/${category}`);
-    if (res.ok) {
-      const data = await res.json();
-      const result = data.results?.[0];
-      if (result?.url) return { url: result.url, anime: result.anime_name || null };
+  const simple = category === 'peck' ? 'kiss' : category;
+  const sources = [
+    {
+      name: 'nekos.best',
+      url: `https://nekos.best/api/v2/${category}`,
+      parse: (data) => ({ url: data.results?.[0]?.url, anime: data.results?.[0]?.anime_name || null }),
+    },
+    {
+      name: 'waifu.pics',
+      url: `https://api.waifu.pics/sfw/${simple}`,
+      parse: (data) => ({ url: data.url, anime: null }),
+    },
+    {
+      name: 'otakugifs',
+      url: `https://api.otakugifs.xyz/gif?reaction=${simple}`,
+      parse: (data) => ({ url: data.url, anime: null }),
+    },
+  ];
+  for (const source of sources) {
+    try {
+      const res = await fetch(source.url, {
+        headers: { 'User-Agent': 'discord-roblox-rp-bot' },
+        signal: AbortSignal.timeout(5000),
+      });
+      if (!res.ok) {
+        console.warn(`⚠️ GIF ${source.name} (${category}) : HTTP ${res.status}`);
+        continue;
+      }
+      const gif = source.parse(await res.json());
+      if (gif.url) return gif;
+      console.warn(`⚠️ GIF ${source.name} (${category}) : réponse sans URL`);
+    } catch (err) {
+      console.warn(`⚠️ GIF ${source.name} (${category}) : ${err.message}`);
     }
-  } catch {}
-  try {
-    const fallback = category === 'peck' ? 'kiss' : category;
-    const res = await fetch(`https://api.waifu.pics/sfw/${fallback}`);
-    if (res.ok) {
-      const data = await res.json();
-      if (data.url) return { url: data.url, anime: null };
-    }
-  } catch {}
+  }
+  console.warn(`⚠️ Aucun GIF trouvé pour « ${category} » — les 3 sources ont échoué.`);
   return null;
 }
 
@@ -113,6 +134,7 @@ async function buildInteractionMessage(interaction, actionKey, author, target, w
     );
   if (gif?.url) embed.setImage(gif.url);
   if (gif?.anime) embed.setFooter({ text: `Anime : ${gif.anime}` });
+  if (!gif?.url) embed.setFooter({ text: '⚠️ GIF momentanément indisponible (détail dans la console du bot)' });
   const payload = { content: `<@${target.id}>`, embeds: [embed] };
   if (withButtons) {
     payload.components = [
