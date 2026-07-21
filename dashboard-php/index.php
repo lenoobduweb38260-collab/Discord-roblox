@@ -15,14 +15,24 @@ if (!file_exists($configFile)) {
 }
 require $configFile;
 
-$manquants = [];
-foreach (['DASH_CLIENT_ID', 'DASH_CLIENT_SECRET', 'DASH_URL', 'AGENT_URL', 'AGENT_KEY'] as $c) {
-  if (!defined($c) || constant($c) === '') $manquants[] = $c;
+// 🧪 Mode démo (DASH_DEMO = true dans config.php) : le dashboard fonctionne
+// SANS Discord ni agent — connexion automatique et données fictives, pour
+// tester l'interface en local (php -S 127.0.0.1:8000). À laisser sur false
+// en production.
+define('DEMO', defined('DASH_DEMO') && DASH_DEMO === true);
+
+if (!DEMO) {
+  $manquants = [];
+  foreach (['DASH_CLIENT_ID', 'DASH_CLIENT_SECRET', 'DASH_URL', 'AGENT_URL', 'AGENT_KEY'] as $c) {
+    if (!defined($c) || constant($c) === '') $manquants[] = $c;
+  }
+  if ($manquants) {
+    http_response_code(500);
+    exit('⚠️ Configuration incomplète : ' . htmlspecialchars(implode(', ', $manquants)) . ' à remplir dans config.php.'
+      . ' (Astuce : mettez DASH_DEMO = true pour tester l\'interface en local sans Discord ni agent.)');
+  }
 }
-if ($manquants) {
-  http_response_code(500);
-  exit('⚠️ Configuration incomplète : ' . htmlspecialchars(implode(', ', $manquants)) . ' à remplir dans config.php.');
-}
+$DASH_URL = defined('DASH_URL') && DASH_URL !== '' ? DASH_URL : '';
 
 // Personnalisation optionnelle (constantes facultatives de config.php).
 $NOM_BOT = defined('DASH_NOM') && DASH_NOM !== '' ? DASH_NOM : 'Mon Bot';
@@ -34,9 +44,62 @@ session_set_cookie_params([
   'path' => '/',
   'httponly' => true,
   'samesite' => 'Lax',
-  'secure' => str_starts_with(DASH_URL, 'https://'),
+  'secure' => str_starts_with($DASH_URL, 'https://'),
 ]);
 session_start();
+
+// Base d'URL pour les redirections (en démo : l'hôte courant).
+function base_url(): string {
+  global $DASH_URL;
+  if ($DASH_URL !== '') return $DASH_URL;
+  $scheme = (($_SERVER['HTTPS'] ?? '') === 'on') ? 'https' : 'http';
+  return $scheme . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost');
+}
+
+// ----- Données fictives du mode démo -----
+function demo_servers(): array {
+  return [
+    ['id' => '900000000000000001', 'name' => 'Colmar RP', 'icon' => null, 'membres' => 842, 'bot' => 'Colmar_rp', 'enligne' => true],
+    ['id' => '900000000000000002', 'name' => 'Shadow Community', 'icon' => null, 'membres' => 1287, 'bot' => 'Shadow_community', 'enligne' => true],
+    ['id' => '900000000000000003', 'name' => 'Lyon RP', 'icon' => null, 'membres' => 356, 'bot' => 'Colmar_rp', 'enligne' => false],
+  ];
+}
+function demo_parametres(): array {
+  return [
+    'config' => [
+      'rp_enabled' => 1, 'rp_locked' => 0, 'staff_role_id' => '10', 'admin_role_id' => '11',
+      'staff_role_ids' => '["10","12"]', 'admin_role_ids' => '["11"]', 'service_role_id' => '13',
+      'log_channel_id' => '20', 'level_channel_id' => '21', 'service_channel_id' => '22',
+      'staff_channel_id' => '23', 'member_channel_id' => '24', 'update_channel_id' => null,
+      'welcome_message' => 'Bienvenue à {user} sur **{server}** ! 🎉\nPense à lire le règlement.',
+      'goodbye_message' => null, 'welcome_mention' => 1,
+      'xp_text' => 20, 'xp_voice' => 10, 'xp_cooldown' => 60,
+    ],
+    'roles' => [
+      ['id' => '10', 'name' => 'Staff'], ['id' => '11', 'name' => 'Administration'], ['id' => '12', 'name' => 'Modérateur'],
+      ['id' => '13', 'name' => 'En service'], ['id' => '14', 'name' => 'Police'], ['id' => '15', 'name' => 'Gérant Police'],
+    ],
+    'channels' => [
+      ['id' => '20', 'name' => 'logs'], ['id' => '21', 'name' => 'niveaux'], ['id' => '22', 'name' => 'services'],
+      ['id' => '23', 'name' => 'staff'], ['id' => '24', 'name' => 'bienvenue'], ['id' => '25', 'name' => 'général'],
+    ],
+    'categories' => [['id' => '30', 'name' => 'TICKETS'], ['id' => '31', 'name' => 'AIDE']],
+    'whitelist' => [['roleId' => '14', 'managerId' => '15', 'role' => 'Police', 'manager' => 'Gérant Police']],
+    'tickets' => [['id' => 1, 'label' => 'Support', 'emoji' => '🎫', 'categorie' => 'TICKETS', 'support' => 'Staff']],
+    'bans' => [],
+  ];
+}
+function demo_apercu(): array {
+  return [
+    'serveur' => ['name' => 'Colmar RP', 'membres' => 842, 'icon' => null],
+    'stats' => ['cartes' => 128, 'permis' => 74, 'entreprises' => 12, 'ticketsOuverts' => 3, 'whitelist' => 41, 'vehicules' => 26],
+    'top' => [
+      ['user' => 'shadow', 'level' => 42, 'xp' => 18400],
+      ['user' => 'Alex', 'level' => 37, 'xp' => 14200],
+      ['user' => 'Marie', 'level' => 31, 'xp' => 9800],
+    ],
+  ];
+}
 
 // ----- Requêtes HTTP sortantes (cURL, sinon flux natifs) -----
 function http_req(string $url, string $method = 'GET', $body = null, array $headers = [], bool $form = false): array {
@@ -117,6 +180,10 @@ function guild_map(): array {
 
 // Le membre connecté administre-t-il ce serveur ?
 function manages_guild(string $guildId): bool {
+  if (DEMO) {
+    foreach (demo_servers() as $s) if ($s['id'] === $guildId) return true;
+    return false;
+  }
   foreach ($_SESSION['guilds'] ?? [] as $g) {
     if ($g['id'] !== $guildId) continue;
     if (!empty($g['owner'])) return true;
@@ -153,8 +220,15 @@ const WEB_KEYS = [
 
 $p = $_GET['p'] ?? '';
 
+// 🧪 Démo : connexion automatique avec un compte fictif (aucun Discord requis).
+if (DEMO && empty($_SESSION['user'])) {
+  $_SESSION['user'] = ['id' => '0', 'username' => 'Démo', 'avatar' => null];
+  $_SESSION['guilds'] = array_map(fn($s) => ['id' => $s['id'], 'name' => $s['name'], 'icon' => null, 'owner' => true, 'permissions' => '8'], demo_servers());
+}
+
 // ----- Connexion Discord (OAuth2) -----
 if ($p === 'login') {
+  if (DEMO) { header('Location: ' . base_url() . '/index.php'); exit; }
   $state = bin2hex(random_bytes(16));
   $_SESSION['oauth_state'] = $state;
   header('Location: https://discord.com/oauth2/authorize?response_type=code'
@@ -169,7 +243,7 @@ if ($p === 'callback') {
   $code = $_GET['code'] ?? '';
   $state = $_GET['state'] ?? '';
   if (!$code || !$state || $state !== ($_SESSION['oauth_state'] ?? null)) {
-    header('Location: ' . DASH_URL . '/index.php');
+    header('Location: ' . base_url() . '/index.php');
     exit;
   }
   unset($_SESSION['oauth_state']);
@@ -202,13 +276,13 @@ if ($p === 'callback') {
     fn($g) => ['id' => $g['id'], 'name' => $g['name'], 'icon' => $g['icon'] ?? null, 'owner' => $g['owner'] ?? false, 'permissions' => $g['permissions'] ?? '0'],
     $guilds
   );
-  header('Location: ' . DASH_URL . '/index.php');
+  header('Location: ' . base_url() . '/index.php');
   exit;
 }
 
 if ($p === 'logout') {
   session_destroy();
-  header('Location: ' . DASH_URL . '/index.php');
+  header('Location: ' . base_url() . '/index.php');
   exit;
 }
 
@@ -222,7 +296,7 @@ if ($p === 'inviter') {
       exit;
     }
   }
-  header('Location: ' . DASH_URL . '/index.php');
+  header('Location: ' . base_url() . '/index.php');
   exit;
 }
 
@@ -231,6 +305,7 @@ if ($p === 'api-moi' || $p === 'api-serveur') {
   if (empty($_SESSION['user'])) send_json(401, ['error' => 'Non connecté — rechargez la page.']);
 
   if ($p === 'api-moi') {
+    if (DEMO) send_json(200, ['user' => $_SESSION['user'], 'servers' => demo_servers()]);
     [$map, $infos] = guild_map();
     $servers = [];
     foreach ($_SESSION['guilds'] as $g) {
@@ -241,6 +316,7 @@ if ($p === 'api-moi' || $p === 'api-serveur') {
         'icon' => $g['icon'] ? "https://cdn.discordapp.com/icons/{$g['id']}/{$g['icon']}.png?size=128" : null,
         'membres' => $infos[$g['id']]['memberCount'] ?? null,
         'bot' => $map[$g['id']],
+        'enligne' => true,
       ];
     }
     send_json(200, ['user' => $_SESSION['user'], 'servers' => $servers]);
@@ -251,6 +327,14 @@ if ($p === 'api-moi' || $p === 'api-serveur') {
   $a = $_GET['a'] ?? '';
   if (!preg_match('/^\d{5,25}$/', $gid)) send_json(400, ['error' => 'Serveur invalide.']);
   if (!manages_guild($gid)) send_json(403, ['error' => 'Vous n\'administrez pas ce serveur.']);
+
+  // 🧪 Démo : données fictives et écritures acceptées sans effet.
+  if (DEMO) {
+    if ($a === 'apercu') send_json(200, demo_apercu());
+    if ($a === 'parametres') send_json(200, demo_parametres());
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') send_json(200, ['ok' => true, 'note' => 'Démo — modification simulée (non enregistrée)']);
+    send_json(404, ['error' => 'Action inconnue.']);
+  }
 
   if ($a === 'apercu') {
     [$st, $data] = bot_api($gid, "/dashboard?guild=$gid");
@@ -374,10 +458,62 @@ $THEME = <<<'CSS'
   .scard img, .scard .noicon { width:54px; height:54px; border-radius:50%; }
   .scard .noicon { background:var(--panel2); display:flex; align-items:center; justify-content:center; font-size:22px; }
   .toast { position:fixed; bottom:24px; right:24px; background:var(--panel2); border:1px solid var(--accent);
-           border-radius:10px; padding:13px 18px; font-size:13.5px; opacity:0; transition:opacity .2s; z-index:60; }
-  .toast.on { opacity:1; }
+           border-radius:10px; padding:13px 18px; font-size:13.5px; opacity:0; transform:translateY(10px);
+           transition:opacity .22s, transform .22s; z-index:60; box-shadow:0 10px 30px rgba(0,0,0,.35); pointer-events:none; }
+  .toast.on { opacity:1; transform:translateY(0); }
+  .toast.ok { border-color:var(--green); }
+  .toast.err { border-color:var(--red); }
   .empty { color:var(--muted); padding:48px; text-align:center; }
   .wrap { max-width:1100px; margin:0 auto; padding:30px 20px; }
+  /* ---- barre de défilement raffinée ---- */
+  ::-webkit-scrollbar { width:10px; height:10px; }
+  ::-webkit-scrollbar-track { background:transparent; }
+  ::-webkit-scrollbar-thumb { background:#3a3e47; border-radius:6px; border:2px solid var(--bg); }
+  ::-webkit-scrollbar-thumb:hover { background:#4a4f59; }
+  * { scrollbar-width:thin; scrollbar-color:#3a3e47 transparent; }
+  :focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
+  /* ---- chargement (spinner) ---- */
+  .spin { width:34px; height:34px; border:3px solid var(--border); border-top-color:var(--accent);
+          border-radius:50%; animation:spin .7s linear infinite; margin:44px auto; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .loadbox { display:flex; flex-direction:column; align-items:center; gap:12px; padding:40px; color:var(--muted); font-size:13.5px; }
+  /* ---- pastille de statut (bot en ligne) ---- */
+  .dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; display:inline-block; }
+  .dot.up { background:var(--green); box-shadow:0 0 7px rgba(67,181,129,.8); }
+  .dot.down { background:var(--red); }
+  .rail .ric { position:relative; }
+  .rail .ric .st { position:absolute; bottom:-1px; right:-1px; width:13px; height:13px; border-radius:50%; border:2.5px solid var(--bg2); }
+  .rail .ric .st.up { background:var(--green); } .rail .ric .st.down { background:var(--red); }
+  .side .head .stline { display:flex; align-items:center; justify-content:center; gap:6px; color:var(--muted); font-size:12px; margin-top:5px; }
+  /* ---- transition d'apparition des pages ---- */
+  .fade { animation:fade .25s ease; }
+  @keyframes fade { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }
+  /* ---- écran d'erreur avec réessai ---- */
+  .errbox { text-align:center; padding:52px 20px; color:var(--muted); }
+  .errbox .ei { font-size:44px; margin-bottom:12px; }
+  .errbox .em { font-size:15px; margin-bottom:18px; max-width:440px; margin-left:auto; margin-right:auto; line-height:1.55; }
+  /* ---- menu mobile (masqué en bureau) ---- */
+  .burger { display:none; background:transparent; border:0; font-size:22px; padding:4px 8px; cursor:pointer; color:var(--text); }
+  @media (max-width:860px) {
+    html, body { overflow-x:hidden; }
+    .nav { gap:10px; padding:0 12px; }
+    .nav .links, .nav .me span, .nav .supportbtn { display:none; }
+    .nav .brand { font-size:16px; }
+    .nav button { padding:8px 12px; font-size:12.5px; }
+    .burger { display:block; }
+    .wrap { padding:22px 14px; }
+    .grid { grid-template-columns:1fr; }
+    .layout { flex-direction:column; }
+    .rail { width:100%; flex-direction:row; overflow-x:auto; padding:10px; border-right:0; border-bottom:1px solid var(--border); }
+    .side { width:100%; border-right:0; border-bottom:1px solid var(--border); display:none; }
+    .side.open { display:block; }
+    .side .head { padding:14px; }
+    .side .head img, .side .head .noicon { width:54px; height:54px; }
+    .main { padding:20px 16px; max-width:100%; }
+    .cols { gap:20px; }
+    .cols > div { min-width:100%; }
+    h1.pagetitle { font-size:22px; margin-bottom:18px; }
+  }
 CSS;
 
 $navLinks = '<span class="links"><a href="' . htmlspecialchars($URL_DOCS) . '" target="_blank">DOCUMENTATION</a></span>';
@@ -466,7 +602,7 @@ echo <<<HTML
   <span class="me"><img id="h_avatar" style="display:none"><span id="h_name"></span></span>
   <a href="index.php?p=logout"><button>Déconnexion</button></a>
 </div>
-<div id="content"><div class="empty">Chargement…</div></div>
+<div id="content"><div class="loadbox"><div class="spin"></div>Chargement…</div></div>
 <div id="toast" class="toast"></div>
 HTML;
 echo <<<'SCRIPT'
@@ -474,16 +610,25 @@ echo <<<'SCRIPT'
 var moi = null, gid = null, page = 'apercu';
 function $(id){ return document.getElementById(id); }
 function esc(s){ var d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; }
-function toast(msg){ var t = $('toast'); t.textContent = msg; t.className = 'toast on'; setTimeout(function(){ t.className = 'toast'; }, 3200); }
+var toastTimer;
+function toast(msg, kind){ var t = $('toast'); t.textContent = msg; t.className = 'toast on ' + (kind || ''); clearTimeout(toastTimer); toastTimer = setTimeout(function(){ t.className = 'toast ' + (kind || ''); }, 3200); }
 function su(a){ return 'index.php?p=api-serveur&gid=' + gid + '&a=' + a; }
+function spinner(){ return '<div class="loadbox"><div class="spin"></div>Chargement…</div>'; }
+function errScreen(msg, retry){
+  var h = '<div class="errbox fade"><div class="ei">😕</div><div class="em">' + esc(msg) + '</div>';
+  if (retry) h += '<button class="accent" id="retrybtn">↻ Réessayer</button>';
+  h += '</div>';
+  return h;
+}
 function api(method, path, body){
   return fetch(path, { method: method, headers: { 'Content-Type': 'application/json' },
     body: body === undefined ? undefined : JSON.stringify(body) })
     .then(function(r){ return r.json(); })
-    .then(function(j){ if (j && j.error) toast('⚠️ ' + j.error); return j; });
+    .then(function(j){ if (j && j.error) toast('⚠️ ' + j.error, 'err'); return j; })
+    .catch(function(){ toast('⚠️ Connexion au serveur impossible.', 'err'); return { error: 'réseau' }; });
 }
 function save(key, value){
-  api('POST', su('config'), { key: key, value: value }).then(function(j){ if (j && !j.error) toast('✅ Enregistré'); });
+  api('POST', su('config'), { key: key, value: value }).then(function(j){ if (j && !j.error) toast('✅ Enregistré', 'ok'); });
 }
 // Interrupteur façon DraftBot.
 function tog(id, checked){
@@ -524,27 +669,32 @@ function renderServer(){
   var srv = null;
   moi.servers.forEach(function(s){ if (s.id === gid) srv = s; });
   var h = '<div class="layout">';
-  // rail : tous mes serveurs en icônes rondes
+  // rail : tous mes serveurs en icônes rondes (pastille verte = bot en ligne)
+  h += '<button class="burger" id="burger" style="margin:8px">☰ ' + esc(srv ? srv.name : '') + '</button>';
   h += '<div class="rail">';
   moi.servers.forEach(function(s){
     h += '<div class="ric' + (s.id === gid ? ' on' : '') + '" data-g="' + s.id + '" title="' + esc(s.name) + '">' +
-      (s.icon ? '<img src="' + s.icon + '">' : '🌐') + '</div>';
+      (s.icon ? '<img src="' + s.icon + '">' : '🌐') +
+      '<span class="st ' + (s.enligne === false ? 'down' : 'up') + '"></span></div>';
   });
   h += '</div>';
-  // sidebar : serveur + catégories
-  h += '<div class="side"><div class="head">' +
+  // sidebar : serveur + statut + catégories
+  h += '<div class="side" id="side"><div class="head">' +
     (srv && srv.icon ? '<img src="' + srv.icon + '">' : '<div class="noicon">🌐</div>') +
-    '<div class="nm">' + esc(srv ? srv.name : '') + '</div></div>';
+    '<div class="nm">' + esc(srv ? srv.name : '') + '</div>' +
+    '<div class="stline"><span class="dot ' + (srv && srv.enligne === false ? 'down' : 'up') + '"></span>' +
+    (srv && srv.enligne === false ? 'Bot hors ligne' : 'Bot en ligne') + '</div></div>';
   PAGES.forEach(function(pg){
     h += '<div class="item' + (pg[0] === page ? ' on' : '') + '" data-p="' + pg[0] + '"><span>' + pg[1] + '</span> ' + pg[2] + '</div>';
   });
-  h += '</div><div class="main" id="main"><div class="empty">Chargement…</div></div></div>';
+  h += '</div><div class="main" id="main">' + spinner() + '</div></div>';
   $('content').innerHTML = h;
+  if ($('burger')) $('burger').onclick = function(){ $('side').classList.toggle('open'); };
   Array.prototype.forEach.call(document.querySelectorAll('.rail .ric'), function(el){
     el.onclick = function(){ gid = el.getAttribute('data-g'); page = 'apercu'; renderServer(); };
   });
   Array.prototype.forEach.call(document.querySelectorAll('.side .item'), function(el){
-    el.onclick = function(){ page = el.getAttribute('data-p'); renderServer(); };
+    el.onclick = function(){ page = el.getAttribute('data-p'); if ($('side')) $('side').classList.remove('open'); renderServer(); };
   });
   loadPage(srv);
 }
@@ -599,10 +749,11 @@ function prevBienvenue(srv){
 
 function loadPage(srv){
   var m = $('main');
+  m.innerHTML = spinner();
   if (page === 'apercu'){
     api('GET', su('apercu')).then(function(d){
-      if (d.error) { m.innerHTML = '<div class="empty">⚠️ ' + esc(d.error) + '</div>'; return; }
-      var h = '<h1 class="pagetitle">' + esc(d.serveur.name) + '</h1>' +
+      if (d.error) { m.innerHTML = errScreen('Impossible de charger ce serveur : ' + d.error, true); if ($('retrybtn')) $('retrybtn').onclick = function(){ loadPage(srv); }; return; }
+      var h = '<div class="fade"><h1 class="pagetitle">' + esc(d.serveur.name) + '</h1>' +
         '<p style="color:var(--muted);margin:-18px 0 8px">' + d.serveur.membres + ' membres · géré par 🤖 ' + esc(srv ? srv.bot : '') + '</p>';
       var labels = { cartes: "🪪 Cartes d'identité", permis: '🚗 Permis', entreprises: '🏢 Entreprises', ticketsOuverts: '🎫 Tickets ouverts', whitelist: '📋 Whitelist métiers', vehicules: '🛡️ Véhicules assurés' };
       h += '<div class="tiles">';
@@ -612,13 +763,13 @@ function loadPage(srv){
         h += '<div class="flabel">🏆 Top niveaux (écrit)</div>';
         d.top.forEach(function(t, i){ h += '<div class="row">' + (i + 1) + '. <b>' + esc(t.user) + '</b> — niveau ' + t.level + ' (' + t.xp + ' XP)</div>'; });
       }
-      m.innerHTML = h;
+      m.innerHTML = h + '</div>';
     });
     return;
   }
   api('GET', su('parametres')).then(function(p){
-    if (p.error) { m.innerHTML = '<div class="empty">⚠️ ' + esc(p.error) + '</div>'; return; }
-    var cfg = p.config, h = '';
+    if (p.error) { m.innerHTML = errScreen('Impossible de charger la configuration : ' + p.error, true); if ($('retrybtn')) $('retrybtn').onclick = function(){ loadPage(srv); }; return; }
+    var cfg = p.config, h = '<div class="fade">';
     if (page === 'module'){
       h += '<h1 class="pagetitle">Module RP</h1>';
       if (cfg.rp_locked){
@@ -700,8 +851,8 @@ function loadPage(srv){
         '<button id="wt_add" class="accent">➕ Ajouter</button></div>';
       h += sec('Nouveau type de ticket', '', addt, '');
     }
-    m.innerHTML = h;
-    var reload = function(j){ if (j && !j.error) { toast('✅ ' + (j.note || 'Enregistré')); loadPage(srv); } };
+    m.innerHTML = h + '</div>';
+    var reload = function(j){ if (j && !j.error) { toast('✅ ' + (j.note || 'Enregistré'), 'ok'); loadPage(srv); } };
     if ($('w_rp')) $('w_rp').onchange = function(){ save('rp_enabled', $('w_rp').checked ? 1 : 0); };
     if ($('w_mention')) $('w_mention').onchange = function(){ save('welcome_mention', $('w_mention').checked ? 1 : 0); prevBienvenue(srv); };
     if ($('w_wel')) {

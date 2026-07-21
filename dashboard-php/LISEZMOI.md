@@ -8,6 +8,16 @@ sur les serveurs qu'il **administre** (et uniquement ceux-là) : vue d'ensemble,
 🎭 Module RP (🔒 verrouillage respecté), 👮 rôles multiples, 📢 salons, 📈 niveaux,
 👋 bienvenue/au revoir, 📋 whitelist métiers, 🎫 tickets.
 
+## 🧪 Tester en local d'abord (sans Discord ni agent)
+
+Pour voir l'interface fonctionner immédiatement sur votre PC :
+1. Dans `config.php`, mettez **`const DASH_DEMO = true;`**
+2. Ouvrez un terminal dans ce dossier et lancez : **`php -S 127.0.0.1:8000`**
+   *(Windows : installez PHP puis `php.exe -S 127.0.0.1:8000` ; ou utilisez WampServer/XAMPP)*
+3. Ouvrez **http://127.0.0.1:8000** — vous êtes connecté automatiquement avec 3 serveurs
+   fictifs et pouvez cliquer partout (les modifications sont simulées, non enregistrées)
+4. Une fois satisfait, remettez **`const DASH_DEMO = false;`** et suivez l'installation ci-dessous.
+
 ## 1️⃣ Créer la connexion Discord (2 minutes)
 
 1. [Portail développeur Discord](https://discord.com/developers/applications) → votre application (celle d'un de vos bots convient)

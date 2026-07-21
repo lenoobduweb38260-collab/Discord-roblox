@@ -2,6 +2,13 @@
 // ⚙️ Configuration du Dashboard web (version PHP pour hébergement public_html)
 // Remplissez les valeurs puis envoyez ce fichier avec index.php dans public_html.
 
+// ================== 🧪 MODE DÉMO (test en local) ==================
+// Mettez « true » pour tester l'interface EN LOCAL sans Discord ni agent :
+// connexion automatique + serveurs et données fictifs. Lancez alors dans ce
+// dossier :  php -S 127.0.0.1:8000   puis ouvrez http://127.0.0.1:8000
+// ⚠️ Remettez « false » en production (sinon tout le monde entre sans Discord).
+const DASH_DEMO = false;
+
 // ================== CONNEXION DISCORD (OAuth2) ==================
 // Portail développeur Discord > votre application > OAuth2 :
 //  - Client ID (= Application ID)
