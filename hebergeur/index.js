@@ -213,6 +213,11 @@ function startBot(name) {
   s.proc = proc;
   s.status = 'demarre';
   s.startedAt = Date.now();
+  // Mémoire d'état : un bot démarré redémarre automatiquement quand l'agent
+  // (ou le serveur de l'hébergeur) redémarre.
+  try {
+    fs.writeFileSync(path.join(dir, 'autostart'), '1');
+  } catch {}
   log(name, `▶️ Bot démarré (PID ${proc.pid}, version ${currentVersion() || '?'}).`);
   wireOutput(name, proc.stdout, false);
   wireOutput(name, proc.stderr, true);
@@ -262,6 +267,10 @@ function stopBot(name) {
   if (!s.proc) return { error: 'Ce bot n\'est pas démarré.' };
   log(name, '⏹️ Arrêt demandé…');
   s.stopping = true;
+  // Arrêt volontaire : pas de reprise au prochain démarrage de l'agent.
+  try {
+    fs.writeFileSync(path.join(botDir(name), 'autostart'), '0');
+  } catch {}
   try {
     if (process.platform === 'win32') spawnSync('taskkill', ['/PID', String(s.proc.pid), '/T', '/F'], { stdio: 'ignore' });
     else s.proc.kill('SIGTERM');
@@ -449,15 +458,35 @@ server.listen(AGENT_PORT, AGENT_HOST, () => {
   console.log(`📁 Dossier : ${baseDir} — un sous-dossier par bot dans bots/`);
   console.log(`⚙️ Configuration lue : ${configLoaded || 'variables d\'environnement de l\'hébergeur uniquement'}`);
   console.log(`🔗 Panel : ➕ Nouveau bot → 🌍 Bot hébergé → http://<ip>:${AGENT_PORT} + clé (même URL/clé pour TOUS vos bots).`);
-  // Mise à jour du code partagé puis démarrage automatique des bots configurés.
-  updateShared().then(() => {
+  // Mise à jour du code partagé puis reprise automatique : les bots qui
+  // étaient démarrés (fichier autostart = 1) redémarrent ; ceux arrêtés
+  // volontairement restent arrêtés ; les bots jamais lancés démarrent dès
+  // qu'ils ont un token.
+  const boot = async () => {
+    await updateShared();
+    if (!fs.existsSync(exePath)) {
+      console.warn('⏳ Exécutable du bot pas encore téléchargé — nouvel essai dans 60 s.');
+      setTimeout(boot, 60_000);
+      return;
+    }
     for (const name of listBots()) {
-      if (readBotEnv(name).DISCORD_TOKEN?.trim()) {
+      if (botState(name).proc) continue; // déjà démarré entre-temps via le panel
+      let flag = null;
+      try {
+        flag = fs.readFileSync(path.join(botDir(name), 'autostart'), 'utf8').trim();
+      } catch {}
+      const hasToken = Boolean(readBotEnv(name).DISCORD_TOKEN?.trim());
+      if (flag === '0') {
+        log(name, 'ℹ️ Bot laissé arrêté (arrêt volontaire avant le redémarrage de l\'agent) — ▶ depuis le panel pour le relancer.');
+        continue;
+      }
+      if (flag === '1' || hasToken) {
         const result = startBot(name);
         if (result?.error) log(name, `⚠️ ${result.error}`, true);
       } else {
         log(name, 'ℹ️ Pas de DISCORD_TOKEN — bot non démarré (remplissez sa configuration via le panel).');
       }
     }
-  });
+  };
+  boot();
 });

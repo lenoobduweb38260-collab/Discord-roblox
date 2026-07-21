@@ -119,6 +119,25 @@ function killPid(pid) {
 
 // Adoption des orphelins : un bot lancé par une session précédente du
 // gestionnaire écrit son PID dans bot.lock — on le retrouve au démarrage.
+// Reprise automatique : les bots qui étaient DÉMARRÉS avant la fermeture du
+// gestionnaire redémarrent tout seuls (démarrages étalés de 1,5 s).
+function resumeAutostart() {
+  let delay = 800;
+  for (const bot of config.bots) {
+    if (bot.remote || !bot.autostart) continue;
+    const r = rt(bot.name);
+    if (r.status !== 'arrete') continue; // déjà repris (processus externe retrouvé)
+    addLine(r, '🔁 Reprise automatique : ce bot était démarré avant la fermeture du gestionnaire.');
+    setTimeout(() => {
+      if (rt(bot.name).status === 'arrete') {
+        const result = startBot(bot.name);
+        if (result?.error) addLine(rt(bot.name), `❌ Reprise impossible : ${result.error}`, true);
+      }
+    }, delay);
+    delay += 1500;
+  }
+}
+
 function adoptOrphans() {
   for (const bot of config.bots) {
     if (bot.remote) continue; // bot hébergé : il tourne chez l'hébergeur, rien à reprendre en local
@@ -264,6 +283,12 @@ function startBot(name) {
   r.pid = proc.pid;
   r.status = 'demarre';
   r.startedAt = Date.now();
+  // Mémoire d'état : un bot démarré sera repris automatiquement au prochain
+  // lancement du gestionnaire.
+  if (!bot.autostart) {
+    bot.autostart = true;
+    saveConfig(config);
+  }
   addLine(r, `▶️ Bot démarré (PID ${proc.pid}, version ${bot.version || '?'}).`);
   wireOutput(r, proc.stdout, false);
   wireOutput(r, proc.stderr, true);
@@ -313,6 +338,12 @@ function startBot(name) {
 
 function stopBot(name) {
   const r = rt(name);
+  // Arrêt volontaire : le bot ne sera pas repris au prochain lancement.
+  const bot = getBot(name);
+  if (bot?.autostart) {
+    bot.autostart = false;
+    saveConfig(config);
+  }
   if (r.proc?.pid) {
     addLine(r, '⏹️ Arrêt demandé…');
     r.stopping = true; // arrêt volontaire : pas de rapport d'erreur
@@ -946,6 +977,7 @@ async function selfUpdate() {
         : `🌐 Interface : http://localhost:${PORT}  (cette fenêtre doit rester ouverte)`
     );
     adoptOrphans();
+    resumeAutostart();
     if (!HOSTED) openBrowser();
   });
 })();
