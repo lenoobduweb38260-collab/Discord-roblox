@@ -1243,6 +1243,7 @@ function renderDashPage(page, gid) {
       h += dashSelect('log_channel_id', 'Salon des logs de sécurité', 'Actions staff, accès refusés, vocal, messages supprimés/modifiés, transcripts de tickets.', p.channels, cfg.log_channel_id, '#');
       h += dashSelect('staff_channel_id', 'Salon staff (arrivées/départs de poste)', 'Annonces /arrivee et /depart du staff.', p.channels, cfg.staff_channel_id, '#');
       h += dashSelect('service_channel_id', 'Salon des services RP', 'Annonces de prise et fin de service.', p.channels, cfg.service_channel_id, '#');
+      h += dashSelect('update_channel_id', 'Salon des annonces de mise à jour', 'Le bot y annonce (avec mention du staff) les mises à jour prêtes et installées. Non configuré : il crée automatiquement #shadow-logs, visible du staff uniquement.', p.channels, cfg.update_channel_id, '#');
     } else if (page === 'whitelist') {
       h += '<h2 class="dbtitle">📋 Whitelist métiers</h2>';
       h += '<p class="dbp">Un gérant peut whitelister des recrues sur son rôle métier (le bot attribue le rôle automatiquement).</p>';

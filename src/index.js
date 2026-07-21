@@ -253,6 +253,16 @@ async function start() {
       .syncAll(client)
       .catch((err) => console.warn(`⚠️ Synchronisation des commandes : ${err.message}`));
   });
+
+  // Annonces de mise à jour au staff : « installée » après une mise à jour,
+  // « prête » quand une nouvelle release est publiée (vérification périodique).
+  client.once(Events.ClientReady, () => {
+    try {
+      require('./utils/updateAnnounce').start(client);
+    } catch (err) {
+      console.warn(`⚠️ Annonces de mise à jour non démarrées : ${err.message}`);
+    }
+  });
   client.on(Events.GuildCreate, (guild) => {
     require('./commandSync').syncGuild(guild.id).catch(() => null);
   });

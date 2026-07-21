@@ -53,6 +53,7 @@ Bot Discord complet pour serveur Roleplay Roblox : cartes d'identité, permis de
 
 ### ℹ️ Fiche membre (`/info`)
 - `/info [membre]` — fiche **visible uniquement par vous** (éphémère) : 💬 nom, 🔢 ID, 🚫 blacklist (🔜 bientôt disponible), 🏅 badges d'interactions par catégorie
+- Fonctionne **partout** : sur les serveurs, en **message privé** avec le bot et en **app utilisateur** — l'embed d'attestation est publiée quel que soit l'endroit
 - Si vous consultez **votre propre fiche** en étant **créateur du bot** (propriétaire de l'application Discord ou `OWNER_ID` du `.env`) ou **membre de l'équipe du bot** (`BOT_TEAM` du `.env`, IDs séparés par des virgules), un bouton **« Me désigner »** apparaît sous l'embed : en cliquant, le bot publie une **embed publique d'attestation** (👑 créateur officiel / 🛡️ membre officiel du staff) émise par le bot lui-même — preuve fiable, impossible à falsifier
 
 ### 🚨 Anti-scam par images échantillons (`/scamimage`)
@@ -84,9 +85,10 @@ Dans le salon de logs configuré : toutes les actions staff et accès refusés, 
 - `/config` ouvre un **panneau interactif unique** (éphémère) avec la vue d'ensemble et toutes les catégories :
   - 🎭 **Module RP** — activation/désactivation des commandes RP (respecte le 🔒 verrouillage administrateur)
   - 👮 **Rôles** — staff, administration, en service (sélecteurs de rôles)
-  - 📢 **Salons** — logs, niveaux, service, staff (sélecteurs de salons)
+  - 📢 **Salons** — logs, niveaux, service, staff, membres, mises à jour (sélecteurs de salons)
   - 📈 **XP & niveaux** — formulaire XP texte/vocal et cooldown
   - 📋 **Whitelist métiers** — vue des autorisations gérants
+  - 🎫 **Tickets** — création d'un type en formulaire (nom, emoji) puis choix de la catégorie Discord, définition du rôle support par sélecteur, suppression — le tout sans quitter le panneau
 - Accessible au **staff** ; le rôle **Administration** ne peut être modifié que par un admin (sécurité grade élevé) ; chaque changement est tracé dans les logs
 
 ## 🎭 Module RP activable
@@ -120,6 +122,9 @@ La base `data.sqlite` est créée à côté de l'exécutable.
 
 ### 🔄 Mise à jour automatique
 L'exécutable est **relié aux releases GitHub** : à chaque lancement, il compare sa version à la dernière release, télécharge la nouvelle version si besoin, se remplace et redémarre tout seul. Chaque push sur le dépôt publie automatiquement une nouvelle release `v1.0.<n>` — les modifications du code arrivent donc chez vous **sans rien faire**. Pour désactiver : ajoutez `AUTO_UPDATE=off` dans le `.env`.
+
+### 📦 Annonces de mise à jour au staff
+Quand une **nouvelle version est prête** (release publiée pendant que le bot tourne), le bot l'annonce sur chaque serveur **en mentionnant le rôle staff** : embed « 📦 Mise à jour prête » (installation via `/update` ou au prochain redémarrage), puis « ✅ Mise à jour installée » une fois la nouvelle version en ligne. Le salon d'annonce se choisit dans `/config` → 📢 Salons → **📦 Salon des annonces de mise à jour**. **Sans salon configuré**, le bot crée automatiquement un salon **`#shadow-logs`** visible **uniquement du staff** (rôles staff/administration configurés + membres avec la permission Administrateur) et y publie les annonces.
 
 ## 🤖 Gestionnaire de bots (pour le développeur)
 

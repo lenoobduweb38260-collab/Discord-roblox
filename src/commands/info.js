@@ -5,6 +5,8 @@ const {
   ButtonBuilder,
   ButtonStyle,
   MessageFlags,
+  InteractionContextType,
+  ApplicationIntegrationType,
 } = require('discord.js');
 const { db } = require('../database');
 const { GRADES } = require('../utils/permissions');
@@ -55,12 +57,16 @@ function badgesSummary(userId) {
 
 module.exports = {
   grade: GRADES.EVERYONE,
+  allowDm: true, // utilisable en message privé avec le bot
+  userInstall: true, // installable en app utilisateur → enregistrement GLOBAL (fonctionne partout)
   data: new SlashCommandBuilder()
     .setName('info')
     .setDescription('Voir les informations d\'un membre (visible uniquement par vous)')
     .addUserOption((opt) =>
       opt.setName('membre').setDescription('Membre à consulter (vous-même par défaut)').setRequired(false)
-    ),
+    )
+    .setIntegrationTypes(ApplicationIntegrationType.GuildInstall, ApplicationIntegrationType.UserInstall)
+    .setContexts(InteractionContextType.Guild, InteractionContextType.BotDM, InteractionContextType.PrivateChannel),
   async execute(interaction) {
     const target = interaction.options.getUser('membre') || interaction.user;
     const embed = new EmbedBuilder()

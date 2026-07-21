@@ -32,6 +32,7 @@ const CHANNEL_COLUMNS = {
   service_channel_id: '🧑‍💼 Salon des prises/fins de service',
   staff_channel_id: '📣 Salon des arrivées/départs staff',
   member_channel_id: '👋 Salon des arrivées/départs des membres',
+  update_channel_id: '📦 Salon des annonces de mise à jour',
 };
 
 const show = (id, kind) => (id ? (kind === 'role' ? `<@&${id}>` : `<#${id}>`) : '*Non configuré*');
@@ -39,6 +40,20 @@ const show = (id, kind) => (id ? (kind === 'role' ? `<@&${id}>` : `<#${id}>`) : 
 const listWhitelistMappings = db.prepare(
   'SELECT * FROM whitelist_managers WHERE guild_id = ? ORDER BY role_id'
 );
+
+const listTicketTypes = db.prepare('SELECT * FROM ticket_types WHERE guild_id = ? ORDER BY id');
+const getTicketType = db.prepare('SELECT * FROM ticket_types WHERE id = ? AND guild_id = ?');
+const getTicketTypeByLabel = db.prepare('SELECT * FROM ticket_types WHERE guild_id = ? AND label = ?');
+const countTicketTypes = db.prepare('SELECT COUNT(*) AS n FROM ticket_types WHERE guild_id = ?');
+const insertTicketType = db.prepare(
+  'INSERT INTO ticket_types (guild_id, label, emoji, category_id, support_role_id) VALUES (?, ?, ?, ?, ?)'
+);
+const deleteTicketTypeStmt = db.prepare('DELETE FROM ticket_types WHERE id = ? AND guild_id = ?');
+const setTicketSupport = db.prepare('UPDATE ticket_types SET support_role_id = ? WHERE id = ? AND guild_id = ?');
+
+// Création d'un type de ticket en deux étapes (formulaire nom/emoji, puis
+// catégorie) : mémoire temporaire entre les deux interactions.
+const pendingTicketTypes = new Map(); // `${guildId}:${userId}` → { label, emoji }
 
 function whitelistSummary(guildId) {
   const rows = listWhitelistMappings.all(guildId);
@@ -83,6 +98,7 @@ function mainView(guild) {
           `Niveaux : ${show(cfg.level_channel_id, 'channel')}`,
           `Service : ${show(cfg.service_channel_id, 'channel')}`,
           `Staff (arrivées/départs) : ${show(cfg.staff_channel_id, 'channel')}`,
+          `Mises à jour : ${cfg.update_channel_id ? `<#${cfg.update_channel_id}>` : '*Non configuré — #shadow-logs sera créé automatiquement*'}`,
         ].join('\n'),
         inline: false,
       },
@@ -101,7 +117,17 @@ function mainView(guild) {
           : '🔴 **Désactivé** — les commandes RP sont masquées sur ce serveur',
         inline: false,
       },
-      { name: '📋 Whitelist métiers', value: whitelistSummary(guild.id), inline: false }
+      { name: '📋 Whitelist métiers', value: whitelistSummary(guild.id), inline: false },
+      {
+        name: '🎫 Tickets',
+        value: (() => {
+          const types = listTicketTypes.all(guild.id);
+          return types.length
+            ? types.map((t) => `${t.emoji ? t.emoji + ' ' : ''}**${t.label}**`).join(' · ')
+            : '*Aucun type de ticket configuré*';
+        })(),
+        inline: false,
+      }
     )
     .setFooter({ text: 'Seul le staff peut utiliser ce panneau • Le rôle Administration ne peut être changé que par un admin' });
 
@@ -114,7 +140,8 @@ function mainView(guild) {
         { label: 'Rôles', value: 'roles', emoji: '👮', description: 'Staff, administration, en service' },
         { label: 'Salons', value: 'salons', emoji: '📢', description: 'Logs, niveaux, service, staff' },
         { label: 'XP & niveaux', value: 'xp', emoji: '📈', description: 'XP texte, XP vocal, cooldown' },
-        { label: 'Whitelist métiers', value: 'whitelist', emoji: '📋', description: 'Autorisations des gérants' }
+        { label: 'Whitelist métiers', value: 'whitelist', emoji: '📋', description: 'Autorisations des gérants' },
+        { label: 'Tickets', value: 'tickets', emoji: '🎫', description: 'Types de tickets, catégories, rôles support' }
       )
   );
   return { embeds: [embed], components: [categoryRow] };
@@ -153,7 +180,9 @@ function salonsView(guild, selectedCol = null) {
     .setDescription(
       Object.entries(CHANNEL_COLUMNS)
         .map(([col, label]) => `${label} : ${show(cfg[col], 'channel')}`)
-        .join('\n') + '\n\n1️⃣ Choisissez le réglage, 2️⃣ puis le salon.'
+        .join('\n') +
+        '\n\n1️⃣ Choisissez le réglage, 2️⃣ puis le salon.' +
+        '\n\n📦 *Sans salon de mises à jour configuré, le bot crée automatiquement **#shadow-logs**, visible uniquement du staff, et y publie les annonces.*'
     );
   const picker = new StringSelectMenuBuilder()
     .setCustomId('cfgchansel')
@@ -239,7 +268,110 @@ function rpView(guild) {
   return { embeds: [embed], components: [row, backRow()] };
 }
 
-const CATEGORY_VIEWS = { rp: rpView, roles: rolesView, salons: salonsView, xp: xpView, whitelist: whitelistView };
+// ----- Catégorie : tickets (types, catégories Discord, rôles support) -----
+function ticketsView(guild, selectedId = null) {
+  const types = listTicketTypes.all(guild.id);
+  const summary = types.length
+    ? types
+        .map((t) => {
+          const cat = guild.channels.cache.get(t.category_id)?.name || t.category_id || '?';
+          const support = t.support_role_id ? ` — support <@&${t.support_role_id}>` : '';
+          return `• ${t.emoji ? t.emoji + ' ' : ''}**${t.label}** — catégorie « ${cat} »${support}`;
+        })
+        .join('\n')
+    : '*Aucun type de ticket configuré*';
+  const embed = new EmbedBuilder()
+    .setColor(COLORS.INFO)
+    .setTitle('🎫 Configuration — Tickets')
+    .setDescription(
+      summary +
+        '\n\n➕ Ajoutez un type, ou sélectionnez-en un pour définir son **rôle support** ou le **supprimer**.' +
+        '\n⚠️ Après un ajout ou une suppression, republiez le panneau : `/ticket panneau-modifier`.'
+    );
+  const components = [];
+  if (types.length) {
+    components.push(
+      new ActionRowBuilder().addComponents(
+        new StringSelectMenuBuilder()
+          .setCustomId('cfgtktsel')
+          .setPlaceholder('🎫 Sélectionnez un type à gérer…')
+          .addOptions(
+            types.slice(0, 25).map((t) => ({
+              label: `${t.emoji ? t.emoji + ' ' : ''}${t.label}`.slice(0, 100),
+              value: String(t.id),
+              default: t.id === selectedId,
+            }))
+          )
+      )
+    );
+  }
+  const selected = selectedId ? types.find((t) => t.id === selectedId) : null;
+  if (selected) {
+    const menu = new RoleSelectMenuBuilder()
+      .setCustomId(`cfgtktrole:${selected.id}`)
+      .setPlaceholder(`🛎️ Rôle support de « ${selected.label} »`.slice(0, 150))
+      .setMinValues(1)
+      .setMaxValues(1);
+    if (selected.support_role_id) menu.setDefaultRoles(selected.support_role_id);
+    components.push(new ActionRowBuilder().addComponents(menu));
+  }
+  const buttons = [
+    new ButtonBuilder().setCustomId('cfgtktadd').setLabel('➕ Ajouter un type').setStyle(ButtonStyle.Primary),
+  ];
+  if (selected) {
+    buttons.push(
+      new ButtonBuilder().setCustomId(`cfgtktdel:${selected.id}`).setLabel('🗑 Supprimer ce type').setStyle(ButtonStyle.Danger)
+    );
+  }
+  buttons.push(new ButtonBuilder().setCustomId('cfgback').setLabel('⬅ Retour').setStyle(ButtonStyle.Secondary));
+  components.push(new ActionRowBuilder().addComponents(...buttons));
+  return { embeds: [embed], components };
+}
+
+// Étape 2 de la création : choix de la catégorie Discord des salons de tickets.
+function ticketCategoryView(pendingLabel) {
+  const embed = new EmbedBuilder()
+    .setColor(COLORS.INFO)
+    .setTitle('🎫 Nouveau type de ticket')
+    .setDescription(
+      `Type « **${pendingLabel}** » : choisissez la **catégorie Discord** où les salons de ce type de ticket seront créés.`
+    );
+  const row = new ActionRowBuilder().addComponents(
+    new ChannelSelectMenuBuilder()
+      .setCustomId('cfgtktcat')
+      .setPlaceholder('📁 Catégorie des salons de tickets')
+      .setChannelTypes(ChannelType.GuildCategory)
+      .setMinValues(1)
+      .setMaxValues(1)
+  );
+  return { embeds: [embed], components: [row, backRow()] };
+}
+
+function ticketModal() {
+  return new ModalBuilder()
+    .setCustomId('cfgtktmodal')
+    .setTitle('🎫 Nouveau type de ticket')
+    .addComponents(
+      new ActionRowBuilder().addComponents(
+        new TextInputBuilder()
+          .setCustomId('tkt_nom')
+          .setLabel('Nom du type (ex : Support)')
+          .setStyle(TextInputStyle.Short)
+          .setRequired(true)
+          .setMaxLength(60)
+      ),
+      new ActionRowBuilder().addComponents(
+        new TextInputBuilder()
+          .setCustomId('tkt_emoji')
+          .setLabel('Emoji (optionnel)')
+          .setStyle(TextInputStyle.Short)
+          .setRequired(false)
+          .setMaxLength(30)
+      )
+    );
+}
+
+const CATEGORY_VIEWS = { rp: rpView, roles: rolesView, salons: salonsView, xp: xpView, whitelist: whitelistView, tickets: ticketsView };
 
 function xpModal(cfg) {
   const field = (id, label, value) =>
@@ -332,6 +464,89 @@ async function handleConfigInteraction(interaction) {
       await sendLog(
         interaction.guild,
         logEmbed('🎭 Module RP', `Module RP ${enable ? 'activé' : 'désactivé'} par <@${interaction.user.id}>.`, enable ? COLORS.SUCCESS : COLORS.DANGER)
+      );
+      return;
+    }
+
+    // ----- Tickets : sélection, création (formulaire → catégorie), support, suppression -----
+    if (id === 'cfgtktsel') {
+      return await interaction.update(ticketsView(interaction.guild, Number(interaction.values[0])));
+    }
+
+    if (id === 'cfgtktadd') {
+      if (countTicketTypes.get(interaction.guildId).n >= 25) {
+        return await interaction.reply({
+          content: '❌ Maximum 25 types de tickets (limite des boutons Discord).',
+          flags: MessageFlags.Ephemeral,
+        });
+      }
+      return await interaction.showModal(ticketModal());
+    }
+
+    if (id === 'cfgtktmodal') {
+      const label = interaction.fields.getTextInputValue('tkt_nom').trim().slice(0, 60);
+      const emoji = interaction.fields.getTextInputValue('tkt_emoji').trim() || null;
+      if (!label) {
+        return await interaction.reply({ content: '❌ Le nom du type est requis.', flags: MessageFlags.Ephemeral });
+      }
+      if (getTicketTypeByLabel.get(interaction.guildId, label)) {
+        return await interaction.reply({ content: `❌ Le type « ${label} » existe déjà.`, flags: MessageFlags.Ephemeral });
+      }
+      pendingTicketTypes.set(`${interaction.guildId}:${interaction.user.id}`, { label, emoji });
+      if (interaction.isFromMessage()) return await interaction.update(ticketCategoryView(label));
+      return await interaction.reply({ ...ticketCategoryView(label), flags: MessageFlags.Ephemeral });
+    }
+
+    if (id === 'cfgtktcat') {
+      const pendingKey = `${interaction.guildId}:${interaction.user.id}`;
+      const pending = pendingTicketTypes.get(pendingKey);
+      if (!pending || getTicketTypeByLabel.get(interaction.guildId, pending.label)) {
+        pendingTicketTypes.delete(pendingKey);
+        return await interaction.update(ticketsView(interaction.guild));
+      }
+      const result = insertTicketType.run(interaction.guildId, pending.label, pending.emoji, interaction.values[0], null);
+      pendingTicketTypes.delete(pendingKey);
+      await interaction.update(ticketsView(interaction.guild, Number(result.lastInsertRowid)));
+      await interaction.followUp({
+        content:
+          `✅ Type « **${pending.label}** » créé. Définissez son rôle support via le sélecteur si besoin, ` +
+          'puis republiez le panneau : `/ticket panneau-modifier`.',
+        flags: MessageFlags.Ephemeral,
+      });
+      await sendLog(
+        interaction.guild,
+        logEmbed('🎫 Type de ticket créé', `**${pending.label}** (catégorie <#${interaction.values[0]}>)\nPar <@${interaction.user.id}>`, COLORS.INFO)
+      );
+      return;
+    }
+
+    if (id.startsWith('cfgtktrole:')) {
+      const typeId = Number(id.split(':')[1]);
+      const type = getTicketType.get(typeId, interaction.guildId);
+      if (!type) return await interaction.update(ticketsView(interaction.guild));
+      const roleId = interaction.values[0];
+      setTicketSupport.run(roleId, typeId, interaction.guildId);
+      await interaction.update(ticketsView(interaction.guild, typeId));
+      await sendLog(
+        interaction.guild,
+        logEmbed('🎫 Rôle support défini', `**${type.label}** → <@&${roleId}>\nPar <@${interaction.user.id}>`, COLORS.INFO)
+      );
+      return;
+    }
+
+    if (id.startsWith('cfgtktdel:')) {
+      const typeId = Number(id.split(':')[1]);
+      const type = getTicketType.get(typeId, interaction.guildId);
+      if (!type) return await interaction.update(ticketsView(interaction.guild));
+      deleteTicketTypeStmt.run(typeId, interaction.guildId);
+      await interaction.update(ticketsView(interaction.guild));
+      await interaction.followUp({
+        content: `🗑 Type « **${type.label}** » supprimé. Republiez le panneau : \`/ticket panneau-modifier\`.`,
+        flags: MessageFlags.Ephemeral,
+      });
+      await sendLog(
+        interaction.guild,
+        logEmbed('🎫 Type de ticket supprimé', `**${type.label}**\nPar <@${interaction.user.id}>`, COLORS.WARNING)
       );
       return;
     }

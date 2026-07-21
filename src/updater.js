@@ -86,4 +86,4 @@ async function autoUpdate() {
   return true;
 }
 
-module.exports = { autoUpdate, relaunch };
+module.exports = { autoUpdate, relaunch, currentVersion, REPO, HEADERS };

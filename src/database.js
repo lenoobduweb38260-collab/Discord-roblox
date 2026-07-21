@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS guild_config (
   service_channel_id TEXT,
   staff_channel_id   TEXT,
   member_channel_id  TEXT,
+  update_channel_id  TEXT,
   rp_enabled         INTEGER NOT NULL DEFAULT 0,
   rp_locked          INTEGER NOT NULL DEFAULT 0,
   xp_text            INTEGER NOT NULL DEFAULT 20,
@@ -195,6 +196,11 @@ CREATE TABLE IF NOT EXISTS ticket_panels (
   options    TEXT NOT NULL DEFAULT '{}'
 );
 
+CREATE TABLE IF NOT EXISTS app_state (
+  key   TEXT PRIMARY KEY,
+  value TEXT
+);
+
 CREATE TABLE IF NOT EXISTS scam_images (
   id       INTEGER PRIMARY KEY AUTOINCREMENT,
   guild_id TEXT NOT NULL,
@@ -215,6 +221,7 @@ for (const column of [
   'welcome_mention INTEGER',
   'rp_enabled INTEGER',
   'rp_locked INTEGER',
+  'update_channel_id TEXT',
 ]) {
   try {
     db.exec(`ALTER TABLE guild_config ADD COLUMN ${column}`);
@@ -230,6 +237,7 @@ const DEFAULT_CONFIG = {
   service_channel_id: null,
   staff_channel_id: null,
   member_channel_id: null,
+  update_channel_id: null,
   welcome_message: null,
   goodbye_message: null,
   welcome_mention: 0,
