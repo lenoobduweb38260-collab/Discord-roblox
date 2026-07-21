@@ -113,9 +113,12 @@ module.exports = {
 
     // Sécurité centralisée : chaque commande déclare son grade minimum, le
     // contrôle est fait ici (impossible de contourner via l'interface Discord).
+    // Le grade n'est calculé que s'il est exigé : en contexte « app
+    // utilisateur » (serveur où le bot n'est pas membre), le membre est un
+    // objet brut sans permissions exploitables.
     const requiredGrade = command.grade ?? GRADES.EVERYONE;
     const cfg = getGuildConfig(interaction.guildId);
-    const memberGrade = getGrade(interaction.member, cfg);
+    const memberGrade = requiredGrade > GRADES.EVERYONE ? getGrade(interaction.member, cfg) : GRADES.EVERYONE;
     if (memberGrade < requiredGrade) {
       if (interaction.guild) {
         await sendLog(

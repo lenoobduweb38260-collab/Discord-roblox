@@ -563,6 +563,7 @@ const server = http.createServer(async (req, res) => {
         if (!m) return sendJson(res, 400, { error: 'CLIENT_ID manquant dans le .env de ce bot (onglet ⚙️ .env).' });
         return sendJson(res, 200, {
           url: `https://discord.com/oauth2/authorize?client_id=${m[1]}&scope=bot+applications.commands&permissions=8`,
+          urlPerso: `https://discord.com/oauth2/authorize?client_id=${m[1]}&integration_type=1&scope=applications.commands`,
         });
       }
 
@@ -917,6 +918,13 @@ function renderActions() {
       if (j.error) { toast('⚠️ ' + j.error); return; }
       window.open(j.url, '_blank');
       toast('🔗 Lien ouvert — choisissez le serveur puis Autoriser.');
+    });
+  });
+  btn('👤 App perso (solo)', 'gray', function(){
+    fetch('/api/bots/' + sel + '/invitation').then(function(r){ return r.json(); }).then(function(j){
+      if (j.error) { toast('⚠️ ' + j.error); return; }
+      window.open(j.urlPerso, '_blank');
+      toast('👤 Ajoutez l\\'app à VOTRE compte — /interact partout (MP, groupes, serveurs). Activez d\\'abord « User Install » dans le portail développeur.');
     });
   });
   btn('🗑 Supprimer', 'gray', function(){

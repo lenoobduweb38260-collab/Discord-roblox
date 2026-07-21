@@ -9,7 +9,11 @@ const GRADES = { EVERYONE: 0, STAFF: 2, ADMIN: 3 };
 const GRADE_NAMES = { 0: 'Membre', 2: 'Staff', 3: 'Administration' };
 
 function getGrade(member, config) {
-  if (!member) return GRADES.EVERYONE;
+  // Membre absent ou objet brut (contexte app utilisateur hors serveur du
+  // bot) : pas de permissions exploitables → grade minimal.
+  if (!member || typeof member.permissions?.has !== 'function' || !member.roles?.cache) {
+    return GRADES.EVERYONE;
+  }
   const cfg = config || getGuildConfig(member.guild.id);
   if (
     member.permissions.has(PermissionFlagsBits.Administrator) ||

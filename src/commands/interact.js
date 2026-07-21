@@ -6,6 +6,7 @@ const {
   ButtonStyle,
   MessageFlags,
   InteractionContextType,
+  ApplicationIntegrationType,
 } = require('discord.js');
 const { db } = require('../database');
 const { GRADES } = require('../utils/permissions');
@@ -135,10 +136,14 @@ module.exports = {
   grade: GRADES.EVERYONE,
   public: true, // réponses visibles par tout le monde (pas d'éphémère)
   allowDm: true, // utilisable en message privé avec le bot
+  userInstall: true, // installable sur un compte utilisateur → enregistrement GLOBAL
   data: new SlashCommandBuilder()
     .setName('interact')
     .setDescription('Interactions : bisous, câlins, caresses, morsures (GIF anime)')
-    .setContexts(InteractionContextType.Guild, InteractionContextType.BotDM)
+    // Installation serveur ET installation utilisateur (app perso) : utilisable
+    // sur les serveurs, en MP avec le bot et dans les MP/groupes privés.
+    .setIntegrationTypes(ApplicationIntegrationType.GuildInstall, ApplicationIntegrationType.UserInstall)
+    .setContexts(InteractionContextType.Guild, InteractionContextType.BotDM, InteractionContextType.PrivateChannel)
     .addSubcommand((sub) =>
       sub
         .setName('kiss')
