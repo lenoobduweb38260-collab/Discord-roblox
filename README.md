@@ -183,6 +183,7 @@ Un **site web de configuration** pour un hébergeur web Node.js (18+), relié au
 - Pages par serveur, style DraftBot : 📊 vue d'ensemble et statistiques, 🎭 Module RP (🔒 verrouillage administrateur respecté), 👮 rôles staff/admin **multiples**, 📢 salons & logs, 📈 niveaux, 👋 messages de bienvenue/au revoir, 📋 whitelist métiers, 🎫 tickets
 - Chaque changement est appliqué **immédiatement** par le bot concerné (via l'agent, clé secrète jamais exposée au navigateur)
 - Installation : `index.js` + `config.env` chez l'hébergeur web, `node index.js` — voir le LISEZMOI.md du pack (2 clés OAuth2 à copier depuis le portail développeur Discord + l'URL `/callback` à déclarer)
+- **Hébergement web classique (public_html) ?** Utilisez **`pack-dashboard-php.zip`** : la même chose en version **PHP** — 2 fichiers (`index.php` + `config.php`) à déposer dans `public_html`, rien à installer (PHP 8+, redirection OAuth2 : `VOTRE_URL/index.php?p=callback`)
 
 ## 🚀 Installation
 

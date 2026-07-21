@@ -91,6 +91,11 @@ jobs:
           cd dashboard
           zip -r ../dist/pack-dashboard.zip index.js config.env LISEZMOI.md
 
+      - name: Créer le pack dashboard PHP (public_html)
+        run: |
+          cd dashboard-php
+          zip -r ../dist/pack-dashboard-php.zip index.php config.php LISEZMOI.md
+
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: v1.0.${{ github.run_number }}
@@ -110,11 +115,14 @@ jobs:
             **panel se relie à distance** (console, ▶/⏹, .env, dashboard, page 🌐 Serveurs)
             via ➕ Nouveau bot → 🌍 Bot hébergé (URL + clé). Voir le LISEZMOI.md inclus.
 
-            ### 🎛️ Pack dashboard web (`pack-dashboard.zip`)
-            Un dashboard **façon DraftBot** pour un hébergeur web (Node 18+) : connexion
-            **avec Discord**, chaque staff configure les serveurs qu'il administre (Module RP,
-            rôles, salons, niveaux, bienvenue, whitelist, tickets). Relié aux bots via l'agent.
-            Voir le LISEZMOI.md inclus.
+            ### 🎛️ Pack dashboard web (`pack-dashboard.zip` / `pack-dashboard-php.zip`)
+            Un dashboard **façon DraftBot** : connexion **avec Discord**, chaque staff
+            configure les serveurs qu'il administre (Module RP, rôles, salons, niveaux,
+            bienvenue, whitelist, tickets). Relié aux bots via l'agent.
+            - `pack-dashboard.zip` : hébergeur **Node.js** 18+ (`node index.js`)
+            - `pack-dashboard-php.zip` : hébergement web classique **PHP/public_html**
+              (2 fichiers à déposer, rien à installer)
+            Voir le LISEZMOI.md inclus dans chaque pack.
 
             ### 🤖 Gestionnaire de bots
             Application locale pour gérer **plusieurs bots** (chacun relié à son propre dépôt GitHub) :
