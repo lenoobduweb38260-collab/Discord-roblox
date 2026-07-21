@@ -263,6 +263,16 @@ async function start() {
       console.warn(`⚠️ Annonces de mise à jour non démarrées : ${err.message}`);
     }
   });
+
+  // Annonces réseaux sociaux : lives Twitch et nouvelles vidéos/publications
+  // (YouTube, TikTok, X, Reddit) des comptes suivis via /reseaux.
+  client.once(Events.ClientReady, () => {
+    try {
+      require('./utils/socialWatch').start(client);
+    } catch (err) {
+      console.warn(`⚠️ Veille des réseaux sociaux non démarrée : ${err.message}`);
+    }
+  });
   client.on(Events.GuildCreate, (guild) => {
     require('./commandSync').syncGuild(guild.id).catch(() => null);
   });

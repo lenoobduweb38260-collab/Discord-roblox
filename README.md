@@ -68,6 +68,12 @@ Bot Discord complet pour serveur Roleplay Roblox : cartes d'identité, permis de
 - `/whitelist retirer` — retire la whitelist **et** le rôle ; `/whitelist liste` — membres whitelistés d'un métier ; `/whitelist roles` — rôles que vous pouvez attribuer
 - Le **staff** peut whitelister tous les rôles métier configurés
 
+### 📡 Annonces réseaux sociaux (`/reseaux`)
+- Le bot **suit vos chaînes et comptes** — ▶️ YouTube, 🟣 Twitch, 🎵 TikTok, 🐦 X (Twitter), 👽 Reddit — et **annonce automatiquement** dans le salon choisi quand un **stream démarre** (Twitch) ou qu'une **nouvelle vidéo/publication** sort (vérification toutes les 5 minutes)
+- `/reseaux ajouter plateforme identifiant salon [message]` — **[Staff]** lien, @pseudo ou r/subreddit acceptés ; message personnalisé avec les variables `{nom}`, `{titre}`, `{lien}` (sinon message par défaut avec aperçu du lien)
+- `/reseaux retirer` (avec autocomplétion), `/reseaux liste` — vue aussi dans `/config` → 📡 Réseaux sociaux
+- À l'ajout d'un flux, le contenu déjà publié est mémorisé **sans être annoncé** (pas de spam d'anciennes vidéos) ; ⚠️ X et TikTok bloquent parfois les requêtes automatisées — YouTube, Twitch et Reddit sont les plus fiables
+
 ### 🛡️ Équipe du bot — hiérarchie, blacklist globale & QG des tickets
 - **Hiérarchie du staff du bot** (indépendante des serveurs), gérée par le **créateur** :
   - `/botstaff ajouter utilisateur grade` — ajouter un membre avec son grade (ex : Responsable, Modérateur)
@@ -105,6 +111,7 @@ Dans le salon de logs configuré : toutes les actions staff et accès refusés, 
   - 📈 **XP & niveaux** — formulaire XP texte/vocal et cooldown
   - 📋 **Whitelist métiers** — vue des autorisations gérants
   - 🎫 **Tickets** — création d'un type en formulaire (nom, emoji) puis choix de la catégorie Discord, définition du rôle support par sélecteur, suppression — le tout sans quitter le panneau
+  - 📡 **Réseaux sociaux** — vue des chaînes/comptes suivis et de leurs salons d'annonce
 - Accessible au **staff** ; le rôle **Administration** ne peut être modifié que par un admin (sécurité grade élevé) ; chaque changement est tracé dans les logs
 
 ## 🎭 Module RP activable

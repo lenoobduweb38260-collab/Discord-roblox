@@ -233,6 +233,18 @@ CREATE TABLE IF NOT EXISTS bot_tickets (
   created_at  TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS social_feeds (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  guild_id   TEXT NOT NULL,
+  platform   TEXT NOT NULL,
+  handle     TEXT NOT NULL,
+  channel_id TEXT NOT NULL,
+  message    TEXT,
+  meta       TEXT,
+  last_item  TEXT,
+  UNIQUE (guild_id, platform, handle)
+);
+
 CREATE TABLE IF NOT EXISTS scam_images (
   id       INTEGER PRIMARY KEY AUTOINCREMENT,
   guild_id TEXT NOT NULL,

@@ -127,6 +127,17 @@ function mainView(guild) {
             : '*Aucun type de ticket configuré*';
         })(),
         inline: false,
+      },
+      {
+        name: '📡 Réseaux sociaux',
+        value: (() => {
+          const { PLATFORMS, listGuildFeeds } = require('./socialWatch');
+          const feeds = listGuildFeeds.all(guild.id);
+          return feeds.length
+            ? feeds.map((f) => `${PLATFORMS[f.platform]?.emoji || '📡'} \`${f.handle}\``).join(' · ')
+            : '*Aucun réseau suivi*';
+        })(),
+        inline: false,
       }
     )
     .setFooter({ text: 'Seul le staff peut utiliser ce panneau • Le rôle Administration ne peut être changé que par un admin' });
@@ -141,7 +152,8 @@ function mainView(guild) {
         { label: 'Salons', value: 'salons', emoji: '📢', description: 'Logs, niveaux, service, staff' },
         { label: 'XP & niveaux', value: 'xp', emoji: '📈', description: 'XP texte, XP vocal, cooldown' },
         { label: 'Whitelist métiers', value: 'whitelist', emoji: '📋', description: 'Autorisations des gérants' },
-        { label: 'Tickets', value: 'tickets', emoji: '🎫', description: 'Types de tickets, catégories, rôles support' }
+        { label: 'Tickets', value: 'tickets', emoji: '🎫', description: 'Types de tickets, catégories, rôles support' },
+        { label: 'Réseaux sociaux', value: 'reseaux', emoji: '📡', description: 'Annonces des lives et nouvelles vidéos' }
       )
   );
   return { embeds: [embed], components: [categoryRow] };
@@ -268,6 +280,33 @@ function rpView(guild) {
   return { embeds: [embed], components: [row, backRow()] };
 }
 
+// ----- Catégorie : réseaux sociaux (annonces lives / nouvelles vidéos) -----
+function reseauxView(guild) {
+  const { PLATFORMS, listGuildFeeds } = require('./socialWatch');
+  const feeds = listGuildFeeds.all(guild.id);
+  const embed = new EmbedBuilder()
+    .setColor(COLORS.INFO)
+    .setTitle('📡 Configuration — Réseaux sociaux')
+    .setDescription(
+      (feeds.length
+        ? feeds
+            .map((f) => `• ${PLATFORMS[f.platform]?.emoji || '📡'} **${PLATFORMS[f.platform]?.label || f.platform}** — \`${f.handle}\` → <#${f.channel_id}>`)
+            .join('\n')
+        : '*Aucun réseau suivi.*') +
+        '\n\nLe bot vérifie **toutes les 5 minutes** et annonce automatiquement les **lives Twitch** ' +
+        'et les **nouvelles vidéos/publications** (YouTube, TikTok, X, Reddit) dans le salon choisi.'
+    )
+    .addFields({
+      name: 'Gérer les réseaux suivis',
+      value:
+        '• `/reseaux ajouter plateforme identifiant salon [message]` — suivre une chaîne/un compte\n' +
+        '• `/reseaux retirer flux` — ne plus suivre\n' +
+        '• `/reseaux liste` — voir les suivis\n' +
+        'Message personnalisé : variables `{nom}`, `{titre}`, `{lien}`',
+    });
+  return { embeds: [embed], components: [backRow()] };
+}
+
 // ----- Catégorie : tickets (types, catégories Discord, rôles support) -----
 function ticketsView(guild, selectedId = null) {
   const types = listTicketTypes.all(guild.id);
@@ -371,7 +410,7 @@ function ticketModal() {
     );
 }
 
-const CATEGORY_VIEWS = { rp: rpView, roles: rolesView, salons: salonsView, xp: xpView, whitelist: whitelistView, tickets: ticketsView };
+const CATEGORY_VIEWS = { rp: rpView, roles: rolesView, salons: salonsView, xp: xpView, whitelist: whitelistView, tickets: ticketsView, reseaux: reseauxView };
 
 function xpModal(cfg) {
   const field = (id, label, value) =>
