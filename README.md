@@ -106,7 +106,7 @@ Dans le salon de logs configuré : toutes les actions staff et accès refusés, 
 ### ⚙️ Configuration (`/config`) — panneau central
 - `/config` ouvre un **panneau interactif unique** (éphémère) avec la vue d'ensemble et toutes les catégories :
   - 🎭 **Module RP** — activation/désactivation des commandes RP (respecte le 🔒 verrouillage administrateur)
-  - 👮 **Rôles** — staff, administration, en service (sélecteurs de rôles)
+  - 👮 **Rôles** — staff et administration en **multi-sélection** (plusieurs rôles staff/admin possibles, tous donnent le grade), rôle en service
   - 📢 **Salons** — logs, niveaux, service, staff, membres, mises à jour (sélecteurs de salons)
   - 📈 **XP & niveaux** — formulaire XP texte/vocal et cooldown
   - 📋 **Whitelist métiers** — vue des autorisations gérants
@@ -127,6 +127,7 @@ Toutes les réponses de commandes sont **éphémères** (« lecture seule » : v
 ## 🔐 Sécurité
 
 - **3 grades** : Membre (0) → **Staff** (2) → **Administration** (3)
+- **Plusieurs rôles Discord** peuvent donner chaque grade (multi-sélection dans `/config` → Rôles et dans le dashboard du gestionnaire)
 - Le grade est vérifié **côté bot, de façon centralisée** pour chaque commande — impossible à contourner même si les permissions Discord de la commande sont mal réglées
 - Repli sans configuration : permission Discord **Modérer les membres** = staff, **Administrateur** = admin
 - Les actions sensibles (`/config`, `/banglobal`, configuration des autorisations de whitelist) exigent le grade **Administration**
@@ -161,6 +162,7 @@ Quand une **nouvelle version est prête** (release publiée pendant que le bot t
 - La commande Discord `/update` d'un bot géré délègue la mise à jour au gestionnaire (téléchargement + redémarrage automatiques)
 - 🎛️ **Dashboard par serveur** (bot démarré) : membres, statistiques (cartes, permis, entreprises, tickets ouverts, whitelist, véhicules assurés), configuration résolue et top niveaux
 - 🌐 **Page Serveurs** : tous les serveurs où le bot est présent (icône, nom, membres, ID) avec **🚪 Retirer le bot** d'un serveur en un clic et accès direct au réglage 🎭 Module RP du serveur, y compris son **🔒 verrouillage administrateur**
+- 🛡️ **Page Staff du bot** : gestion de l'équipe du bot par **IDs Discord** — création des **grades** (libres : Responsable, Modérateur, Support…), attribution du grade et **permissions par personne** (🚫 Blacklist, 🎫 Tickets du QG, 🛡️ Gestion du staff) en cases à cocher
 - 🖼️ **Créateur d'embed avec prévisualisation en direct** façon DraftBot : auteur + icône, titre, description, couleur (pipette), grande image, miniature, pied de page — aperçu identique à Discord pendant la frappe, puis envoi dans le salon choisi
 - 🔗 **Bouton « Inviter sur un serveur »** : génère le lien d'invitation du bot à partir du CLIENT_ID de son `.env`
 

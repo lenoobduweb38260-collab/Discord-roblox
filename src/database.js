@@ -269,6 +269,8 @@ for (const column of [
   'rp_enabled INTEGER',
   'rp_locked INTEGER',
   'update_channel_id TEXT',
+  'staff_role_ids TEXT',
+  'admin_role_ids TEXT',
 ]) {
   try {
     db.exec(`ALTER TABLE guild_config ADD COLUMN ${column}`);
@@ -278,6 +280,8 @@ for (const column of [
 const DEFAULT_CONFIG = {
   staff_role_id: null,
   admin_role_id: null,
+  staff_role_ids: null,
+  admin_role_ids: null,
   service_role_id: null,
   log_channel_id: null,
   level_channel_id: null,

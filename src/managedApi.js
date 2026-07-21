@@ -39,10 +39,13 @@ function startManagedApi(client, baseDir) {
   const listBans = db.prepare('SELECT * FROM global_bans ORDER BY banned_at DESC');
   const deleteBanStmt = db.prepare('DELETE FROM global_bans WHERE user_id = ?');
 
-  // Clés de configuration modifiables depuis le dashboard ('s' = id, 'n' = nombre).
+  // Clés de configuration modifiables depuis le dashboard
+  // ('s' = id, 'n' = nombre, 'b' = booléen, 't' = texte, 'j' = liste d'IDs).
   const CONFIG_KEYS = {
     staff_role_id: 's',
     admin_role_id: 's',
+    staff_role_ids: 'j',
+    admin_role_ids: 'j',
     service_role_id: 's',
     log_channel_id: 's',
     level_channel_id: 's',
@@ -207,6 +210,76 @@ function startManagedApi(client, baseDir) {
         return send(200, { ok: true });
       }
 
+      // ----- 🛡️ Staff du bot (équipe globale, page dédiée du gestionnaire) -----
+      // IDs Discord des staffs, grades libres et permissions par personne.
+      if (url.pathname.startsWith('/botstaff')) {
+        const { PERMS, listStaffRows, getStaffRow, insertStaff, updatePerms, deleteStaff, state, setState } = require('./utils/botTeam');
+        const ranks = () => {
+          try {
+            const list = JSON.parse(state('staff_ranks') || '[]');
+            return Array.isArray(list) && list.length ? list : ['Responsable', 'Modérateur'];
+          } catch {
+            return ['Responsable', 'Modérateur'];
+          }
+        };
+        if (req.method === 'GET' && url.pathname === '/botstaff') {
+          const rows = listStaffRows.all();
+          const staffList = await Promise.all(
+            rows.map(async (row) => {
+              const user = await client.users.fetch(row.user_id).catch(() => null);
+              let perms = [];
+              try {
+                perms = JSON.parse(row.perms);
+              } catch {}
+              return { userId: row.user_id, tag: user?.tag || null, rank: row.rank, perms };
+            })
+          );
+          return send(200, { staff: staffList, grades: ranks(), perms: PERMS });
+        }
+        if (req.method === 'POST' && url.pathname === '/botstaff-ajouter') {
+          const body = await readBody(req);
+          const userId = String(body.userId || '').trim();
+          if (!/^\d{5,25}$/.test(userId)) return send(400, { error: 'ID Discord invalide (clic droit sur le membre → Copier l\'identifiant).' });
+          const rank = String(body.rank || '').trim().slice(0, 50) || ranks()[0];
+          insertStaff.run(userId, rank, '[]', 'gestionnaire', new Date().toISOString());
+          const user = await client.users.fetch(userId).catch(() => null);
+          return send(200, { ok: true, tag: user?.tag || null });
+        }
+        if (req.method === 'POST' && url.pathname === '/botstaff-retirer') {
+          const body = await readBody(req);
+          deleteStaff.run(String(body.userId || ''));
+          return send(200, { ok: true });
+        }
+        if (req.method === 'POST' && url.pathname === '/botstaff-perm') {
+          const body = await readBody(req);
+          const row = getStaffRow.get(String(body.userId || ''));
+          if (!row) return send(404, { error: 'Ce membre n\'est pas dans le staff du bot.' });
+          if (!(body.perm in PERMS)) return send(400, { error: 'Permission inconnue.' });
+          let perms = [];
+          try {
+            perms = JSON.parse(row.perms);
+          } catch {}
+          perms = perms.filter((p) => p !== body.perm);
+          if (body.on) perms.push(body.perm);
+          updatePerms.run(JSON.stringify(perms), row.user_id);
+          return send(200, { ok: true, perms });
+        }
+        if (req.method === 'POST' && url.pathname === '/botstaff-grade') {
+          const body = await readBody(req);
+          const name = String(body.name || '').trim().slice(0, 50);
+          if (!name) return send(400, { error: 'Nom de grade requis.' });
+          const list = ranks().filter((g) => g !== name);
+          list.push(name);
+          setState('staff_ranks', JSON.stringify(list.slice(0, 25)));
+          return send(200, { ok: true });
+        }
+        if (req.method === 'POST' && url.pathname === '/botstaff-grade-suppr') {
+          const body = await readBody(req);
+          setState('staff_ranks', JSON.stringify(ranks().filter((g) => g !== String(body.name || ''))));
+          return send(200, { ok: true });
+        }
+      }
+
       // Retrait du bot d'un serveur (demandé depuis la page 🌐 Serveurs du gestionnaire).
       if (req.method === 'POST' && url.pathname === '/leave') {
         const body = await readBody(req);
@@ -251,8 +324,21 @@ function startManagedApi(client, baseDir) {
           value = value ? 1 : 0;
         } else if (CONFIG_KEYS[key] === 't' && value !== null) {
           value = String(value).slice(0, 1500);
+        } else if (CONFIG_KEYS[key] === 'j' && value !== null) {
+          const ids = (Array.isArray(value) ? value : [value]).map((v) => String(v).trim()).filter((v) => /^\d{5,25}$/.test(v));
+          value = ids.length ? JSON.stringify(ids.slice(0, 10)) : null;
         }
         setGuildConfig(body.guildId, key, value);
+        // Colonnes historiques mono-rôle synchronisées avec les listes (le
+        // grade fusionne les deux : sans ça, un rôle retiré de la liste
+        // resterait actif via l'ancienne colonne).
+        if (key === 'staff_role_ids' || key === 'admin_role_ids') {
+          let first = null;
+          try {
+            first = JSON.parse(value || '[]')[0] || null;
+          } catch {}
+          setGuildConfig(body.guildId, key.replace('_ids', '_id'), first);
+        }
         // Le Module RP change la liste des commandes du serveur : resynchronisation.
         if (key === 'rp_enabled') {
           require('./commandSync')

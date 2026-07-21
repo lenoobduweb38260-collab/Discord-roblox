@@ -1261,6 +1261,7 @@ function loadTab() {
       var pages = [
         ['apercu', '📊 Vue d\\'ensemble'],
         ['serveurs', '🌐 Serveurs'],
+        ['botstaff', '🛡️ Staff du bot'],
         ['module', '🎭 Module RP'],
         ['membres', '👋 Arrivées et départs'],
         ['messages', '💬 Messages'],
@@ -1398,6 +1399,15 @@ function dashSelect(key, label, desc, list, current, prefix) {
   h += '</select></div>';
   return h;
 }
+function dashMulti(key, label, desc, list, currentJson) {
+  var current = [];
+  try { current = JSON.parse(currentJson || '[]'); } catch (e) {}
+  var h = '<div class="dsec"><h3>' + label + '</h3><p>' + desc + '</p>';
+  h += '<select multiple size="6" class="dmulti" data-k="' + key + '" style="max-width:320px;height:auto">';
+  list.forEach(function(x){ h += '<option value="' + x.id + '"' + (current.indexOf(x.id) >= 0 ? ' selected' : '') + '>@' + x.name + '</option>'; });
+  h += '</select><br><button class="dmultisave" data-k="' + key + '" style="margin-top:6px">💾 Enregistrer la sélection</button></div>';
+  return h;
+}
 function dashNumber(key, label, desc, value, min, max) {
   return '<div class="dsec"><h3>' + label + '</h3><p>' + desc + '</p>' +
     '<div style="display:flex;gap:8px"><input type="number" class="dnum" data-k="' + key + '" value="' + value + '" min="' + min + '" max="' + max + '" style="width:120px">' +
@@ -1449,6 +1459,61 @@ function renderDashPage(page, gid) {
           api('POST', '/api/bots/' + sel + '/proxy/leave', { guildId: el.getAttribute('data-g') })
             .then(function(j){ if (j && j.ok) { toast('🚪 Bot retiré de « ' + (j.name || '') + ' ».'); loadTab(); } });
         };
+      });
+    });
+    return;
+  }
+  if (page === 'botstaff') {
+    fetch('/api/bots/' + sel + '/proxy/botstaff').then(function(r){ return r.json(); }).then(function(d){
+      if (d.error) { m.innerHTML = '<div class="empty">⚠️ ' + d.error + '</div>'; return; }
+      var h = '<h2 class="dbtitle">🛡️ Staff du bot</h2>';
+      h += '<p class="dbp">Équipe du bot, valable sur <b>tous ses serveurs</b> — le créateur a toutes les permissions d\\'office. Ajoutez les <b>IDs Discord</b> de vos staffs, créez vos <b>grades</b>, puis cochez les <b>permissions</b> de chacun (équivalent Discord : <code>/botstaff</code>).</p>';
+      h += '<div class="dsec"><h3>📛 Grades</h3><div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">';
+      (d.grades || []).forEach(function(g){
+        h += '<span style="background:#101114;border:1px solid var(--border);border-radius:14px;padding:3px 10px;font-size:12.5px;display:inline-flex;gap:6px;align-items:center">' + escHtml(g) +
+          '<button class="bsg-del" data-g="' + escHtml(g) + '" style="padding:0 6px;font-size:11px">✕</button></span>';
+      });
+      h += '<input id="bs_gnew" placeholder="Nouveau grade (ex : Support)" style="max-width:190px"><button id="bs_gadd" class="accent" style="padding:4px 12px">➕</button></div></div>';
+      var permKeys = Object.keys(d.perms || {});
+      (d.staff || []).forEach(function(s){
+        h += '<div class="dbrow" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">';
+        h += '<div style="min-width:170px"><b>' + escHtml(s.tag || 'ID ' + s.userId) + '</b><div style="color:var(--muted);font-size:11.5px">' + s.userId + '</div></div>';
+        h += '<select class="bs-rank" data-u="' + s.userId + '" style="max-width:150px">';
+        var seen = false;
+        (d.grades || []).forEach(function(g){ if (g === s.rank) seen = true; h += '<option' + (g === s.rank ? ' selected' : '') + '>' + escHtml(g) + '</option>'; });
+        if (!seen) h += '<option selected>' + escHtml(s.rank) + '</option>';
+        h += '</select>';
+        permKeys.forEach(function(pk){
+          h += '<label style="display:flex;gap:4px;align-items:center;font-size:12px"><input type="checkbox" class="bs-perm" data-u="' + s.userId + '" data-p="' + pk + '"' + (s.perms.indexOf(pk) >= 0 ? ' checked' : '') + ' style="width:auto"> ' + d.perms[pk] + '</label>';
+        });
+        h += '<button class="bs-del" data-u="' + s.userId + '" style="margin-left:auto;padding:3px 10px;font-size:12px">🗑</button></div>';
+      });
+      if (!(d.staff || []).length) h += '<p class="dbp"><i>Aucun membre dans le staff du bot pour le moment.</i></p>';
+      h += '<div class="dsec" style="margin-top:14px"><h3>➕ Ajouter un staff</h3><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">';
+      h += '<input id="bs_id" placeholder="ID Discord (ex : 123456789012345678)" style="max-width:250px">';
+      h += '<select id="bs_rank" style="max-width:160px">' + (d.grades || []).map(function(g){ return '<option>' + escHtml(g) + '</option>'; }).join('') + '</select>';
+      h += '<button id="bs_add" class="accent">Ajouter</button></div>';
+      h += '<p class="dbp" style="margin-top:6px">Astuce : clic droit sur le membre dans Discord → « Copier l\\'identifiant » (mode développeur activé).</p></div>';
+      m.innerHTML = h;
+      var proxy2 = function(route, body){ return api('POST', '/api/bots/' + sel + '/proxy/' + route, body); };
+      var rerun = function(){ renderDashPage('botstaff', gid); };
+      $('bs_gadd').onclick = function(){ if ($('bs_gnew').value.trim()) proxy2('botstaff-grade', { name: $('bs_gnew').value }).then(rerun); };
+      Array.prototype.forEach.call(m.querySelectorAll('.bsg-del'), function(el){
+        el.onclick = function(){ proxy2('botstaff-grade-suppr', { name: el.getAttribute('data-g') }).then(rerun); };
+      });
+      $('bs_add').onclick = function(){
+        proxy2('botstaff-ajouter', { userId: $('bs_id').value, rank: $('bs_rank').value }).then(function(j){
+          if (j && j.ok) { toast('✅ ' + (j.tag || 'Membre') + ' ajouté au staff du bot.'); rerun(); }
+        });
+      };
+      Array.prototype.forEach.call(m.querySelectorAll('.bs-rank'), function(el){
+        el.onchange = function(){ proxy2('botstaff-ajouter', { userId: el.getAttribute('data-u'), rank: el.value }).then(function(j){ if (j && j.ok) toast('✅ Grade mis à jour.'); }); };
+      });
+      Array.prototype.forEach.call(m.querySelectorAll('.bs-perm'), function(el){
+        el.onchange = function(){ proxy2('botstaff-perm', { userId: el.getAttribute('data-u'), perm: el.getAttribute('data-p'), on: el.checked }).then(function(j){ if (j && j.ok) toast('✅ Permission mise à jour.'); }); };
+      });
+      Array.prototype.forEach.call(m.querySelectorAll('.bs-del'), function(el){
+        el.onclick = function(){ if (confirm('Retirer ce membre du staff du bot ?')) proxy2('botstaff-retirer', { userId: el.getAttribute('data-u') }).then(rerun); };
       });
     });
     return;
@@ -1510,8 +1575,8 @@ function renderDashPage(page, gid) {
       h += dashNumber('xp_cooldown', 'Cooldown XP texte (secondes)', 'Délai minimum entre deux gains d\\'XP texte.', cfg.xp_cooldown, 5, 3600);
     } else if (page === 'roles') {
       h += '<h2 class="dbtitle">👮 Rôles & sécurité</h2>';
-      h += dashSelect('staff_role_id', 'Rôle Staff (grade 2)', 'Accès aux commandes staff : cartes, permis, entreprises, modération, tickets…', p.roles, cfg.staff_role_id, '@');
-      h += dashSelect('admin_role_id', 'Rôle Administration (grade 3)', 'Accès à /banglobal et aux réglages sensibles.', p.roles, cfg.admin_role_id, '@');
+      h += dashMulti('staff_role_ids', 'Rôles Staff (grade 2 — plusieurs possibles)', 'Ctrl+clic pour sélectionner plusieurs rôles : tous donnent accès aux commandes staff (cartes, permis, modération, tickets…).', p.roles, cfg.staff_role_ids || (cfg.staff_role_id ? JSON.stringify([cfg.staff_role_id]) : null));
+      h += dashMulti('admin_role_ids', 'Rôles Administration (grade 3 — plusieurs possibles)', 'Accès à /banglobal et aux réglages sensibles.', p.roles, cfg.admin_role_ids || (cfg.admin_role_id ? JSON.stringify([cfg.admin_role_id]) : null));
       h += dashSelect('service_role_id', 'Rôle « En service »', 'Ajouté/retiré automatiquement par /service.', p.roles, cfg.service_role_id, '@');
     } else if (page === 'salons') {
       h += '<h2 class="dbtitle">📢 Salons & logs</h2>';
@@ -1588,6 +1653,13 @@ function renderDashPage(page, gid) {
       el.onclick = function(){
         var input = m.querySelector('.dnum[data-k="' + el.getAttribute('data-k') + '"]');
         dashSave(gid, el.getAttribute('data-k'), input.value);
+      };
+    });
+    Array.prototype.forEach.call(m.querySelectorAll('.dmultisave'), function(el){
+      el.onclick = function(){
+        var s = m.querySelector('.dmulti[data-k="' + el.getAttribute('data-k') + '"]');
+        var vals = Array.prototype.filter.call(s.options, function(o){ return o.selected; }).map(function(o){ return o.value; });
+        dashSave(gid, el.getAttribute('data-k'), vals.length ? vals : null);
       };
     });
   });

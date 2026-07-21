@@ -14,7 +14,7 @@ const {
 } = require('discord.js');
 const { db, getGuildConfig, setGuildConfig } = require('../database');
 const { COLORS, sendLog, logEmbed } = require('./embeds');
-const { GRADES, getGrade } = require('./permissions');
+const { GRADES, getGrade, staffRoleIds, adminRoleIds } = require('./permissions');
 
 // Panneau central de configuration : /config ouvre une vue d'ensemble avec un
 // menu de catégories ; chaque catégorie se règle via des sélecteurs de rôles,
@@ -85,8 +85,8 @@ function mainView(guild) {
       {
         name: '👮 Rôles',
         value: [
-          `Staff : ${show(cfg.staff_role_id, 'role')}`,
-          `Administration : ${show(cfg.admin_role_id, 'role')}`,
+          `Staff : ${staffRoleIds(cfg).map((id) => `<@&${id}>`).join(' ') || '*Non configuré*'}`,
+          `Administration : ${adminRoleIds(cfg).map((id) => `<@&${id}>`).join(' ') || '*Non configuré*'}`,
           `En service : ${show(cfg.service_role_id, 'role')}`,
         ].join('\n'),
         inline: false,
@@ -159,28 +159,50 @@ function mainView(guild) {
   return { embeds: [embed], components: [categoryRow] };
 }
 
-// ----- Catégorie : rôles -----
+// ----- Catégorie : rôles (PLUSIEURS rôles staff/administration possibles) -----
 function rolesView(guild) {
   const cfg = getGuildConfig(guild.id);
+  const staffIds = staffRoleIds(cfg);
+  const adminIds = adminRoleIds(cfg);
   const embed = new EmbedBuilder()
     .setColor(COLORS.INFO)
     .setTitle('👮 Configuration — Rôles')
     .setDescription(
-      Object.entries(ROLE_COLUMNS)
-        .map(([col, label]) => `${label} : ${show(cfg[col], 'role')}`)
-        .join('\n') + '\n\nSélectionnez un rôle dans chaque menu pour le définir.'
+      [
+        `👮 Rôles Staff : ${staffIds.map((id) => `<@&${id}>`).join(' ') || '*Non configuré*'}`,
+        `🛡️ Rôles Administration : ${adminIds.map((id) => `<@&${id}>`).join(' ') || '*Non configuré*'}`,
+        `🧑‍💼 Rôle « En service » : ${show(cfg.service_role_id, 'role')}`,
+      ].join('\n') +
+        '\n\nSélectionnez **un ou plusieurs rôles** dans les menus Staff/Administration — ' +
+        'tous les membres ayant l\'un de ces rôles auront le grade correspondant.'
     );
-  const components = Object.entries(ROLE_COLUMNS).map(([col, label]) => {
-    const menu = new RoleSelectMenuBuilder()
-      .setCustomId(`cfgrole:${col}`)
-      .setPlaceholder(label)
-      .setMinValues(1)
-      .setMaxValues(1);
-    if (cfg[col]) menu.setDefaultRoles(cfg[col]);
-    return new ActionRowBuilder().addComponents(menu);
-  });
-  components.push(backRow());
-  return { embeds: [embed], components };
+  const staffMenu = new RoleSelectMenuBuilder()
+    .setCustomId('cfgmrole:staff')
+    .setPlaceholder('👮 Rôles Staff (plusieurs possibles)')
+    .setMinValues(1)
+    .setMaxValues(10);
+  if (staffIds.length) staffMenu.setDefaultRoles(staffIds.slice(0, 10));
+  const adminMenu = new RoleSelectMenuBuilder()
+    .setCustomId('cfgmrole:admin')
+    .setPlaceholder('🛡️ Rôles Administration (plusieurs possibles)')
+    .setMinValues(1)
+    .setMaxValues(10);
+  if (adminIds.length) adminMenu.setDefaultRoles(adminIds.slice(0, 10));
+  const serviceMenu = new RoleSelectMenuBuilder()
+    .setCustomId('cfgrole:service_role_id')
+    .setPlaceholder('🧑‍💼 Rôle « En service »')
+    .setMinValues(1)
+    .setMaxValues(1);
+  if (cfg.service_role_id) serviceMenu.setDefaultRoles(cfg.service_role_id);
+  return {
+    embeds: [embed],
+    components: [
+      new ActionRowBuilder().addComponents(staffMenu),
+      new ActionRowBuilder().addComponents(adminMenu),
+      new ActionRowBuilder().addComponents(serviceMenu),
+      backRow(),
+    ],
+  };
 }
 
 // ----- Catégorie : salons (choix du réglage, puis choix du salon) -----
@@ -471,6 +493,32 @@ async function handleConfigInteraction(interaction) {
       await sendLog(
         interaction.guild,
         logEmbed('⚙️ Configuration modifiée', `${ROLE_COLUMNS[col]} → <@&${roleId}>\nPar <@${interaction.user.id}>`, COLORS.INFO)
+      );
+      return;
+    }
+
+    // Rôles staff / administration MULTIPLES.
+    if (id.startsWith('cfgmrole:')) {
+      const kind = id.split(':')[1]; // 'staff' | 'admin'
+      if (!['staff', 'admin'].includes(kind)) return;
+      // Sécurité grade élevé : seuls les admins touchent aux rôles Administration.
+      if (kind === 'admin' && grade < GRADES.ADMIN) {
+        return await interaction.reply({
+          content: '⛔ Sécurité : seul un membre de l\'**administration** peut changer les rôles Administration.',
+          flags: MessageFlags.Ephemeral,
+        });
+      }
+      const ids = interaction.values.slice(0, 10);
+      setGuildConfig(interaction.guildId, `${kind}_role_ids`, JSON.stringify(ids));
+      setGuildConfig(interaction.guildId, `${kind}_role_id`, ids[0] || null); // compatibilité colonne historique
+      await interaction.update(rolesView(interaction.guild));
+      await sendLog(
+        interaction.guild,
+        logEmbed(
+          '⚙️ Configuration modifiée',
+          `Rôles ${kind === 'staff' ? 'Staff' : 'Administration'} → ${ids.map((r) => `<@&${r}>`).join(' ')}\nPar <@${interaction.user.id}>`,
+          COLORS.INFO
+        )
       );
       return;
     }

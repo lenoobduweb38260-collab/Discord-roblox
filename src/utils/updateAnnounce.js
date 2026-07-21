@@ -1,6 +1,7 @@
 const { EmbedBuilder, ChannelType, PermissionFlagsBits } = require('discord.js');
 const { db, getGuildConfig, setGuildConfig } = require('../database');
 const { currentVersion, REPO, HEADERS } = require('../updater');
+const { staffRoleIds, adminRoleIds } = require('./permissions');
 
 // Annonces de mise à jour : quand une nouvelle release GitHub est prête, le
 // bot l'annonce sur chaque serveur en mentionnant le rôle staff. Le salon
@@ -39,7 +40,7 @@ async function resolveUpdateChannel(guild) {
         allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages],
       },
     ];
-    for (const roleId of [cfg.staff_role_id, cfg.admin_role_id]) {
+    for (const roleId of [...staffRoleIds(cfg), ...adminRoleIds(cfg)]) {
       if (roleId && guild.roles.cache.has(roleId)) {
         overwrites.push({
           id: roleId,
@@ -68,7 +69,10 @@ async function broadcast(client, embed) {
       const channel = await resolveUpdateChannel(guild);
       if (!channel) continue;
       const cfg = getGuildConfig(guild.id);
-      const ping = cfg.staff_role_id && guild.roles.cache.has(cfg.staff_role_id) ? `<@&${cfg.staff_role_id}>` : '';
+      const ping = staffRoleIds(cfg)
+        .filter((id) => guild.roles.cache.has(id))
+        .map((id) => `<@&${id}>`)
+        .join(' ');
       await channel.send({ content: ping || undefined, embeds: [embed] });
     } catch (err) {
       console.warn(`⚠️ Annonce de mise à jour impossible sur ${guild.name} : ${err.message}`);
