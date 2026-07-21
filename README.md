@@ -175,6 +175,15 @@ Le fichier **`pack-hebergeur.zip`** (dans chaque release) fait tourner le bot **
 3. Sur votre PC : Gestionnaire → **➕ Nouveau bot → 🌍 Bot hébergé** (URL `http://ip:port` + clé) — le bot distant s'utilise ensuite **comme un bot local** : console en direct, ▶/⏹, ⬇ mise à jour, ⚙️ .env distant, 📊 dashboard complet et page **🌐 Serveurs** (chaque serveur qui ajoute le bot)
 4. Sécurité : toutes les routes de l'agent exigent la clé (`401` sinon) ; le panel local peut aussi être exposé (`PANEL_HOST`/`PANEL_PORT`/`PANEL_PASSWORD`, page de connexion intégrée)
 
+## 🎛️ Dashboard web façon DraftBot (`pack-dashboard.zip`)
+
+Un **site web de configuration** pour un hébergeur web Node.js (18+), relié aux bots via l'agent :
+
+- **Connexion avec Discord** (OAuth2) : chaque staff ne voit que les serveurs qu'il **administre** (permission *Gérer le serveur*) et où un bot est présent — partagez simplement l'URL, les droits se vérifient tout seuls
+- Pages par serveur, style DraftBot : 📊 vue d'ensemble et statistiques, 🎭 Module RP (🔒 verrouillage administrateur respecté), 👮 rôles staff/admin **multiples**, 📢 salons & logs, 📈 niveaux, 👋 messages de bienvenue/au revoir, 📋 whitelist métiers, 🎫 tickets
+- Chaque changement est appliqué **immédiatement** par le bot concerné (via l'agent, clé secrète jamais exposée au navigateur)
+- Installation : `index.js` + `config.env` chez l'hébergeur web, `node index.js` — voir le LISEZMOI.md du pack (2 clés OAuth2 à copier depuis le portail développeur Discord + l'URL `/callback` à déclarer)
+
 ## 🚀 Installation
 
 ### 1. Créer l'application Discord

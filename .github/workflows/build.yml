@@ -86,6 +86,11 @@ jobs:
           cd hebergeur
           zip -r ../dist/pack-hebergeur.zip index.js config.env LISEZMOI.md
 
+      - name: Créer le pack dashboard web
+        run: |
+          cd dashboard
+          zip -r ../dist/pack-dashboard.zip index.js config.env LISEZMOI.md
+
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: v1.0.${{ github.run_number }}
@@ -104,6 +109,12 @@ jobs:
             télécharge la dernière version du bot depuis GitHub, le fait tourner, et votre
             **panel se relie à distance** (console, ▶/⏹, .env, dashboard, page 🌐 Serveurs)
             via ➕ Nouveau bot → 🌍 Bot hébergé (URL + clé). Voir le LISEZMOI.md inclus.
+
+            ### 🎛️ Pack dashboard web (`pack-dashboard.zip`)
+            Un dashboard **façon DraftBot** pour un hébergeur web (Node 18+) : connexion
+            **avec Discord**, chaque staff configure les serveurs qu'il administre (Module RP,
+            rôles, salons, niveaux, bienvenue, whitelist, tickets). Relié aux bots via l'agent.
+            Voir le LISEZMOI.md inclus.
 
             ### 🤖 Gestionnaire de bots
             Application locale pour gérer **plusieurs bots** (chacun relié à son propre dépôt GitHub) :
