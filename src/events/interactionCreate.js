@@ -39,6 +39,19 @@ module.exports = {
       return require('../commands/info').handleButton(interaction);
     }
 
+    // ----- Boutons du QG des tickets de l'équipe du bot (bans + reports) -----
+    if (interaction.isButton() && interaction.customId.startsWith('btk:')) {
+      if (!interaction.inGuild()) return;
+      try {
+        return await require('../utils/botTickets').handleButton(interaction);
+      } catch (err) {
+        console.error('Erreur ticket QG :', err);
+        return interaction
+          .reply({ content: '❌ Une erreur est survenue sur ce ticket.', flags: MessageFlags.Ephemeral })
+          .catch(() => null);
+      }
+    }
+
     // ----- Boutons du système de tickets -----
     if (interaction.isButton() && interaction.customId.startsWith('tkt')) {
       if (!interaction.inGuild()) return;

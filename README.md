@@ -52,7 +52,7 @@ Bot Discord complet pour serveur Roleplay Roblox : cartes d'identité, permis de
 - **Contrôle administrateur du bot** (`.env`) : `MODULE_INTERACT=off` désactive le module sur **ce bot** (commande retirée + boutons bloqués) ; `INTERACT_GUILDS=id1,id2` limite le module à **certains serveurs** (vide = partout)
 
 ### ℹ️ Fiche membre (`/info`)
-- `/info [membre]` — fiche **visible uniquement par vous** (éphémère) : 💬 nom, 🔢 ID, 🚫 blacklist (🔜 bientôt disponible), 🏅 badges d'interactions par catégorie
+- `/info [membre]` — fiche **visible uniquement par vous** (éphémère) : 💬 nom, 🔢 ID, 🚫 statut de blacklist (avec la raison), 🏅 badges d'interactions par catégorie
 - Fonctionne **partout** : sur les serveurs, en **message privé** avec le bot et en **app utilisateur** — l'embed d'attestation est publiée quel que soit l'endroit
 - Si vous consultez **votre propre fiche** en étant **créateur du bot** (propriétaire de l'application Discord ou `OWNER_ID` du `.env`) ou **membre de l'équipe du bot** (`BOT_TEAM` du `.env`, IDs séparés par des virgules), un bouton **« Me désigner »** apparaît sous l'embed : en cliquant, le bot publie une **embed publique d'attestation** (👑 créateur officiel / 🛡️ membre officiel du staff) émise par le bot lui-même — preuve fiable, impossible à falsifier
 
@@ -67,6 +67,22 @@ Bot Discord complet pour serveur Roleplay Roblox : cartes d'identité, permis de
 - `/whitelist config ajouter role:@Policier gerant:@GérantPolice` — **[Admin]** autorise un rôle gérant à whitelister un rôle métier (plusieurs gérants possibles par métier)
 - `/whitelist retirer` — retire la whitelist **et** le rôle ; `/whitelist liste` — membres whitelistés d'un métier ; `/whitelist roles` — rôles que vous pouvez attribuer
 - Le **staff** peut whitelister tous les rôles métier configurés
+
+### 🛡️ Équipe du bot — hiérarchie, blacklist globale & QG des tickets
+- **Hiérarchie du staff du bot** (indépendante des serveurs), gérée par le **créateur** :
+  - `/botstaff ajouter utilisateur grade` — ajouter un membre avec son grade (ex : Responsable, Modérateur)
+  - `/botstaff permission utilisateur permission état` — donner/retirer les permissions **🚫 Blacklist**, **🎫 Tickets du QG**, **🛡️ Gestion du staff**
+  - `/botstaff retirer`, `/botstaff liste` — le créateur du bot a toutes les permissions d'office
+- **🚫 Blacklist globale** (permission Blacklist requise) :
+  - `/blacklist ajouter utilisateur raison` — l'utilisateur reçoit un **MP avec la raison et l'invitation du serveur de déban**, est **banni de tous les serveurs du bot** et **re-banni automatiquement à chaque arrivée** tant que la blacklist n'est pas levée
+  - `/blacklist retirer` — lève la blacklist et débannit partout ; `/blacklist liste`
+  - `/blacklist serveur-deban invitation` — **[Créateur]** définit le lien du serveur de contestation joint aux MP
+- **🏛️ QG des tickets** (`/botstaff salon-qg` — créateur) : chaque **bannissement** sur un serveur du bot et chaque **`/report utilisateur raison`** (ouvert à tous) arrive en embed dans le salon QG, avec les boutons :
+  - **🙋 Claim** — prendre le ticket (permission Tickets requise ; un seul staff à la fois)
+  - **🔗 Invitation du serveur** — le bot crée une invitation du serveur d'origine (1 h, 1 utilisation) donnée **en lecture seule** au staff qui a claim
+  - **⏭️ Passer** — rendre le ticket pour qu'un autre staff le prenne
+  - **⚖️ Traiter** — le bot demande la décision : **✅ Aucune sanction** ou **🚫 Blacklist** (l'utilisateur ne pourra plus rejoindre aucun serveur du bot tant qu'il n'est pas unblacklist)
+- **🔗 `/invite`** — tout le monde peut inviter le bot sur son serveur (ou l'installer sur son compte), depuis n'importe où
 
 ### 🔨 Modération staff
 - `/arrivee`, `/depart` — annonces d'arrivée/départ staff (enregistrées en base)

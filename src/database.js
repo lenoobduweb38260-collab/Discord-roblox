@@ -201,6 +201,38 @@ CREATE TABLE IF NOT EXISTS app_state (
   value TEXT
 );
 
+CREATE TABLE IF NOT EXISTS blacklist (
+  user_id TEXT PRIMARY KEY,
+  reason  TEXT,
+  by_id   TEXT NOT NULL,
+  at      TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS bot_staff (
+  user_id  TEXT PRIMARY KEY,
+  rank     TEXT NOT NULL,
+  perms    TEXT NOT NULL DEFAULT '[]',
+  added_by TEXT NOT NULL,
+  added_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS bot_tickets (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  kind        TEXT NOT NULL,
+  guild_id    TEXT NOT NULL,
+  guild_name  TEXT,
+  target_id   TEXT NOT NULL,
+  target_tag  TEXT,
+  reporter_id TEXT,
+  reason      TEXT,
+  status      TEXT NOT NULL DEFAULT 'ouvert',
+  claimed_by  TEXT,
+  channel_id  TEXT,
+  message_id  TEXT,
+  resolution  TEXT,
+  created_at  TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS scam_images (
   id       INTEGER PRIMARY KEY AUTOINCREMENT,
   guild_id TEXT NOT NULL,

@@ -9,6 +9,31 @@ const ts = (date, style = 'F') => `<t:${Math.floor(date.getTime() / 1000)}:${sty
 module.exports = {
   name: Events.GuildMemberAdd,
   async execute(member) {
+    // 0) Blacklist de l'équipe du bot : un blacklisté ne peut PAS rejoindre un
+    // serveur où le système est actif — MP (raison + serveur de déban) puis ban.
+    const { getBlacklistRow, state } = require('../utils/botTeam');
+    const bl = getBlacklistRow.get(member.id);
+    if (bl) {
+      const debanInvite = state('deban_invite');
+      await member
+        .send(
+          `🚫 Vous êtes **blacklisté** par l'équipe du bot : vous ne pouvez pas rejoindre **${member.guild.name}**.\n` +
+            `**Raison :** ${bl.reason || 'Aucune raison précisée'}` +
+            (debanInvite ? `\n🔓 **Serveur de déban (contestation) :** ${debanInvite}` : '')
+        )
+        .catch(() => null);
+      await member.ban({ reason: `Blacklist du bot : ${bl.reason || 'Aucune raison'}` }).catch(() => null);
+      await sendLog(
+        member.guild,
+        logEmbed(
+          '🚫 Blacklist appliquée',
+          `<@${member.id}> (\`${member.id}\`) est blacklisté par l'équipe du bot — banni à son arrivée.\n**Raison :** ${bl.reason || 'Aucune'}`,
+          COLORS.DANGER
+        )
+      );
+      return;
+    }
+
     // 1) Ban global : appliqué automatiquement dès l'arrivée sur n'importe quel serveur.
     const gban = getGlobalBan.get(member.id);
     if (gban) {

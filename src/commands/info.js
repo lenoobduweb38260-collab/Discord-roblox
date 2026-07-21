@@ -10,6 +10,7 @@ const {
 } = require('discord.js');
 const { db } = require('../database');
 const { GRADES } = require('../utils/permissions');
+const { getBlacklistRow, getStaffRow } = require('../utils/botTeam');
 
 // /info [membre] : fiche visible UNIQUEMENT par l'auteur de la commande
 // (réponse éphémère) — Nom, ID, blacklist (bientôt), badges d'interactions.
@@ -38,6 +39,7 @@ async function getBotRole(client, userId) {
   if (creators.has(userId)) return 'createur';
   const team = (process.env.BOT_TEAM || '').split(',').map((s) => s.trim()).filter(Boolean);
   if (team.includes(userId)) return 'staff';
+  if (getStaffRow.get(userId)) return 'staff'; // hiérarchie /botstaff
   return null;
 }
 
@@ -76,7 +78,14 @@ module.exports = {
       .addFields(
         { name: '💬 Nom', value: target.tag, inline: true },
         { name: '🔢 ID', value: target.id, inline: true },
-        { name: '🚫 Blacklist', value: '🔜 *Bientôt disponible*', inline: false },
+        {
+          name: '🚫 Blacklist',
+          value: (() => {
+            const bl = getBlacklistRow.get(target.id);
+            return bl ? `🚫 **Blacklisté** — ${bl.reason || '*aucune raison précisée*'}` : '✅ Non blacklisté';
+          })(),
+          inline: false,
+        },
         { name: '🏅 Badges', value: badgesSummary(target.id), inline: false }
       )
       .setFooter({ text: 'Visible uniquement par vous' });
