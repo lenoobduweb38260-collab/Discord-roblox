@@ -46,7 +46,9 @@ Bot Discord complet pour serveur Roleplay Roblox : cartes d'identité, permis de
 ### 💞 Interactions façon Nekotina (`/interact`)
 - `/interact kiss` (avec choix **sur les lèvres ou sur la joue**), `hug`, `pat`, `bite`, `lick` : choisissez un membre → **embed avec un GIF anime tiré d'internet** (API nekos.best avec le nom de l'anime en pied de page, waifu.pics en secours)
 - **Compteur par duo** (« Ils se sont embrassés N fois ») et boutons **Rendre** / **❌ Rejeter**, utilisables uniquement par la personne visée
-- Fonctionne **sur les serveurs et en message privé** avec le bot ; réponses publiques (non éphémères)
+- **🏅 Badges par paliers** (10 🥉, 50 🥈, 100 🥇, 250 💎, 500 👑 utilisations par catégorie) **envoyés en MP** au moment du déblocage ; `/interact badges` pour consulter les siens
+- **Traduction automatique** selon la langue Discord de chaque utilisateur (français, anglais, espagnol, allemand — repli anglais) : phrases, compteurs, boutons, badges
+- Fonctionne **sur les serveurs et en message privé** avec le bot ; installable en **app utilisateur** ; réponses publiques (non éphémères)
 
 ### 🚨 Anti-scam par images échantillons (`/scamimage`)
 - `/scamimage ajouter image:… [nom]` — **[Staff]** enregistre une image scam échantillon

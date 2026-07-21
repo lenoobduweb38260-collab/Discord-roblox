@@ -148,6 +148,21 @@ CREATE TABLE IF NOT EXISTS interactions (
   PRIMARY KEY (user_a, user_b, action)
 );
 
+CREATE TABLE IF NOT EXISTS interaction_stats (
+  user_id TEXT NOT NULL,
+  action  TEXT NOT NULL,
+  count   INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (user_id, action)
+);
+
+CREATE TABLE IF NOT EXISTS user_badges (
+  user_id   TEXT NOT NULL,
+  action    TEXT NOT NULL,
+  level     INTEGER NOT NULL,
+  earned_at TEXT NOT NULL,
+  PRIMARY KEY (user_id, action, level)
+);
+
 CREATE TABLE IF NOT EXISTS ticket_types (
   id              INTEGER PRIMARY KEY AUTOINCREMENT,
   guild_id        TEXT NOT NULL,
