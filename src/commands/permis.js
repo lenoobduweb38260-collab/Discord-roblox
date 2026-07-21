@@ -15,6 +15,7 @@ const setValid = db.prepare('UPDATE permits SET valid = ? WHERE guild_id = ? AND
 const deletePermit = db.prepare('DELETE FROM permits WHERE guild_id = ? AND user_id = ?');
 
 module.exports = {
+  module: 'rp', // fait partie du Module RP activable dans /config
   grade: GRADES.EVERYONE, // contrôle fin par sous-commande dans execute()
   data: new SlashCommandBuilder()
     .setName('permis')

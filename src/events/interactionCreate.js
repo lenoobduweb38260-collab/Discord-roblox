@@ -118,6 +118,15 @@ module.exports = {
     // objet brut sans permissions exploitables.
     const requiredGrade = command.grade ?? GRADES.EVERYONE;
     const cfg = getGuildConfig(interaction.guildId);
+
+    // Module RP : ses commandes sont refusées tant qu'il n'est pas activé
+    // (elles sont aussi retirées de la liste du serveur par la synchronisation).
+    if (command.module === 'rp' && interaction.inGuild() && !cfg.rp_enabled) {
+      return interaction.reply({
+        content: '⛔ Le **Module RP** n\'est pas activé sur ce serveur. Un staff peut l\'activer via `/config` → 🎭 Module RP.',
+        flags: MessageFlags.Ephemeral,
+      });
+    }
     const memberGrade = requiredGrade > GRADES.EVERYONE ? getGrade(interaction.member, cfg) : GRADES.EVERYONE;
     if (memberGrade < requiredGrade) {
       if (interaction.guild) {

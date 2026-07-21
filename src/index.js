@@ -233,31 +233,26 @@ async function start() {
     });
   }
 
-  // En exécutable : enregistrement automatique des commandes slash au démarrage,
-  // pour que tout fonctionne sans étape supplémentaire.
-  const autoDeploy = async () => {
-    if (!process.pkg) return;
-    if (!process.env.CLIENT_ID?.trim()) {
-      console.warn('⚠️ CLIENT_ID manquant dans le .env : les commandes slash ne seront pas enregistrées automatiquement.');
-      return;
-    }
-    try {
-      await require('./deploy-commands').deployCommands();
-    } catch (err) {
-      console.error(`⚠️ Enregistrement automatique des commandes impossible : ${err.message}`);
-    }
-  };
+  // Synchronisation des commandes au démarrage : globales (app utilisateur)
+  // + jeu par serveur selon le Module RP. Resynchronisation quand le bot
+  // rejoint un nouveau serveur.
+  client.once(Events.ClientReady, () => {
+    require('./commandSync')
+      .syncAll(client)
+      .catch((err) => console.warn(`⚠️ Synchronisation des commandes : ${err.message}`));
+  });
+  client.on(Events.GuildCreate, (guild) => {
+    require('./commandSync').syncGuild(guild.id).catch(() => null);
+  });
 
-  autoDeploy().then(() =>
-    client
-      .login(process.env.DISCORD_TOKEN)
-      .catch((err) =>
-        fatal(
-          `❌ Connexion à Discord impossible : ${err.message}\n\n` +
-            `Vérifiez le DISCORD_TOKEN dans ${envPath}\n` +
-            `et que les intents "Server Members" et "Message Content" sont activés\n` +
-            `(Portail développeur Discord > Bot > Privileged Gateway Intents).`
-        )
+  client
+    .login(process.env.DISCORD_TOKEN)
+    .catch((err) =>
+      fatal(
+        `❌ Connexion à Discord impossible : ${err.message}\n\n` +
+          `Vérifiez le DISCORD_TOKEN dans ${envPath}\n` +
+          `et que les intents "Server Members" et "Message Content" sont activés\n` +
+          `(Portail développeur Discord > Bot > Privileged Gateway Intents).`
       )
-  );
+    );
 }

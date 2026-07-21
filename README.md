@@ -83,6 +83,10 @@ Dans le salon de logs configuré : toutes les actions staff et accès refusés, 
   - 📋 **Whitelist métiers** — vue des autorisations gérants
 - Accessible au **staff** ; le rôle **Administration** ne peut être modifié que par un admin (sécurité grade élevé) ; chaque changement est tracé dans les logs
 
+## 🎭 Module RP activable
+
+Les systèmes RP — 🪪 `/carte`, 🚗 `/permis`, 🏢 `/entreprise`, 🛡️ `/assurance`, 🧑‍💼 `/service`, ⏱️ `/temps` — forment le **Module RP**, désactivé par défaut. Tant qu'il n'est pas activé, ces commandes **n'apparaissent pas** dans la liste du serveur (elles sont réellement retirées par la synchronisation, pas seulement bloquées) : seules les commandes de base du bot restent visibles. Activation : `/config` → **🎭 Module RP** → bouton Activer, ou dashboard du gestionnaire → page 🎭 Module RP — la liste des commandes du serveur est resynchronisée immédiatement. Le bot synchronise aussi automatiquement les commandes de chaque serveur à son démarrage et quand il rejoint un nouveau serveur.
+
 ## 🤫 Anti-flood
 
 Toutes les réponses de commandes sont **éphémères** (« lecture seule » : visibles uniquement par la personne qui tape la commande) — les salons textuels ne sont jamais inondés. Les messages publics passent exclusivement par les **salons dédiés** configurés dans `/config` : annonces de service, arrivées/départs staff, montées de niveau et journal de sécurité (qui garde la trace publique des actions de modération pour le staff).

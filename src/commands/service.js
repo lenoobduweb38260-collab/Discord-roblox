@@ -27,6 +27,7 @@ async function announceService(interaction, embed) {
 }
 
 module.exports = {
+  module: 'rp', // fait partie du Module RP activable dans /config
   grade: GRADES.EVERYONE,
   data: new SlashCommandBuilder()
     .setName('service')

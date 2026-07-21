@@ -68,6 +68,7 @@ function managedFactions(interaction) {
 }
 
 module.exports = {
+  module: 'rp', // fait partie du Module RP activable dans /config
   grade: GRADES.EVERYONE, // accès contrôlé par gérance de faction (ou staff)
   data: new SlashCommandBuilder()
     .setName('temps')

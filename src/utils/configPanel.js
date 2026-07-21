@@ -94,6 +94,13 @@ function mainView(guild) {
         ].join('\n'),
         inline: false,
       },
+      {
+        name: '🎭 Module RP',
+        value: cfg.rp_enabled
+          ? '🟢 **Activé** — /carte, /permis, /entreprise, /assurance, /service, /temps disponibles'
+          : '🔴 **Désactivé** — les commandes RP sont masquées sur ce serveur',
+        inline: false,
+      },
       { name: '📋 Whitelist métiers', value: whitelistSummary(guild.id), inline: false }
     )
     .setFooter({ text: 'Seul le staff peut utiliser ce panneau • Le rôle Administration ne peut être changé que par un admin' });
@@ -103,6 +110,7 @@ function mainView(guild) {
       .setCustomId('cfgcat')
       .setPlaceholder('⚙️ Choisissez une catégorie à configurer…')
       .addOptions(
+        { label: 'Module RP', value: 'rp', emoji: '🎭', description: 'Cartes, permis, entreprises, assurances, service' },
         { label: 'Rôles', value: 'roles', emoji: '👮', description: 'Staff, administration, en service' },
         { label: 'Salons', value: 'salons', emoji: '📢', description: 'Logs, niveaux, service, staff' },
         { label: 'XP & niveaux', value: 'xp', emoji: '📈', description: 'XP texte, XP vocal, cooldown' },
@@ -207,7 +215,27 @@ function whitelistView(guild) {
   return { embeds: [embed], components: [backRow()] };
 }
 
-const CATEGORY_VIEWS = { roles: rolesView, salons: salonsView, xp: xpView, whitelist: whitelistView };
+// ----- Catégorie : Module RP (cartes, permis, entreprises, assurances, service) -----
+function rpView(guild) {
+  const cfg = getGuildConfig(guild.id);
+  const enabled = Boolean(cfg.rp_enabled);
+  const embed = new EmbedBuilder()
+    .setColor(enabled ? COLORS.SUCCESS : COLORS.DANGER)
+    .setTitle('🎭 Module RP')
+    .setDescription(
+      `État : ${enabled ? '🟢 **Activé**' : '🔴 **Désactivé**'}\n\n` +
+        'Le Module RP regroupe :\n🪪 `/carte` · 🚗 `/permis` · 🏢 `/entreprise` · 🛡️ `/assurance` · 🧑‍💼 `/service` · ⏱️ `/temps`\n\n' +
+        'Désactivé, ces commandes sont **retirées de la liste du serveur** — seules les commandes de base du bot restent visibles. ' +
+        'La synchronisation est appliquée immédiatement après le changement.'
+    );
+  const row = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('cfgrpon').setLabel('Activer le Module RP').setEmoji('🟢').setStyle(ButtonStyle.Success).setDisabled(enabled),
+    new ButtonBuilder().setCustomId('cfgrpoff').setLabel('Désactiver').setEmoji('🔴').setStyle(ButtonStyle.Danger).setDisabled(!enabled)
+  );
+  return { embeds: [embed], components: [row, backRow()] };
+}
+
+const CATEGORY_VIEWS = { rp: rpView, roles: rolesView, salons: salonsView, xp: xpView, whitelist: whitelistView };
 
 function xpModal(cfg) {
   const field = (id, label, value) =>
@@ -268,6 +296,30 @@ async function handleConfigInteraction(interaction) {
       await sendLog(
         interaction.guild,
         logEmbed('⚙️ Configuration modifiée', `${ROLE_COLUMNS[col]} → <@&${roleId}>\nPar <@${interaction.user.id}>`, COLORS.INFO)
+      );
+      return;
+    }
+
+    if (id === 'cfgrpon' || id === 'cfgrpoff') {
+      const enable = id === 'cfgrpon' ? 1 : 0;
+      setGuildConfig(interaction.guildId, 'rp_enabled', enable);
+      await interaction.update(rpView(interaction.guild));
+      require('../commandSync')
+        .syncGuild(interaction.guildId)
+        .then(() =>
+          interaction.followUp({
+            content: enable
+              ? '🟢 Module RP **activé** — les commandes RP sont maintenant visibles sur le serveur.'
+              : '🔴 Module RP **désactivé** — les commandes RP ont été retirées du serveur.',
+            flags: MessageFlags.Ephemeral,
+          })
+        )
+        .catch((err) =>
+          interaction.followUp({ content: `⚠️ Synchronisation des commandes : ${err.message}`, flags: MessageFlags.Ephemeral })
+        );
+      await sendLog(
+        interaction.guild,
+        logEmbed('🎭 Module RP', `Module RP ${enable ? 'activé' : 'désactivé'} par <@${interaction.user.id}>.`, enable ? COLORS.SUCCESS : COLORS.DANGER)
       );
       return;
     }

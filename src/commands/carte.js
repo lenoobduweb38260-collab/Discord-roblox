@@ -30,6 +30,7 @@ const EDITABLE_FIELDS = {
 };
 
 module.exports = {
+  module: 'rp', // fait partie du Module RP activable dans /config
   grade: GRADES.EVERYONE, // contrôle fin par sous-commande dans execute()
   data: new SlashCommandBuilder()
     .setName('carte')

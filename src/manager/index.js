@@ -981,6 +981,7 @@ function loadTab() {
       var page = window.dashPage || 'apercu';
       var pages = [
         ['apercu', '📊 Vue d\\'ensemble'],
+        ['module', '🎭 Module RP'],
         ['membres', '👋 Arrivées et départs'],
         ['messages', '💬 Messages'],
         ['niveaux', '📈 Niveaux'],
@@ -1142,7 +1143,14 @@ function renderDashPage(page, gid) {
   fetch('/api/bots/' + sel + '/proxy/parametres?guild=' + gid).then(function(r){ return r.json(); }).then(function(p){
     if (p.error) { m.innerHTML = '<div class="empty">⚠️ ' + p.error + '</div>'; return; }
     var cfg = p.config, h = '';
-    if (page === 'membres') {
+    if (page === 'module') {
+      h += '<h2 class="dbtitle">🎭 Module RP</h2>';
+      h += '<p class="dbp">Le Module RP regroupe /carte, /permis, /entreprise, /assurance, /service et /temps. ' +
+        'Désactivé, ces commandes sont <b>retirées de la liste du serveur</b> (seules les commandes de base du bot restent visibles). ' +
+        'La synchronisation est appliquée immédiatement.</p>';
+      h += '<div class="dsec"><label style="display:flex;gap:8px;align-items:center;font-size:13.5px">' +
+        '<input type="checkbox" id="rp_on"' + (cfg.rp_enabled ? ' checked' : '') + ' style="width:auto"> Activer le Module RP sur ce serveur</label></div>';
+    } else if (page === 'membres') {
       h += '<h2 class="dbtitle">👋 Arrivées et Départs</h2>';
       h += dashSelect('member_channel_id', 'Salon des messages',
         'Salon des embeds d\\'arrivée (nom, ID, photo de profil, date de création du compte) et de départ (depuis quand le membre avait rejoint le serveur). « — Désactivé — » pour couper.',
@@ -1235,6 +1243,7 @@ function renderDashPage(page, gid) {
     var rerender = function(j){ if (j && j.ok) { toast('✅ ' + (j.note || 'Enregistré')); renderDashPage(page, gid); } };
     if ($('em_pv')) setupMessagesPage(gid);
     if ($('dm_pv')) setupMembresPage(gid);
+    if ($('rp_on')) $('rp_on').onchange = function(){ dashSave(gid, 'rp_enabled', $('rp_on').checked ? 1 : 0); };
     if ($('dw_add')) $('dw_add').onclick = function(){
       if (!$('dw_role').value || !$('dw_mgr').value) { toast('⚠️ Choisissez les deux rôles.'); return; }
       proxy('whitelist-ajouter', { guildId: gid, roleId: $('dw_role').value, managerRoleId: $('dw_mgr').value }).then(rerender);

@@ -52,6 +52,7 @@ function startManagedApi(client, baseDir) {
     welcome_message: 't',
     goodbye_message: 't',
     welcome_mention: 'b',
+    rp_enabled: 'b',
     xp_text: 'n',
     xp_voice: 'n',
     xp_cooldown: 'n',
@@ -239,6 +240,13 @@ function startManagedApi(client, baseDir) {
           value = String(value).slice(0, 1500);
         }
         setGuildConfig(body.guildId, key, value);
+        // Le Module RP change la liste des commandes du serveur : resynchronisation.
+        if (key === 'rp_enabled') {
+          require('./commandSync')
+            .syncGuild(body.guildId)
+            .then((result) => console.log(`🔄 Module RP ${result.rp ? 'activé' : 'désactivé'} — ${result.total} commande(s) synchronisées.`))
+            .catch((err) => console.warn(`⚠️ Sync commandes : ${err.message}`));
+        }
         return send(200, { ok: true, value });
       }
 
