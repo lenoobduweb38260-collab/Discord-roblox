@@ -7,7 +7,10 @@ const path = require('path');
 
 // En exécutable packagé (pkg), les fichiers de l'utilisateur (.env, data.sqlite)
 // vivent à côté de l'exécutable ; en mode Node classique, à la racine du projet.
-const baseDir = process.pkg ? path.dirname(process.execPath) : path.join(__dirname, '..');
+// BOT_DIR (agent hébergeur multi-bots) : chaque bot a son propre dossier de
+// données même quand plusieurs bots partagent le même exécutable.
+const baseDir =
+  process.env.BOT_DIR?.trim() || (process.pkg ? path.dirname(process.execPath) : path.join(__dirname, '..'));
 const envPath = path.join(baseDir, '.env');
 
 const ENV_TEMPLATE = `# Token du bot (Portail développeur Discord > Bot > Token)

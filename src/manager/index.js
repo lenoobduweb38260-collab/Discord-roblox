@@ -397,6 +397,11 @@ const NAME_RE = /^[a-zA-Z0-9_-]{1,32}$/;
 const REPO_RE = /^[\w.-]+\/[\w.-]+$/;
 
 // ----- Bots hébergés (reliés à un agent distant via URL + clé) -----
+// Un même agent (même URL + même clé) sert PLUSIEURS bots : chaque bot du
+// panel correspond au dossier bots/<nom> chez l'hébergeur.
+function agentBase(bot, name) {
+  return `/agent/bots/${encodeURIComponent(name)}`;
+}
 function agentFetch(bot, method, agentPath, body, timeoutMs = 8000) {
   return fetch(bot.remote.url + agentPath, {
     method,
@@ -415,7 +420,7 @@ async function refreshRemoteStates() {
         const r = rt(b.name);
         if (r.remoteEtat && Date.now() - r.remoteEtat.at < 4000) return;
         try {
-          const res = await agentFetch(b, 'GET', '/agent/etat', undefined, 1500);
+          const res = await agentFetch(b, 'GET', `${agentBase(b, b.name)}/etat`, undefined, 1500);
           const data = await res.json();
           r.remoteEtat = { at: Date.now(), status: data.status || 'injoignable', version: data.version || null, pid: data.pid || null };
         } catch {
@@ -423,6 +428,32 @@ async function refreshRemoteStates() {
         }
       })
   );
+}
+
+// Diagnostic précis de la liaison panel → agent (bouton 🧪 du dialogue 🌍).
+async function testRemoteLink(bot, name) {
+  try {
+    const res = await agentFetch(bot, 'GET', '/agent/etat', undefined, 4000);
+    if (res.status === 401) return { error: 'Clé d\'accès refusée (401) — la clé saisie ne correspond pas à AGENT_KEY chez l\'hébergeur.' };
+    if (!res.ok) return { error: `L'agent répond mais avec une erreur HTTP ${res.status}.` };
+    const data = await res.json();
+    if (!data.multi) {
+      return { error: 'Agent trop ancien (mono-bot) — re-téléversez le index.js du dernier pack-hebergeur.zip chez l\'hébergeur puis redémarrez-le.' };
+    }
+    const here = (data.bots || []).find((x) => x.name === name);
+    return {
+      ok: true,
+      message:
+        `Agent joignable ✅ (code du bot : ${data.version || 'pas encore téléchargé'}, ${(data.bots || []).length} bot(s) chez l'hébergeur)` +
+        (here ? ` — « ${name} » y est ${here.status === 'demarre' ? 'démarré' : 'arrêté'}.` : ` — le dossier « ${name} » sera créé au premier démarrage.`),
+    };
+  } catch (err) {
+    const msg = String(err?.cause?.code || err?.name || err?.message || err);
+    if (/ECONNREFUSED/i.test(msg)) return { error: 'Connexion refusée — l\'agent ne tourne pas sur ce port, ou le port n\'est pas ouvert.' };
+    if (/Timeout|Abort/i.test(msg)) return { error: 'Délai dépassé — vérifiez l\'IP, le port (celui alloué par l\'hébergeur) et son pare-feu.' };
+    if (/ENOTFOUND|EAI_AGAIN/i.test(msg)) return { error: 'Adresse introuvable — vérifiez l\'IP/le domaine dans l\'URL.' };
+    return { error: `Liaison impossible : ${msg}` };
+  }
 }
 
 function stateSnapshot() {
@@ -628,12 +659,19 @@ const server = http.createServer(async (req, res) => {
         return sendJson(res, 200, { ok: true });
       }
 
+      // 🧪 Test précis de la liaison avec l'agent (bouton du dialogue 🌍).
+      if (req.method === 'POST' && action === 'distant-test') {
+        if (!bot.remote) return sendJson(res, 400, { error: 'Ce bot n\'est pas relié à un hébergeur.' });
+        return sendJson(res, 200, await testRemoteLink(bot, name));
+      }
+
       // 🌍 Bot hébergé : tout passe par son agent distant (sauf les brouillons,
       // stockés côté panel, et la suppression, qui ne fait que délier).
-      if (bot.remote && !action.startsWith('brouillons') && !(req.method === 'DELETE' && !action)) {
+      if (bot.remote && !action.startsWith('brouillons') && action !== 'distant' && !(req.method === 'DELETE' && !action)) {
+        const base = agentBase(bot, name);
         try {
           if (action === 'proxy') {
-            const subPath = '/agent/proxy/' + parts.slice(4).join('/') + (url.search || '');
+            const subPath = `${base}/proxy/` + parts.slice(4).join('/') + (url.search || '');
             const upstream = await agentFetch(
               bot,
               req.method,
@@ -643,12 +681,12 @@ const server = http.createServer(async (req, res) => {
             return sendJson(res, upstream.status, await upstream.json().catch(() => ({})));
           }
           if (req.method === 'GET' && action === 'diagnostic') {
-            const upstream = await agentFetch(bot, 'GET', '/agent/diagnostic');
+            const upstream = await agentFetch(bot, 'GET', `${base}/diagnostic`);
             res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
             return res.end(await upstream.text());
           }
           if (req.method === 'POST' && action === 'signaler') {
-            const diag = await agentFetch(bot, 'GET', '/agent/diagnostic')
+            const diag = await agentFetch(bot, 'GET', `${base}/diagnostic`)
               .then((u) => u.text())
               .catch(() => '(diagnostic distant indisponible)');
             return sendJson(res, 200, await sendReport(name, 'signalement manuel (bot hébergé)', true, diag));
@@ -666,7 +704,7 @@ const server = http.createServer(async (req, res) => {
             const upstream = await agentFetch(
               bot,
               req.method,
-              `/agent/${action}`,
+              `${base}/${action}`,
               ['POST', 'PUT'].includes(req.method) ? await jsonBody(req) : undefined
             );
             return sendJson(res, upstream.status, await upstream.json().catch(() => ({})));
@@ -674,7 +712,7 @@ const server = http.createServer(async (req, res) => {
           return sendJson(res, 404, { error: 'Action non disponible pour un bot hébergé.' });
         } catch {
           return sendJson(res, 502, {
-            error: 'Agent hébergeur injoignable — vérifiez l\'URL, la clé (AGENT_KEY) et que l\'agent tourne.',
+            error: 'Agent hébergeur injoignable — utilisez 🧪 Tester dans le dialogue 🌍 pour un diagnostic précis.',
           });
         }
       }
@@ -1040,10 +1078,11 @@ const HTML = `<!DOCTYPE html>
 </dialog>
 <dialog id="dlgRemote">
   <h2>🌍 Bot hébergé</h2>
-  <p style="font-size:12.5px;color:#a9aab3;line-height:1.5">Reliez ce bot à l'<b>agent</b> qui tourne chez votre hébergeur (pack-hebergeur.zip) : le gestionnaire pilote alors le bot <b>distant</b> — console en direct, ▶/⏹, mises à jour GitHub, config.env, dashboard, page 🌐 Serveurs — et <b>ne lance plus rien en local</b> (l'instance locale est arrêtée pour éviter le doublon de connexion Discord).</p>
+  <p style="font-size:12.5px;color:#a9aab3;line-height:1.5">Reliez ce bot à l'<b>agent</b> qui tourne chez votre hébergeur (pack-hebergeur.zip) : le gestionnaire pilote alors le bot <b>distant</b> — console en direct, ▶/⏹, mises à jour GitHub, configuration, dashboard, page 🌐 Serveurs — et <b>ne lance plus rien en local</b>.<br><br>💡 <b>Un seul agent sert TOUS vos bots</b> : utilisez la <b>même URL et la même clé</b> pour chacun — chaque bot a son dossier <code>bots/&lt;nom&gt;</code> et sa propre configuration chez l'hébergeur (le nom du bot dans le panel = le nom de son dossier).</p>
   <label>URL de l'agent (http://ip:port)</label><input id="d_url" placeholder="http://51.210.0.0:43600">
   <label>Clé d'accès (AGENT_KEY)</label><input id="d_key">
-  <div class="row"><button class="gray" onclick="dlgRemote.close()">Annuler</button><button class="gray" id="d_local" onclick="unlinkRemote()">🏠 Repasser en local</button><button onclick="saveRemote()">🌍 Relier</button></div>
+  <div class="row"><button class="gray" onclick="dlgRemote.close()">Annuler</button><button class="gray" id="d_test" onclick="testRemote()">🧪 Tester</button><button class="gray" id="d_local" onclick="unlinkRemote()">🏠 Repasser en local</button><button onclick="saveRemote()">🌍 Relier</button></div>
+  <div id="d_result" style="font-size:12.5px;margin-top:10px;line-height:1.5;min-height:16px"></div>
 </dialog>
 <dialog id="dlgSet">
   <h2>⚙️ Rapports d'erreurs automatiques</h2>
@@ -1140,14 +1179,34 @@ function openRemote() {
   $('d_key').value = '';
   $('d_key').placeholder = b.distant ? 'laisser vide pour garder la clé enregistrée' : 'AGENT_KEY du config.env distant';
   $('d_local').style.display = b.distant ? '' : 'none';
+  $('d_result').textContent = '';
   dlgRemote.showModal();
 }
 function saveRemote() {
   var u = $('d_url').value.trim();
   if (!u) { toast('⚠️ Entrez l\\'URL de l\\'agent (http://ip:port).'); return; }
   api('PUT', '/api/bots/' + sel + '/distant', { url: u, key: $('d_key').value }).then(function(j){
-    if (j && j.ok) { dlgRemote.close(); toast('🌍 Bot relié à l\\'hébergeur — le gestionnaire ne lance plus rien en local.'); setTimeout(refresh, 400); }
+    if (j && j.ok) { toast('🌍 Bot relié à l\\'hébergeur.'); setTimeout(refresh, 400); testRemote(); }
   });
+}
+function testRemote() {
+  var b = botSel(); if (!b) return;
+  var out = $('d_result');
+  var u = $('d_url').value.trim();
+  var run = function(){
+    out.style.color = '#a9aab3'; out.textContent = '⏳ Test de la liaison…';
+    api('POST', '/api/bots/' + sel + '/distant-test').then(function(j){
+      if (j && j.ok) { out.style.color = 'var(--green)'; out.textContent = '✅ ' + j.message; }
+      else { out.style.color = 'var(--red)'; out.textContent = '❌ ' + ((j && j.error) || 'Test impossible.'); }
+    });
+  };
+  // Si l'URL/clé saisies diffèrent de l'enregistré, on enregistre d'abord.
+  if (u && (!b.distant || u !== b.distantUrl || $('d_key').value.trim())) {
+    api('PUT', '/api/bots/' + sel + '/distant', { url: u, key: $('d_key').value }).then(function(j){
+      if (j && j.ok) { setTimeout(refresh, 400); run(); }
+    });
+  } else if (b.distant) run();
+  else toast('⚠️ Entrez l\\'URL de l\\'agent d\\'abord.');
 }
 function unlinkRemote() {
   if (!confirm('Repasser « ' + sel + ' » en bot local ?\\n(l\\'agent chez l\\'hébergeur continue de tourner de son côté)')) return;

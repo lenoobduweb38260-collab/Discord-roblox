@@ -1,50 +1,54 @@
-# 🌍 Pack hébergeur — bot Discord + lien avec votre panel
+# 🌍 Pack hébergeur MULTI-BOTS — vos bots chez l'hébergeur, votre panel sur votre PC
 
-Ce pack fait tourner **le bot chez votre hébergeur**, avec :
-- 🔄 **Mises à jour toujours via GitHub** : l'agent télécharge la dernière release au démarrage, et `/update` sur Discord met à jour puis relance le bot
-- 🖥️ **Lien avec votre panel** (Gestionnaire de bots sur votre PC) : console en direct, démarrage/arrêt, éditeur `.env`, dashboard complet — dont la page **🌐 Serveurs** qui liste **chaque serveur ayant ajouté le bot**
+Ce pack fait tourner **PLUSIEURS bots avec le même code** chez votre hébergeur :
+- 🤖 **Un seul déploiement** : un exécutable du bot partagé, **un dossier par bot** (`bots/<nom>/` avec sa configuration et sa base de données)
+- 🔄 **Mises à jour toujours via GitHub** : le code est téléchargé depuis la dernière release, et `/update` sur Discord met à jour puis relance le bot
+- 🖥️ **Lien avec votre panel** (Gestionnaire de bots sur votre PC) : console en direct par bot, ▶/⏹, configuration à distance, dashboard complet — dont la page **🌐 Serveurs** qui liste **chaque serveur ayant ajouté le bot**
 - 🔁 Relance automatique en cas de crash
 
-## 1️⃣ Installation chez l'hébergeur
+## 1️⃣ Installation chez l'hébergeur (une seule fois)
 
 1. **Envoyez le contenu du ZIP** dans un dossier de votre hébergeur
-2. Ouvrez **`config.env`** (aucun renommage nécessaire — pas de fichier caché) et remplissez :
-   - `AGENT_KEY` — inventez une **longue clé secrète** (c'est le mot de passe du lien avec votre panel)
+2. Ouvrez **`config.env`** (fichier visible, aucun renommage) et remplissez :
+   - `AGENT_KEY` — inventez une **longue clé secrète** (le mot de passe du lien avec votre panel)
    - `AGENT_PORT` — le port réseau que votre hébergeur vous a alloué
-   - `DISCORD_TOKEN` + `CLIENT_ID` — comme d'habitude (et `OWNER_ID` recommandé)
-   - *(Vous pouvez aussi définir ces variables dans le panneau de votre hébergeur : elles priment sur le fichier. Un fichier `.env` classique fonctionne aussi si votre hébergeur l'accepte.)*
-3. Commande de démarrage à configurer chez l'hébergeur : **`node index.js`**
-   (Node.js **18 ou plus récent** requis — aucun `npm install` nécessaire)
-4. Au premier lancement, l'agent télécharge la dernière version du bot depuis GitHub puis le démarre. La base `data.sqlite` est créée dans le même dossier — **sauvegardez-la**.
+   - *(les tokens Discord ne vont PAS ici — chaque bot a sa propre configuration, voir ci-dessous)*
+3. Commande de démarrage : **`node index.js`** (Node.js **18+**, aucun `npm install`)
+   - Egg Pterodactyl : variable **`MAIN_FILE`** = `index.js` (si erreur ts-node : mettez littéralement `*.js`)
+4. La console doit afficher : `🌍 Agent hébergeur MULTI-BOTS prêt : port …`
 
-## 2️⃣ Lien avec votre panel (sur votre PC)
+## 2️⃣ Relier vos bots depuis votre panel (sur votre PC)
 
-1. Ouvrez votre **Gestionnaire de bots** habituel
-2. **➕ Nouveau bot** → section **🌍 Bot hébergé** :
-   - **URL de l'agent** : `http://IP-DE-VOTRE-HEBERGEUR:AGENT_PORT`
-   - **Clé d'accès** : la valeur de `AGENT_KEY`
-3. C'est tout : le bot apparaît dans la barre latérale comme un bot local — console en direct, ▶ / ⏹, ⬇ mise à jour, ⚙️ .env distant, 📊 dashboard, 🌐 Serveurs, 🔗 Inviter…
+Pour **chaque** bot (existant ou nouveau) :
+1. Sélectionnez le bot → bouton **🌍 Hébergé** (ou ➕ Nouveau bot → section 🌍)
+2. **La même URL** (`http://IP:AGENT_PORT`) et **la même clé** pour tous les bots
+3. **🧪 Tester** → le panel vous dit précisément si la liaison passe (et sinon, pourquoi)
+4. Onglet **⚙️ .env** → remplissez `DISCORD_TOKEN` + `CLIENT_ID` de CE bot → 💾 → **▶ Démarrer**
+
+Le nom du bot dans le panel = le nom de son dossier `bots/<nom>` chez l'hébergeur
+(créé automatiquement au premier contact). Chaque bot a sa base `data.sqlite`
+dans son dossier — **sauvegardez le dossier `bots/`**.
 
 ## 🔄 Les mises à jour
 
-- **Le bot** : `/update` sur Discord (ou le bouton ⬇ du panel) → l'agent télécharge la dernière release GitHub et relance le bot. Le staff est prévenu par les annonces automatiques (`#shadow-logs`).
-- **L'agent lui-même** : ce petit script change rarement ; pour le mettre à jour, re-téléchargez `pack-hebergeur.zip` depuis la dernière release GitHub et remplacez `index.js`.
+- **Le code des bots** (partagé) : `/update` sur Discord ou le bouton ⬇ du panel → l'agent télécharge la dernière release GitHub puis relance le bot concerné. Les annonces automatiques (`#shadow-logs`) préviennent le staff.
+- **L'agent lui-même** : re-téléversez le `index.js` du dernier `pack-hebergeur.zip` et redémarrez (il change rarement).
 
 ## 🛡️ Sécurité
 
 - **Toutes** les routes de l'agent exigent la clé `AGENT_KEY` — sans elle, réponse 401.
-- Ne partagez jamais votre `config.env` (il contient le token du bot ET la clé de l'agent).
+- Ne partagez jamais `config.env` ni le dossier `bots/` (tokens des bots).
 - Si votre hébergeur propose un pare-feu, ouvrez uniquement le port `AGENT_PORT`.
 
 ## ❓ Dépannage
 
-- **Erreur `ts-node` au démarrage (`Cannot read properties of undefined (reading 'fileExists')`)** →
-  votre hébergeur (egg Node.js type Pterodactyl) lance le fichier avec **ts-node** au lieu de **node**.
-  Dans l'onglet **Startup** du panneau : mettez la variable **`MAIN_FILE`** à `index.js` — et si
-  l'erreur persiste, mettez-la littéralement à `*.js` (c'est la valeur exacte que la commande de
-  démarrage compare). Alternative : remplacez la commande de démarrage par `node /home/container/index.js`.
-  Le bon lancement affiche « 🌍 Agent hébergeur prêt ».
-
-- **« Clé d'accès invalide » dans le panel** → l'URL pointe bien vers l'agent, mais la clé saisie diffère de `AGENT_KEY`.
-- **« Agent hébergeur injoignable »** → vérifiez que l'agent tourne, que le port est ouvert/alloué, et que l'URL est `http://ip:port` (sans « / » final).
-- **Le bot ne se connecte pas à Discord** → vérifiez `DISCORD_TOKEN` dans le `.env` (onglet ⚙️ .env du panel, puis redémarrez le bot), et les **intents** (Server Members + Message Content) dans le portail développeur.
+- **« hébergeur injoignable » dans le panel** → bouton **🧪 Tester** du dialogue 🌍 : il distingue
+  connexion refusée (agent éteint / mauvais port), délai dépassé (IP/pare-feu), clé refusée (AGENT_KEY),
+  et agent trop ancien (re-téléverser `index.js`).
+- **Erreur `ts-node` au démarrage** (`Cannot read properties of undefined (reading 'fileExists')`) →
+  l'hébergeur lance le fichier avec ts-node : variable **`MAIN_FILE`** = `index.js` (sinon littéralement `*.js`),
+  ou commande de démarrage `node /home/container/index.js`.
+- **Le bot ne démarre pas : « DISCORD_TOKEN manquant »** → la configuration est PAR BOT :
+  onglet ⚙️ .env du panel (bot sélectionné) → remplissez le token → 💾 → ▶.
+- **Le bot ne se connecte pas à Discord** → vérifiez le token et les **intents** (Server Members +
+  Message Content) dans le portail développeur.
