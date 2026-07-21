@@ -74,10 +74,17 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+
       - uses: actions/download-artifact@v4
         with:
           path: dist
           merge-multiple: true
+
+      - name: Créer le pack hébergeur (agent + configuration)
+        run: |
+          cd hebergeur
+          zip -r ../dist/pack-hebergeur.zip index.js .env.exemple LISEZMOI.md
 
       - uses: softprops/action-gh-release@v2
         with:
@@ -91,6 +98,12 @@ jobs:
             |---|---|---|
             | 🪟 Windows | `discord-roblox-bot-win-x64.exe` | `gestionnaire-bots-win-x64.exe` |
             | 🐧 Linux | `discord-roblox-bot-linux-x64` | `gestionnaire-bots-linux-x64` |
+
+            ### 🌍 Pack hébergeur (`pack-hebergeur.zip`)
+            À envoyer chez votre hébergeur (commande : `node index.js`, Node 18+) : l'agent
+            télécharge la dernière version du bot depuis GitHub, le fait tourner, et votre
+            **panel se relie à distance** (console, ▶/⏹, .env, dashboard, page 🌐 Serveurs)
+            via ➕ Nouveau bot → 🌍 Bot hébergé (URL + clé). Voir le LISEZMOI.md inclus.
 
             ### 🤖 Gestionnaire de bots
             Application locale pour gérer **plusieurs bots** (chacun relié à son propre dépôt GitHub) :

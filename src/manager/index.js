@@ -20,7 +20,15 @@ if (mode === 'check') {
   process.exit(0);
 }
 
-const PORT = 43550;
+// Mode hébergeur : PANEL_PORT / PANEL_HOST / PANEL_PASSWORD (variables
+// d'environnement) exposent le panel sur une machine distante. Par sécurité,
+// l'écoute hors localhost exige un mot de passe (l'éditeur .env contient les
+// tokens des bots).
+const PORT = parseInt(process.env.PANEL_PORT, 10) || 43550;
+const HOST = process.env.PANEL_HOST || '127.0.0.1';
+const PANEL_PASSWORD = (process.env.PANEL_PASSWORD || '').trim();
+const HOSTED = HOST !== '127.0.0.1' && HOST !== 'localhost';
+const panelSessions = new Set();
 const baseDir = process.pkg ? path.dirname(process.execPath) : path.join(__dirname, '..', '..');
 const dataDir = path.join(baseDir, 'gestionnaire');
 const botsDir = path.join(dataDir, 'bots');
@@ -189,7 +197,7 @@ const HTTP_HINTS = {
   404: 'dépôt ou numéro de PR introuvable — vérifiez les champs dans ⚙️ Paramètres',
 };
 
-async function sendReport(name, motif, force = false) {
+async function sendReport(name, motif, force = false, diagOverride = null) {
   const cfg = config.rapport || {};
   const r = rt(name);
   if (!cfg.actif || !cfg.token) {
@@ -204,7 +212,7 @@ async function sendReport(name, motif, force = false) {
   }
   try {
     // Le diagnostic n'inclut JAMAIS le .env (donc jamais le token du bot).
-    const body = `## 🚨 Rapport automatique — bot « ${name} » (${motif})\n\n\`\`\`\n${diagnosticText(name).slice(0, 6000)}\n\`\`\``;
+    const body = `## 🚨 Rapport automatique — bot « ${name} » (${motif})\n\n\`\`\`\n${(diagOverride || diagnosticText(name)).slice(0, 6000)}\n\`\`\``;
     const res = await fetch(
       `https://api.github.com/repos/${cfg.repo || DEFAULT_REPO}/issues/${cfg.issue || 1}/comments`,
       {
@@ -387,6 +395,35 @@ function jsonBody(req) {
 const NAME_RE = /^[a-zA-Z0-9_-]{1,32}$/;
 const REPO_RE = /^[\w.-]+\/[\w.-]+$/;
 
+// ----- Bots hébergés (reliés à un agent distant via URL + clé) -----
+function agentFetch(bot, method, agentPath, body, timeoutMs = 8000) {
+  return fetch(bot.remote.url + agentPath, {
+    method,
+    headers: { 'Content-Type': 'application/json', 'x-cle': bot.remote.key || '' },
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+    signal: AbortSignal.timeout(timeoutMs),
+  });
+}
+
+// État des bots hébergés, rafraîchi au plus toutes les 4 s (timeout court).
+async function refreshRemoteStates() {
+  await Promise.all(
+    config.bots
+      .filter((b) => b.remote)
+      .map(async (b) => {
+        const r = rt(b.name);
+        if (r.remoteEtat && Date.now() - r.remoteEtat.at < 4000) return;
+        try {
+          const res = await agentFetch(b, 'GET', '/agent/etat', undefined, 1500);
+          const data = await res.json();
+          r.remoteEtat = { at: Date.now(), status: data.status || 'injoignable', version: data.version || null, pid: data.pid || null };
+        } catch {
+          r.remoteEtat = { at: Date.now(), status: 'injoignable', version: null, pid: null };
+        }
+      })
+  );
+}
+
 function stateSnapshot() {
   return {
     version: VERSION,
@@ -394,6 +431,17 @@ function stateSnapshot() {
     dossier: dataDir,
     bots: config.bots.map((b) => {
       const r = rt(b.name);
+      if (b.remote) {
+        return {
+          name: b.name,
+          repo: b.repo,
+          version: r.remoteEtat?.version || null,
+          exe: null,
+          status: r.remoteEtat?.status || 'injoignable',
+          pid: r.remoteEtat?.pid || null,
+          distant: true,
+        };
+      }
       return {
         name: b.name,
         repo: b.repo,
@@ -434,6 +482,31 @@ const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, 'http://localhost');
     const parts = url.pathname.split('/').filter(Boolean);
 
+    // ----- Mot de passe du panel (mode hébergeur) -----
+    if (PANEL_PASSWORD) {
+      if (req.method === 'POST' && url.pathname === '/api/login') {
+        const body = await jsonBody(req);
+        if (String(body.password || '') !== PANEL_PASSWORD) {
+          return sendJson(res, 401, { error: 'Mot de passe incorrect.' });
+        }
+        const token = require('crypto').randomBytes(24).toString('hex');
+        panelSessions.add(token);
+        res.writeHead(200, {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Set-Cookie': `panel_session=${token}; HttpOnly; Path=/; Max-Age=604800; SameSite=Strict`,
+        });
+        return res.end(JSON.stringify({ ok: true }));
+      }
+      const token = (req.headers.cookie || '').match(/panel_session=([a-f0-9]{48})/)?.[1];
+      if (!token || !panelSessions.has(token)) {
+        if (req.method === 'GET' && url.pathname === '/') {
+          res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+          return res.end(LOGIN_HTML);
+        }
+        return sendJson(res, 401, { error: 'Non connecté — rechargez la page pour vous identifier.' });
+      }
+    }
+
     if (req.method === 'GET' && url.pathname === '/') {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       return res.end(HTML);
@@ -441,7 +514,10 @@ const server = http.createServer(async (req, res) => {
     if (parts[0] !== 'api') return sendJson(res, 404, { error: 'Introuvable' });
 
     // GET /api/etat
-    if (req.method === 'GET' && parts[1] === 'etat') return sendJson(res, 200, stateSnapshot());
+    if (req.method === 'GET' && parts[1] === 'etat') {
+      await refreshRemoteStates().catch(() => null);
+      return sendJson(res, 200, stateSnapshot());
+    }
 
     // Paramètres des rapports automatiques (le token n'est jamais renvoyé).
     if (req.method === 'GET' && parts[1] === 'rapport') {
@@ -488,14 +564,25 @@ const server = http.createServer(async (req, res) => {
       }
     }
 
-    // POST /api/bots — création
+    // POST /api/bots — création (locale, ou liaison d'un bot hébergé)
     if (req.method === 'POST' && parts[1] === 'bots' && parts.length === 2) {
       const body = await jsonBody(req);
       const name = String(body.name || '').trim();
       const repo = String(body.repo || DEFAULT_REPO).trim();
       if (!NAME_RE.test(name)) return sendJson(res, 400, { error: 'Nom invalide (lettres, chiffres, - et _ uniquement).' });
-      if (!REPO_RE.test(repo)) return sendJson(res, 400, { error: 'Dépôt invalide (format attendu : proprietaire/depot).' });
       if (getBot(name)) return sendJson(res, 400, { error: 'Un bot porte déjà ce nom.' });
+      // 🌍 Bot hébergé : URL d'agent fournie → simple liaison, rien à télécharger.
+      const remoteUrl = String(body.remoteUrl || '').trim().replace(/\/+$/, '');
+      if (remoteUrl) {
+        if (!/^https?:\/\/[^\s/]+(:\d+)?$/i.test(remoteUrl)) {
+          return sendJson(res, 400, { error: 'URL d\'agent invalide (attendu : http://ip:port).' });
+        }
+        config.bots.push({ name, repo, remote: { url: remoteUrl, key: String(body.remoteKey || '').trim() } });
+        saveConfig(config);
+        addLine(rt(name), `🆕 Bot hébergé relié (${remoteUrl}).`);
+        return sendJson(res, 200, { ok: true, distant: true });
+      }
+      if (!REPO_RE.test(repo)) return sendJson(res, 400, { error: 'Dépôt invalide (format attendu : proprietaire/depot).' });
       fs.mkdirSync(botFolder(name), { recursive: true });
       fs.writeFileSync(path.join(botFolder(name), '.env'), envTemplate(body));
       config.bots.push({ name, repo, exe: null, version: null });
@@ -512,6 +599,57 @@ const server = http.createServer(async (req, res) => {
       if (!bot) return sendJson(res, 404, { error: 'Bot inconnu.' });
       const action = parts[3] || '';
       const r = rt(name);
+
+      // 🌍 Bot hébergé : tout passe par son agent distant (sauf les brouillons,
+      // stockés côté panel, et la suppression, qui ne fait que délier).
+      if (bot.remote && !action.startsWith('brouillons') && !(req.method === 'DELETE' && !action)) {
+        try {
+          if (action === 'proxy') {
+            const subPath = '/agent/proxy/' + parts.slice(4).join('/') + (url.search || '');
+            const upstream = await agentFetch(
+              bot,
+              req.method,
+              subPath,
+              ['POST', 'PUT'].includes(req.method) ? await jsonBody(req) : undefined
+            );
+            return sendJson(res, upstream.status, await upstream.json().catch(() => ({})));
+          }
+          if (req.method === 'GET' && action === 'diagnostic') {
+            const upstream = await agentFetch(bot, 'GET', '/agent/diagnostic');
+            res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
+            return res.end(await upstream.text());
+          }
+          if (req.method === 'POST' && action === 'signaler') {
+            const diag = await agentFetch(bot, 'GET', '/agent/diagnostic')
+              .then((u) => u.text())
+              .catch(() => '(diagnostic distant indisponible)');
+            return sendJson(res, 200, await sendReport(name, 'signalement manuel (bot hébergé)', true, diag));
+          }
+          const forwardable = {
+            demarrer: 'POST',
+            arreter: 'POST',
+            maj: 'POST',
+            logs: 'GET',
+            erreurs: 'GET',
+            invitation: 'GET',
+            env: req.method,
+          };
+          if (action in forwardable) {
+            const upstream = await agentFetch(
+              bot,
+              req.method,
+              `/agent/${action}`,
+              ['POST', 'PUT'].includes(req.method) ? await jsonBody(req) : undefined
+            );
+            return sendJson(res, upstream.status, await upstream.json().catch(() => ({})));
+          }
+          return sendJson(res, 404, { error: 'Action non disponible pour un bot hébergé.' });
+        } catch {
+          return sendJson(res, 502, {
+            error: 'Agent hébergeur injoignable — vérifiez l\'URL, la clé (AGENT_KEY) et que l\'agent tourne.',
+          });
+        }
+      }
 
       if (req.method === 'POST' && action === 'demarrer') return sendJson(res, 200, startBot(name));
       if (req.method === 'POST' && action === 'arreter') return sendJson(res, 200, stopBot(name));
@@ -675,7 +813,7 @@ function openBrowser() {
 server.on('error', (err) => {
   if (err.code === 'EADDRINUSE') {
     console.log('ℹ️ Le gestionnaire est déjà lancé : ouverture de l\'interface dans le navigateur…');
-    openBrowser();
+    if (!HOSTED) openBrowser();
     setTimeout(() => process.exit(0), 800);
   } else {
     console.error('❌ Erreur serveur :', err);
@@ -726,12 +864,23 @@ async function selfUpdate() {
     fs.unlinkSync(`${process.execPath}.old`);
   } catch {}
   if (await selfUpdate()) return; // redémarrage en cours avec la nouvelle version
-  server.listen(PORT, '127.0.0.1', () => {
+  // Sécurité hébergeur : jamais d'exposition hors localhost sans mot de passe
+  // (l'éditeur .env du panel contient les tokens des bots).
+  if (HOSTED && !PANEL_PASSWORD) {
+    console.error('❌ PANEL_HOST est exposé hors localhost sans PANEL_PASSWORD.');
+    console.error('   Définissez PANEL_PASSWORD=votre-mot-de-passe puis relancez.');
+    process.exit(1);
+  }
+  server.listen(PORT, HOST, () => {
     console.log(`🤖 Gestionnaire de bots v${VERSION}`);
     console.log(`📁 Données : ${dataDir}`);
-    console.log(`🌐 Interface : http://localhost:${PORT}  (cette fenêtre doit rester ouverte)`);
+    console.log(
+      HOSTED
+        ? `🌐 Panel hébergé : http://<ip-du-serveur>:${PORT} (protégé par mot de passe)`
+        : `🌐 Interface : http://localhost:${PORT}  (cette fenêtre doit rester ouverte)`
+    );
     adoptOrphans();
-    openBrowser();
+    if (!HOSTED) openBrowser();
   });
 })();
 
@@ -854,6 +1003,9 @@ const HTML = `<!DOCTYPE html>
   <label>CLIENT_ID (Application ID)</label><input id="f_client" placeholder="123456789…">
   <label>GUILD_ID (ID du serveur, facultatif)</label><input id="f_guild">
   <label>OWNER_ID (votre ID Discord, facultatif)</label><input id="f_owner">
+  <div style="margin:12px 0 2px;font-size:12px;color:#8a8b94;border-top:1px solid #2c2e35;padding-top:10px">🌍 <b>Bot hébergé</b> (optionnel) : le bot tourne chez un hébergeur avec le pack agent — remplissez l'URL et la clé pour le relier, les champs token/CLIENT_ID ci-dessus deviennent inutiles (ils se règlent dans le .env distant).</div>
+  <label>URL de l'agent (http://ip:port)</label><input id="f_rurl" placeholder="http://51.210.0.0:43600">
+  <label>Clé d'accès (AGENT_KEY du .env distant)</label><input id="f_rkey">
   <div class="row"><button class="gray" onclick="dlgNew.close()">Annuler</button><button onclick="createBot()">Créer</button></div>
 </dialog>
 <dialog id="dlgSet">
@@ -1030,9 +1182,14 @@ function loadTab() {
 function createBot() {
   api('POST', '/api/bots', {
     name: $('f_name').value, repo: $('f_repo').value, token: $('f_token').value,
-    clientId: $('f_client').value, guildId: $('f_guild').value, ownerId: $('f_owner').value
+    clientId: $('f_client').value, guildId: $('f_guild').value, ownerId: $('f_owner').value,
+    remoteUrl: $('f_rurl').value, remoteKey: $('f_rkey').value
   }).then(function(j){
-    if (j && j.ok) { dlgNew.close(); toast('✅ Bot créé — téléchargement de l\\'exécutable en cours…'); selectBot($('f_name').value.trim()); }
+    if (j && j.ok) {
+      dlgNew.close();
+      toast(j.distant ? '🌍 Bot hébergé relié au panel !' : '✅ Bot créé — téléchargement de l\\'exécutable en cours…');
+      selectBot($('f_name').value.trim());
+    }
   });
 }
 // ----- Pages du dashboard (style DraftBot) -----
@@ -1346,6 +1503,58 @@ function testSettings() {
   });
 }
 refresh(); setInterval(refresh, 2500);
+</script>
+</body>
+</html>`;
+
+// ----- Page de connexion (mode hébergeur, PANEL_PASSWORD défini) -----
+const LOGIN_HTML = `<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>🤖 Panel — Connexion</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: #17181c; color: #e8e9ed;
+         display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+  .card { background: #1f2126; border: 1px solid #2c2e35; border-radius: 14px; padding: 34px 30px;
+          width: 340px; text-align: center; }
+  .logo { font-size: 40px; margin-bottom: 8px; }
+  h1 { font-size: 18px; margin-bottom: 4px; }
+  p { color: #8a8b94; font-size: 13px; margin-bottom: 18px; }
+  input { width: 100%; background: #101114; border: 1px solid #2c2e35; color: #e8e9ed;
+          border-radius: 8px; padding: 11px 12px; font-size: 14px; margin-bottom: 10px; }
+  input:focus { outline: none; border-color: #e8593a; }
+  button { width: 100%; background: #e8593a; color: #fff; border: 0; border-radius: 8px;
+           padding: 11px; font-size: 14px; font-weight: 600; cursor: pointer; }
+  button:hover { filter: brightness(1.1); }
+  .err { color: #ff8a70; font-size: 12.5px; margin-top: 10px; min-height: 16px; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">🤖</div>
+  <h1>Gestionnaire de bots</h1>
+  <p>Panel protégé — entrez le mot de passe.</p>
+  <form id="f">
+    <input id="pw" type="password" placeholder="Mot de passe" autofocus autocomplete="current-password">
+    <button type="submit">Se connecter</button>
+  </form>
+  <div class="err" id="err"></div>
+</div>
+<script>
+document.getElementById('f').onsubmit = function(e){
+  e.preventDefault();
+  fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ password: document.getElementById('pw').value }) })
+    .then(function(r){ return r.json(); })
+    .then(function(j){
+      if (j.ok) location.reload();
+      else document.getElementById('err').textContent = j.error || 'Mot de passe incorrect.';
+    })
+    .catch(function(){ document.getElementById('err').textContent = 'Erreur réseau.'; });
+};
 </script>
 </body>
 </html>`;

@@ -38,7 +38,10 @@ async function fetchText(url, browser = false) {
   return res.text();
 }
 
-// ----- Résolution YouTube : URL / @pseudo / ID de chaîne → ID « UC… » -----
+// ----- Résolution YouTube : N'IMPORTE QUEL lien retrouve la chaîne -----
+// Acceptés : ID « UC… », @pseudo, lien de chaîne (/channel/, /@, /c/, /user/),
+// lien de VIDÉO (youtube.com/watch, youtu.be, shorts) — la page contient
+// toujours l'ID de la chaîne, on le retrouve dedans.
 async function resolveYouTubeChannel(input) {
   const s = input.trim();
   const direct = s.match(/(UC[\w-]{22})/);
@@ -48,6 +51,16 @@ async function resolveYouTubeChannel(input) {
   if (!html) return null;
   const m = html.match(/"channelId":"(UC[\w-]{22})"/) || html.match(/channel\/(UC[\w-]{22})/);
   return m ? m[1] : null;
+}
+
+// Nom réel de la chaîne YouTube (titre de son flux RSS) pour l'affichage.
+async function fetchYouTubeTitle(channelId) {
+  try {
+    const xml = await fetchText(`https://www.youtube.com/feeds/videos.xml?channel_id=${channelId}`);
+    return xml.match(/<title>([^<]+)<\/title>/)?.[1]?.trim() || null;
+  } catch {
+    return null;
+  }
 }
 
 // ----- Dernier contenu d'un flux, par plateforme -----
@@ -177,5 +190,6 @@ module.exports = {
   insertFeed,
   deleteFeed,
   resolveYouTubeChannel,
+  fetchYouTubeTitle,
   fetchLatest,
 };

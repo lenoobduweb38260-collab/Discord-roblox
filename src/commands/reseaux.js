@@ -17,24 +17,25 @@ const {
 
 const platformChoices = Object.entries(PLATFORMS).map(([value, p]) => ({ name: `${p.emoji} ${p.label}`, value }));
 
-// Nettoie l'identifiant saisi selon la plateforme (URL ou @ acceptés).
+// Nettoie l'identifiant saisi selon la plateforme — le LIEN du compte/de la
+// chaîne est valide (liens www., m., mobile. et pages profil acceptés).
 function normalizeHandle(platform, raw) {
   let s = raw.trim();
   if (platform === 'twitch') {
-    s = s.replace(/^https?:\/\/(www\.)?twitch\.tv\//i, '').split(/[/?#]/)[0];
+    s = s.replace(/^https?:\/\/(www\.|m\.)?twitch\.tv\//i, '').split(/[/?#]/)[0];
     return s.replace(/^@/, '').toLowerCase();
   }
   if (platform === 'tiktok') {
-    s = s.replace(/^https?:\/\/(www\.)?tiktok\.com\/@?/i, '').split(/[/?#]/)[0];
+    s = s.replace(/^https?:\/\/(www\.|m\.)?tiktok\.com\/@?/i, '').split(/[/?#]/)[0];
     return s.replace(/^@/, '');
   }
   if (platform === 'x') {
-    s = s.replace(/^https?:\/\/(www\.)?(x|twitter)\.com\//i, '').split(/[/?#]/)[0];
+    s = s.replace(/^https?:\/\/(www\.|mobile\.)?(x|twitter)\.com\//i, '').split(/[/?#]/)[0];
     return s.replace(/^@/, '');
   }
   if (platform === 'reddit') {
-    s = s.replace(/^https?:\/\/(www\.)?reddit\.com\//i, '').replace(/\/+$/, '');
-    if (/^(r|u|user)\//i.test(s)) return s.replace(/^user\//i, 'u/').toLowerCase();
+    s = s.replace(/^https?:\/\/(www\.|old\.)?reddit\.com\//i, '').replace(/\/+$/, '');
+    if (/^(r|u|user)\//i.test(s)) return s.split(/[?#]/)[0].split('/').slice(0, 2).join('/').replace(/^user\//i, 'u/').toLowerCase();
     return `r/${s.toLowerCase()}`;
   }
   return s; // youtube : résolu séparément
@@ -125,13 +126,17 @@ module.exports = {
     let handle;
     let meta = null;
     if (platform === 'youtube') {
+      // N'importe quel lien fonctionne : page de chaîne, @pseudo, vidéo,
+      // youtu.be, short… — le bot retrouve la chaîne à partir du lien.
       const channelId = await resolveYouTubeChannel(rawId).catch(() => null);
       if (!channelId) {
         return interaction.editReply(
-          '❌ Chaîne YouTube introuvable — donnez le **lien de la chaîne**, son **@pseudo** ou son **ID** (commence par `UC`).'
+          '❌ Chaîne YouTube introuvable — collez le **lien de la chaîne** (ou d\'une de ses vidéos), son **@pseudo** ou son **ID** (commence par `UC`).'
         );
       }
-      handle = rawId.replace(/^https?:\/\/(www\.)?youtube\.com\//i, '').split(/[/?#]/)[0] || channelId;
+      // Nom affiché : le vrai nom de la chaîne (titre de son flux RSS).
+      const { fetchYouTubeTitle } = require('../utils/socialWatch');
+      handle = (await fetchYouTubeTitle(channelId)) || rawId.match(/@[\w.-]+/)?.[0] || channelId;
       meta = JSON.stringify({ channelId });
     } else {
       handle = normalizeHandle(platform, rawId);

@@ -70,7 +70,7 @@ Bot Discord complet pour serveur Roleplay Roblox : cartes d'identité, permis de
 
 ### 📡 Annonces réseaux sociaux (`/reseaux`)
 - Le bot **suit vos chaînes et comptes** — ▶️ YouTube, 🟣 Twitch, 🎵 TikTok, 🐦 X (Twitter), 👽 Reddit — et **annonce automatiquement** dans le salon choisi quand un **stream démarre** (Twitch) ou qu'une **nouvelle vidéo/publication** sort (vérification toutes les 5 minutes)
-- `/reseaux ajouter plateforme identifiant salon [message]` — **[Staff]** lien, @pseudo ou r/subreddit acceptés ; message personnalisé avec les variables `{nom}`, `{titre}`, `{lien}` (sinon message par défaut avec aperçu du lien)
+- `/reseaux ajouter plateforme identifiant salon [message]` — **[Staff]** le **lien de la chaîne/du compte est valide** : le bot retrouve la chaîne à partir de n'importe quel lien (page de chaîne, **lien d'une vidéo**, youtu.be, liens mobiles…), d'un @pseudo ou d'un r/subreddit, et affiche son **vrai nom** ; message personnalisé avec les variables `{nom}`, `{titre}`, `{lien}` (sinon message par défaut avec aperçu du lien)
 - `/reseaux retirer` (avec autocomplétion), `/reseaux liste` — vue aussi dans `/config` → 📡 Réseaux sociaux
 - À l'ajout d'un flux, le contenu déjà publié est mémorisé **sans être annoncé** (pas de spam d'anciennes vidéos) ; ⚠️ X et TikTok bloquent parfois les requêtes automatisées — YouTube, Twitch et Reddit sont les plus fiables
 
@@ -163,6 +163,15 @@ Quand une **nouvelle version est prête** (release publiée pendant que le bot t
 - 🌐 **Page Serveurs** : tous les serveurs où le bot est présent (icône, nom, membres, ID) avec **🚪 Retirer le bot** d'un serveur en un clic et accès direct au réglage 🎭 Module RP du serveur, y compris son **🔒 verrouillage administrateur**
 - 🖼️ **Créateur d'embed avec prévisualisation en direct** façon DraftBot : auteur + icône, titre, description, couleur (pipette), grande image, miniature, pied de page — aperçu identique à Discord pendant la frappe, puis envoi dans le salon choisi
 - 🔗 **Bouton « Inviter sur un serveur »** : génère le lien d'invitation du bot à partir du CLIENT_ID de son `.env`
+
+## 🌍 Pack hébergeur — bot chez un hébergeur, panel relié à distance
+
+Le fichier **`pack-hebergeur.zip`** (dans chaque release) fait tourner le bot **chez votre hébergeur** tout en gardant votre panel :
+
+1. Envoyez le contenu du zip chez l'hébergeur, renommez `.env.exemple` en `.env` (clé `AGENT_KEY` inventée + `AGENT_PORT` alloué + `DISCORD_TOKEN`/`CLIENT_ID`), commande de démarrage **`node index.js`** (Node 18+, aucun npm install)
+2. L'**agent** télécharge la dernière version du bot depuis les **releases GitHub**, le lance, capture sa console, le relance en cas de crash, et gère `/update` (mise à jour GitHub + relance)
+3. Sur votre PC : Gestionnaire → **➕ Nouveau bot → 🌍 Bot hébergé** (URL `http://ip:port` + clé) — le bot distant s'utilise ensuite **comme un bot local** : console en direct, ▶/⏹, ⬇ mise à jour, ⚙️ .env distant, 📊 dashboard complet et page **🌐 Serveurs** (chaque serveur qui ajoute le bot)
+4. Sécurité : toutes les routes de l'agent exigent la clé (`401` sinon) ; le panel local peut aussi être exposé (`PANEL_HOST`/`PANEL_PORT`/`PANEL_PASSWORD`, page de connexion intégrée)
 
 ## 🚀 Installation
 
