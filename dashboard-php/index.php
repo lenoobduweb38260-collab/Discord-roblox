@@ -100,6 +100,26 @@ function demo_apercu(): array {
     ],
   ];
 }
+// En démo, l'utilisateur est CRÉATEUR (accès Staff + Créateur).
+function demo_role(): array {
+  return ['creator' => true, 'staff' => true, 'rank' => 'Créateur', 'perms' => ['blacklist', 'tickets', 'staff']];
+}
+function demo_blacklist(): array {
+  return ['blacklist' => [
+    ['userId' => '700000000000000010', 'tag' => 'ScammeurX', 'reason' => 'Arnaque MrBeast', 'by' => '0', 'at' => '2026-07-20T14:00:00Z'],
+    ['userId' => '700000000000000011', 'tag' => null, 'reason' => 'Spam massif', 'by' => '0', 'at' => '2026-07-19T09:30:00Z'],
+  ]];
+}
+function demo_botstaff(): array {
+  return [
+    'staff' => [
+      ['userId' => '800000000000000001', 'tag' => 'Alex', 'rank' => 'Responsable', 'perms' => ['blacklist', 'tickets', 'staff']],
+      ['userId' => '800000000000000002', 'tag' => 'Marie', 'rank' => 'Modérateur', 'perms' => ['tickets']],
+    ],
+    'grades' => ['Responsable', 'Modérateur', 'Support'],
+    'perms' => ['blacklist' => '🚫 Blacklist', 'tickets' => '🎫 Tickets du QG', 'staff' => '🛡️ Gestion du staff'],
+  ];
+}
 
 // ----- Requêtes HTTP sortantes (cURL, sinon flux natifs) -----
 function http_req(string $url, string $method = 'GET', $body = null, array $headers = [], bool $form = false): array {
@@ -197,6 +217,42 @@ function bot_api(string $guildId, string $path, string $method = 'GET', $body = 
   $botName = $map[$guildId] ?? null;
   if (!$botName) return [404, ['error' => 'Aucun bot en ligne sur ce serveur.']];
   return agent_call('/agent/bots/' . rawurlencode($botName) . '/proxy' . $path, $method, $body);
+}
+
+// Appel « global » (blacklist, staff du bot, config du dashboard) : ces
+// données sont propres au bot, pas à un serveur — on interroge le premier
+// bot en ligne.
+function first_bot_api(string $path, string $method = 'GET', $body = null): array {
+  [$map] = guild_map();
+  $botName = null;
+  foreach ($map as $b) { $botName = $b; break; }
+  if (!$botName) return [404, ['error' => 'Aucun bot en ligne.']];
+  return agent_call('/agent/bots/' . rawurlencode($botName) . '/proxy' . $path, $method, $body);
+}
+
+// Modules du dashboard (activables par le créateur). Ordre = ordre d'affichage.
+const DASH_MODULES = [
+  'apercu' => ['📊', 'Vue d\'ensemble'],
+  'module' => ['🎭', 'Module RP'],
+  'membres' => ['👋', 'Arrivées et départs'],
+  'roles' => ['👮', 'Rôles & sécurité'],
+  'salons' => ['📢', 'Salons & logs'],
+  'niveaux' => ['📈', 'Niveaux'],
+  'whitelist' => ['📋', 'Whitelist métiers'],
+  'tickets' => ['🎫', 'Tickets'],
+];
+function dash_defaults(): array {
+  return [
+    'nom' => defined('DASH_NOM') && DASH_NOM !== '' ? DASH_NOM : 'Mon Bot',
+    'accent' => '#d8734f',
+    'accroche' => 'Le Roleplay',
+    'modules' => array_fill_keys(array_keys(DASH_MODULES), true),
+  ];
+}
+function dash_config_get(): array {
+  if (DEMO) $cfg = ['nom' => 'Zetku', 'accent' => '#d8734f', 'accroche' => 'Le Roleplay', 'modules' => ['apercu' => true, 'module' => true, 'membres' => true, 'roles' => true, 'salons' => true, 'niveaux' => true, 'whitelist' => false, 'tickets' => true]];
+  else { [$st, $d] = first_bot_api('/dashboard-config'); $cfg = ($st === 200 && !empty($d['config'])) ? $d['config'] : []; }
+  return array_replace_recursive(dash_defaults(), is_array($cfg) ? $cfg : []);
 }
 
 function send_json(int $code, array $data): never {
@@ -300,12 +356,22 @@ if ($p === 'inviter') {
   exit;
 }
 
+// Rôle du membre connecté vis-à-vis du bot (créateur / staff).
+function my_role(): array {
+  if (DEMO) return demo_role();
+  $uid = $_SESSION['user']['id'] ?? '';
+  [$st, $d] = first_bot_api('/whoami?userId=' . rawurlencode($uid));
+  return ($st === 200) ? $d : ['creator' => false, 'staff' => false, 'rank' => null, 'perms' => []];
+}
+
 // ----- API (session requise) -----
-if ($p === 'api-moi' || $p === 'api-serveur') {
+if ($p === 'api-moi' || $p === 'api-serveur' || $p === 'api-global') {
   if (empty($_SESSION['user'])) send_json(401, ['error' => 'Non connecté — rechargez la page.']);
 
   if ($p === 'api-moi') {
-    if (DEMO) send_json(200, ['user' => $_SESSION['user'], 'servers' => demo_servers()]);
+    $role = my_role();
+    $dash = dash_config_get();
+    if (DEMO) send_json(200, ['user' => $_SESSION['user'], 'servers' => demo_servers(), 'role' => $role, 'dash' => $dash]);
     [$map, $infos] = guild_map();
     $servers = [];
     foreach ($_SESSION['guilds'] as $g) {
@@ -319,7 +385,54 @@ if ($p === 'api-moi' || $p === 'api-serveur') {
         'enligne' => true,
       ];
     }
-    send_json(200, ['user' => $_SESSION['user'], 'servers' => $servers]);
+    send_json(200, ['user' => $_SESSION['user'], 'servers' => $servers, 'role' => $role, 'dash' => $dash]);
+  }
+
+  // ----- Espace Staff / Créateur (données globales du bot) -----
+  if ($p === 'api-global') {
+    $a = $_GET['a'] ?? '';
+    $role = my_role();
+    $uid = $_SESSION['user']['id'] ?? '';
+    $post = ($_SERVER['REQUEST_METHOD'] === 'POST') ? json_body() : [];
+
+    // Lecture blacklist / staff : accès staff (ou créateur).
+    if ($a === 'blacklist' && $_SERVER['REQUEST_METHOD'] === 'GET') {
+      if (empty($role['staff'])) send_json(403, ['error' => 'Réservé au staff du bot.']);
+      if (DEMO) send_json(200, demo_blacklist());
+      [$st, $d] = first_bot_api('/blacklist');
+      send_json($st ?: 502, $d ?: ['error' => 'Bot injoignable.']);
+    }
+    if ($a === 'botstaff' && $_SERVER['REQUEST_METHOD'] === 'GET') {
+      if (empty($role['staff'])) send_json(403, ['error' => 'Réservé au staff du bot.']);
+      if (DEMO) send_json(200, demo_botstaff());
+      [$st, $d] = first_bot_api('/botstaff');
+      send_json($st ?: 502, $d ?: ['error' => 'Bot injoignable.']);
+    }
+    if ($a === 'dashconfig' && $_SERVER['REQUEST_METHOD'] === 'GET') {
+      send_json(200, ['config' => dash_config_get(), 'modules' => DASH_MODULES]);
+    }
+
+    // Écritures : le bot revérifie la permission via actorId.
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+      if (empty($role['staff'])) send_json(403, ['error' => 'Réservé au staff du bot.']);
+      $post['actorId'] = $uid;
+      if (DEMO) send_json(200, ['ok' => true, 'note' => 'Démo — action simulée']);
+      $map = [
+        'blacklist-ajouter' => '/blacklist-ajouter', 'blacklist-retirer' => '/blacklist-retirer',
+        'botstaff-ajouter' => '/botstaff-ajouter', 'botstaff-retirer' => '/botstaff-retirer',
+        'botstaff-perm' => '/botstaff-perm', 'botstaff-grade' => '/botstaff-grade', 'botstaff-grade-suppr' => '/botstaff-grade-suppr',
+      ];
+      if (isset($map[$a])) {
+        [$st, $d] = first_bot_api($map[$a], 'POST', $post);
+        send_json($st ?: 502, $d ?: ['error' => 'Bot injoignable.']);
+      }
+      if ($a === 'dashconfig-save') {
+        if (empty($role['creator'])) send_json(403, ['error' => 'Réservé au créateur du bot.']);
+        [$st, $d] = first_bot_api('/dashboard-config', 'POST', ['actorId' => $uid, 'config' => $post['config'] ?? []]);
+        send_json($st ?: 502, $d ?: ['error' => 'Bot injoignable.']);
+      }
+    }
+    send_json(404, ['error' => 'Action inconnue.']);
   }
 
   // api-serveur : &gid=…&a=…
@@ -465,6 +578,19 @@ $THEME = <<<'CSS'
   .toast.err { border-color:var(--red); }
   .empty { color:var(--muted); padding:48px; text-align:center; }
   .wrap { max-width:1100px; margin:0 auto; padding:30px 20px; }
+  /* ---- onglets (espace staff) ---- */
+  .tabbar { display:flex; gap:4px; border-bottom:1px solid var(--border); margin:16px 0 22px; flex-wrap:wrap; }
+  .tab { padding:10px 18px; font-size:13.5px; color:var(--muted); cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-1px; }
+  .tab:hover { color:var(--text); }
+  .tab.on { color:var(--accent); border-bottom-color:var(--accent); font-weight:600; }
+  .chip { background:#101114; border:1px solid var(--border); border-radius:14px; padding:4px 11px; font-size:12.5px;
+          display:inline-flex; gap:6px; align-items:center; }
+  .chip button { padding:0 5px; font-size:11px; background:transparent; border:0; color:var(--muted); }
+  /* ---- bouton flottant Créateur (en bas à gauche) ---- */
+  .cfab { position:fixed; bottom:22px; left:22px; width:52px; height:52px; border-radius:50%; background:var(--accent);
+          color:#fff; font-size:24px; display:flex; align-items:center; justify-content:center; cursor:pointer;
+          box-shadow:0 8px 26px rgba(0,0,0,.4); z-index:40; transition:transform .15s; }
+  .cfab:hover { transform:scale(1.08); }
   /* ---- barre de défilement raffinée ---- */
   ::-webkit-scrollbar { width:10px; height:10px; }
   ::-webkit-scrollbar-track { background:transparent; }
@@ -635,6 +761,10 @@ function tog(id, checked){
   return '<label class="switch"><input type="checkbox" id="' + id + '"' + (checked ? ' checked' : '') + '><span class="sl"></span></label>';
 }
 
+var ROLE = { creator: false, staff: false, perms: [] };
+var DASH = { nom: 'Mon Bot', accent: '#d8734f', modules: {} };
+function canPerm(p){ return ROLE.creator || (ROLE.perms || []).indexOf(p) >= 0; }
+
 // ----- Accueil : grille des serveurs -----
 function renderHome(){
   gid = null;
@@ -647,15 +777,33 @@ function renderHome(){
       '<div><div style="font-weight:700">' + esc(s.name) + '</div>' +
       '<div style="color:var(--muted);font-size:12px">' + (s.membres ? s.membres + ' membres · ' : '') + '🤖 ' + esc(s.bot) + '</div></div></div>';
   });
-  h += '</div></div>';
+  h += '</div>';
+  // Accès Staff / Créateur (réservés à l'équipe du bot)
+  if (ROLE.staff || ROLE.creator){
+    h += '<h1 class="pagetitle" style="margin-top:34px">Espace équipe du bot</h1><div class="grid">';
+    if (ROLE.staff) h += '<div class="scard" id="go-staff"><div class="noicon">🛡️</div><div><div style="font-weight:700">Staff du bot</div><div style="color:var(--muted);font-size:12px">Blacklist · Équipe du bot</div></div></div>';
+    if (ROLE.creator) h += '<div class="scard" id="go-createur"><div class="noicon">⚙️</div><div><div style="font-weight:700">Créateur</div><div style="color:var(--muted);font-size:12px">Configurer le dashboard</div></div></div>';
+    h += '</div>';
+  }
+  h += '</div>';
   $('content').innerHTML = h;
-  Array.prototype.forEach.call(document.querySelectorAll('.scard'), function(el){
+  Array.prototype.forEach.call(document.querySelectorAll('.scard[data-g]'), function(el){
     el.onclick = function(){ gid = el.getAttribute('data-g'); page = 'apercu'; renderServer(); };
   });
+  if ($('go-staff')) $('go-staff').onclick = function(){ renderStaff('blacklist'); };
+  if ($('go-createur')) $('go-createur').onclick = renderCreateur;
+  // Bouton flottant « Créateur » en bas à gauche (créateur uniquement).
+  var old = $('cfab'); if (old) old.remove();
+  if (ROLE.creator){
+    var fab = document.createElement('div');
+    fab.id = 'cfab'; fab.className = 'cfab'; fab.title = 'Espace Créateur';
+    fab.innerHTML = '⚙️'; fab.onclick = renderCreateur;
+    document.body.appendChild(fab);
+  }
 }
 
 // ----- Vue serveur : rail d'icônes + sidebar + page -----
-var PAGES = [
+var ALL_PAGES = [
   ['apercu', '📊', 'Vue d\'ensemble'],
   ['module', '🎭', 'Module RP'],
   ['membres', '👋', 'Arrivées et départs'],
@@ -665,6 +813,11 @@ var PAGES = [
   ['whitelist', '📋', 'Whitelist métiers'],
   ['tickets', '🎫', 'Tickets']
 ];
+// Seules les pages dont le module est activé par le créateur s'affichent.
+function pagesActives(){
+  return ALL_PAGES.filter(function(p){ return p[0] === 'apercu' || DASH.modules[p[0]] !== false; });
+}
+var PAGES = ALL_PAGES;
 function renderServer(){
   var srv = null;
   moi.servers.forEach(function(s){ if (s.id === gid) srv = s; });
@@ -684,18 +837,22 @@ function renderServer(){
     '<div class="nm">' + esc(srv ? srv.name : '') + '</div>' +
     '<div class="stline"><span class="dot ' + (srv && srv.enligne === false ? 'down' : 'up') + '"></span>' +
     (srv && srv.enligne === false ? 'Bot hors ligne' : 'Bot en ligne') + '</div></div>';
-  PAGES.forEach(function(pg){
+  var pages = pagesActives();
+  if (!pages.some(function(p){ return p[0] === page; })) page = 'apercu';
+  pages.forEach(function(pg){
     h += '<div class="item' + (pg[0] === page ? ' on' : '') + '" data-p="' + pg[0] + '"><span>' + pg[1] + '</span> ' + pg[2] + '</div>';
   });
+  h += '<div class="item" id="side-home">⬅ Mes serveurs</div>';
   h += '</div><div class="main" id="main">' + spinner() + '</div></div>';
   $('content').innerHTML = h;
   if ($('burger')) $('burger').onclick = function(){ $('side').classList.toggle('open'); };
   Array.prototype.forEach.call(document.querySelectorAll('.rail .ric'), function(el){
     el.onclick = function(){ gid = el.getAttribute('data-g'); page = 'apercu'; renderServer(); };
   });
-  Array.prototype.forEach.call(document.querySelectorAll('.side .item'), function(el){
+  Array.prototype.forEach.call(document.querySelectorAll('.side .item[data-p]'), function(el){
     el.onclick = function(){ page = el.getAttribute('data-p'); if ($('side')) $('side').classList.remove('open'); renderServer(); };
   });
+  if ($('side-home')) $('side-home').onclick = renderHome;
   loadPage(srv);
 }
 
@@ -902,10 +1059,158 @@ function fsel3(id, label, list){
   list.forEach(function(x){ h += '<option value="' + x.id + '">' + esc(x.name) + '</option>'; });
   return h + '</select>';
 }
+function gu(a){ return 'index.php?p=api-global&a=' + a; }
+
+// ================= 🛡️ ESPACE STAFF DU BOT =================
+function staffShell(active, inner){
+  var tabs = [['blacklist', '🚫 Blacklist'], ['equipe', '🛡️ Équipe du bot']];
+  var h = '<div class="wrap"><div style="display:flex;align-items:center;gap:14px;margin-bottom:8px">' +
+    '<h1 class="pagetitle" style="margin:0">🛡️ Staff du bot</h1>' +
+    '<button id="staff-home" style="margin-left:auto">⬅ Mes serveurs</button></div>' +
+    '<p class="sub">Espace réservé à l\'équipe du bot (valable sur tous les serveurs).</p>';
+  h += '<div class="tabbar">';
+  tabs.forEach(function(t){ h += '<div class="tab' + (t[0] === active ? ' on' : '') + '" data-t="' + t[0] + '">' + t[1] + '</div>'; });
+  h += '</div><div id="staffmain">' + inner + '</div></div>';
+  $('content').innerHTML = h;
+  if ($('staff-home')) $('staff-home').onclick = renderHome;
+  Array.prototype.forEach.call(document.querySelectorAll('.tab[data-t]'), function(el){
+    el.onclick = function(){ renderStaff(el.getAttribute('data-t')); };
+  });
+}
+function renderStaff(tab){
+  staffShell(tab, spinner());
+  var m = function(){ return $('staffmain'); };
+  if (tab === 'blacklist'){
+    api('GET', gu('blacklist')).then(function(d){
+      if (!d || d.error) { m().innerHTML = errScreen((d && d.error) || 'Erreur', false); return; }
+      var h = '<div class="fade">';
+      if (canPerm('blacklist')){
+        h += sec('Blacklister un utilisateur', 'Il reçoit un MP (raison + serveur de déban), est banni de tous les serveurs du bot et re-banni à chaque arrivée.',
+          '<div class="fields" style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end">' +
+          '<div style="min-width:210px"><div class="flabel">ID Discord</div><input id="bl_id" placeholder="123456789012345678"></div>' +
+          '<div style="flex:1;min-width:220px"><div class="flabel">Raison</div><input id="bl_reason" placeholder="Motif de la blacklist"></div>' +
+          '<button id="bl_add" class="accent">🚫 Blacklister</button></div>', '');
+      }
+      var list = (d.blacklist || []);
+      var rows = '';
+      list.forEach(function(b){
+        rows += '<div class="row">🚫 <b>' + esc(b.tag || ('ID ' + b.userId)) + '</b> <span style="color:var(--muted)">' + esc(b.userId) + '</span>' +
+          (b.reason ? ' — ' + esc(b.reason) : '') +
+          (canPerm('blacklist') ? '<button class="bl-del" data-u="' + b.userId + '" style="margin-left:auto;padding:4px 11px;font-size:12px">Débannir</button>' : '') + '</div>';
+      });
+      if (!list.length) rows = '<div class="row" style="color:var(--muted)"><i>Personne n\'est blacklisté.</i></div>';
+      h += sec('Blacklist (' + list.length + ')', '', rows, '');
+      m().innerHTML = h + '</div>';
+      if ($('bl_add')) $('bl_add').onclick = function(){
+        if (!/^\d{5,25}$/.test($('bl_id').value.trim())) { toast('⚠️ ID Discord invalide.', 'err'); return; }
+        api('POST', gu('blacklist-ajouter'), { userId: $('bl_id').value.trim(), reason: $('bl_reason').value }).then(function(j){ if (j && !j.error){ toast('🚫 ' + (j.tag || 'Utilisateur') + ' blacklisté' + (j.banned != null ? ' (' + j.banned + ' serveur(s))' : ''), 'ok'); renderStaff('blacklist'); } });
+      };
+      Array.prototype.forEach.call(m().querySelectorAll('.bl-del'), function(el){
+        el.onclick = function(){ if (confirm('Débannir cet utilisateur partout ?')) api('POST', gu('blacklist-retirer'), { userId: el.getAttribute('data-u') }).then(function(j){ if (j && !j.error){ toast('🔓 Blacklist levée', 'ok'); renderStaff('blacklist'); } }); };
+      });
+    });
+    return;
+  }
+  // Équipe du bot (grades + permissions par personne)
+  api('GET', gu('botstaff')).then(function(d){
+    if (!d || d.error) { m().innerHTML = errScreen((d && d.error) || 'Erreur', false); return; }
+    var permKeys = Object.keys(d.perms || {});
+    var manage = canPerm('staff');
+    var h = '<div class="fade">';
+    if (manage){
+      var gr = '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">';
+      (d.grades || []).forEach(function(g){ gr += '<span class="chip">' + esc(g) + (manage ? '<button class="bsg-del" data-g="' + esc(g) + '">✕</button>' : '') + '</span>'; });
+      gr += '<input id="bsg_new" placeholder="Nouveau grade" style="max-width:190px"><button id="bsg_add" class="accent" style="padding:5px 12px">➕</button></div>';
+      h += sec('📛 Grades', 'Créez vos grades librement (Responsable, Modérateur, Support…).', gr, '');
+    }
+    var rows = '';
+    (d.staff || []).forEach(function(s){
+      rows += '<div class="row"><div style="min-width:150px"><b>' + esc(s.tag || ('ID ' + s.userId)) + '</b><div style="color:var(--muted);font-size:11.5px">' + esc(s.userId) + '</div></div>';
+      if (manage){
+        rows += '<select class="bs-rank" data-u="' + s.userId + '" style="max-width:150px">';
+        var seen = false;
+        (d.grades || []).forEach(function(g){ if (g === s.rank) seen = true; rows += '<option' + (g === s.rank ? ' selected' : '') + '>' + esc(g) + '</option>'; });
+        if (!seen) rows += '<option selected>' + esc(s.rank) + '</option>';
+        rows += '</select>';
+        permKeys.forEach(function(pk){ rows += '<label style="display:flex;gap:4px;align-items:center;font-size:12px"><input type="checkbox" class="bs-perm" data-u="' + s.userId + '" data-p="' + pk + '"' + (s.perms.indexOf(pk) >= 0 ? ' checked' : '') + ' style="width:auto"> ' + d.perms[pk] + '</label>'; });
+        rows += '<button class="bs-del" data-u="' + s.userId + '" style="margin-left:auto;padding:4px 10px;font-size:12px">🗑</button>';
+      } else {
+        rows += '<span style="color:var(--muted)">' + esc(s.rank) + ' — ' + (s.perms.map(function(pk){ return d.perms[pk] || pk; }).join(' · ') || 'aucune') + '</span>';
+      }
+      rows += '</div>';
+    });
+    if (!(d.staff || []).length) rows = '<div class="row" style="color:var(--muted)"><i>Aucun membre dans le staff du bot.</i></div>';
+    h += sec('Membres du staff', manage ? 'Grade et permissions par personne.' : 'Vous n\'avez pas la gestion du staff.', rows, '');
+    if (manage){
+      h += sec('➕ Ajouter un staff', '', '<div class="fields" style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end">' +
+        '<div style="min-width:210px"><div class="flabel">ID Discord</div><input id="bs_id" placeholder="123456789012345678"></div>' +
+        '<div style="min-width:150px"><div class="flabel">Grade</div><select id="bs_rank">' + (d.grades || []).map(function(g){ return '<option>' + esc(g) + '</option>'; }).join('') + '</select></div>' +
+        '<button id="bs_add" class="accent">Ajouter</button></div>', '');
+    }
+    m().innerHTML = h + '</div>';
+    var rr = function(){ renderStaff('equipe'); };
+    if ($('bsg_add')) $('bsg_add').onclick = function(){ if ($('bsg_new').value.trim()) api('POST', gu('botstaff-grade'), { name: $('bsg_new').value }).then(function(j){ if (j && !j.error) rr(); }); };
+    Array.prototype.forEach.call(m().querySelectorAll('.bsg-del'), function(el){ el.onclick = function(){ api('POST', gu('botstaff-grade-suppr'), { name: el.getAttribute('data-g') }).then(function(j){ if (j && !j.error) rr(); }); }; });
+    if ($('bs_add')) $('bs_add').onclick = function(){ if (!/^\d{5,25}$/.test($('bs_id').value.trim())){ toast('⚠️ ID invalide.', 'err'); return; } api('POST', gu('botstaff-ajouter'), { userId: $('bs_id').value.trim(), rank: $('bs_rank').value }).then(function(j){ if (j && !j.error){ toast('✅ Ajouté', 'ok'); rr(); } }); };
+    Array.prototype.forEach.call(m().querySelectorAll('.bs-rank'), function(el){ el.onchange = function(){ api('POST', gu('botstaff-ajouter'), { userId: el.getAttribute('data-u'), rank: el.value }).then(function(j){ if (j && !j.error) toast('✅ Grade mis à jour', 'ok'); }); }; });
+    Array.prototype.forEach.call(m().querySelectorAll('.bs-perm'), function(el){ el.onchange = function(){ api('POST', gu('botstaff-perm'), { userId: el.getAttribute('data-u'), perm: el.getAttribute('data-p'), on: el.checked }).then(function(j){ if (j && !j.error) toast('✅ Permission mise à jour', 'ok'); }); }; });
+    Array.prototype.forEach.call(m().querySelectorAll('.bs-del'), function(el){ el.onclick = function(){ if (confirm('Retirer ce membre du staff ?')) api('POST', gu('botstaff-retirer'), { userId: el.getAttribute('data-u') }).then(function(j){ if (j && !j.error) rr(); }); }; });
+  });
+}
+
+// ================= ⚙️ ESPACE CRÉATEUR (config du dashboard) =================
+function renderCreateur(){
+  gid = null;
+  $('content').innerHTML = '<div class="wrap">' + spinner() + '</div>';
+  api('GET', gu('dashconfig')).then(function(d){
+    if (!d || d.error) { $('content').innerHTML = '<div class="wrap">' + errScreen((d && d.error) || 'Erreur', false) + '</div>'; return; }
+    var cfg = d.config, mods = d.modules;
+    var h = '<div class="wrap fade"><div style="display:flex;align-items:center;gap:14px;margin-bottom:8px">' +
+      '<h1 class="pagetitle" style="margin:0">⚙️ Créateur — configurer le dashboard</h1>' +
+      '<button id="cr-home" style="margin-left:auto">⬅ Mes serveurs</button></div>' +
+      '<p class="sub">Personnalisez le dashboard de A à Z : marque et modules affichés à vos staffs. Appliqué à tout le monde.</p>';
+    // Marque
+    h += sec('🎨 Marque du dashboard', 'Nom, couleur d\'accent et accroche de la page d\'accueil.',
+      '<div class="fields">' +
+      '<div class="flabel">Nom affiché</div><input id="cr_nom" value="' + esc(cfg.nom || '') + '">' +
+      '<div class="flabel" style="margin-top:12px">Accroche (page d\'accueil : « Un bot pour … »)</div><input id="cr_accroche" value="' + esc(cfg.accroche || '') + '">' +
+      '<div class="flabel" style="margin-top:12px">Couleur d\'accent</div><input id="cr_accent" type="color" value="' + esc(cfg.accent || '#d8734f') + '" style="width:70px;height:38px;padding:3px">' +
+      '</div>', '');
+    // Modules
+    var mi = '';
+    Object.keys(mods).forEach(function(k){
+      if (k === 'apercu') return; // la vue d'ensemble reste toujours active
+      var on = cfg.modules[k] !== false;
+      mi += '<div class="row"><span style="font-size:18px">' + mods[k][0] + '</span> <b>' + mods[k][1] + '</b>' +
+        '<span class="sw" style="margin-left:auto">' + tog('crm_' + k, on) + '</span></div>';
+    });
+    h += sec('🧩 Modules affichés', 'Activez ou désactivez les pages visibles par vos staffs dans la configuration des serveurs.', mi, '');
+    h += '<button id="cr_save" class="accent" style="font-size:14px;padding:11px 22px">💾 Enregistrer la configuration</button></div>';
+    $('content').innerHTML = h;
+    if ($('cr-home')) $('cr-home').onclick = renderHome;
+    $('cr_save').onclick = function(){
+      var modules = {};
+      Object.keys(mods).forEach(function(k){ if (k === 'apercu') { modules[k] = true; return; } modules[k] = $('crm_' + k) ? $('crm_' + k).checked : true; });
+      var newCfg = { nom: $('cr_nom').value.trim() || 'Mon Bot', accroche: $('cr_accroche').value.trim() || 'Le Roleplay', accent: $('cr_accent').value, modules: modules };
+      api('POST', gu('dashconfig-save'), { config: newCfg }).then(function(j){
+        if (j && !j.error){ toast('✅ Configuration enregistrée', 'ok'); DASH = newCfg; applyBrand(); }
+      });
+    };
+  });
+}
+
+// Applique la marque (nom + couleur d'accent) définie par le créateur.
+function applyBrand(){
+  if (DASH.accent) document.documentElement.style.setProperty('--accent', DASH.accent);
+  if (DASH.nom){ var b = document.querySelector('.nav .brand'); if (b) b.innerHTML = '<span class="lg">🎛️</span>' + esc(DASH.nom); document.title = DASH.nom + ' — Dashboard'; }
+}
 
 api('GET', 'index.php?p=api-moi').then(function(j){
   if (!j || j.error) { location.href = 'index.php'; return; }
   moi = j;
+  ROLE = j.role || ROLE;
+  DASH = j.dash || DASH;
+  applyBrand();
   if (moi.user.avatar) { $('h_avatar').src = moi.user.avatar; $('h_avatar').style.display = ''; }
   $('h_name').textContent = moi.user.username;
   renderHome();

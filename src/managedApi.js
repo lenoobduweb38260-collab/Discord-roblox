@@ -210,6 +210,77 @@ function startManagedApi(client, baseDir) {
         return send(200, { ok: true });
       }
 
+      // ----- Rôle d'un membre vis-à-vis du bot (pour le dashboard web) -----
+      // Le dashboard passe l'ID Discord (vérifié par OAuth) : le bot répond
+      // s'il est créateur / staff et quelles permissions il a.
+      if (req.method === 'GET' && url.pathname === '/whoami') {
+        const { isCreator, staffPermsOf } = require('./utils/botTeam');
+        const userId = String(url.searchParams.get('userId') || '');
+        const creator = await isCreator(client, userId);
+        const sp = staffPermsOf(userId);
+        return send(200, {
+          creator,
+          staff: creator || Boolean(sp),
+          rank: sp?.rank || (creator ? 'Créateur' : null),
+          perms: creator ? ['blacklist', 'tickets', 'staff'] : sp?.perms || [],
+        });
+      }
+
+      // ----- 🚫 Blacklist globale du bot (mode staff du dashboard) -----
+      if (url.pathname.startsWith('/blacklist')) {
+        const { hasPerm, isCreator, listBlacklistRows, getBlacklistRow, applyBlacklist, removeBlacklist } = require('./utils/botTeam');
+        const actorId = String((url.searchParams.get('actorId') || '')).trim();
+        if (req.method === 'GET' && url.pathname === '/blacklist') {
+          const rows = listBlacklistRows.all().map((r) => ({
+            userId: r.user_id,
+            tag: client.users.cache.get(r.user_id)?.tag || null,
+            reason: r.reason,
+            by: r.by_id,
+            at: r.at,
+          }));
+          return send(200, { blacklist: rows });
+        }
+        // Écritures : réservées aux détenteurs de la permission 🚫 Blacklist.
+        const body = await readBody(req);
+        const who = String(body.actorId || actorId);
+        if (!(await hasPerm(client, who, 'blacklist'))) {
+          return send(403, { error: 'Permission 🚫 Blacklist requise.' });
+        }
+        if (url.pathname === '/blacklist-ajouter') {
+          const userId = String(body.userId || '').trim();
+          if (!/^\d{5,25}$/.test(userId)) return send(400, { error: 'ID Discord invalide.' });
+          if (await isCreator(client, userId)) return send(400, { error: 'Le créateur du bot ne peut pas être blacklisté.' });
+          const result = await applyBlacklist(client, userId, String(body.reason || '').slice(0, 500) || null, who);
+          return send(200, { ok: true, tag: result.tag, banned: result.banned, dmOk: result.dmOk });
+        }
+        if (url.pathname === '/blacklist-retirer') {
+          if (!getBlacklistRow.get(String(body.userId || ''))) return send(404, { error: 'Non blacklisté.' });
+          const result = await removeBlacklist(client, String(body.userId));
+          return send(200, { ok: true, unbanned: result.unbanned });
+        }
+      }
+
+      // ----- ⚙️ Configuration du dashboard (créateur du bot) -----
+      // Modules affichés + marque, stockés dans app_state (partagés).
+      if (url.pathname.startsWith('/dashboard-config')) {
+        const { isCreator, state, setState } = require('./utils/botTeam');
+        const parse = () => {
+          try {
+            return JSON.parse(state('dashboard_config') || '{}');
+          } catch {
+            return {};
+          }
+        };
+        if (req.method === 'GET') return send(200, { config: parse() });
+        const body = await readBody(req);
+        if (!(await isCreator(client, String(body.actorId || '')))) {
+          return send(403, { error: 'Réservé au créateur du bot.' });
+        }
+        const incoming = body.config && typeof body.config === 'object' ? body.config : {};
+        setState('dashboard_config', JSON.stringify(incoming).slice(0, 8000));
+        return send(200, { ok: true, config: incoming });
+      }
+
       // ----- 🛡️ Staff du bot (équipe globale, page dédiée du gestionnaire) -----
       // IDs Discord des staffs, grades libres et permissions par personne.
       if (url.pathname.startsWith('/botstaff')) {
