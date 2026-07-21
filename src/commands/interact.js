@@ -234,7 +234,11 @@ async function buildInteractionMessage(interaction, actionKey, author, target, w
   if (gif?.anime) embed.setFooter({ text: `${L.anime}${gif.anime}` });
   if (!gif?.url) embed.setFooter({ text: L.noGif });
 
-  const payload = { content: `<@${target.id}>`, embeds: [embed] };
+  // Mention de la personne visée uniquement sur un serveur — en MP (et en
+  // salon privé d'app utilisateur), pas de mention : elle est inutile et
+  // génère des notifications parasites.
+  const payload = { embeds: [embed] };
+  if (interaction.inGuild()) payload.content = `<@${target.id}>`;
   if (withButtons) {
     payload.components = [
       new ActionRowBuilder().addComponents(
