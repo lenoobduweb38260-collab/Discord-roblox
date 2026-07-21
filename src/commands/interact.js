@@ -253,11 +253,27 @@ async function buildInteractionMessage(interaction, actionKey, author, target, w
   return payload;
 }
 
+// Contrôle administrateur du bot (via .env) :
+//   MODULE_INTERACT=off      → module interactions désactivé sur CE bot
+//   INTERACT_GUILDS=id1,id2  → module limité à ces serveurs (vide = partout)
+function moduleBlocked(interaction) {
+  if (process.env.MODULE_INTERACT?.trim().toLowerCase() === 'off') {
+    return '⛔ Le module interactions est désactivé sur ce bot par son administrateur.';
+  }
+  const allowed = (process.env.INTERACT_GUILDS || '').split(',').map((s) => s.trim()).filter(Boolean);
+  if (allowed.length && interaction.guildId && !allowed.includes(interaction.guildId)) {
+    return '⛔ Le module interactions n\'est pas autorisé sur ce serveur.';
+  }
+  return null;
+}
+
 module.exports = {
   grade: GRADES.EVERYONE,
   public: true, // réponses visibles par tout le monde (pas d'éphémère)
   allowDm: true, // utilisable en message privé avec le bot
   userInstall: true, // installable sur un compte utilisateur → enregistrement GLOBAL
+  botModule: 'interact', // désactivable par bot via MODULE_INTERACT=off
+  moduleBlocked,
   data: new SlashCommandBuilder()
     .setName('interact')
     .setDescription('Interactions : bisous, câlins, caresses, morsures (GIF anime)')

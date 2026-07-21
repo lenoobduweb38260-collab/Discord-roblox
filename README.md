@@ -49,6 +49,11 @@ Bot Discord complet pour serveur Roleplay Roblox : cartes d'identité, permis de
 - **🏅 Badges par paliers** (10 🥉, 50 🥈, 100 🥇, 250 💎, 500 👑 utilisations par catégorie) **envoyés en MP** au moment du déblocage ; `/interact badges` pour consulter les siens
 - **Traduction automatique** selon la langue Discord de chaque utilisateur (français, anglais, espagnol, allemand — repli anglais) : phrases, compteurs, boutons, badges
 - Fonctionne **sur les serveurs et en message privé** avec le bot ; installable en **app utilisateur** ; réponses publiques (non éphémères)
+- **Contrôle administrateur du bot** (`.env`) : `MODULE_INTERACT=off` désactive le module sur **ce bot** (commande retirée + boutons bloqués) ; `INTERACT_GUILDS=id1,id2` limite le module à **certains serveurs** (vide = partout)
+
+### ℹ️ Fiche membre (`/info`)
+- `/info [membre]` — fiche **visible uniquement par vous** (éphémère) : 💬 nom, 🔢 ID, 🚫 blacklist (🔜 bientôt disponible), 🏅 badges d'interactions par catégorie
+- Si vous consultez **votre propre fiche** en étant **créateur du bot** (propriétaire de l'application Discord ou `OWNER_ID` du `.env`) ou **membre de l'équipe du bot** (`BOT_TEAM` du `.env`, IDs séparés par des virgules), un bouton **« Me désigner »** apparaît sous l'embed : en cliquant, le bot publie une **embed publique d'attestation** (👑 créateur officiel / 🛡️ membre officiel du staff) émise par le bot lui-même — preuve fiable, impossible à falsifier
 
 ### 🚨 Anti-scam par images échantillons (`/scamimage`)
 - `/scamimage ajouter image:… [nom]` — **[Staff]** enregistre une image scam échantillon
@@ -77,6 +82,7 @@ Dans le salon de logs configuré : toutes les actions staff et accès refusés, 
 
 ### ⚙️ Configuration (`/config`) — panneau central
 - `/config` ouvre un **panneau interactif unique** (éphémère) avec la vue d'ensemble et toutes les catégories :
+  - 🎭 **Module RP** — activation/désactivation des commandes RP (respecte le 🔒 verrouillage administrateur)
   - 👮 **Rôles** — staff, administration, en service (sélecteurs de rôles)
   - 📢 **Salons** — logs, niveaux, service, staff (sélecteurs de salons)
   - 📈 **XP & niveaux** — formulaire XP texte/vocal et cooldown
@@ -86,6 +92,8 @@ Dans le salon de logs configuré : toutes les actions staff et accès refusés, 
 ## 🎭 Module RP activable
 
 Les systèmes RP — 🪪 `/carte`, 🚗 `/permis`, 🏢 `/entreprise`, 🛡️ `/assurance`, 🧑‍💼 `/service`, ⏱️ `/temps` — forment le **Module RP**, désactivé par défaut. Tant qu'il n'est pas activé, ces commandes **n'apparaissent pas** dans la liste du serveur (elles sont réellement retirées par la synchronisation, pas seulement bloquées) : seules les commandes de base du bot restent visibles. Activation : `/config` → **🎭 Module RP** → bouton Activer, ou dashboard du gestionnaire → page 🎭 Module RP — la liste des commandes du serveur est resynchronisée immédiatement. Le bot synchronise aussi automatiquement les commandes de chaque serveur à son démarrage et quand il rejoint un nouveau serveur.
+
+**🔒 Verrouillage administrateur** : depuis le gestionnaire (page 🎭 Module RP), l'administrateur du bot peut **verrouiller** le réglage d'un serveur — le staff du serveur ne peut alors plus activer ni désactiver le Module RP via `/config` (boutons grisés + refus explicite) ; seul le gestionnaire peut encore le changer.
 
 ## 🤫 Anti-flood
 
@@ -124,6 +132,7 @@ L'exécutable est **relié aux releases GitHub** : à chaque lancement, il compa
 - L'application est **relançable à volonté** : si elle tourne déjà, un nouveau lancement rouvre simplement l'interface (http://localhost:43550). La fenêtre console du gestionnaire doit rester ouverte ; sa fermeture arrête proprement les bots lancés (ils sont repris automatiquement au prochain lancement s'ils tournent encore)
 - La commande Discord `/update` d'un bot géré délègue la mise à jour au gestionnaire (téléchargement + redémarrage automatiques)
 - 🎛️ **Dashboard par serveur** (bot démarré) : membres, statistiques (cartes, permis, entreprises, tickets ouverts, whitelist, véhicules assurés), configuration résolue et top niveaux
+- 🌐 **Page Serveurs** : tous les serveurs où le bot est présent (icône, nom, membres, ID) avec **🚪 Retirer le bot** d'un serveur en un clic et accès direct au réglage 🎭 Module RP du serveur, y compris son **🔒 verrouillage administrateur**
 - 🖼️ **Créateur d'embed avec prévisualisation en direct** façon DraftBot : auteur + icône, titre, description, couleur (pipette), grande image, miniature, pied de page — aperçu identique à Discord pendant la frappe, puis envoi dans le salon choisi
 - 🔗 **Bouton « Inviter sur un serveur »** : génère le lien d'invitation du bot à partir du CLIENT_ID de son `.env`
 

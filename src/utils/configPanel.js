@@ -219,18 +219,22 @@ function whitelistView(guild) {
 function rpView(guild) {
   const cfg = getGuildConfig(guild.id);
   const enabled = Boolean(cfg.rp_enabled);
+  const locked = Boolean(cfg.rp_locked);
   const embed = new EmbedBuilder()
     .setColor(enabled ? COLORS.SUCCESS : COLORS.DANGER)
     .setTitle('🎭 Module RP')
     .setDescription(
-      `État : ${enabled ? '🟢 **Activé**' : '🔴 **Désactivé**'}\n\n` +
+      `État : ${enabled ? '🟢 **Activé**' : '🔴 **Désactivé**'}${locked ? ' · 🔒 **Verrouillé**' : ''}\n\n` +
         'Le Module RP regroupe :\n🪪 `/carte` · 🚗 `/permis` · 🏢 `/entreprise` · 🛡️ `/assurance` · 🧑‍💼 `/service` · ⏱️ `/temps`\n\n' +
         'Désactivé, ces commandes sont **retirées de la liste du serveur** — seules les commandes de base du bot restent visibles. ' +
-        'La synchronisation est appliquée immédiatement après le changement.'
+        'La synchronisation est appliquée immédiatement après le changement.' +
+        (locked
+          ? '\n\n🔒 Ce réglage est **verrouillé par l\'administrateur du bot** : il ne peut être modifié que depuis le gestionnaire des bots.'
+          : '')
     );
   const row = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId('cfgrpon').setLabel('Activer le Module RP').setEmoji('🟢').setStyle(ButtonStyle.Success).setDisabled(enabled),
-    new ButtonBuilder().setCustomId('cfgrpoff').setLabel('Désactiver').setEmoji('🔴').setStyle(ButtonStyle.Danger).setDisabled(!enabled)
+    new ButtonBuilder().setCustomId('cfgrpon').setLabel('Activer le Module RP').setEmoji('🟢').setStyle(ButtonStyle.Success).setDisabled(enabled || locked),
+    new ButtonBuilder().setCustomId('cfgrpoff').setLabel('Désactiver').setEmoji('🔴').setStyle(ButtonStyle.Danger).setDisabled(!enabled || locked)
   );
   return { embeds: [embed], components: [row, backRow()] };
 }
@@ -301,6 +305,14 @@ async function handleConfigInteraction(interaction) {
     }
 
     if (id === 'cfgrpon' || id === 'cfgrpoff') {
+      // Verrouillage administrateur : le réglage ne peut plus être changé
+      // depuis le serveur, uniquement depuis le gestionnaire des bots.
+      if (getGuildConfig(interaction.guildId).rp_locked) {
+        return await interaction.reply({
+          content: '🔒 Réglage **verrouillé par l\'administrateur du bot** — modifiable uniquement depuis le gestionnaire.',
+          flags: MessageFlags.Ephemeral,
+        });
+      }
       const enable = id === 'cfgrpon' ? 1 : 0;
       setGuildConfig(interaction.guildId, 'rp_enabled', enable);
       await interaction.update(rpView(interaction.guild));

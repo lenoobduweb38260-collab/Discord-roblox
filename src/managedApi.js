@@ -53,6 +53,7 @@ function startManagedApi(client, baseDir) {
     goodbye_message: 't',
     welcome_mention: 'b',
     rp_enabled: 'b',
+    rp_locked: 'b',
     xp_text: 'n',
     xp_voice: 'n',
     xp_cooldown: 'n',
@@ -202,6 +203,16 @@ function startManagedApi(client, baseDir) {
         if (!client.guilds.cache.has(body.guildId)) return send(404, { error: 'Serveur introuvable.' });
         deleteWl.run(body.guildId, String(body.roleId), String(body.managerRoleId));
         return send(200, { ok: true });
+      }
+
+      // Retrait du bot d'un serveur (demandé depuis la page 🌐 Serveurs du gestionnaire).
+      if (req.method === 'POST' && url.pathname === '/leave') {
+        const body = await readBody(req);
+        const guild = client.guilds.cache.get(String(body.guildId || ''));
+        if (!guild) return send(404, { error: 'Serveur introuvable (le bot y est-il encore ?).' });
+        const name = guild.name;
+        await guild.leave();
+        return send(200, { ok: true, name });
       }
 
       // Retrait d'un ban global (débannit sur tous les serveurs du bot).

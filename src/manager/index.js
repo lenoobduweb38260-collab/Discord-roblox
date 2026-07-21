@@ -343,8 +343,17 @@ function envTemplate(fields = {}) {
     '# ID du serveur (facultatif : enregistrement instantané des commandes)',
     `GUILD_ID=${fields.guildId || ''}`,
     '',
-    '# Votre ID Discord (autorisé à utiliser /stop)',
+    '# Votre ID Discord (autorisé à utiliser /stop et reconnu créateur par /info)',
     `OWNER_ID=${fields.ownerId || ''}`,
+    '',
+    '# IDs Discord de l\'équipe du bot, séparés par des virgules (reconnus staff par /info)',
+    'BOT_TEAM=',
+    '',
+    '# Module interactions (/interact) : "on" (défaut) ou "off" pour le désactiver sur CE bot',
+    'MODULE_INTERACT=on',
+    '',
+    '# Limite /interact à certains serveurs (IDs séparés par des virgules ; vide = partout)',
+    'INTERACT_GUILDS=',
     '',
     '# Géré par le Gestionnaire de bots (mise à jour interne désactivée)',
     'AUTO_UPDATE=off',
@@ -981,6 +990,7 @@ function loadTab() {
       var page = window.dashPage || 'apercu';
       var pages = [
         ['apercu', '📊 Vue d\\'ensemble'],
+        ['serveurs', '🌐 Serveurs'],
         ['module', '🎭 Module RP'],
         ['membres', '👋 Arrivées et départs'],
         ['messages', '💬 Messages'],
@@ -1140,6 +1150,34 @@ function renderDashPage(page, gid) {
     });
     return;
   }
+  if (page === 'serveurs') {
+    fetch('/api/bots/' + sel + '/proxy/infos').then(function(r){ return r.json(); }).then(function(info){
+      if (info.error) { m.innerHTML = '<div class="empty">⚠️ ' + info.error + '</div>'; return; }
+      var h = '<h2 class="dbtitle">🌐 Serveurs</h2>';
+      h += '<p class="dbp">Tous les serveurs où le bot est présent. « 🚪 Retirer le bot » le fait quitter immédiatement (réinvitable via 🔗 Inviter). ' +
+        '« 🎭 Module RP » ouvre le réglage du module pour ce serveur (avec le verrouillage administrateur).</p>';
+      (info.guilds || []).forEach(function(g){
+        h += '<div class="dbrow" style="display:flex;align-items:center;gap:10px">' +
+          (g.icon ? '<img src="' + g.icon + '" style="width:32px;height:32px;border-radius:8px">' : '<span style="width:32px;text-align:center;font-size:20px">🌐</span>') +
+          '<div style="flex:1"><b>' + escHtml(g.name) + '</b><div style="color:var(--muted);font-size:12px">👥 ' + g.memberCount + ' membres · 🆔 ' + g.id + '</div></div>' +
+          '<button class="srv-mod" data-g="' + g.id + '" style="padding:4px 10px;font-size:12px">🎭 Module RP</button>' +
+          '<button class="srv-del" data-g="' + g.id + '" data-n="' + escHtml(g.name) + '" style="padding:4px 10px;font-size:12px;border-color:#a03325;color:#ff8a70">🚪 Retirer le bot</button></div>';
+      });
+      if (!(info.guilds || []).length) h += '<p class="dbp"><i>Le bot n\\'est sur aucun serveur — utilisez le bouton 🔗 Inviter.</i></p>';
+      m.innerHTML = h;
+      Array.prototype.forEach.call(m.querySelectorAll('.srv-mod'), function(el){
+        el.onclick = function(){ window.dashGuild = el.getAttribute('data-g'); window.dashPage = 'module'; loadTab(); };
+      });
+      Array.prototype.forEach.call(m.querySelectorAll('.srv-del'), function(el){
+        el.onclick = function(){
+          if (!confirm('Retirer le bot du serveur « ' + el.getAttribute('data-n') + ' » ?\\nIl quittera immédiatement ce serveur.')) return;
+          api('POST', '/api/bots/' + sel + '/proxy/leave', { guildId: el.getAttribute('data-g') })
+            .then(function(j){ if (j && j.ok) { toast('🚪 Bot retiré de « ' + (j.name || '') + ' ».'); loadTab(); } });
+        };
+      });
+    });
+    return;
+  }
   fetch('/api/bots/' + sel + '/proxy/parametres?guild=' + gid).then(function(r){ return r.json(); }).then(function(p){
     if (p.error) { m.innerHTML = '<div class="empty">⚠️ ' + p.error + '</div>'; return; }
     var cfg = p.config, h = '';
@@ -1150,6 +1188,11 @@ function renderDashPage(page, gid) {
         'La synchronisation est appliquée immédiatement.</p>';
       h += '<div class="dsec"><label style="display:flex;gap:8px;align-items:center;font-size:13.5px">' +
         '<input type="checkbox" id="rp_on"' + (cfg.rp_enabled ? ' checked' : '') + ' style="width:auto"> Activer le Module RP sur ce serveur</label></div>';
+      h += '<div class="dsec"><h3>🔒 Verrouillage administrateur</h3>' +
+        '<p>Verrouillé, le serveur ne peut plus activer ni désactiver le Module RP depuis <code>/config</code> — ' +
+        'seul vous, depuis ce gestionnaire, pouvez changer le réglage ci-dessus.</p>' +
+        '<label style="display:flex;gap:8px;align-items:center;font-size:13.5px">' +
+        '<input type="checkbox" id="rp_lock"' + (cfg.rp_locked ? ' checked' : '') + ' style="width:auto"> Verrouiller ce réglage pour le serveur</label></div>';
     } else if (page === 'membres') {
       h += '<h2 class="dbtitle">👋 Arrivées et Départs</h2>';
       h += dashSelect('member_channel_id', 'Salon des messages',
@@ -1244,6 +1287,7 @@ function renderDashPage(page, gid) {
     if ($('em_pv')) setupMessagesPage(gid);
     if ($('dm_pv')) setupMembresPage(gid);
     if ($('rp_on')) $('rp_on').onchange = function(){ dashSave(gid, 'rp_enabled', $('rp_on').checked ? 1 : 0); };
+    if ($('rp_lock')) $('rp_lock').onchange = function(){ dashSave(gid, 'rp_locked', $('rp_lock').checked ? 1 : 0); };
     if ($('dw_add')) $('dw_add').onclick = function(){
       if (!$('dw_role').value || !$('dw_mgr').value) { toast('⚠️ Choisissez les deux rôles.'); return; }
       proxy('whitelist-ajouter', { guildId: gid, roleId: $('dw_role').value, managerRoleId: $('dw_mgr').value }).then(rerender);

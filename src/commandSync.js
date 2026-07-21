@@ -20,6 +20,9 @@ function loadDefs() {
     const mod = require(path.join(commandsPath, file));
     for (const command of Array.isArray(mod) ? mod : [mod]) {
       if (!command?.data) continue;
+      // Module interactions désactivé par l'administrateur du bot : la
+      // commande n'est enregistrée nulle part.
+      if (command.botModule === 'interact' && process.env.MODULE_INTERACT?.trim().toLowerCase() === 'off') continue;
       const json = command.data.toJSON();
       if (command.userInstall) globalCmds.push(json);
       else if (command.module === 'rp') rpCmds.push(json);

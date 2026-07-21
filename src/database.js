@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS guild_config (
   staff_channel_id   TEXT,
   member_channel_id  TEXT,
   rp_enabled         INTEGER NOT NULL DEFAULT 0,
+  rp_locked          INTEGER NOT NULL DEFAULT 0,
   xp_text            INTEGER NOT NULL DEFAULT 20,
   xp_voice           INTEGER NOT NULL DEFAULT 10,
   xp_cooldown        INTEGER NOT NULL DEFAULT 60
@@ -213,6 +214,7 @@ for (const column of [
   'goodbye_message TEXT',
   'welcome_mention INTEGER',
   'rp_enabled INTEGER',
+  'rp_locked INTEGER',
 ]) {
   try {
     db.exec(`ALTER TABLE guild_config ADD COLUMN ${column}`);
@@ -232,6 +234,7 @@ const DEFAULT_CONFIG = {
   goodbye_message: null,
   welcome_mention: 0,
   rp_enabled: 0,
+  rp_locked: 0,
   xp_text: 20,
   xp_voice: 10,
   xp_cooldown: 60,

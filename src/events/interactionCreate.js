@@ -28,7 +28,15 @@ module.exports = {
 
     // ----- Boutons des interactions Nekotina (/interact) — serveurs ET MP -----
     if (interaction.isButton() && interaction.customId.startsWith('itx')) {
-      return require('../commands/interact').handleButton(interaction);
+      const interact = require('../commands/interact');
+      const blocked = interact.moduleBlocked(interaction);
+      if (blocked) return interaction.reply({ content: blocked, flags: MessageFlags.Ephemeral });
+      return interact.handleButton(interaction);
+    }
+
+    // ----- Bouton « Me désigner » de /info (preuve créateur/staff du bot) -----
+    if (interaction.isButton() && interaction.customId.startsWith('infoclaim:')) {
+      return require('../commands/info').handleButton(interaction);
     }
 
     // ----- Boutons du système de tickets -----
@@ -90,6 +98,17 @@ module.exports = {
 
     if (!interaction.inGuild() && !command.allowDm) {
       return interaction.reply({ content: '⛔ Cette commande s\'utilise sur un serveur.', flags: MessageFlags.Ephemeral });
+    }
+
+    // Module interactions : l'administrateur du bot peut le désactiver sur ce
+    // bot (MODULE_INTERACT=off) ou le limiter à certains serveurs
+    // (INTERACT_GUILDS) — contrôle appliqué même si la commande était déjà
+    // enregistrée avant le changement de réglage.
+    if (command.botModule === 'interact') {
+      const blocked = command.moduleBlocked?.(interaction);
+      if (blocked) {
+        return interaction.reply({ content: blocked, flags: MessageFlags.Ephemeral });
+      }
     }
 
     // Réponses en « lecture seule » : toutes les réponses de commandes sont

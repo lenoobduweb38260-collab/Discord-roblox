@@ -19,6 +19,18 @@ CLIENT_ID=
 # Optionnel : ID de votre serveur pour un enregistrement instantané des commandes.
 # Laissez vide pour un enregistrement global (propagation jusqu'à 1 h).
 GUILD_ID=
+
+# Optionnel : votre ID Discord (autorisé à utiliser /stop et reconnu créateur par /info)
+OWNER_ID=
+
+# Optionnel : IDs Discord de l'équipe du bot, séparés par des virgules (reconnus staff par /info)
+BOT_TEAM=
+
+# Module interactions (/interact) : "on" (défaut) ou "off" pour le désactiver sur CE bot
+MODULE_INTERACT=on
+
+# Optionnel : limite /interact à certains serveurs (IDs séparés par des virgules ; vide = partout)
+INTERACT_GUILDS=
 `;
 
 // Premier lancement de l'exécutable : on crée un .env à remplir à côté de l'exe.
