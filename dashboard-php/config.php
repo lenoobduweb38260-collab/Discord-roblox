@@ -20,3 +20,11 @@ const DASH_URL = '';
 // L'agent hébergeur multi-bots (pack-hebergeur.zip) déjà en place :
 const AGENT_URL = 'http://191.44.119.37:9999';
 const AGENT_KEY = '';
+
+// ================== PERSONNALISATION (facultatif) ==================
+// Nom affiché en haut du site et sur la page d'accueil.
+const DASH_NOM = 'Mon Bot';
+// Lien du bouton SUPPORT (vide = bouton masqué), ex : votre serveur Discord.
+const DASH_SUPPORT_URL = '';
+// Lien du menu DOCUMENTATION (vide = README GitHub par défaut).
+const DASH_DOCS_URL = '';

@@ -24,6 +24,11 @@ if ($manquants) {
   exit('⚠️ Configuration incomplète : ' . htmlspecialchars(implode(', ', $manquants)) . ' à remplir dans config.php.');
 }
 
+// Personnalisation optionnelle (constantes facultatives de config.php).
+$NOM_BOT = defined('DASH_NOM') && DASH_NOM !== '' ? DASH_NOM : 'Mon Bot';
+$URL_SUPPORT = defined('DASH_SUPPORT_URL') ? DASH_SUPPORT_URL : '';
+$URL_DOCS = defined('DASH_DOCS_URL') && DASH_DOCS_URL !== '' ? DASH_DOCS_URL : 'https://github.com/lenoobduweb38260-collab/Discord-roblox#readme';
+
 session_set_cookie_params([
   'lifetime' => 604800,
   'path' => '/',
@@ -207,6 +212,20 @@ if ($p === 'logout') {
   exit;
 }
 
+// « Ajouter à Discord » : lien d'invitation du premier bot en ligne de l'agent.
+if ($p === 'inviter') {
+  [, $etat] = agent_call('/agent/etat');
+  foreach ($etat['bots'] ?? [] as $bot) {
+    [$st2, $inv] = agent_call('/agent/bots/' . rawurlencode($bot['name']) . '/invitation');
+    if ($st2 === 200 && !empty($inv['url'])) {
+      header('Location: ' . $inv['url']);
+      exit;
+    }
+  }
+  header('Location: ' . DASH_URL . '/index.php');
+  exit;
+}
+
 // ----- API (session requise) -----
 if ($p === 'api-moi' || $p === 'api-serveur') {
   if (empty($_SESSION['user'])) send_json(401, ['error' => 'Non connecté — rechargez la page.']);
@@ -263,55 +282,107 @@ if ($p === 'api-moi' || $p === 'api-serveur') {
   send_json(404, ['error' => 'Action inconnue.']);
 }
 
-// ----- Pages -----
+// ============================ INTERFACE ============================
+
 $THEME = <<<'CSS'
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  :root { --bg:#17181c; --panel:#1f2126; --panel2:#26282e; --border:#2c2e35; --text:#e8e9ed;
-          --muted:#8a8b94; --accent:#e8593a; --green:#43b581; --red:#f04747; --blue:#4d9de0; --yellow:#faa61a; }
+  :root { --bg:#1e2126; --bg2:#17191d; --panel:#24272d; --panel2:#2b2f36; --border:#33373f; --text:#e8e9ed;
+          --muted:#8f919b; --accent:#d8734f; --accent2:#c05f3d; --green:#43b581; --red:#f04747; --blue:#4d9de0; }
   body { font-family:'Segoe UI',system-ui,sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
   a { color:inherit; text-decoration:none; }
   button { background:var(--panel2); color:var(--text); border:1px solid var(--border); border-radius:8px;
-           padding:8px 14px; font-size:13.5px; cursor:pointer; }
-  button:hover { filter:brightness(1.15); }
+           padding:9px 16px; font-size:13.5px; cursor:pointer; font-family:inherit; }
+  button:hover { filter:brightness(1.12); }
   button.accent { background:var(--accent); border-color:var(--accent); color:#fff; font-weight:600; }
-  input, select, textarea { background:#101114; border:1px solid var(--border); color:var(--text);
-           border-radius:8px; padding:9px 11px; font-size:13.5px; width:100%; }
+  input, select, textarea { background:#191b1f; border:1px solid var(--border); color:var(--text);
+           border-radius:9px; padding:11px 13px; font-size:13.5px; width:100%; font-family:inherit; }
   input:focus, select:focus, textarea:focus { outline:none; border-color:var(--accent); }
-  header { display:flex; align-items:center; gap:12px; padding:14px 22px; border-bottom:1px solid var(--border);
-           background:var(--panel); position:sticky; top:0; z-index:5; }
-  header .logo { font-size:22px; }
-  header .title { font-weight:700; font-size:16px; }
-  header .spacer { margin-left:auto; }
-  .avatar { width:34px; height:34px; border-radius:50%; }
-  .wrap { max-width:1100px; margin:0 auto; padding:26px 18px; }
-  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:14px; }
-  .card { background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:18px;
-          display:flex; align-items:center; gap:13px; cursor:pointer; transition:border-color .15s; }
-  .card:hover { border-color:var(--accent); }
-  .card img, .card .noicon { width:52px; height:52px; border-radius:14px; }
-  .card .noicon { background:var(--panel2); display:flex; align-items:center; justify-content:center; font-size:22px; }
-  .layout { display:flex; gap:0; min-height:calc(100vh - 63px); }
-  .side { width:230px; background:var(--panel); border-right:1px solid var(--border); padding:14px 10px; flex-shrink:0; }
-  .side .item { padding:9px 12px; border-radius:8px; font-size:13.5px; color:var(--muted); cursor:pointer; margin-bottom:2px; }
+  /* ---- barre du haut ---- */
+  .nav { display:flex; align-items:center; gap:26px; padding:0 26px; height:64px; background:var(--bg2);
+         border-bottom:1px solid var(--border); position:sticky; top:0; z-index:20; }
+  .nav .brand { display:flex; align-items:center; gap:10px; font-weight:800; font-size:19px; letter-spacing:.02em; color:var(--accent); }
+  .nav .brand .lg { font-size:24px; }
+  .nav .links { display:flex; gap:22px; font-size:13px; font-weight:700; letter-spacing:.06em; }
+  .nav .links a { color:var(--text); opacity:.85; } .nav .links a:hover { color:var(--accent); opacity:1; }
+  .nav .spacer { margin-left:auto; }
+  .nav .supportbtn { border:1.5px solid var(--accent); color:var(--accent); background:transparent; border-radius:22px;
+                     padding:9px 22px; font-weight:700; letter-spacing:.05em; font-size:12.5px; }
+  .nav .me { display:flex; align-items:center; gap:9px; font-weight:600; font-size:14px; }
+  .nav .me img { width:36px; height:36px; border-radius:50%; border:2px solid var(--border); }
+  /* ---- interrupteurs façon DraftBot ---- */
+  .switch { position:relative; width:46px; height:25px; flex-shrink:0; display:inline-block; }
+  .switch input { opacity:0; width:0; height:0; }
+  .switch .sl { position:absolute; inset:0; background:#3a3e47; border-radius:25px; transition:.18s; cursor:pointer; }
+  .switch .sl:before { content:''; position:absolute; width:19px; height:19px; border-radius:50%; background:#fff; top:3px; left:3px; transition:.18s; }
+  .switch input:checked + .sl { background:var(--accent); }
+  .switch input:checked + .sl:before { transform:translateX(21px); }
+  /* ---- disposition application ---- */
+  .layout { display:flex; min-height:calc(100vh - 64px); }
+  .rail { width:68px; background:var(--bg2); border-right:1px solid var(--border); padding:12px 0; display:flex;
+          flex-direction:column; align-items:center; gap:10px; flex-shrink:0; }
+  .rail .ric { width:46px; height:46px; border-radius:50%; cursor:pointer; border:2px solid transparent; transition:.15s;
+               background:var(--panel2); display:flex; align-items:center; justify-content:center; font-size:19px; overflow:hidden; }
+  .rail .ric img { width:100%; height:100%; object-fit:cover; }
+  .rail .ric:hover { border-color:var(--muted); border-radius:16px; }
+  .rail .ric.on { border-color:var(--accent); }
+  .side { width:250px; background:var(--panel); border-right:1px solid var(--border); flex-shrink:0; }
+  .side .head { padding:20px 16px; text-align:center; border-bottom:1px solid var(--border); }
+  .side .head img, .side .head .noicon { width:76px; height:76px; border-radius:50%; margin-bottom:9px; }
+  .side .head .noicon { background:var(--panel2); display:inline-flex; align-items:center; justify-content:center; font-size:30px; }
+  .side .head .nm { font-family:'Georgia',serif; font-weight:700; font-size:16px; }
+  .side .item { display:flex; align-items:center; gap:10px; padding:11px 16px; font-size:13.5px; color:var(--muted);
+                cursor:pointer; border-left:3px solid transparent; }
   .side .item:hover { background:var(--panel2); color:var(--text); }
-  .side .item.on { background:rgba(232,89,58,.14); color:var(--accent); font-weight:600; }
-  .main { flex:1; padding:24px 28px; min-width:0; }
-  h2.title { font-size:19px; margin-bottom:6px; }
-  p.sub { color:var(--muted); font-size:13px; margin-bottom:18px; }
-  .dsec { background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:16px; margin-bottom:14px; max-width:640px; }
-  .dsec h3 { font-size:14px; margin-bottom:4px; }
-  .dsec p { color:var(--muted); font-size:12.5px; margin-bottom:10px; }
-  .tiles { display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:12px; margin:14px 0; }
-  .tile { background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:14px; }
-  .tile .tv { font-size:22px; font-weight:700; }
-  .tile .tl { color:var(--muted); font-size:12px; margin-top:3px; }
-  .row { background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:10px 14px;
+  .side .item.on { background:var(--panel2); color:var(--text); border-left-color:var(--accent); font-weight:600; }
+  .main { flex:1; padding:34px 42px; min-width:0; max-width:1150px; }
+  h1.pagetitle { font-size:26px; font-weight:700; margin-bottom:26px; }
+  .sec { margin-bottom:34px; }
+  .sechead { display:flex; align-items:flex-start; gap:14px; margin-bottom:8px; }
+  .sechead .t { font-size:17px; font-weight:700; }
+  .sechead .d { color:var(--muted); font-size:13px; margin-top:3px; }
+  .sechead .sw { margin-left:auto; }
+  .flabel { font-size:11px; letter-spacing:.08em; font-weight:800; color:#b9bac3; text-transform:uppercase; margin:16px 0 7px; }
+  .fields { max-width:640px; }
+  .cols { display:flex; gap:34px; flex-wrap:wrap; }
+  .cols > div { flex:1; min-width:320px; }
+  .togline { display:flex; align-items:center; gap:12px; font-size:13.5px; color:var(--muted); margin:14px 0; }
+  .count { text-align:right; font-size:11.5px; color:var(--muted); margin-top:3px; }
+  .count b { color:var(--accent); font-weight:600; }
+  /* ---- prévisualisation Discord ---- */
+  .dprev { background:#313338; border-radius:10px; padding:14px 16px; font-size:14px; }
+  .dprev .dtop { display:flex; align-items:center; gap:8px; margin-bottom:6px; }
+  .dprev .dtop img { width:38px; height:38px; border-radius:50%; }
+  .dprev .dtop .bn { font-weight:600; }
+  .dprev .dtop .badge { background:#5865f2; color:#fff; font-size:10px; font-weight:700; border-radius:4px; padding:1px 5px; }
+  .dprev .dtop .ts { color:#949ba4; font-size:11.5px; }
+  .dprev .dcard { border-left:4px solid var(--accent); background:#2b2d31; border-radius:5px; padding:11px 13px; margin-top:4px; }
+  .dprev .dcard .dt { font-weight:700; margin-bottom:5px; }
+  .dprev .dcard .dd { color:#dbdee1; font-size:13.5px; line-height:1.55; white-space:pre-wrap; }
+  .dprev .dcard .df { color:#949ba4; font-size:11.5px; margin-top:9px; }
+  .dprev .mention { background:rgba(88,101,242,.3); color:#c9cdfb; border-radius:3px; padding:0 3px; }
+  /* ---- tuiles / lignes ---- */
+  .tiles { display:grid; grid-template-columns:repeat(auto-fill,minmax(170px,1fr)); gap:13px; margin:18px 0; }
+  .tile { background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:16px; }
+  .tile .tv { font-size:23px; font-weight:800; color:var(--accent); }
+  .tile .tl { color:var(--muted); font-size:12px; margin-top:4px; }
+  .row { background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:11px 15px;
          margin-bottom:8px; display:flex; align-items:center; gap:10px; flex-wrap:wrap; font-size:13.5px; }
-  .toast { position:fixed; bottom:22px; right:22px; background:var(--panel2); border:1px solid var(--border);
-           border-radius:10px; padding:12px 16px; font-size:13.5px; opacity:0; transition:opacity .2s; z-index:50; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:15px; }
+  .scard { background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:19px;
+           display:flex; align-items:center; gap:14px; cursor:pointer; transition:.15s; }
+  .scard:hover { border-color:var(--accent); transform:translateY(-2px); }
+  .scard img, .scard .noicon { width:54px; height:54px; border-radius:50%; }
+  .scard .noicon { background:var(--panel2); display:flex; align-items:center; justify-content:center; font-size:22px; }
+  .toast { position:fixed; bottom:24px; right:24px; background:var(--panel2); border:1px solid var(--accent);
+           border-radius:10px; padding:13px 18px; font-size:13.5px; opacity:0; transition:opacity .2s; z-index:60; }
   .toast.on { opacity:1; }
-  .empty { color:var(--muted); padding:40px; text-align:center; }
+  .empty { color:var(--muted); padding:48px; text-align:center; }
+  .wrap { max-width:1100px; margin:0 auto; padding:30px 20px; }
 CSS;
+
+$navLinks = '<span class="links"><a href="' . htmlspecialchars($URL_DOCS) . '" target="_blank">DOCUMENTATION</a></span>';
+$navSupport = $URL_SUPPORT !== '' ? '<a href="' . htmlspecialchars($URL_SUPPORT) . '" target="_blank"><button class="supportbtn">SUPPORT</button></a>' : '';
+$NOM_HTML = htmlspecialchars($NOM_BOT);
 
 if (empty($_SESSION['user'])) {
   header('Content-Type: text/html; charset=utf-8');
@@ -320,24 +391,57 @@ if (empty($_SESSION['user'])) {
 <html lang="fr">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>🎛️ Dashboard du bot</title>
+<title>$NOM_HTML — Dashboard</title>
 <style>$THEME
-  .hero { min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:20px; }
-  .hero .big { font-size:52px; margin-bottom:14px; }
-  .hero h1 { font-size:30px; margin-bottom:10px; }
-  .hero p { color:var(--muted); max-width:520px; line-height:1.6; margin-bottom:26px; }
-  .discordbtn { background:#5865f2; border:0; color:#fff; font-size:15px; font-weight:600; padding:13px 26px; border-radius:10px; }
+  .hero { position:relative; min-height:calc(100vh - 64px); display:flex; flex-direction:column; align-items:center;
+          justify-content:center; text-align:center; padding:20px 20px 150px; overflow:hidden; background:var(--bg); }
+  .star { position:absolute; background:#fff; border-radius:50%; opacity:.5; animation:tw 3s infinite; }
+  @keyframes tw { 0%,100% { opacity:.15; } 50% { opacity:.7; } }
+  .biglogo { font-size:96px; margin-bottom:18px; filter:drop-shadow(0 6px 24px rgba(216,115,79,.35)); }
+  .hero .pre { color:var(--muted); font-size:21px; }
+  .hero .word { color:var(--accent); font-size:32px; font-weight:700; min-height:44px; margin-bottom:26px; transition:opacity .3s; }
+  .addbtn { background:var(--accent); border:0; color:#fff; font-size:15.5px; font-weight:600; padding:14px 28px; border-radius:9px; }
+  .connectbtn { margin-top:14px; background:transparent; border:1.5px solid var(--border); color:var(--muted); border-radius:9px; }
+  .wave { position:absolute; bottom:-4px; left:0; right:0; pointer-events:none; }
 </style>
 </head>
 <body>
-<div class="hero">
-  <div class="big">🎛️</div>
-  <h1>Dashboard du bot</h1>
-  <p>Configurez le bot sur vos serveurs depuis votre navigateur : Module RP, rôles, salons,
-  niveaux, messages de bienvenue, whitelist métiers et tickets — comme sur DraftBot.
-  Connectez-vous avec Discord : vous ne verrez que les serveurs que vous administrez.</p>
-  <a href="index.php?p=login"><button class="discordbtn">🔗 Se connecter avec Discord</button></a>
+<div class="nav">
+  <span class="brand"><span class="lg">🎛️</span>$NOM_HTML</span>
+  $navLinks
+  <span class="spacer"></span>
+  $navSupport
+  <a href="index.php?p=login"><button class="accent">Se connecter</button></a>
 </div>
+<div class="hero" id="hero">
+  <div class="biglogo">🎛️</div>
+  <div class="pre">Un bot pour</div>
+  <div class="word" id="word">Le Roleplay</div>
+  <a href="index.php?p=inviter"><button class="addbtn">🎮 Ajouter à Discord</button></a>
+  <a href="index.php?p=login"><button class="connectbtn">🔗 Se connecter avec Discord pour gérer vos serveurs</button></a>
+  <svg class="wave" viewBox="0 0 1440 180" preserveAspectRatio="none" height="150">
+    <path fill="#d8734f" d="M0,96 C240,150 480,40 720,80 C960,120 1200,150 1440,90 L1440,180 L0,180 Z" opacity=".9"/>
+    <path fill="#2b2f36" d="M0,130 C260,170 520,80 760,110 C1000,140 1240,170 1440,120 L1440,180 L0,180 Z"/>
+  </svg>
+</div>
+<script>
+var hero = document.getElementById('hero');
+for (var i = 0; i < 90; i++) {
+  var s = document.createElement('div');
+  s.className = 'star';
+  var size = Math.random() * 2.4 + 1;
+  s.style.width = size + 'px'; s.style.height = size + 'px';
+  s.style.left = Math.random() * 100 + '%'; s.style.top = Math.random() * 82 + '%';
+  s.style.animationDelay = (Math.random() * 3) + 's';
+  hero.appendChild(s);
+}
+var mots = ['Le Roleplay', 'La Modération', 'Les Niveaux', 'Les Tickets', 'La Communauté'];
+var wi = 0, w = document.getElementById('word');
+setInterval(function(){
+  w.style.opacity = 0;
+  setTimeout(function(){ wi = (wi + 1) % mots.length; w.textContent = mots[wi]; w.style.opacity = 1; }, 300);
+}, 2600);
+</script>
 </body>
 </html>
 HTML;
@@ -350,17 +454,18 @@ echo <<<HTML
 <html lang="fr">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>🎛️ Dashboard du bot</title>
+<title>$NOM_HTML — Dashboard</title>
 <style>$THEME</style>
 </head>
 <body>
-<header>
-  <span class="logo">🎛️</span><span class="title">Dashboard du bot</span>
+<div class="nav">
+  <span class="brand" style="cursor:pointer" onclick="renderHome()"><span class="lg">🎛️</span>$NOM_HTML</span>
+  $navLinks
   <span class="spacer"></span>
-  <img id="h_avatar" class="avatar" style="display:none">
-  <span id="h_name" style="font-size:13.5px;color:var(--muted)"></span>
+  $navSupport
+  <span class="me"><img id="h_avatar" style="display:none"><span id="h_name"></span></span>
   <a href="index.php?p=logout"><button>Déconnexion</button></a>
-</header>
+</div>
 <div id="content"><div class="empty">Chargement…</div></div>
 <div id="toast" class="toast"></div>
 HTML;
@@ -380,70 +485,116 @@ function api(method, path, body){
 function save(key, value){
   api('POST', su('config'), { key: key, value: value }).then(function(j){ if (j && !j.error) toast('✅ Enregistré'); });
 }
+// Interrupteur façon DraftBot.
+function tog(id, checked){
+  return '<label class="switch"><input type="checkbox" id="' + id + '"' + (checked ? ' checked' : '') + '><span class="sl"></span></label>';
+}
 
+// ----- Accueil : grille des serveurs -----
 function renderHome(){
   gid = null;
-  var h = '<div class="wrap"><h2 class="title">Mes serveurs</h2><p class="sub">Serveurs que vous administrez et où le bot est présent.</p>';
-  if (!moi.servers.length) h += '<div class="empty">Aucun serveur — invitez le bot sur votre serveur, puis rechargez cette page.</div>';
+  var h = '<div class="wrap"><h1 class="pagetitle">Mes serveurs</h1>';
+  if (!moi.servers.length) h += '<div class="empty">Aucun serveur — invitez le bot sur votre serveur (bouton « Ajouter à Discord » de la page d\'accueil), puis rechargez.</div>';
   h += '<div class="grid">';
   moi.servers.forEach(function(s){
-    h += '<div class="card" data-g="' + s.id + '">' +
+    h += '<div class="scard" data-g="' + s.id + '">' +
       (s.icon ? '<img src="' + s.icon + '">' : '<div class="noicon">🌐</div>') +
-      '<div><div style="font-weight:600">' + esc(s.name) + '</div>' +
+      '<div><div style="font-weight:700">' + esc(s.name) + '</div>' +
       '<div style="color:var(--muted);font-size:12px">' + (s.membres ? s.membres + ' membres · ' : '') + '🤖 ' + esc(s.bot) + '</div></div></div>';
   });
   h += '</div></div>';
   $('content').innerHTML = h;
-  Array.prototype.forEach.call(document.querySelectorAll('.card'), function(el){
+  Array.prototype.forEach.call(document.querySelectorAll('.scard'), function(el){
     el.onclick = function(){ gid = el.getAttribute('data-g'); page = 'apercu'; renderServer(); };
   });
 }
 
+// ----- Vue serveur : rail d'icônes + sidebar + page -----
 var PAGES = [
-  ['apercu', '📊 Vue d\'ensemble'],
-  ['module', '🎭 Module RP'],
-  ['roles', '👮 Rôles & sécurité'],
-  ['salons', '📢 Salons & logs'],
-  ['niveaux', '📈 Niveaux'],
-  ['membres', '👋 Arrivées & départs'],
-  ['whitelist', '📋 Whitelist métiers'],
-  ['tickets', '🎫 Tickets']
+  ['apercu', '📊', 'Vue d\'ensemble'],
+  ['module', '🎭', 'Module RP'],
+  ['membres', '👋', 'Arrivées et départs'],
+  ['roles', '👮', 'Rôles & sécurité'],
+  ['salons', '📢', 'Salons & logs'],
+  ['niveaux', '📈', 'Niveaux'],
+  ['whitelist', '📋', 'Whitelist métiers'],
+  ['tickets', '🎫', 'Tickets']
 ];
 function renderServer(){
   var srv = null;
   moi.servers.forEach(function(s){ if (s.id === gid) srv = s; });
-  var h = '<div class="layout"><div class="side">';
-  h += '<div class="item" id="back">⬅ Mes serveurs</div><hr style="border-color:var(--border);margin:8px 0">';
-  PAGES.forEach(function(p){ h += '<div class="item' + (p[0] === page ? ' on' : '') + '" data-p="' + p[0] + '">' + p[1] + '</div>'; });
+  var h = '<div class="layout">';
+  // rail : tous mes serveurs en icônes rondes
+  h += '<div class="rail">';
+  moi.servers.forEach(function(s){
+    h += '<div class="ric' + (s.id === gid ? ' on' : '') + '" data-g="' + s.id + '" title="' + esc(s.name) + '">' +
+      (s.icon ? '<img src="' + s.icon + '">' : '🌐') + '</div>';
+  });
+  h += '</div>';
+  // sidebar : serveur + catégories
+  h += '<div class="side"><div class="head">' +
+    (srv && srv.icon ? '<img src="' + srv.icon + '">' : '<div class="noicon">🌐</div>') +
+    '<div class="nm">' + esc(srv ? srv.name : '') + '</div></div>';
+  PAGES.forEach(function(pg){
+    h += '<div class="item' + (pg[0] === page ? ' on' : '') + '" data-p="' + pg[0] + '"><span>' + pg[1] + '</span> ' + pg[2] + '</div>';
+  });
   h += '</div><div class="main" id="main"><div class="empty">Chargement…</div></div></div>';
   $('content').innerHTML = h;
-  $('back').onclick = renderHome;
-  Array.prototype.forEach.call(document.querySelectorAll('.side .item[data-p]'), function(el){
+  Array.prototype.forEach.call(document.querySelectorAll('.rail .ric'), function(el){
+    el.onclick = function(){ gid = el.getAttribute('data-g'); page = 'apercu'; renderServer(); };
+  });
+  Array.prototype.forEach.call(document.querySelectorAll('.side .item'), function(el){
     el.onclick = function(){ page = el.getAttribute('data-p'); renderServer(); };
   });
   loadPage(srv);
 }
 
-function sel(key, label, desc, list, current, prefix){
-  var h = '<div class="dsec"><h3>' + label + '</h3><p>' + desc + '</p>';
+// ----- Aides de mise en page façon DraftBot -----
+function sec(title, desc, inner, togHtml){
+  return '<div class="sec"><div class="sechead"><div><div class="t">' + title + '</div>' +
+    (desc ? '<div class="d">' + desc + '</div>' : '') + '</div>' +
+    (togHtml ? '<div class="sw">' + togHtml + '</div>' : '') + '</div>' + inner + '</div>';
+}
+function fsel(key, label, list, current, prefix){
+  var h = '<div class="flabel">' + label + '</div>';
   h += '<select class="wsave" data-k="' + key + '"><option value="">— Désactivé —</option>';
   list.forEach(function(x){ h += '<option value="' + x.id + '"' + (x.id === current ? ' selected' : '') + '>' + (prefix || '') + esc(x.name) + '</option>'; });
-  h += '</select></div>';
+  h += '</select>';
   return h;
 }
-function multi(key, label, desc, list, currentJson){
+function fmulti(key, label, list, currentJson){
   var current = [];
   try { current = JSON.parse(currentJson || '[]'); } catch (e) {}
-  var h = '<div class="dsec"><h3>' + label + '</h3><p>' + desc + '</p>';
+  var h = '<div class="flabel">' + label + '</div>';
   h += '<select multiple size="6" class="wmulti" data-k="' + key + '" style="height:auto">';
   list.forEach(function(x){ h += '<option value="' + x.id + '"' + (current.indexOf(x.id) >= 0 ? ' selected' : '') + '>@' + esc(x.name) + '</option>'; });
-  h += '</select><br><button class="wmultisave" data-k="' + key + '" style="margin-top:8px">💾 Enregistrer la sélection</button></div>';
+  h += '</select><br><button class="wmultisave accent" data-k="' + key + '" style="margin-top:9px">💾 Enregistrer la sélection</button>';
   return h;
 }
-function num(key, label, desc, value, min, max){
-  return '<div class="dsec"><h3>' + label + '</h3><p>' + desc + '</p>' +
-    '<div style="display:flex;gap:8px"><input type="number" class="wnum" data-k="' + key + '" value="' + value + '" min="' + min + '" max="' + max + '" style="width:130px">' +
-    '<button class="wnumsave" data-k="' + key + '">💾</button></div></div>';
+function fnum(key, label, value, min, max){
+  return '<div class="flabel">' + label + '</div>' +
+    '<div style="display:flex;gap:8px"><input type="number" class="wnum" data-k="' + key + '" value="' + value + '" min="' + min + '" max="' + max + '" style="width:140px">' +
+    '<button class="wnumsave" data-k="' + key + '">💾</button></div>';
+}
+
+// Prévisualisation Discord du message de bienvenue (variables + gras).
+function prevBienvenue(srv){
+  var raw = $('w_wel') ? ($('w_wel').value || '') : '';
+  if (!raw.trim()) raw = 'Bienvenue à {user} sur **{server}** ! 🎉';
+  var txt = esc(raw)
+    .replace(/\{user\.username\}/g, moi.user.username)
+    .replace(/\{user\.mention\}|\{user\}/g, '<span class="mention">@' + esc(moi.user.username) + '</span>')
+    .replace(/\{server\}/g, esc(srv ? srv.name : 'Mon Serveur'))
+    .replace(/\{membercount\}/g, srv && srv.membres ? srv.membres : '128')
+    .replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>')
+    .replace(/\*([^*]+)\*/g, '<i>$1</i>');
+  var mention = $('w_mention') && $('w_mention').checked ? '<div style="margin-bottom:5px"><span class="mention">@' + esc(moi.user.username) + '</span></div>' : '';
+  $('w_pv').innerHTML =
+    '<div class="dprev"><div class="dtop"><img src="' + (srv && srv.icon ? srv.icon : 'https://cdn.discordapp.com/embed/avatars/1.png') + '">' +
+    '<span class="bn">' + esc(srv ? srv.bot : 'Bot') + '</span><span class="badge">✔ APP</span><span class="ts">Aujourd\'hui</span></div>' +
+    mention +
+    '<div class="dcard"><div class="dt">📥 Arrivée d\'un membre</div><div class="dd">' + txt + '</div>' +
+    '<div class="df">💬 ' + esc(moi.user.username) + ' · 👥 Membre n°' + (srv && srv.membres ? srv.membres : '128') + ' · 📅 Compte créé le 12/01/2023</div></div></div>';
 }
 
 function loadPage(srv){
@@ -451,16 +602,14 @@ function loadPage(srv){
   if (page === 'apercu'){
     api('GET', su('apercu')).then(function(d){
       if (d.error) { m.innerHTML = '<div class="empty">⚠️ ' + esc(d.error) + '</div>'; return; }
-      var h = '<div style="display:flex;align-items:center;gap:13px;margin-bottom:6px">' +
-        (d.serveur.icon ? '<img src="' + d.serveur.icon + '" style="width:52px;height:52px;border-radius:14px">' : '') +
-        '<div><h2 class="title" style="margin:0">' + esc(d.serveur.name) + '</h2>' +
-        '<p class="sub" style="margin:0">' + d.serveur.membres + ' membres · géré par 🤖 ' + esc(srv ? srv.bot : '') + '</p></div></div>';
+      var h = '<h1 class="pagetitle">' + esc(d.serveur.name) + '</h1>' +
+        '<p style="color:var(--muted);margin:-18px 0 8px">' + d.serveur.membres + ' membres · géré par 🤖 ' + esc(srv ? srv.bot : '') + '</p>';
       var labels = { cartes: "🪪 Cartes d'identité", permis: '🚗 Permis', entreprises: '🏢 Entreprises', ticketsOuverts: '🎫 Tickets ouverts', whitelist: '📋 Whitelist métiers', vehicules: '🛡️ Véhicules assurés' };
       h += '<div class="tiles">';
       Object.keys(labels).forEach(function(k){ h += '<div class="tile"><div class="tv">' + (d.stats[k] || 0) + '</div><div class="tl">' + labels[k] + '</div></div>'; });
       h += '</div>';
       if (d.top && d.top.length){
-        h += '<h3 style="margin:14px 0 8px;font-size:14px">🏆 Top niveaux (écrit)</h3>';
+        h += '<div class="flabel">🏆 Top niveaux (écrit)</div>';
         d.top.forEach(function(t, i){ h += '<div class="row">' + (i + 1) + '. <b>' + esc(t.user) + '</b> — niveau ' + t.level + ' (' + t.xp + ' XP)</div>'; });
       }
       m.innerHTML = h;
@@ -471,69 +620,94 @@ function loadPage(srv){
     if (p.error) { m.innerHTML = '<div class="empty">⚠️ ' + esc(p.error) + '</div>'; return; }
     var cfg = p.config, h = '';
     if (page === 'module'){
-      h += '<h2 class="title">🎭 Module RP</h2><p class="sub">Cartes, permis, entreprises, assurances, service, temps — activable par serveur.</p>';
+      h += '<h1 class="pagetitle">Module RP</h1>';
       if (cfg.rp_locked){
-        h += '<div class="dsec"><h3>🔒 Verrouillé</h3><p>Ce réglage est verrouillé par l\'administrateur du bot : il ne peut être changé que depuis son gestionnaire.</p>' +
-          '<p style="color:var(--text)">État actuel : ' + (cfg.rp_enabled ? '🟢 <b>Activé</b>' : '🔴 <b>Désactivé</b>') + '</p></div>';
+        h += sec('Module RP 🔒', 'Réglage verrouillé par l\'administrateur du bot — modifiable uniquement depuis son gestionnaire.',
+          '<div class="row">État actuel : ' + (cfg.rp_enabled ? '🟢 <b>Activé</b>' : '🔴 <b>Désactivé</b>') + '</div>', '');
       } else {
-        h += '<div class="dsec"><h3>Activer le Module RP</h3><p>Désactivé, les commandes RP sont retirées de la liste du serveur.</p>' +
-          '<label style="display:flex;gap:8px;align-items:center;font-size:14px"><input type="checkbox" id="w_rp"' + (cfg.rp_enabled ? ' checked' : '') + ' style="width:auto"> Module RP activé sur ce serveur</label></div>';
+        h += sec('Module RP', 'Cartes d\'identité, permis, entreprises, assurances, service et temps. Désactivé, ces commandes sont retirées de la liste du serveur.',
+          '<div class="togline">Activer le Module RP sur ce serveur</div>', tog('w_rp', cfg.rp_enabled));
       }
-    } else if (page === 'roles'){
-      h += '<h2 class="title">👮 Rôles & sécurité</h2><p class="sub">Plusieurs rôles possibles pour chaque grade (Ctrl+clic).</p>';
-      h += multi('staff_role_ids', 'Rôles Staff (grade 2)', 'Accès aux commandes staff : cartes, permis, modération, tickets…', p.roles, cfg.staff_role_ids || (cfg.staff_role_id ? JSON.stringify([cfg.staff_role_id]) : null));
-      h += multi('admin_role_ids', 'Rôles Administration (grade 3)', 'Accès aux réglages sensibles et /banglobal.', p.roles, cfg.admin_role_ids || (cfg.admin_role_id ? JSON.stringify([cfg.admin_role_id]) : null));
-      h += sel('service_role_id', 'Rôle « En service »', 'Ajouté/retiré automatiquement par /service.', p.roles, cfg.service_role_id, '@');
-    } else if (page === 'salons'){
-      h += '<h2 class="title">📢 Salons & logs</h2><p class="sub">Où le bot publie ses annonces et journaux.</p>';
-      h += sel('log_channel_id', 'Salon des logs de sécurité', 'Actions staff, messages supprimés/modifiés, vocal, transcripts.', p.channels, cfg.log_channel_id, '#');
-      h += sel('staff_channel_id', 'Salon staff (arrivées/départs de poste)', 'Annonces /arrivee et /depart.', p.channels, cfg.staff_channel_id, '#');
-      h += sel('service_channel_id', 'Salon des services RP', 'Prises et fins de service.', p.channels, cfg.service_channel_id, '#');
-      h += sel('update_channel_id', 'Salon des annonces de mise à jour', 'Sans salon : #shadow-logs est créé automatiquement (staff uniquement).', p.channels, cfg.update_channel_id, '#');
-    } else if (page === 'niveaux'){
-      h += '<h2 class="title">📈 Niveaux</h2><p class="sub">XP écrit et vocal.</p>';
-      h += sel('level_channel_id', 'Salon des annonces de niveau', 'Montées de niveau (écrit et vocal).', p.channels, cfg.level_channel_id, '#');
-      h += num('xp_text', 'XP par message', 'Anti-spam via le cooldown.', cfg.xp_text, 1, 1000);
-      h += num('xp_voice', 'XP par minute en vocal', '', cfg.xp_voice, 1, 1000);
-      h += num('xp_cooldown', 'Cooldown XP texte (secondes)', '', cfg.xp_cooldown, 5, 3600);
     } else if (page === 'membres'){
-      h += '<h2 class="title">👋 Arrivées & départs</h2><p class="sub">Embeds d\'arrivée et de départ des membres.</p>';
-      h += sel('member_channel_id', 'Salon des messages', 'Embeds d\'arrivée et de départ. « — Désactivé — » pour couper.', p.channels, cfg.member_channel_id, '#');
-      h += '<div class="dsec"><h3>Mentionner le membre</h3><p>Mention @membre au-dessus de l\'embed de bienvenue.</p>' +
-        '<label style="display:flex;gap:8px;align-items:center;font-size:13.5px"><input type="checkbox" id="w_mention"' + (cfg.welcome_mention ? ' checked' : '') + ' style="width:auto"> Activer la mention</label></div>';
-      h += '<div class="dsec"><h3>Message de bienvenue</h3><p>Variables : {user} {user.username} {server} {membercount} — vide = message par défaut.</p>' +
-        '<textarea id="w_wel" rows="3">' + esc(cfg.welcome_message || '') + '</textarea><br><button id="w_savew" style="margin-top:8px">💾 Enregistrer</button></div>';
-      h += '<div class="dsec"><h3>Message d\'au revoir</h3><p>Mêmes variables.</p>' +
-        '<textarea id="w_bye" rows="3">' + esc(cfg.goodbye_message || '') + '</textarea><br><button id="w_saveb" style="margin-top:8px">💾 Enregistrer</button></div>';
+      h += '<h1 class="pagetitle">Arrivées et Départs</h1>';
+      var inner = '<div class="cols"><div class="fields">';
+      inner += fsel('member_channel_id', 'Salon des messages de bienvenue', p.channels, cfg.member_channel_id, '# ');
+      inner += '<div class="flabel">Message personnalisé</div>';
+      inner += '<textarea id="w_wel" rows="6">' + esc(cfg.welcome_message || '') + '</textarea>';
+      inner += '<div class="count"><b id="w_count">' + (cfg.welcome_message || '').length + '</b> /1500 — variables : {user} {user.username} {server} {membercount}</div>';
+      inner += '<button id="w_savew" class="accent" style="margin-top:8px">💾 Enregistrer le message</button>';
+      inner += '<div class="togline">' + tog('w_mention', cfg.welcome_mention) + ' Mentionner le membre dans le message de bienvenue.</div>';
+      inner += '</div><div><div class="flabel">Prévisualisation</div><div id="w_pv"></div></div></div>';
+      h += sec('Message de Bienvenue', 'Configurez des messages de bienvenue pour les nouveaux membres.', inner, '');
+      var bye = '<div class="fields"><div class="flabel">Message personnalisé</div>' +
+        '<textarea id="w_bye" rows="4">' + esc(cfg.goodbye_message || '') + '</textarea>' +
+        '<div class="count">variables : {user.username} {server} {membercount}</div>' +
+        '<button id="w_saveb" class="accent" style="margin-top:8px">💾 Enregistrer le message</button></div>';
+      h += sec('Message d\'Au Revoir', 'Configurez des messages d\'au revoir pour les anciens membres (même salon).', bye, '');
+    } else if (page === 'roles'){
+      h += '<h1 class="pagetitle">Rôles & sécurité</h1>';
+      h += sec('Rôles Staff', 'Grade 2 — accès aux commandes staff : cartes, permis, modération, tickets… Plusieurs rôles possibles (Ctrl+clic).',
+        '<div class="fields">' + fmulti('staff_role_ids', 'Rôles staff', p.roles, cfg.staff_role_ids || (cfg.staff_role_id ? JSON.stringify([cfg.staff_role_id]) : null)) + '</div>', '');
+      h += sec('Rôles Administration', 'Grade 3 — accès aux réglages sensibles et /banglobal.',
+        '<div class="fields">' + fmulti('admin_role_ids', 'Rôles administration', p.roles, cfg.admin_role_ids || (cfg.admin_role_id ? JSON.stringify([cfg.admin_role_id]) : null)) + '</div>', '');
+      h += sec('Rôle « En service »', 'Ajouté et retiré automatiquement par /service.',
+        '<div class="fields">' + fsel('service_role_id', 'Rôle en service', p.roles, cfg.service_role_id, '@ ') + '</div>', '');
+    } else if (page === 'salons'){
+      h += '<h1 class="pagetitle">Salons & logs</h1>';
+      h += sec('Journal de sécurité', 'Actions staff, messages supprimés/modifiés, vocal, transcripts de tickets.',
+        '<div class="fields">' + fsel('log_channel_id', 'Salon des logs', p.channels, cfg.log_channel_id, '# ') + '</div>', '');
+      h += sec('Annonces du staff', 'Arrivées et départs de poste (/arrivee, /depart) et services RP.',
+        '<div class="fields">' + fsel('staff_channel_id', 'Salon staff', p.channels, cfg.staff_channel_id, '# ') +
+        fsel('service_channel_id', 'Salon des services RP', p.channels, cfg.service_channel_id, '# ') + '</div>', '');
+      h += sec('Mises à jour du bot', 'Annonces « mise à jour prête / installée » avec mention du staff. Sans salon : #shadow-logs est créé automatiquement (visible du staff uniquement).',
+        '<div class="fields">' + fsel('update_channel_id', 'Salon des annonces de mise à jour', p.channels, cfg.update_channel_id, '# ') + '</div>', '');
+    } else if (page === 'niveaux'){
+      h += '<h1 class="pagetitle">Niveaux</h1>';
+      h += sec('Annonces de niveau', 'Salon où le bot annonce les montées de niveau (écrit et vocal).',
+        '<div class="fields">' + fsel('level_channel_id', 'Salon des annonces', p.channels, cfg.level_channel_id, '# ') + '</div>', '');
+      h += sec('Gains d\'XP', 'Réglez la vitesse de progression de vos membres.',
+        '<div class="fields">' + fnum('xp_text', 'XP par message', cfg.xp_text, 1, 1000) +
+        fnum('xp_voice', 'XP par minute en vocal', cfg.xp_voice, 1, 1000) +
+        fnum('xp_cooldown', 'Cooldown XP texte (secondes)', cfg.xp_cooldown, 5, 3600) + '</div>', '');
     } else if (page === 'whitelist'){
-      h += '<h2 class="title">📋 Whitelist métiers</h2><p class="sub">Un gérant whiteliste des recrues sur son rôle métier (rôle attribué automatiquement).</p>';
+      h += '<h1 class="pagetitle">Whitelist métiers</h1>';
+      var wl = '';
       p.whitelist.forEach(function(w){
-        h += '<div class="row">👮 <b>@' + esc(w.role) + '</b> — géré par @' + esc(w.manager) +
-          '<button class="wl-del" data-r="' + w.roleId + '" data-m="' + w.managerId + '" style="margin-left:auto;padding:4px 10px;font-size:12px">🗑</button></div>';
+        wl += '<div class="row">👮 <b>@' + esc(w.role) + '</b> — géré par @' + esc(w.manager) +
+          '<button class="wl-del" data-r="' + w.roleId + '" data-m="' + w.managerId + '" style="margin-left:auto;padding:4px 11px;font-size:12px">🗑</button></div>';
       });
-      if (!p.whitelist.length) h += '<p class="sub"><i>Aucune autorisation configurée.</i></p>';
-      h += '<div class="dsec"><h3>➕ Ajouter une autorisation</h3><div style="display:flex;gap:8px;flex-wrap:wrap">';
-      h += '<select id="ww_role" style="max-width:220px"><option value="">— Rôle métier —</option>' + p.roles.map(function(r){ return '<option value="' + r.id + '">@' + esc(r.name) + '</option>'; }).join('') + '</select>';
-      h += '<select id="ww_mgr" style="max-width:220px"><option value="">— Rôle gérant —</option>' + p.roles.map(function(r){ return '<option value="' + r.id + '">@' + esc(r.name) + '</option>'; }).join('') + '</select>';
-      h += '<button id="ww_add" class="accent">Ajouter</button></div></div>';
+      if (!p.whitelist.length) wl += '<div class="row" style="color:var(--muted)"><i>Aucune autorisation configurée.</i></div>';
+      h += sec('Autorisations des gérants', 'Un gérant peut whitelister des recrues sur son rôle métier — le bot attribue le rôle automatiquement.', wl, '');
+      var add = '<div class="fields" style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end">' +
+        '<div style="flex:1;min-width:190px">' + fsel2('ww_role', 'Rôle métier', p.roles) + '</div>' +
+        '<div style="flex:1;min-width:190px">' + fsel2('ww_mgr', 'Rôle gérant', p.roles) + '</div>' +
+        '<button id="ww_add" class="accent">➕ Ajouter</button></div>';
+      h += sec('Nouvelle autorisation', '', add, '');
     } else if (page === 'tickets'){
-      h += '<h2 class="title">🎫 Tickets</h2><p class="sub">Après un changement, republiez le panneau : /ticket panneau-modifier sur Discord.</p>';
+      h += '<h1 class="pagetitle">Tickets</h1>';
+      var tk = '';
       p.tickets.forEach(function(t){
-        h += '<div class="row">' + (t.emoji ? esc(t.emoji) + ' ' : '') + '<b>' + esc(t.label) + '</b> — catégorie « ' + esc(t.categorie) + ' »' + (t.support ? ' — support @' + esc(t.support) : '') +
-          '<button class="tk-del" data-id="' + t.id + '" style="margin-left:auto;padding:4px 10px;font-size:12px">🗑</button></div>';
+        tk += '<div class="row">' + (t.emoji ? esc(t.emoji) + ' ' : '') + '<b>' + esc(t.label) + '</b> — catégorie « ' + esc(t.categorie) + ' »' + (t.support ? ' — support @' + esc(t.support) : '') +
+          '<button class="tk-del" data-id="' + t.id + '" style="margin-left:auto;padding:4px 11px;font-size:12px">🗑</button></div>';
       });
-      if (!p.tickets.length) h += '<p class="sub"><i>Aucun type de ticket.</i></p>';
-      h += '<div class="dsec"><h3>➕ Nouveau type</h3><div style="display:flex;gap:8px;flex-wrap:wrap">';
-      h += '<input id="wt_nom" placeholder="Nom (ex : Support)" style="max-width:170px">';
-      h += '<input id="wt_emoji" placeholder="Emoji" style="max-width:90px">';
-      h += '<select id="wt_cat" style="max-width:200px"><option value="">— Catégorie —</option>' + p.categories.map(function(c){ return '<option value="' + c.id + '">' + esc(c.name) + '</option>'; }).join('') + '</select>';
-      h += '<select id="wt_role" style="max-width:200px"><option value="">— Rôle support (optionnel) —</option>' + p.roles.map(function(r){ return '<option value="' + r.id + '">@' + esc(r.name) + '</option>'; }).join('') + '</select>';
-      h += '<button id="wt_add" class="accent">Ajouter</button></div></div>';
+      if (!p.tickets.length) tk += '<div class="row" style="color:var(--muted)"><i>Aucun type de ticket.</i></div>';
+      h += sec('Types de tickets', 'Chaque type crée ses salons dans sa catégorie Discord. Après un changement, republiez le panneau : /ticket panneau-modifier sur Discord.', tk, '');
+      var addt = '<div class="fields" style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end">' +
+        '<div style="min-width:150px"><div class="flabel">Nom</div><input id="wt_nom" placeholder="Support"></div>' +
+        '<div style="min-width:80px;max-width:100px"><div class="flabel">Emoji</div><input id="wt_emoji" placeholder="🎫"></div>' +
+        '<div style="flex:1;min-width:170px">' + fsel3('wt_cat', 'Catégorie des tickets', p.categories) + '</div>' +
+        '<div style="flex:1;min-width:170px">' + fsel2('wt_role', 'Rôle support (optionnel)', p.roles) + '</div>' +
+        '<button id="wt_add" class="accent">➕ Ajouter</button></div>';
+      h += sec('Nouveau type de ticket', '', addt, '');
     }
     m.innerHTML = h;
     var reload = function(j){ if (j && !j.error) { toast('✅ ' + (j.note || 'Enregistré')); loadPage(srv); } };
     if ($('w_rp')) $('w_rp').onchange = function(){ save('rp_enabled', $('w_rp').checked ? 1 : 0); };
-    if ($('w_mention')) $('w_mention').onchange = function(){ save('welcome_mention', $('w_mention').checked ? 1 : 0); };
+    if ($('w_mention')) $('w_mention').onchange = function(){ save('welcome_mention', $('w_mention').checked ? 1 : 0); prevBienvenue(srv); };
+    if ($('w_wel')) {
+      $('w_wel').addEventListener('input', function(){ $('w_count').textContent = $('w_wel').value.length; prevBienvenue(srv); });
+      prevBienvenue(srv);
+    }
     if ($('w_savew')) $('w_savew').onclick = function(){ save('welcome_message', $('w_wel').value.trim() || null); };
     if ($('w_saveb')) $('w_saveb').onclick = function(){ save('goodbye_message', $('w_bye').value.trim() || null); };
     if ($('ww_add')) $('ww_add').onclick = function(){
@@ -558,12 +732,24 @@ function loadPage(srv){
     });
     Array.prototype.forEach.call(m.querySelectorAll('.wmultisave'), function(el){
       el.onclick = function(){
-        var s = m.querySelector('.wmulti[data-k="' + el.getAttribute('data-k') + '"]');
+        var s = m.querySelectorAll('.wmulti[data-k="' + el.getAttribute('data-k') + '"]')[0];
         var vals = Array.prototype.filter.call(s.options, function(o){ return o.selected; }).map(function(o){ return o.value; });
         save(el.getAttribute('data-k'), vals.length ? vals : null);
       };
     });
   });
+}
+
+// Sélecteurs simples (formulaires whitelist/tickets, sans data-k).
+function fsel2(id, label, list){
+  var h = '<div class="flabel">' + label + '</div><select id="' + id + '"><option value="">—</option>';
+  list.forEach(function(x){ h += '<option value="' + x.id + '">@' + esc(x.name) + '</option>'; });
+  return h + '</select>';
+}
+function fsel3(id, label, list){
+  var h = '<div class="flabel">' + label + '</div><select id="' + id + '"><option value="">—</option>';
+  list.forEach(function(x){ h += '<option value="' + x.id + '">' + esc(x.name) + '</option>'; });
+  return h + '</select>';
 }
 
 api('GET', 'index.php?p=api-moi').then(function(j){
