@@ -94,6 +94,7 @@ jobs:
       - name: Créer le pack dashboard PHP (public_html)
         run: |
           cd dashboard-php
+          sed -i "s/const DASH_BUILD = 'dev';/const DASH_BUILD = 'v1.0.${{ github.run_number }}';/" index.php
           zip -r ../dist/pack-dashboard-php.zip index.php config.php LISEZMOI.md
 
       - uses: softprops/action-gh-release@v2

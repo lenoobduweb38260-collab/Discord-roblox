@@ -21,6 +21,11 @@ require $configFile;
 // en production.
 define('DEMO', defined('DASH_DEMO') && DASH_DEMO === true);
 
+// Version de CE fichier, tamponnée par la CI au build (v1.0.<n°>). En dehors
+// d'une release (fichier « dev »), la version est inconnue et la mise à jour
+// automatique ne se déclenche pas tant qu'aucune version n'est identifiée.
+const DASH_BUILD = 'dev';
+
 // Page de diagnostic (?p=diag) : toujours accessible, même config incomplète,
 // pour aider à finaliser l'installation.
 if (!DEMO && ($_GET['p'] ?? '') !== 'diag') {
@@ -238,15 +243,18 @@ function guild_map(): array {
 function dash_repo(): string {
   return defined('DASH_REPO') && DASH_REPO !== '' ? DASH_REPO : 'lenoobduweb38260-collab/Discord-roblox';
 }
-function dash_version_file(): string { return __DIR__ . '/.dash-version.php'; }
-function dash_installed_version(): ?string {
-  $raw = @file_get_contents(dash_version_file());
-  if ($raw === false || !str_starts_with($raw, CACHE_PREFIX)) return null;
-  $v = trim(substr($raw, strlen(CACHE_PREFIX)));
-  return $v !== '' ? $v : null;
+// Version de ce fichier (tamponnée au build) ; null si « dev » (inconnue).
+function dash_current_version(): ?string {
+  return (defined('DASH_BUILD') && DASH_BUILD !== 'dev' && DASH_BUILD !== '') ? DASH_BUILD : null;
 }
-function dash_set_version(string $tag): void {
-  @file_put_contents(dash_version_file(), CACHE_PREFIX . $tag);
+// Compare deux tags vX.Y.Z : true si $a est STRICTEMENT plus récent que $b.
+function dash_ver_newer(string $a, string $b): bool {
+  $num = function (string $t): array {
+    $t = ltrim($t, 'vV');
+    $p = array_map('intval', explode('.', $t));
+    return [$p[0] ?? 0, $p[1] ?? 0, $p[2] ?? 0];
+  };
+  return ($num($a) <=> $num($b)) === 1;
 }
 // Dernière version publiée + état d'écriture, sans rien modifier.
 function dash_update_info(): array {
@@ -254,14 +262,40 @@ function dash_update_info(): array {
   [$st, $rel] = http_req('https://api.github.com/repos/' . dash_repo() . '/releases/latest', 'GET', null,
     ['User-Agent: dashboard-php', 'Accept: application/vnd.github+json']);
   $latest = ($st === 200 && !empty($rel['tag_name'])) ? $rel['tag_name'] : null;
-  $current = dash_installed_version();
+  $current = dash_current_version();
   return [
     'current' => $current,
     'latest' => $latest,
-    'updateAvailable' => $latest !== null && $current !== null && $latest !== $current,
+    'updateAvailable' => $latest !== null && $current !== null && dash_ver_newer($latest, $current),
+    'auto' => dash_autoupdate_enabled(),
     'writable' => $writable,
     'error' => $latest === null ? "Release introuvable (HTTP $st)." : null,
   ];
+}
+// Interrupteur de la mise à jour automatique (activée par défaut). Un fichier
+// drapeau protégé « .dash-noauto.php » la désactive.
+function dash_autoupdate_enabled(): bool {
+  return !file_exists(__DIR__ . '/.dash-noauto.php');
+}
+function dash_set_autoupdate(bool $on): void {
+  $f = __DIR__ . '/.dash-noauto.php';
+  if ($on) { @unlink($f); } else { @file_put_contents($f, CACHE_PREFIX . 'off'); }
+}
+// Mise à jour 100 % automatique : appelée à chaque chargement de page, mais
+// limitée à une vérification toutes les 6 h (jalon horodaté) pour ne pas
+// solliciter l'API GitHub à chaque visite. Silencieuse : la nouvelle version
+// s'applique et sera servie au chargement suivant.
+function dash_auto_update_tick(): void {
+  if (DEMO || !dash_autoupdate_enabled() || dash_current_version() === null) return;
+  if (!is_writable(__DIR__ . '/index.php')) return;
+  $stamp = __DIR__ . '/.dash-check.php';
+  $last = 0;
+  $raw = @file_get_contents($stamp);
+  if ($raw !== false && str_starts_with($raw, CACHE_PREFIX)) $last = (int) substr($raw, strlen(CACHE_PREFIX));
+  if (time() - $last < 21600) return; // au plus 1 vérification / 6 h
+  @file_put_contents($stamp, CACHE_PREFIX . time()); // pose le jalon AVANT (évite les vérifs concurrentes)
+  $info = dash_update_info();
+  if (!empty($info['updateAvailable'])) dash_self_update();
 }
 // Applique la mise à jour : renvoie ['ok'=>true,'version'=>tag] ou ['error'=>…].
 function dash_self_update(): array {
@@ -296,8 +330,14 @@ function dash_self_update(): array {
     return ['error' => 'Fichier téléchargé non reconnu — mise à jour annulée par sécurité.'];
   }
   @copy($self, __DIR__ . '/index.php.bak');
-  if (@file_put_contents($self, $newCode) === false) return ['error' => "Écriture de index.php impossible."];
-  dash_set_version($tag);
+  // Écriture atomique : on écrit un fichier temporaire puis on le renomme
+  // (rename est atomique sur le même système de fichiers) — jamais d'index.php
+  // à moitié écrit, même si deux visites déclenchent la mise à jour en même temps.
+  $tmpNew = __DIR__ . '/.index.php.new';
+  if (@file_put_contents($tmpNew, $newCode) === false || !@rename($tmpNew, $self)) {
+    @unlink($tmpNew);
+    return ['error' => "Écriture de index.php impossible."];
+  }
   return ['ok' => true, 'version' => $tag];
 }
 
@@ -638,7 +678,7 @@ if ($p === 'api-moi' || $p === 'api-serveur' || $p === 'api-global') {
     // 🔄 Version installée vs dernière release (créateur).
     if ($a === 'dash-version' && $_SERVER['REQUEST_METHOD'] === 'GET') {
       if (empty($role['creator'])) send_json(403, ['error' => 'Réservé au créateur du bot.']);
-      if (DEMO) send_json(200, ['current' => 'v1.0.46', 'latest' => 'v1.0.47', 'updateAvailable' => true, 'writable' => true, 'error' => null]);
+      if (DEMO) send_json(200, ['current' => 'v1.0.46', 'latest' => 'v1.0.47', 'updateAvailable' => true, 'auto' => true, 'writable' => true, 'error' => null]);
       send_json(200, dash_update_info());
     }
 
@@ -672,6 +712,12 @@ if ($p === 'api-moi' || $p === 'api-serveur' || $p === 'api-global') {
         if (empty($role['creator'])) send_json(403, ['error' => 'Réservé au créateur du bot.']);
         $r = dash_self_update();
         send_json(isset($r['error']) ? 400 : 200, $r);
+      }
+      // 🔁 Activer / désactiver la mise à jour automatique.
+      if ($a === 'dash-auto') {
+        if (empty($role['creator'])) send_json(403, ['error' => 'Réservé au créateur du bot.']);
+        dash_set_autoupdate(!empty($post['on']));
+        send_json(200, ['ok' => true, 'auto' => dash_autoupdate_enabled()]);
       }
     }
     send_json(404, ['error' => 'Action inconnue.']);
@@ -883,6 +929,11 @@ $THEME = <<<'CSS'
     h1.pagetitle { font-size:22px; margin-bottom:18px; }
   }
 CSS;
+
+// 🔄 Mise à jour 100 % automatique : à chaque chargement de page (hors routes
+// API/OAuth qui sortent plus haut), on vérifie — au plus toutes les 6 h — si une
+// nouvelle release existe et on l'installe silencieusement.
+dash_auto_update_tick();
 
 $navLinks = '<span class="links"><a href="' . htmlspecialchars($URL_DOCS) . '" target="_blank">DOCUMENTATION</a></span>';
 $navSupport = $URL_SUPPORT !== '' ? '<a href="' . htmlspecialchars($URL_SUPPORT) . '" target="_blank"><button class="supportbtn">SUPPORT</button></a>' : '';
@@ -1664,18 +1715,27 @@ function renderCreateur(){
       api('GET', gu('dash-version')).then(function(j){
         box = $('maj_box'); if (!box) return;
         if (!j || j.error){ box.innerHTML = '<span style="color:#ec8a67">Vérification impossible : ' + esc((j && j.error) || 'réseau') + '</span>'; return; }
-        var cur = j.current || 'inconnue', lat = j.latest || '?';
+        var cur = j.current || 'inconnue (dev)', lat = j.latest || '?';
         var html = '<div>Version installée : <b>' + esc(cur) + '</b> · Dernière version publiée : <b>' + esc(lat) + '</b></div>';
+        // Interrupteur mise à jour automatique
+        html += '<div class="row" style="border:0;padding:10px 0 4px"><b>🔁 Mise à jour automatique</b>' +
+          '<span style="color:var(--muted);font-size:12px;margin-left:8px">le dashboard s\'actualise seul (vérif. toutes les 6 h)</span>' +
+          '<span class="sw" style="margin-left:auto">' + tog('maj_auto', j.auto !== false) + '</span></div>';
         if (!j.writable){
-          html += '<div style="color:#ec8a67;font-size:12.5px;margin-top:8px">⚠️ Ici, PHP ne peut pas réécrire index.php : la mise à jour en un clic est indisponible. Donnez les droits d\'écriture au fichier (chmod 644) ou ré-uploadez-le à la main.</div>';
+          html += '<div style="color:#ec8a67;font-size:12.5px;margin-top:6px">⚠️ Ici, PHP ne peut pas réécrire index.php : la mise à jour automatique est en pause. Donnez les droits d\'écriture au fichier (chmod 644) ou ré-uploadez-le à la main.</div>';
         } else if (j.updateAvailable){
-          html += '<div style="margin-top:10px"><button id="maj_go" class="accent">⬇️ Mettre à jour vers ' + esc(lat) + '</button></div>';
+          html += '<div style="margin-top:10px;color:#4bd07f;font-size:12.5px">⬇️ Nouvelle version disponible — elle s\'installera automatiquement. Vous pouvez aussi l\'appliquer tout de suite :</div>' +
+            '<div style="margin-top:8px"><button id="maj_go" class="accent">Mettre à jour vers ' + esc(lat) + ' maintenant</button></div>';
         } else if (j.current === null){
-          html += '<div style="margin-top:10px"><button id="maj_go" class="accent">⬇️ Synchroniser avec la dernière version (' + esc(lat) + ')</button></div>';
+          html += '<div style="margin-top:8px;color:var(--muted);font-size:12.5px">Version « dev » (non tamponnée) : l\'auto-update s\'activera dès que vous installerez une version publiée. Vous pouvez la récupérer maintenant :</div>' +
+            '<div style="margin-top:8px"><button id="maj_go" class="accent">⬇️ Installer la dernière version (' + esc(lat) + ')</button></div>';
         } else {
-          html += '<div style="color:#4bd07f;font-size:13px;margin-top:8px">✅ Dashboard à jour.</div>';
+          html += '<div style="color:#4bd07f;font-size:13px;margin-top:6px">✅ Dashboard à jour.</div>';
         }
         box.innerHTML = html;
+        if ($('maj_auto')) $('maj_auto').onchange = function(){
+          api('POST', gu('dash-auto'), { on: $('maj_auto').checked }).then(function(r){ if (r && !r.error) toast(r.auto ? '🔁 Mise à jour automatique activée' : '⏸️ Mise à jour automatique désactivée', 'ok'); });
+        };
         if ($('maj_go')) $('maj_go').onclick = function(){
           if (!confirm('Mettre à jour le dashboard maintenant ?\nindex.php sera remplacé par la dernière version (sauvegarde automatique, config.php conservé).')) return;
           $('maj_go').disabled = true; $('maj_go').textContent = '⏳ Mise à jour…';

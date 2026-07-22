@@ -59,15 +59,22 @@ Prérequis côté hébergeur (standard partout) : **PHP 8.0+**, extension cURL *
 (certains mutualisés gratuits bloquent les ports non standards — testez, sinon
 mettez l'agent derrière un port 80/443 ou un sous-domaine Cloudflare).
 
-## 🔄 Mises à jour automatiques
+## 🔄 Mises à jour automatiques (100 % auto)
 
-Le dashboard se met à jour **tout seul depuis GitHub**, comme le bot. Dans l'espace
-**⚙️ Créateur → « Mises à jour du dashboard »**, la version installée et la dernière
-version publiée sont affichées ; un bouton **« Mettre à jour »** récupère la dernière
-release, remplace `index.php` (sauvegarde `index.php.bak` créée) et recharge la page.
+Le dashboard se met à jour **tout seul depuis GitHub**, comme le bot — **activé par
+défaut, rien à faire**. À chaque chargement de page (au plus une vérification toutes
+les **6 h**), s'il existe une release plus récente, `index.php` est remplacé
+silencieusement (sauvegarde `index.php.bak`) ; la nouvelle version est servie au
+chargement suivant.
+
+Dans l'espace **⚙️ Créateur → « Mises à jour du dashboard »** vous trouvez aussi :
+- la **version installée** vs la dernière publiée,
+- un interrupteur **🔁 Mise à jour automatique** (pour la désactiver si besoin),
+- un bouton **« Mettre à jour maintenant »** pour l'appliquer sans attendre.
 
 - `config.php` n'est **jamais** touché : vos clés et réglages sont conservés.
-- Réservé au **créateur** du bot.
+- La version n'est **jamais** rétrogradée (comparaison `vX.Y.Z`).
+- Réservé au **créateur** du bot pour les réglages manuels.
 - Nécessite que l'hébergeur autorise PHP à écrire `index.php` (droits `644`/`664`).
   La page `?p=diag` indique si c'est possible ; sinon, ré-uploadez `index.php` à la main.
 

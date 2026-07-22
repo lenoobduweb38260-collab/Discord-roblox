@@ -229,6 +229,7 @@ var DB = {
   preuves:[ {id:5,authorId:'800000000000000001',authorTag:'Alex',content:'Preuve arnaque ScammeurX — capture ci-jointe',attachments:['https://cdn.discordapp.com/preuve1.png'],at:'2026-07-20T13:58:00Z'},
     {id:4,authorId:'800000000000000002',authorTag:'Marie',content:'Logs du spam de Troll',attachments:['https://cdn.discordapp.com/logs.txt'],at:'2026-07-21T19:40:00Z'} ],
   status:{ type:'watching', text:'les serveurs RP', presence:'online' },
+  auto:true,
   dashconfig:null
 };
 DB.dashconfig = { config: DB.moi.dash, modules: {
@@ -273,8 +274,9 @@ function demoRoute(method, path, body){
       if (g === 'botstaff' && method === 'GET') return DB.botstaff;
       if (g === 'dashconfig' && method === 'GET') return DB.dashconfig;
       if (g === 'bot-status' && method === 'GET') return { status: DB.status, tag:'Colmar_rp#0001' };
-      if (g === 'dash-version' && method === 'GET') return { current:'v1.0.46', latest:'v1.0.47', updateAvailable:true, writable:true, error:null };
+      if (g === 'dash-version' && method === 'GET') return { current:'v1.0.46', latest:'v1.0.47', updateAvailable:true, auto:(DB.auto !== false), writable:true, error:null };
       if (g === 'dash-maj') return { ok:true, version:'v1.0.47' };
+      if (g === 'dash-auto'){ DB.auto = !!body.on; return { ok:true, auto: DB.auto }; }
       if (g === 'qg-tickets' && method === 'GET') return { tickets: DB.qg };
       if (g === 'blacklist-historique' && method === 'GET') return { historique: demoQ(DB.historique, qparam(path,'q'), ['userId','tag','reason']) };
       if (g === 'preuves' && method === 'GET') return { preuves: demoQ(DB.preuves, qparam(path,'q'), ['authorId','authorTag','content']) };
@@ -974,18 +976,27 @@ function renderCreateur(){
       api('GET', gu('dash-version')).then(function(j){
         box = $('maj_box'); if (!box) return;
         if (!j || j.error){ box.innerHTML = '<span style="color:#ec8a67">Vérification impossible : ' + esc((j && j.error) || 'réseau') + '</span>'; return; }
-        var cur = j.current || 'inconnue', lat = j.latest || '?';
+        var cur = j.current || 'inconnue (dev)', lat = j.latest || '?';
         var html = '<div>Version installée : <b>' + esc(cur) + '</b> · Dernière version publiée : <b>' + esc(lat) + '</b></div>';
+        // Interrupteur mise à jour automatique
+        html += '<div class="row" style="border:0;padding:10px 0 4px"><b>🔁 Mise à jour automatique</b>' +
+          '<span style="color:var(--muted);font-size:12px;margin-left:8px">le dashboard s\'actualise seul (vérif. toutes les 6 h)</span>' +
+          '<span class="sw" style="margin-left:auto">' + tog('maj_auto', j.auto !== false) + '</span></div>';
         if (!j.writable){
-          html += '<div style="color:#ec8a67;font-size:12.5px;margin-top:8px">⚠️ Ici, PHP ne peut pas réécrire index.php : la mise à jour en un clic est indisponible. Donnez les droits d\'écriture au fichier (chmod 644) ou ré-uploadez-le à la main.</div>';
+          html += '<div style="color:#ec8a67;font-size:12.5px;margin-top:6px">⚠️ Ici, PHP ne peut pas réécrire index.php : la mise à jour automatique est en pause. Donnez les droits d\'écriture au fichier (chmod 644) ou ré-uploadez-le à la main.</div>';
         } else if (j.updateAvailable){
-          html += '<div style="margin-top:10px"><button id="maj_go" class="accent">⬇️ Mettre à jour vers ' + esc(lat) + '</button></div>';
+          html += '<div style="margin-top:10px;color:#4bd07f;font-size:12.5px">⬇️ Nouvelle version disponible — elle s\'installera automatiquement. Vous pouvez aussi l\'appliquer tout de suite :</div>' +
+            '<div style="margin-top:8px"><button id="maj_go" class="accent">Mettre à jour vers ' + esc(lat) + ' maintenant</button></div>';
         } else if (j.current === null){
-          html += '<div style="margin-top:10px"><button id="maj_go" class="accent">⬇️ Synchroniser avec la dernière version (' + esc(lat) + ')</button></div>';
+          html += '<div style="margin-top:8px;color:var(--muted);font-size:12.5px">Version « dev » (non tamponnée) : l\'auto-update s\'activera dès que vous installerez une version publiée. Vous pouvez la récupérer maintenant :</div>' +
+            '<div style="margin-top:8px"><button id="maj_go" class="accent">⬇️ Installer la dernière version (' + esc(lat) + ')</button></div>';
         } else {
-          html += '<div style="color:#4bd07f;font-size:13px;margin-top:8px">✅ Dashboard à jour.</div>';
+          html += '<div style="color:#4bd07f;font-size:13px;margin-top:6px">✅ Dashboard à jour.</div>';
         }
         box.innerHTML = html;
+        if ($('maj_auto')) $('maj_auto').onchange = function(){
+          api('POST', gu('dash-auto'), { on: $('maj_auto').checked }).then(function(r){ if (r && !r.error) toast(r.auto ? '🔁 Mise à jour automatique activée' : '⏸️ Mise à jour automatique désactivée', 'ok'); });
+        };
         if ($('maj_go')) $('maj_go').onclick = function(){
           if (!confirm('Mettre à jour le dashboard maintenant ?\nindex.php sera remplacé par la dernière version (sauvegarde automatique, config.php conservé).')) return;
           $('maj_go').disabled = true; $('maj_go').textContent = '⏳ Mise à jour…';
