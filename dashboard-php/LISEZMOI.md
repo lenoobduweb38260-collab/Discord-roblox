@@ -59,6 +59,18 @@ Prérequis côté hébergeur (standard partout) : **PHP 8.0+**, extension cURL *
 (certains mutualisés gratuits bloquent les ports non standards — testez, sinon
 mettez l'agent derrière un port 80/443 ou un sous-domaine Cloudflare).
 
+## 🔄 Mises à jour automatiques
+
+Le dashboard se met à jour **tout seul depuis GitHub**, comme le bot. Dans l'espace
+**⚙️ Créateur → « Mises à jour du dashboard »**, la version installée et la dernière
+version publiée sont affichées ; un bouton **« Mettre à jour »** récupère la dernière
+release, remplace `index.php` (sauvegarde `index.php.bak` créée) et recharge la page.
+
+- `config.php` n'est **jamais** touché : vos clés et réglages sont conservés.
+- Réservé au **créateur** du bot.
+- Nécessite que l'hébergeur autorise PHP à écrire `index.php` (droits `644`/`664`).
+  La page `?p=diag` indique si c'est possible ; sinon, ré-uploadez `index.php` à la main.
+
 ## 🛡️ Sécurité
 
 - `AGENT_KEY` reste dans `config.php`, **côté serveur** — jamais envoyée au navigateur

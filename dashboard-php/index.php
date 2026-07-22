@@ -231,6 +231,76 @@ function guild_map(): array {
   return [$map, $infos];
 }
 
+// ----- 🔄 Mise à jour automatique du dashboard (créateur) -----
+// Le dashboard se met à jour comme le bot : il récupère la dernière release
+// GitHub, en extrait index.php (depuis pack-dashboard-php.zip) et se réécrit
+// lui-même après sauvegarde. config.php n'est JAMAIS touché (réglages conservés).
+function dash_repo(): string {
+  return defined('DASH_REPO') && DASH_REPO !== '' ? DASH_REPO : 'lenoobduweb38260-collab/Discord-roblox';
+}
+function dash_version_file(): string { return __DIR__ . '/.dash-version.php'; }
+function dash_installed_version(): ?string {
+  $raw = @file_get_contents(dash_version_file());
+  if ($raw === false || !str_starts_with($raw, CACHE_PREFIX)) return null;
+  $v = trim(substr($raw, strlen(CACHE_PREFIX)));
+  return $v !== '' ? $v : null;
+}
+function dash_set_version(string $tag): void {
+  @file_put_contents(dash_version_file(), CACHE_PREFIX . $tag);
+}
+// Dernière version publiée + état d'écriture, sans rien modifier.
+function dash_update_info(): array {
+  $writable = is_writable(__DIR__ . '/index.php');
+  [$st, $rel] = http_req('https://api.github.com/repos/' . dash_repo() . '/releases/latest', 'GET', null,
+    ['User-Agent: dashboard-php', 'Accept: application/vnd.github+json']);
+  $latest = ($st === 200 && !empty($rel['tag_name'])) ? $rel['tag_name'] : null;
+  $current = dash_installed_version();
+  return [
+    'current' => $current,
+    'latest' => $latest,
+    'updateAvailable' => $latest !== null && $current !== null && $latest !== $current,
+    'writable' => $writable,
+    'error' => $latest === null ? "Release introuvable (HTTP $st)." : null,
+  ];
+}
+// Applique la mise à jour : renvoie ['ok'=>true,'version'=>tag] ou ['error'=>…].
+function dash_self_update(): array {
+  $self = __DIR__ . '/index.php';
+  if (!is_writable($self)) {
+    return ['error' => "index.php n'est pas modifiable par PHP sur cet hébergeur : ré-uploadez-le à la main, ou donnez les droits d'écriture (chmod 644/664)."];
+  }
+  [$st, $rel] = http_req('https://api.github.com/repos/' . dash_repo() . '/releases/latest', 'GET', null,
+    ['User-Agent: dashboard-php', 'Accept: application/vnd.github+json']);
+  if ($st !== 200 || empty($rel['tag_name'])) return ['error' => "Release introuvable (HTTP $st)."];
+  $tag = $rel['tag_name'];
+  $asset = null;
+  foreach ($rel['assets'] ?? [] as $a) if (($a['name'] ?? '') === 'pack-dashboard-php.zip') { $asset = $a; break; }
+  if (!$asset || empty($asset['browser_download_url'])) return ['error' => "Version $tag publiée sans pack-dashboard-php.zip."];
+  [$st2, , $rawZip] = http_req($asset['browser_download_url'], 'GET', null, ['User-Agent: dashboard-php']);
+  if ($st2 !== 200 || $rawZip === '') return ['error' => "Téléchargement du pack impossible (HTTP $st2)."];
+  if (!class_exists('ZipArchive')) return ['error' => "Extension PHP ZipArchive absente chez votre hébergeur — mise à jour auto indisponible."];
+  $tmp = tempnam(sys_get_temp_dir(), 'dashmaj');
+  file_put_contents($tmp, $rawZip);
+  $newCode = null;
+  $zip = new ZipArchive();
+  if ($zip->open($tmp) === true) {
+    for ($i = 0; $i < $zip->numFiles; $i++) {
+      if (basename((string) $zip->getNameIndex($i)) === 'index.php') { $newCode = $zip->getFromIndex($i); break; }
+    }
+    $zip->close();
+  }
+  @unlink($tmp);
+  if ($newCode === null || $newCode === '') return ['error' => 'index.php introuvable dans le pack téléchargé.'];
+  // Garde-fou : le fichier doit être un index.php de dashboard valide.
+  if (strpos($newCode, '<?php') !== 0 || strpos($newCode, 'p=api-global') === false || strpos($newCode, 'function renderHome') === false) {
+    return ['error' => 'Fichier téléchargé non reconnu — mise à jour annulée par sécurité.'];
+  }
+  @copy($self, __DIR__ . '/index.php.bak');
+  if (@file_put_contents($self, $newCode) === false) return ['error' => "Écriture de index.php impossible."];
+  dash_set_version($tag);
+  return ['ok' => true, 'version' => $tag];
+}
+
 // Le membre connecté administre-t-il ce serveur ?
 function manages_guild(string $guildId): bool {
   if (DEMO) {
@@ -425,6 +495,11 @@ if ($p === 'diag') {
   }
   $checks[] = ['Liaison au bot via l\'agent' . ($agentOk ? " — $botCount bot(s) démarré(s), $srvCount serveur(s)" : ''), $agentOk, $agentMsg ?: 'Renseignez d\'abord AGENT_URL et AGENT_KEY.'];
 
+  $selfWritable = is_writable(__DIR__ . '/index.php');
+  $majNote = $selfWritable
+    ? '<div class="box" style="border-color:#3ba55d">🔄 <b style="color:#4bd07f">Mise à jour automatique disponible</b> : le créateur peut mettre le dashboard à jour en un clic depuis l\'espace Créateur.</div>'
+    : '<div class="box">🔄 <b>Mise à jour automatique indisponible</b> : PHP ne peut pas réécrire index.php ici. Donnez les droits d\'écriture (chmod 644) pour l\'activer, sinon ré-uploadez le fichier à la main lors des mises à jour.</div>';
+
   $redirect = htmlspecialchars(($durl !== '' ? $durl : rtrim(base_url(), '/')) . '/index.php?p=callback');
   $rows = '';
   $allOk = true;
@@ -454,6 +529,7 @@ a.btn{display:inline-block;margin-top:20px;background:#d8734f;color:#fff;text-de
 $banner
 $rows
 <div class="box">🔗 <b>URL de redirection à coller</b> dans Portail développeur Discord → OAuth2 → Redirects :<br><code>$redirect</code></div>
+$majNote
 <a class="btn" href="index.php">← Retour au dashboard</a>
 </div></body></html>
 HTML;
@@ -559,6 +635,12 @@ if ($p === 'api-moi' || $p === 'api-serveur' || $p === 'api-global') {
       [$st, $d] = first_bot_api('/preuves' . ($q !== '' ? '?q=' . rawurlencode($q) : ''));
       send_json($st ?: 502, $d ?: ['error' => 'Bot injoignable.']);
     }
+    // 🔄 Version installée vs dernière release (créateur).
+    if ($a === 'dash-version' && $_SERVER['REQUEST_METHOD'] === 'GET') {
+      if (empty($role['creator'])) send_json(403, ['error' => 'Réservé au créateur du bot.']);
+      if (DEMO) send_json(200, ['current' => 'v1.0.46', 'latest' => 'v1.0.47', 'updateAvailable' => true, 'writable' => true, 'error' => null]);
+      send_json(200, dash_update_info());
+    }
 
     // Écritures : le bot revérifie la permission via actorId.
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -584,6 +666,12 @@ if ($p === 'api-moi' || $p === 'api-serveur' || $p === 'api-global') {
         if (empty($role['creator'])) send_json(403, ['error' => 'Réservé au créateur du bot.']);
         [$st, $d] = named_bot_api((string) ($post['bot'] ?? ''), '/bot-status', 'POST', ['actorId' => $uid, 'status' => $post['status'] ?? null]);
         send_json($st ?: 502, $d ?: ['error' => 'Bot injoignable.']);
+      }
+      // 🔄 Mise à jour du dashboard : se réécrit avec la dernière release.
+      if ($a === 'dash-maj') {
+        if (empty($role['creator'])) send_json(403, ['error' => 'Réservé au créateur du bot.']);
+        $r = dash_self_update();
+        send_json(isset($r['error']) ? 400 : 200, $r);
       }
     }
     send_json(404, ['error' => 'Action inconnue.']);
@@ -1563,10 +1651,42 @@ function renderCreateur(){
       '<div class="flabel" id="st_urlL" style="margin-top:12px;display:none">URL Twitch (pour « En live »)</div><input id="st_url" placeholder="https://twitch.tv/…" style="display:none">' +
       '<div style="margin-top:12px;display:flex;gap:9px"><button id="st_save" class="accent">💾 Appliquer le statut</button><button id="st_clear">🧹 Retirer le statut</button></div></div>';
     h += sec('🟢 Statut personnalisé par bot', 'Définissez l\'activité et la présence Discord affichées par un bot précis.', stat, '');
+    // Mises à jour du dashboard (auto-update depuis GitHub, comme le bot)
+    h += sec('🔄 Mises à jour du dashboard', 'Le dashboard se met à jour tout seul depuis GitHub, comme le bot. Le fichier config.php et vos réglages sont conservés (une sauvegarde index.php.bak est créée).',
+      '<div id="maj_box" style="color:var(--muted)">Vérification…</div>', '');
     h += '</div>';
 
     $('content').innerHTML = h;
     if ($('cr-home')) $('cr-home').onclick = renderHome;
+    // ----- Mises à jour -----
+    var loadMaj = function(){
+      var box = $('maj_box'); if (!box) return;
+      api('GET', gu('dash-version')).then(function(j){
+        box = $('maj_box'); if (!box) return;
+        if (!j || j.error){ box.innerHTML = '<span style="color:#ec8a67">Vérification impossible : ' + esc((j && j.error) || 'réseau') + '</span>'; return; }
+        var cur = j.current || 'inconnue', lat = j.latest || '?';
+        var html = '<div>Version installée : <b>' + esc(cur) + '</b> · Dernière version publiée : <b>' + esc(lat) + '</b></div>';
+        if (!j.writable){
+          html += '<div style="color:#ec8a67;font-size:12.5px;margin-top:8px">⚠️ Ici, PHP ne peut pas réécrire index.php : la mise à jour en un clic est indisponible. Donnez les droits d\'écriture au fichier (chmod 644) ou ré-uploadez-le à la main.</div>';
+        } else if (j.updateAvailable){
+          html += '<div style="margin-top:10px"><button id="maj_go" class="accent">⬇️ Mettre à jour vers ' + esc(lat) + '</button></div>';
+        } else if (j.current === null){
+          html += '<div style="margin-top:10px"><button id="maj_go" class="accent">⬇️ Synchroniser avec la dernière version (' + esc(lat) + ')</button></div>';
+        } else {
+          html += '<div style="color:#4bd07f;font-size:13px;margin-top:8px">✅ Dashboard à jour.</div>';
+        }
+        box.innerHTML = html;
+        if ($('maj_go')) $('maj_go').onclick = function(){
+          if (!confirm('Mettre à jour le dashboard maintenant ?\nindex.php sera remplacé par la dernière version (sauvegarde automatique, config.php conservé).')) return;
+          $('maj_go').disabled = true; $('maj_go').textContent = '⏳ Mise à jour…';
+          api('POST', gu('dash-maj')).then(function(r){
+            if (r && !r.error){ toast('✅ Dashboard mis à jour' + (r.version ? ' — ' + r.version : ''), 'ok'); setTimeout(function(){ location.reload(); }, 1300); }
+            else { loadMaj(); }
+          });
+        };
+      });
+    };
+    loadMaj();
     $('cr_save').onclick = function(){
       var modules = {};
       Object.keys(mods).forEach(function(k){ if (k === 'apercu') { modules[k] = true; return; } modules[k] = $('crm_' + k) ? $('crm_' + k).checked : true; });

@@ -273,6 +273,8 @@ function demoRoute(method, path, body){
       if (g === 'botstaff' && method === 'GET') return DB.botstaff;
       if (g === 'dashconfig' && method === 'GET') return DB.dashconfig;
       if (g === 'bot-status' && method === 'GET') return { status: DB.status, tag:'Colmar_rp#0001' };
+      if (g === 'dash-version' && method === 'GET') return { current:'v1.0.46', latest:'v1.0.47', updateAvailable:true, writable:true, error:null };
+      if (g === 'dash-maj') return { ok:true, version:'v1.0.47' };
       if (g === 'qg-tickets' && method === 'GET') return { tickets: DB.qg };
       if (g === 'blacklist-historique' && method === 'GET') return { historique: demoQ(DB.historique, qparam(path,'q'), ['userId','tag','reason']) };
       if (g === 'preuves' && method === 'GET') return { preuves: demoQ(DB.preuves, qparam(path,'q'), ['authorId','authorTag','content']) };
@@ -959,10 +961,42 @@ function renderCreateur(){
       '<div class="flabel" id="st_urlL" style="margin-top:12px;display:none">URL Twitch (pour « En live »)</div><input id="st_url" placeholder="https://twitch.tv/…" style="display:none">' +
       '<div style="margin-top:12px;display:flex;gap:9px"><button id="st_save" class="accent">💾 Appliquer le statut</button><button id="st_clear">🧹 Retirer le statut</button></div></div>';
     h += sec('🟢 Statut personnalisé par bot', 'Définissez l\'activité et la présence Discord affichées par un bot précis.', stat, '');
+    // Mises à jour du dashboard (auto-update depuis GitHub, comme le bot)
+    h += sec('🔄 Mises à jour du dashboard', 'Le dashboard se met à jour tout seul depuis GitHub, comme le bot. Le fichier config.php et vos réglages sont conservés (une sauvegarde index.php.bak est créée).',
+      '<div id="maj_box" style="color:var(--muted)">Vérification…</div>', '');
     h += '</div>';
 
     $('content').innerHTML = h;
     if ($('cr-home')) $('cr-home').onclick = renderHome;
+    // ----- Mises à jour -----
+    var loadMaj = function(){
+      var box = $('maj_box'); if (!box) return;
+      api('GET', gu('dash-version')).then(function(j){
+        box = $('maj_box'); if (!box) return;
+        if (!j || j.error){ box.innerHTML = '<span style="color:#ec8a67">Vérification impossible : ' + esc((j && j.error) || 'réseau') + '</span>'; return; }
+        var cur = j.current || 'inconnue', lat = j.latest || '?';
+        var html = '<div>Version installée : <b>' + esc(cur) + '</b> · Dernière version publiée : <b>' + esc(lat) + '</b></div>';
+        if (!j.writable){
+          html += '<div style="color:#ec8a67;font-size:12.5px;margin-top:8px">⚠️ Ici, PHP ne peut pas réécrire index.php : la mise à jour en un clic est indisponible. Donnez les droits d\'écriture au fichier (chmod 644) ou ré-uploadez-le à la main.</div>';
+        } else if (j.updateAvailable){
+          html += '<div style="margin-top:10px"><button id="maj_go" class="accent">⬇️ Mettre à jour vers ' + esc(lat) + '</button></div>';
+        } else if (j.current === null){
+          html += '<div style="margin-top:10px"><button id="maj_go" class="accent">⬇️ Synchroniser avec la dernière version (' + esc(lat) + ')</button></div>';
+        } else {
+          html += '<div style="color:#4bd07f;font-size:13px;margin-top:8px">✅ Dashboard à jour.</div>';
+        }
+        box.innerHTML = html;
+        if ($('maj_go')) $('maj_go').onclick = function(){
+          if (!confirm('Mettre à jour le dashboard maintenant ?\nindex.php sera remplacé par la dernière version (sauvegarde automatique, config.php conservé).')) return;
+          $('maj_go').disabled = true; $('maj_go').textContent = '⏳ Mise à jour…';
+          api('POST', gu('dash-maj')).then(function(r){
+            if (r && !r.error){ toast('✅ Dashboard mis à jour' + (r.version ? ' — ' + r.version : ''), 'ok'); setTimeout(function(){ location.reload(); }, 1300); }
+            else { loadMaj(); }
+          });
+        };
+      });
+    };
+    loadMaj();
     $('cr_save').onclick = function(){
       var modules = {};
       Object.keys(mods).forEach(function(k){ if (k === 'apercu') { modules[k] = true; return; } modules[k] = $('crm_' + k) ? $('crm_' + k).checked : true; });
