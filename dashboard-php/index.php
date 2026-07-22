@@ -21,7 +21,9 @@ require $configFile;
 // en production.
 define('DEMO', defined('DASH_DEMO') && DASH_DEMO === true);
 
-if (!DEMO) {
+// Page de diagnostic (?p=diag) : toujours accessible, même config incomplète,
+// pour aider à finaliser l'installation.
+if (!DEMO && ($_GET['p'] ?? '') !== 'diag') {
   $manquants = [];
   foreach (['DASH_CLIENT_ID', 'DASH_CLIENT_SECRET', 'DASH_URL', 'AGENT_URL', 'AGENT_KEY'] as $c) {
     if (!defined($c) || constant($c) === '') $manquants[] = $c;
@@ -29,7 +31,7 @@ if (!DEMO) {
   if ($manquants) {
     http_response_code(500);
     exit('⚠️ Configuration incomplète : ' . htmlspecialchars(implode(', ', $manquants)) . ' à remplir dans config.php.'
-      . ' (Astuce : mettez DASH_DEMO = true pour tester l\'interface en local sans Discord ni agent.)');
+      . ' (Astuce : ouvrez index.php?p=diag pour un diagnostic guidé, ou mettez DASH_DEMO = true pour tester l\'interface en local.)');
   }
 }
 $DASH_URL = defined('DASH_URL') && DASH_URL !== '' ? DASH_URL : '';
@@ -385,6 +387,76 @@ if ($p === 'callback') {
 if ($p === 'logout') {
   session_destroy();
   header('Location: ' . base_url() . '/index.php');
+  exit;
+}
+
+// 🔧 Diagnostic : vérifie la configuration et la liaison au bot (accessible
+// SANS connexion, pour dépanner l'installation). Ne révèle aucun secret.
+if ($p === 'diag') {
+  header('Content-Type: text/html; charset=utf-8');
+  $checks = [];
+  $checks[] = ['PHP ' . PHP_VERSION, version_compare(PHP_VERSION, '7.4', '>='), 'PHP 7.4 ou plus est requis (réglable chez votre hébergeur).'];
+  $net = function_exists('curl_init') ? 'cURL' : ((bool) ini_get('allow_url_fopen') ? 'flux natifs' : 'aucun');
+  $checks[] = ['Requêtes HTTP sortantes : ' . $net, $net !== 'aucun', 'Activez cURL ou allow_url_fopen chez votre hébergeur.'];
+  $checks[] = ['Sessions PHP actives', session_status() === PHP_SESSION_ACTIVE, 'Les sessions PHP doivent fonctionner.'];
+  $demoOn = defined('DASH_DEMO') && DASH_DEMO === true;
+  $checks[] = ['Mode démo ' . ($demoOn ? 'ACTIVÉ' : 'désactivé'), !$demoOn, 'Passez DASH_DEMO à false dans config.php pour la mise en ligne (sinon tout le monde entre sans Discord).'];
+  $cid = defined('DASH_CLIENT_ID') ? DASH_CLIENT_ID : '';
+  $csec = defined('DASH_CLIENT_SECRET') ? DASH_CLIENT_SECRET : '';
+  $durl = defined('DASH_URL') ? DASH_URL : '';
+  $checks[] = ['Client ID Discord renseigné', $cid !== '', 'Portail développeur Discord → votre application → OAuth2 → Client ID.'];
+  $checks[] = ['Client Secret Discord renseigné', $csec !== '', 'Portail développeur Discord → OAuth2 → « Reset Secret ».'];
+  $checks[] = ['URL publique (DASH_URL) renseignée', $durl !== '', 'Ex : https://monsite.fr (l\'adresse où se trouve ce dashboard).'];
+  $aurl = defined('AGENT_URL') ? AGENT_URL : '';
+  $akey = defined('AGENT_KEY') ? AGENT_KEY : '';
+  $checks[] = ['Adresse de l\'agent (AGENT_URL) renseignée', $aurl !== '', 'Ex : http://IP-de-votre-serveur:9999 (le pack hébergeur qui fait tourner les bots).'];
+  $checks[] = ['Clé de l\'agent (AGENT_KEY) renseignée', $akey !== '', 'La même clé que dans la configuration du pack hébergeur.'];
+  $agentOk = false; $botCount = 0; $srvCount = 0; $agentMsg = '';
+  if ($aurl !== '') {
+    [$st, $etat] = agent_call('/agent/etat');
+    if ($st === 200) {
+      $agentOk = true;
+      foreach ($etat['bots'] ?? [] as $b) if (($b['status'] ?? '') === 'demarre') $botCount++;
+      [$map] = guild_map();
+      $srvCount = count($map);
+    } else {
+      $agentMsg = $st === 0 ? 'Agent injoignable (adresse/port bloqués ou agent éteint).' : "Réponse HTTP $st — vérifiez AGENT_URL et AGENT_KEY.";
+    }
+  }
+  $checks[] = ['Liaison au bot via l\'agent' . ($agentOk ? " — $botCount bot(s) démarré(s), $srvCount serveur(s)" : ''), $agentOk, $agentMsg ?: 'Renseignez d\'abord AGENT_URL et AGENT_KEY.'];
+
+  $redirect = htmlspecialchars(($durl !== '' ? $durl : rtrim(base_url(), '/')) . '/index.php?p=callback');
+  $rows = '';
+  $allOk = true;
+  foreach ($checks as $c) {
+    if (!$c[1]) $allOk = false;
+    $rows .= '<div class="row"><span class="ic">' . ($c[1] ? '✅' : '❌') . '</span><div><div class="lbl">' . htmlspecialchars($c[0]) . '</div>'
+      . ($c[1] ? '' : '<div class="hint">' . htmlspecialchars($c[2]) . '</div>') . '</div></div>';
+  }
+  $banner = $allOk
+    ? '<div class="bn ok">✅ Tout est prêt : votre dashboard est correctement relié au bot.</div>'
+    : '<div class="bn ko">⚠️ Configuration incomplète — corrigez les lignes ❌ ci-dessous, puis rechargez cette page.</div>';
+  echo <<<HTML
+<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Diagnostic — Dashboard</title><style>
+*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Segoe UI',system-ui,sans-serif;background:#1e2126;color:#e8e9ed;padding:32px 18px;line-height:1.5}
+.card{max-width:680px;margin:0 auto;background:#24272d;border:1px solid #33373f;border-radius:14px;padding:26px}
+h1{font-size:22px;margin-bottom:4px}.sub{color:#8f919b;font-size:13.5px;margin-bottom:18px}
+.bn{border-radius:10px;padding:12px 15px;font-weight:600;font-size:14px;margin-bottom:18px}
+.bn.ok{background:#3ba55d22;color:#4bd07f}.bn.ko{background:#d8734f22;color:#ec8a67}
+.row{display:flex;gap:11px;align-items:flex-start;padding:11px 0;border-top:1px solid #33373f}
+.ic{font-size:16px;line-height:1.4}.lbl{font-size:14px;font-weight:500}.hint{color:#8f919b;font-size:12.5px;margin-top:2px}
+.box{background:#191b1f;border:1px solid #33373f;border-radius:9px;padding:12px 14px;margin-top:18px}
+.box b{color:#d8734f}code{background:#000;padding:2px 7px;border-radius:5px;font-size:13px;word-break:break-all;display:inline-block;margin-top:5px}
+a.btn{display:inline-block;margin-top:20px;background:#d8734f;color:#fff;text-decoration:none;padding:11px 20px;border-radius:9px;font-weight:600;font-size:14px}
+</style></head><body><div class="card">
+<h1>🔧 Diagnostic du dashboard</h1><div class="sub">Vérification de la configuration (config.php) et de la liaison au bot.</div>
+$banner
+$rows
+<div class="box">🔗 <b>URL de redirection à coller</b> dans Portail développeur Discord → OAuth2 → Redirects :<br><code>$redirect</code></div>
+<a class="btn" href="index.php">← Retour au dashboard</a>
+</div></body></html>
+HTML;
   exit;
 }
 
@@ -763,6 +835,7 @@ if (empty($_SESSION['user'])) {
   <div class="word" id="word">Le Roleplay</div>
   <a href="index.php?p=inviter"><button class="addbtn">🎮 Ajouter à Discord</button></a>
   <a href="index.php?p=login"><button class="connectbtn">🔗 Se connecter avec Discord pour gérer vos serveurs</button></a>
+  <a href="index.php?p=diag" style="margin-top:16px;color:var(--muted);font-size:12.5px">🔧 Vérifier ma configuration</a>
   <svg class="wave" viewBox="0 0 1440 180" preserveAspectRatio="none" height="150">
     <path fill="#d8734f" d="M0,96 C240,150 480,40 720,80 C960,120 1200,150 1440,90 L1440,180 L0,180 Z" opacity=".9"/>
     <path fill="#2b2f36" d="M0,130 C260,170 520,80 760,110 C1000,140 1240,170 1440,120 L1440,180 L0,180 Z"/>

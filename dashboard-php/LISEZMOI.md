@@ -8,6 +8,16 @@ sur les serveurs qu'il **administre** (et uniquement ceux-là) : vue d'ensemble,
 🎭 Module RP (🔒 verrouillage respecté), 👮 rôles multiples, 📢 salons, 📈 niveaux,
 👋 bienvenue/au revoir, 📋 whitelist métiers, 🎫 tickets.
 
+### 🎚️ Qui peut faire quoi (contrôle d'accès)
+
+| Accès | Qui | Ce qu'il peut faire à distance |
+|-------|-----|-------------------------------|
+| **Tout le monde** | N'importe quel membre qui **administre** un serveur où le bot est présent | Se connecter avec Discord et **configurer les messages** (bienvenue/au revoir), salons, rôles, niveaux, tickets… de **ses** serveurs |
+| 🛡️ **Staff du bot** | Les IDs Discord ajoutés à l'équipe du bot | En plus : blacklist, tickets de bannissement, base de données des preuves |
+| ⚙️ **Créateur** (vous) | Le propriétaire du bot (`OWNER_ID` / propriétaire de l'application) | **Tout** : espace staff **+** configuration complète du dashboard (marque, modules, statut par bot) |
+
+Les boutons **Staff** et **Créateur** n'apparaissent qu'aux personnes concernées ; tout le reste est ouvert à chaque administrateur de serveur.
+
 ## 🧪 Tester en local d'abord (sans Discord ni agent)
 
 Pour voir l'interface fonctionner immédiatement sur votre PC :
@@ -36,6 +46,14 @@ Pour voir l'interface fonctionner immédiatement sur votre PC :
    - `AGENT_URL` (ex : `http://191.44.119.37:9999`) et `AGENT_KEY` — les mêmes que dans votre panel
 3. C'est tout — ouvrez `DASH_URL` dans votre navigateur : la page « Se connecter avec Discord » apparaît
 
+## 3️⃣ Vérifier que tout est branché (page de diagnostic)
+
+Ouvrez **`DASH_URL/index.php?p=diag`** (lien « 🔧 Vérifier ma configuration » aussi présent
+sur la page d'accueil). Cette page — accessible **même si la configuration est incomplète** —
+teste ligne par ligne : version PHP, requêtes sortantes, clés OAuth2, liaison à l'agent
+(nombre de bots démarrés et de serveurs détectés) et vous **affiche l'URL de redirection
+exacte** à coller dans le portail Discord. Corrigez les lignes ❌ jusqu'à ce que tout soit ✅.
+
 Prérequis côté hébergeur (standard partout) : **PHP 8.0+**, extension cURL **ou**
 `allow_url_fopen` activé, et le droit de sortir en HTTP vers votre agent
 (certains mutualisés gratuits bloquent les ports non standards — testez, sinon
@@ -49,6 +67,8 @@ mettez l'agent derrière un port 80/443 ou un sous-domaine Cloudflare).
 - HTTPS fourni par votre hébergement mutualisé = parfait pour l'OAuth2
 
 ## ❓ Dépannage
+
+> 💡 En cas de doute, ouvrez d'abord **`DASH_URL/index.php?p=diag`** : la page de diagnostic pointe directement la ligne qui coince.
 
 - **Retour à l'accueil après la connexion Discord** → l'URL dans Redirects ne correspond pas exactement à `DASH_URL/index.php?p=callback`, ou le Client Secret est faux (détail dans le journal d'erreurs PHP de l'hébergeur)
 - **« Aucun serveur »** → vous n'avez pas *Gérer le serveur* sur ce serveur, ou le bot n'y est pas / n'est pas démarré chez l'agent
