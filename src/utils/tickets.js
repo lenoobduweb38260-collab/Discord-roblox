@@ -3,6 +3,7 @@ const {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
+  StringSelectMenuBuilder,
   ChannelType,
   PermissionFlagsBits,
   AttachmentBuilder,
@@ -16,7 +17,7 @@ const listTypes = db.prepare('SELECT * FROM ticket_types WHERE guild_id = ? ORDE
 const getType = db.prepare('SELECT * FROM ticket_types WHERE id = ? AND guild_id = ?');
 const getTypeByLabel = db.prepare('SELECT * FROM ticket_types WHERE guild_id = ? AND label = ?');
 const insertType = db.prepare(
-  'INSERT INTO ticket_types (guild_id, label, emoji, category_id, support_role_id) VALUES (?, ?, ?, ?, ?)'
+  'INSERT INTO ticket_types (guild_id, label, emoji, category_id, support_role_id, description) VALUES (?, ?, ?, ?, ?, ?)'
 );
 const deleteType = db.prepare('DELETE FROM ticket_types WHERE id = ?');
 
@@ -51,23 +52,44 @@ const nl = (s) => (s ? String(s).replace(/\\n/g, '\n') : s);
 function buildPanelPayload(guildId, options = {}) {
   const types = listTypes.all(guildId);
   const rows = [];
-  for (let i = 0; i < types.length && rows.length < 5; i += 5) {
-    rows.push(
-      new ActionRowBuilder().addComponents(
-        types.slice(i, i + 5).map((t) => {
-          const button = new ButtonBuilder()
-            .setCustomId(`tktopen:${t.id}`)
-            .setLabel(t.label)
-            .setStyle(ButtonStyle.Primary);
+  // Mécanisme d'ouverture : « menu » = sélecteur de raison (menu déroulant,
+  // façon Ticket Tool) ; sinon un bouton par raison.
+  if (options.ouverture === 'menu' && types.length) {
+    const menu = new StringSelectMenuBuilder()
+      .setCustomId('tktmenu')
+      .setPlaceholder(nl(options.selecteur_texte) || '🎫 Choisissez une raison pour ouvrir un ticket…')
+      .addOptions(
+        types.slice(0, 25).map((t) => {
+          const opt = { label: String(t.label).slice(0, 100), value: String(t.id) };
+          if (t.description) opt.description = String(t.description).slice(0, 100);
           if (t.emoji) {
             try {
-              button.setEmoji(t.emoji);
+              opt.emoji = t.emoji;
             } catch {}
           }
-          return button;
+          return opt;
         })
-      )
-    );
+      );
+    rows.push(new ActionRowBuilder().addComponents(menu));
+  } else {
+    for (let i = 0; i < types.length && rows.length < 5; i += 5) {
+      rows.push(
+        new ActionRowBuilder().addComponents(
+          types.slice(i, i + 5).map((t) => {
+            const button = new ButtonBuilder()
+              .setCustomId(`tktopen:${t.id}`)
+              .setLabel(t.label)
+              .setStyle(ButtonStyle.Primary);
+            if (t.emoji) {
+              try {
+                button.setEmoji(t.emoji);
+              } catch {}
+            }
+            return button;
+          })
+        )
+      );
+    }
   }
   const payload = { components: rows };
   if (options.mode === 'embed') {
@@ -254,6 +276,10 @@ async function deleteTicket(interaction, ticketId) {
 
 async function handleTicketButton(interaction) {
   try {
+    // Sélecteur de raison (menu déroulant) : la valeur choisie = l'ID du type.
+    if (interaction.isStringSelectMenu() && interaction.customId === 'tktmenu') {
+      return await openTicket(interaction, Number(interaction.values[0]));
+    }
     const [prefix, rawId] = interaction.customId.split(':');
     const id = Number(rawId);
     if (prefix === 'tktopen') return await openTicket(interaction, id);

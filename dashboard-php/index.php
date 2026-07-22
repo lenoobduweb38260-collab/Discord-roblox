@@ -85,7 +85,10 @@ function demo_parametres(): array {
     ],
     'categories' => [['id' => '30', 'name' => 'TICKETS'], ['id' => '31', 'name' => 'AIDE']],
     'whitelist' => [['roleId' => '14', 'managerId' => '15', 'role' => 'Police', 'manager' => 'Gérant Police']],
-    'tickets' => [['id' => 1, 'label' => 'Support', 'emoji' => '🎫', 'categorie' => 'TICKETS', 'support' => 'Staff']],
+    'tickets' => [
+      ['id' => 1, 'label' => 'Support', 'emoji' => '🛠️', 'description' => 'Une question, un souci ?', 'categorie' => 'TICKETS', 'support' => 'Staff'],
+      ['id' => 2, 'label' => 'Plainte', 'emoji' => '⚖️', 'description' => 'Signaler un membre', 'categorie' => 'AIDE', 'support' => 'Modérateur'],
+    ],
     'bans' => [],
   ];
 }
@@ -228,6 +231,21 @@ function first_bot_api(string $path, string $method = 'GET', $body = null): arra
   foreach ($map as $b) { $botName = $b; break; }
   if (!$botName) return [404, ['error' => 'Aucun bot en ligne.']];
   return agent_call('/agent/bots/' . rawurlencode($botName) . '/proxy' . $path, $method, $body);
+}
+// Appel vers un bot NOMMÉ (statut personnalisé par bot).
+function named_bot_api(string $botName, string $path, string $method = 'GET', $body = null): array {
+  if (!preg_match('/^[a-zA-Z0-9_-]{1,32}$/', $botName)) return [400, ['error' => 'Bot invalide.']];
+  return agent_call('/agent/bots/' . rawurlencode($botName) . '/proxy' . $path, $method, $body);
+}
+// Liste des bots (noms uniques) présents pour ce membre.
+function my_bots(): array {
+  [$map, $infos] = guild_map();
+  $bots = [];
+  foreach ($map as $gid => $b) {
+    if (!$bots[$b] ?? false) $bots[$b] = ['name' => $b, 'serveurs' => 0];
+    $bots[$b] = ['name' => $b, 'serveurs' => ($bots[$b]['serveurs'] ?? 0) + 1];
+  }
+  return array_values($bots);
 }
 
 // Modules du dashboard (activables par le créateur). Ordre = ordre d'affichage.
@@ -409,7 +427,14 @@ if ($p === 'api-moi' || $p === 'api-serveur' || $p === 'api-global') {
       send_json($st ?: 502, $d ?: ['error' => 'Bot injoignable.']);
     }
     if ($a === 'dashconfig' && $_SERVER['REQUEST_METHOD'] === 'GET') {
-      send_json(200, ['config' => dash_config_get(), 'modules' => DASH_MODULES]);
+      send_json(200, ['config' => dash_config_get(), 'modules' => DASH_MODULES, 'bots' => DEMO ? [['name' => 'Colmar_rp', 'serveurs' => 2], ['name' => 'Shadow_community', 'serveurs' => 1]] : my_bots()]);
+    }
+    // Statut personnalisé d'un bot précis (créateur).
+    if ($a === 'bot-status' && $_SERVER['REQUEST_METHOD'] === 'GET') {
+      if (empty($role['creator'])) send_json(403, ['error' => 'Réservé au créateur du bot.']);
+      if (DEMO) send_json(200, ['status' => ['type' => 'watching', 'text' => 'les serveurs RP', 'presence' => 'online'], 'tag' => 'Colmar_rp#0001']);
+      [$st, $d] = named_bot_api((string) ($_GET['bot'] ?? ''), '/bot-status');
+      send_json($st ?: 502, $d ?: ['error' => 'Bot injoignable.']);
     }
 
     // Écritures : le bot revérifie la permission via actorId.
@@ -429,6 +454,11 @@ if ($p === 'api-moi' || $p === 'api-serveur' || $p === 'api-global') {
       if ($a === 'dashconfig-save') {
         if (empty($role['creator'])) send_json(403, ['error' => 'Réservé au créateur du bot.']);
         [$st, $d] = first_bot_api('/dashboard-config', 'POST', ['actorId' => $uid, 'config' => $post['config'] ?? []]);
+        send_json($st ?: 502, $d ?: ['error' => 'Bot injoignable.']);
+      }
+      if ($a === 'bot-status-save') {
+        if (empty($role['creator'])) send_json(403, ['error' => 'Réservé au créateur du bot.']);
+        [$st, $d] = named_bot_api((string) ($post['bot'] ?? ''), '/bot-status', 'POST', ['actorId' => $uid, 'status' => $post['status'] ?? null]);
         send_json($st ?: 502, $d ?: ['error' => 'Bot injoignable.']);
       }
     }
@@ -993,20 +1023,34 @@ function loadPage(srv){
       h += sec('Nouvelle autorisation', '', add, '');
     } else if (page === 'tickets'){
       h += '<h1 class="pagetitle">Tickets</h1>';
+      // Prévisualisation joueur : ce que verra un membre dans le salon du panneau.
+      var opts = '';
+      p.tickets.forEach(function(t){ opts += '<option>' + (t.emoji ? esc(t.emoji) + ' ' : '') + esc(t.label) + (t.description ? ' — ' + esc(t.description) : '') + '</option>'; });
+      var btns = '';
+      p.tickets.forEach(function(t){ btns += '<button style="background:#5865f2;border:0;color:#fff;pointer-events:none">' + (t.emoji ? esc(t.emoji) + ' ' : '') + esc(t.label) + '</button> '; });
+      var prev = '<div class="dprev"><div class="dtop"><img src="https://cdn.discordapp.com/embed/avatars/1.png"><span class="bn">' + esc(srv ? srv.bot : 'Bot') + '</span><span class="badge">✔ APP</span></div>' +
+        '<div class="dcard"><div class="dt">🎫 Ouvrir un ticket</div><div class="dd">Choisissez une raison pour contacter le staff.</div></div>' +
+        '<div style="margin-top:10px"><div class="flabel">Aperçu — menu déroulant (sélecteur de raison)</div>' +
+        (p.tickets.length ? '<select style="pointer-events:none"><option>🎫 Choisissez une raison…</option>' + opts + '</select>' : '<i style="color:var(--muted)">Ajoutez des raisons ci-dessous.</i>') +
+        '<div class="flabel" style="margin-top:10px">Aperçu — boutons</div><div style="display:flex;gap:6px;flex-wrap:wrap">' + (btns || '<i style="color:var(--muted)">—</i>') + '</div></div></div>';
+      h += sec('👁️ Prévisualisation joueur', 'Ce que verront les membres. Choisissez le mode d\'ouverture (menu ou boutons) en publiant le panneau : <code>/ticket panneau ouverture:menu</code> sur Discord.', prev, '');
       var tk = '';
       p.tickets.forEach(function(t){
-        tk += '<div class="row">' + (t.emoji ? esc(t.emoji) + ' ' : '') + '<b>' + esc(t.label) + '</b> — catégorie « ' + esc(t.categorie) + ' »' + (t.support ? ' — support @' + esc(t.support) : '') +
+        tk += '<div class="row">' + (t.emoji ? esc(t.emoji) + ' ' : '') + '<b>' + esc(t.label) + '</b>' + (t.description ? ' <span style="color:var(--muted)">— ' + esc(t.description) + '</span>' : '') +
+          '<span style="color:var(--muted);font-size:12px">📁 ' + esc(t.categorie) + (t.support ? ' · 🛎️ @' + esc(t.support) : '') + '</span>' +
           '<button class="tk-del" data-id="' + t.id + '" style="margin-left:auto;padding:4px 11px;font-size:12px">🗑</button></div>';
       });
-      if (!p.tickets.length) tk += '<div class="row" style="color:var(--muted)"><i>Aucun type de ticket.</i></div>';
-      h += sec('Types de tickets', 'Chaque type crée ses salons dans sa catégorie Discord. Après un changement, republiez le panneau : /ticket panneau-modifier sur Discord.', tk, '');
-      var addt = '<div class="fields" style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end">' +
-        '<div style="min-width:150px"><div class="flabel">Nom</div><input id="wt_nom" placeholder="Support"></div>' +
+      if (!p.tickets.length) tk += '<div class="row" style="color:var(--muted)"><i>Aucune raison de ticket.</i></div>';
+      h += sec('Raisons de tickets', 'Chaque raison a sa <b>propre catégorie</b> Discord : un ticket ouvert avec cette raison sera créé dedans. Après un changement, republiez le panneau : <code>/ticket panneau</code>.', tk, '');
+      var addt = '<div class="fields">' +
+        '<div style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end">' +
+        '<div style="min-width:150px"><div class="flabel">Nom de la raison</div><input id="wt_nom" placeholder="Support"></div>' +
         '<div style="min-width:80px;max-width:100px"><div class="flabel">Emoji</div><input id="wt_emoji" placeholder="🎫"></div>' +
-        '<div style="flex:1;min-width:170px">' + fsel3('wt_cat', 'Catégorie des tickets', p.categories) + '</div>' +
-        '<div style="flex:1;min-width:170px">' + fsel2('wt_role', 'Rôle support (optionnel)', p.roles) + '</div>' +
-        '<button id="wt_add" class="accent">➕ Ajouter</button></div>';
-      h += sec('Nouveau type de ticket', '', addt, '');
+        '<div style="flex:1;min-width:200px">' + fsel3('wt_cat', 'Catégorie dédiée à cette raison', p.categories) + '</div>' +
+        '<div style="flex:1;min-width:170px">' + fsel2('wt_role', 'Rôle support (optionnel)', p.roles) + '</div></div>' +
+        '<div class="flabel" style="margin-top:10px">Description (affichée sous la raison dans le menu déroulant)</div><input id="wt_desc" placeholder="Ex : Une question, un souci ? Ouvrez ici.">' +
+        '<button id="wt_add" class="accent" style="margin-top:10px">➕ Ajouter la raison</button></div>';
+      h += sec('Nouvelle raison (avec sa catégorie)', 'La config avancée du sélecteur : chaque raison peut pointer vers une catégorie différente.', addt, '');
     }
     m.innerHTML = h + '</div>';
     var reload = function(j){ if (j && !j.error) { toast('✅ ' + (j.note || 'Enregistré'), 'ok'); loadPage(srv); } };
@@ -1027,7 +1071,7 @@ function loadPage(srv){
     });
     if ($('wt_add')) $('wt_add').onclick = function(){
       if (!$('wt_nom').value.trim() || !$('wt_cat').value) { toast('⚠️ Nom et catégorie requis.'); return; }
-      api('POST', su('tickets-type'), { label: $('wt_nom').value, emoji: $('wt_emoji').value, categoryId: $('wt_cat').value, supportRoleId: $('wt_role').value || null }).then(reload);
+      api('POST', su('tickets-type'), { label: $('wt_nom').value, emoji: $('wt_emoji').value, categoryId: $('wt_cat').value, supportRoleId: $('wt_role').value || null, description: $('wt_desc') ? $('wt_desc').value : '' }).then(reload);
     };
     Array.prototype.forEach.call(m.querySelectorAll('.tk-del'), function(el){
       el.onclick = function(){ if (confirm('Supprimer ce type de ticket ?')) api('POST', su('tickets-type-suppr'), { id: el.getAttribute('data-id') }).then(reload); };
@@ -1185,7 +1229,26 @@ function renderCreateur(){
         '<span class="sw" style="margin-left:auto">' + tog('crm_' + k, on) + '</span></div>';
     });
     h += sec('🧩 Modules affichés', 'Activez ou désactivez les pages visibles par vos staffs dans la configuration des serveurs.', mi, '');
-    h += '<button id="cr_save" class="accent" style="font-size:14px;padding:11px 22px">💾 Enregistrer la configuration</button></div>';
+    h += '<button id="cr_save" class="accent" style="font-size:14px;padding:11px 22px">💾 Enregistrer la configuration</button>';
+
+    // Statut personnalisé par bot
+    var bots = d.bots || [];
+    var bopts = bots.map(function(b){ return '<option value="' + esc(b.name) + '">' + esc(b.name) + ' (' + b.serveurs + ' serveur' + (b.serveurs > 1 ? 's' : '') + ')</option>'; }).join('');
+    var typeOpts = [['custom','Personnalisé'],['playing','Joue à'],['watching','Regarde'],['listening','Écoute'],['competing','Participe à'],['streaming','En live (Twitch)']]
+      .map(function(t){ return '<option value="' + t[0] + '">' + t[1] + '</option>'; }).join('');
+    var presOpts = [['online','🟢 En ligne'],['idle','🌙 Inactif'],['dnd','⛔ Ne pas déranger'],['invisible','⚪ Invisible']]
+      .map(function(p){ return '<option value="' + p[0] + '">' + p[1] + '</option>'; }).join('');
+    var stat = '<div class="fields">' +
+      '<div class="flabel">Bot concerné</div><select id="st_bot">' + (bopts || '<option value="">— Aucun bot en ligne —</option>') + '</select>' +
+      '<div style="display:flex;gap:9px;flex-wrap:wrap;margin-top:12px">' +
+      '<div style="min-width:150px"><div class="flabel">Type</div><select id="st_type">' + typeOpts + '</select></div>' +
+      '<div style="flex:1;min-width:220px"><div class="flabel">Texte du statut</div><input id="st_text" placeholder="ex : les serveurs RP"></div>' +
+      '<div style="min-width:170px"><div class="flabel">Présence</div><select id="st_pres">' + presOpts + '</select></div></div>' +
+      '<div class="flabel" id="st_urlL" style="margin-top:12px;display:none">URL Twitch (pour « En live »)</div><input id="st_url" placeholder="https://twitch.tv/…" style="display:none">' +
+      '<div style="margin-top:12px;display:flex;gap:9px"><button id="st_save" class="accent">💾 Appliquer le statut</button><button id="st_clear">🧹 Retirer le statut</button></div></div>';
+    h += sec('🟢 Statut personnalisé par bot', 'Définissez l\'activité et la présence Discord affichées par un bot précis.', stat, '');
+    h += '</div>';
+
     $('content').innerHTML = h;
     if ($('cr-home')) $('cr-home').onclick = renderHome;
     $('cr_save').onclick = function(){
@@ -1195,6 +1258,30 @@ function renderCreateur(){
       api('POST', gu('dashconfig-save'), { config: newCfg }).then(function(j){
         if (j && !j.error){ toast('✅ Configuration enregistrée', 'ok'); DASH = newCfg; applyBrand(); }
       });
+    };
+    // Statut : affiche le champ URL uniquement pour « streaming », charge l'existant.
+    var toggleUrl = function(){ var on = $('st_type').value === 'streaming'; $('st_url').style.display = on ? '' : 'none'; $('st_urlL').style.display = on ? '' : 'none'; };
+    if ($('st_type')) $('st_type').onchange = toggleUrl;
+    var loadStatus = function(){
+      if (!$('st_bot') || !$('st_bot').value) return;
+      api('GET', gu('bot-status') + '&bot=' + encodeURIComponent($('st_bot').value)).then(function(j){
+        var s = (j && j.status) || {};
+        if ($('st_type')) $('st_type').value = s.type || 'custom';
+        if ($('st_text')) $('st_text').value = s.text || '';
+        if ($('st_pres')) $('st_pres').value = s.presence || 'online';
+        if ($('st_url')) $('st_url').value = s.url || '';
+        toggleUrl();
+      });
+    };
+    if ($('st_bot')) { $('st_bot').onchange = loadStatus; loadStatus(); }
+    if ($('st_save')) $('st_save').onclick = function(){
+      if (!$('st_bot').value) { toast('⚠️ Aucun bot.', 'err'); return; }
+      var status = { type: $('st_type').value, text: $('st_text').value.trim(), presence: $('st_pres').value, url: $('st_url').value.trim() };
+      api('POST', gu('bot-status-save'), { bot: $('st_bot').value, status: status }).then(function(j){ if (j && !j.error) toast('✅ Statut appliqué', 'ok'); });
+    };
+    if ($('st_clear')) $('st_clear').onclick = function(){
+      if (!$('st_bot').value) return;
+      api('POST', gu('bot-status-save'), { bot: $('st_bot').value, status: null }).then(function(j){ if (j && !j.error){ toast('🧹 Statut retiré', 'ok'); $('st_text').value = ''; } });
     };
   });
 }

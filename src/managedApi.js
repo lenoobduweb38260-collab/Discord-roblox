@@ -25,7 +25,7 @@ function startManagedApi(client, baseDir) {
     });
 
   const insertTicketType = db.prepare(
-    'INSERT INTO ticket_types (guild_id, label, emoji, category_id, support_role_id) VALUES (?, ?, ?, ?, ?)'
+    'INSERT INTO ticket_types (guild_id, label, emoji, category_id, support_role_id, description) VALUES (?, ?, ?, ?, ?, ?)'
   );
   const deleteTicketType = db.prepare('DELETE FROM ticket_types WHERE id = ? AND guild_id = ?');
   const getTicketTypeByLabel = db.prepare('SELECT * FROM ticket_types WHERE guild_id = ? AND label = ?');
@@ -158,6 +158,7 @@ function startManagedApi(client, baseDir) {
           id: t.id,
           label: t.label,
           emoji: t.emoji,
+          description: t.description || null,
           categorie: guild.channels.cache.get(t.category_id)?.name || t.category_id || '?',
           support: t.support_role_id ? guild.roles.cache.get(t.support_role_id)?.name || t.support_role_id : null,
         }));
@@ -182,8 +183,9 @@ function startManagedApi(client, baseDir) {
         const category = guild.channels.cache.get(body.categoryId);
         if (!category || category.type !== ChannelType.GuildCategory) return send(400, { error: 'Catégorie invalide.' });
         const supportRole = body.supportRoleId ? guild.roles.cache.get(body.supportRoleId) : null;
-        insertTicketType.run(guild.id, label, String(body.emoji || '').trim() || null, category.id, supportRole?.id || null);
-        return send(200, { ok: true, note: 'Republiez le panneau (/ticket panneau-modifier) pour afficher le nouveau bouton.' });
+        const description = String(body.description || '').trim().slice(0, 100) || null;
+        insertTicketType.run(guild.id, label, String(body.emoji || '').trim() || null, category.id, supportRole?.id || null, description);
+        return send(200, { ok: true, note: 'Republiez le panneau (/ticket panneau) pour afficher la nouvelle raison.' });
       }
       if (req.method === 'POST' && url.pathname === '/tickets-type-suppr') {
         const body = await readBody(req);
@@ -279,6 +281,59 @@ function startManagedApi(client, baseDir) {
         const incoming = body.config && typeof body.config === 'object' ? body.config : {};
         setState('dashboard_config', JSON.stringify(incoming).slice(0, 8000));
         return send(200, { ok: true, config: incoming });
+      }
+
+      // ----- 🟢 Statut personnalisé du bot (créateur) -----
+      // Type d'activité + texte, appliqués à la présence Discord et mémorisés.
+      if (url.pathname.startsWith('/bot-status')) {
+        const { isCreator, state, setState } = require('./utils/botTeam');
+        const { ActivityType, PresenceUpdateStatus } = require('discord.js');
+        const parse = () => {
+          try {
+            return JSON.parse(state('bot_status') || 'null');
+          } catch {
+            return null;
+          }
+        };
+        if (req.method === 'GET') {
+          return send(200, { status: parse(), tag: client.user.tag });
+        }
+        const body = await readBody(req);
+        if (!(await isCreator(client, String(body.actorId || '')))) {
+          return send(403, { error: 'Réservé au créateur du bot.' });
+        }
+        const cfg = body.status && typeof body.status === 'object' ? body.status : null;
+        setState('bot_status', cfg ? JSON.stringify(cfg) : '');
+        // Application immédiate.
+        try {
+          if (!cfg || !cfg.text) {
+            client.user.setPresence({ activities: [], status: 'online' });
+          } else {
+            const typeMap = {
+              playing: ActivityType.Playing,
+              watching: ActivityType.Watching,
+              listening: ActivityType.Listening,
+              competing: ActivityType.Competing,
+              custom: ActivityType.Custom,
+            };
+            const presenceMap = {
+              online: PresenceUpdateStatus.Online,
+              idle: PresenceUpdateStatus.Idle,
+              dnd: PresenceUpdateStatus.DoNotDisturb,
+              invisible: PresenceUpdateStatus.Invisible,
+            };
+            const activity = { name: String(cfg.text).slice(0, 128), type: typeMap[cfg.type] ?? ActivityType.Custom };
+            if (activity.type === ActivityType.Custom) activity.state = activity.name;
+            if (cfg.type === 'streaming' && /^https?:\/\/(www\.)?twitch\.tv\//i.test(cfg.url || '')) {
+              activity.type = ActivityType.Streaming;
+              activity.url = cfg.url;
+            }
+            client.user.setPresence({ activities: [activity], status: presenceMap[cfg.presence] || PresenceUpdateStatus.Online });
+          }
+        } catch (err) {
+          return send(500, { error: `Application du statut impossible : ${err.message}` });
+        }
+        return send(200, { ok: true, status: cfg });
       }
 
       // ----- 🛡️ Staff du bot (équipe globale, page dédiée du gestionnaire) -----

@@ -27,6 +27,7 @@ const ACTION_NAMES = { kiss: '💋 Bisous', hug: '🤗 Câlins', pat: '🖐️ C
 // propriétaire/équipe de l'application Discord), 'staff' (IDs listés dans
 // BOT_TEAM, séparés par des virgules), ou null.
 async function getBotRole(client, userId) {
+  userId = String(userId || '').trim();
   const creators = new Set();
   if (process.env.OWNER_ID?.trim()) creators.add(process.env.OWNER_ID.trim());
   try {
@@ -39,7 +40,7 @@ async function getBotRole(client, userId) {
   if (creators.has(userId)) return 'createur';
   const team = (process.env.BOT_TEAM || '').split(',').map((s) => s.trim()).filter(Boolean);
   if (team.includes(userId)) return 'staff';
-  if (getStaffRow.get(userId)) return 'staff'; // hiérarchie /botstaff
+  if (getStaffRow.get(userId)) return 'staff'; // hiérarchie /botstaff (dashboard/gestionnaire)
   return null;
 }
 
@@ -90,11 +91,25 @@ module.exports = {
       )
       .setFooter({ text: 'Visible uniquement par vous' });
 
+    // Statut vis-à-vis du bot — affiché pour N'IMPORTE QUEL membre consulté
+    // (permet de vérifier qui est staff/créateur du bot).
+    const targetRole = await getBotRole(interaction.client, target.id);
+    embed.spliceFields(3, 0, {
+      name: '🛡️ Équipe du bot',
+      value:
+        targetRole === 'createur'
+          ? '👑 **Créateur du bot**'
+          : targetRole === 'staff'
+            ? '🛡️ **Membre du staff du bot**'
+            : '— Aucun',
+      inline: false,
+    });
+
     const components = [];
     // Le bouton « Me désigner » n'apparaît que si l'auteur consulte SA propre
     // fiche et qu'il est créateur du bot ou membre de son équipe.
     if (target.id === interaction.user.id) {
-      const role = await getBotRole(interaction.client, interaction.user.id);
+      const role = targetRole;
       if (role) {
         embed.addFields({
           name: role === 'createur' ? '👑 Créateur du bot' : '🛡️ Staff du bot',

@@ -16,7 +16,7 @@ const { GRADES } = require('../utils/permissions');
 // Récupère les options de personnalisation du panneau depuis l'interaction.
 function readPanelOptions(interaction) {
   const opts = {};
-  for (const key of ['mode', 'texte', 'titre', 'description', 'couleur', 'image', 'miniature', 'footer']) {
+  for (const key of ['mode', 'ouverture', 'selecteur_texte', 'texte', 'titre', 'description', 'couleur', 'image', 'miniature', 'footer']) {
     const value = interaction.options.getString(key);
     if (value !== null) opts[key] = value;
   }
@@ -39,6 +39,14 @@ function addPanelOptions(sub, modeRequired, withSalon) {
     );
   }
   return sub
+    .addStringOption((o) =>
+      o
+        .setName('ouverture')
+        .setDescription('Comment ouvrir un ticket : menu déroulant de raisons ou boutons')
+        .setRequired(false)
+        .addChoices({ name: '📋 Menu déroulant (sélecteur de raison)', value: 'menu' }, { name: '🔘 Boutons', value: 'boutons' })
+    )
+    .addStringOption((o) => o.setName('selecteur_texte').setDescription('Texte affiché dans le menu déroulant').setRequired(false))
     .addStringOption((o) => o.setName('texte').setDescription('Texte du message (\\n = saut de ligne)').setRequired(false))
     .addStringOption((o) => o.setName('titre').setDescription('Titre de l\'embed').setRequired(false))
     .addStringOption((o) => o.setName('description').setDescription('Description de l\'embed (\\n = saut de ligne)').setRequired(false))
@@ -63,7 +71,8 @@ module.exports = {
             o.setName('categorie').setDescription('Catégorie où créer les salons de ce type').addChannelTypes(ChannelType.GuildCategory).setRequired(true)
           )
           .addRoleOption((o) => o.setName('role_support').setDescription('Rôle qui voit et gère ces tickets').setRequired(false))
-          .addStringOption((o) => o.setName('emoji').setDescription('Emoji du bouton (ex : 🛠️)').setRequired(false))
+          .addStringOption((o) => o.setName('emoji').setDescription('Emoji du bouton/du sélecteur (ex : 🛠️)').setRequired(false))
+          .addStringOption((o) => o.setName('description').setDescription('Description de la raison (affichée dans le menu déroulant)').setRequired(false))
       )
       .addSubcommand((sub) =>
         sub
@@ -108,7 +117,8 @@ module.exports = {
       const categorie = interaction.options.getChannel('categorie');
       const role = interaction.options.getRole('role_support');
       const emoji = interaction.options.getString('emoji');
-      insertType.run(interaction.guildId, nom, emoji, categorie.id, role?.id || null);
+      const description = interaction.options.getString('description')?.slice(0, 100) || null;
+      insertType.run(interaction.guildId, nom, emoji, categorie.id, role?.id || null, description);
       await interaction.reply({
         content:
           `✅ Type **${emoji ? `${emoji} ` : ''}${nom}** créé → salons dans **${categorie.name}**` +

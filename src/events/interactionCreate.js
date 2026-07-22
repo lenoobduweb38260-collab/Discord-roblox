@@ -58,6 +58,12 @@ module.exports = {
       return handleTicketButton(interaction);
     }
 
+    // ----- Sélecteur de raison du panneau de tickets (menu déroulant) -----
+    if (interaction.isStringSelectMenu() && interaction.customId === 'tktmenu') {
+      if (!interaction.inGuild()) return;
+      return handleTicketButton(interaction);
+    }
+
     // ----- Panneau central de configuration (/config) -----
     if (
       (interaction.isButton() || interaction.isAnySelectMenu() || interaction.isModalSubmit()) &&

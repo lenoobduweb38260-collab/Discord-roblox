@@ -277,6 +277,14 @@ for (const column of [
   } catch {}
 }
 
+// Types de tickets : description (option du sélecteur de raison) et
+// ping_role_id (rôle mentionné à l'ouverture, sinon le support).
+for (const column of ['description TEXT', 'ping_role_id TEXT']) {
+  try {
+    db.exec(`ALTER TABLE ticket_types ADD COLUMN ${column}`);
+  } catch {}
+}
+
 const DEFAULT_CONFIG = {
   staff_role_id: null,
   admin_role_id: null,
