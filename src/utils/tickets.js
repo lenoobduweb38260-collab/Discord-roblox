@@ -95,14 +95,15 @@ function buildPanelPayload(guildId, options = {}) {
   if (options.mode === 'embed') {
     const embed = new EmbedBuilder().setColor(parseColor(options.couleur) ?? COLORS.PRIMARY);
     if (options.titre) embed.setTitle(nl(options.titre));
-    embed.setDescription(nl(options.description) || '🎫 Cliquez sur un bouton ci-dessous pour ouvrir un ticket.');
+    embed.setDescription(nl(options.description) || '🎫 Cliquez ci-dessous pour ouvrir un ticket.');
+    if (options.auteur) embed.setAuthor({ name: String(options.auteur).slice(0, 256), iconURL: options.auteur_icone || undefined });
     if (options.image) embed.setImage(options.image);
     if (options.miniature) embed.setThumbnail(options.miniature);
     if (options.footer) embed.setFooter({ text: nl(options.footer) });
     payload.embeds = [embed];
     payload.content = nl(options.texte) || '';
   } else {
-    payload.content = nl(options.texte) || '🎫 Cliquez sur un bouton ci-dessous pour ouvrir un ticket.';
+    payload.content = nl(options.texte) || '🎫 Cliquez ci-dessous pour ouvrir un ticket.';
     payload.embeds = [];
   }
   return payload;

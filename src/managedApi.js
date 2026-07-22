@@ -38,6 +38,14 @@ function startManagedApi(client, baseDir) {
   );
   const listBans = db.prepare('SELECT * FROM global_bans ORDER BY banned_at DESC');
   const deleteBanStmt = db.prepare('DELETE FROM global_bans WHERE user_id = ?');
+  // Profils d'envoi (nom + avatar personnalisés) pour les panneaux.
+  const listProfiles = db.prepare('SELECT * FROM webhook_profiles WHERE guild_id = ? ORDER BY id');
+  const getProfile = db.prepare('SELECT * FROM webhook_profiles WHERE id = ? AND guild_id = ?');
+  const insertProfile = db.prepare('INSERT INTO webhook_profiles (guild_id, name, avatar_url) VALUES (?, ?, ?)');
+  const deleteProfile = db.prepare('DELETE FROM webhook_profiles WHERE id = ? AND guild_id = ?');
+  const insertTicketPanel = db.prepare(
+    'INSERT INTO ticket_panels (guild_id, channel_id, message_id, options, webhook_id, webhook_token) VALUES (?, ?, ?, ?, ?, ?)'
+  );
 
   // Clés de configuration modifiables depuis le dashboard
   // ('s' = id, 'n' = nombre, 'b' = booléen, 't' = texte, 'j' = liste d'IDs).
@@ -168,7 +176,58 @@ function startManagedApi(client, baseDir) {
           reason: b.reason,
           at: b.banned_at,
         }));
-        return send(200, { config: getGuildConfig(guild.id), roles, channels, categories, whitelist, tickets, bans });
+        const profils = listProfiles.all(guild.id).map((p) => ({ id: p.id, name: p.name, avatar: p.avatar_url }));
+        return send(200, { config: getGuildConfig(guild.id), roles, channels, categories, whitelist, tickets, bans, profils });
+      }
+
+      // ----- Profils d'envoi (nom + avatar) pour les panneaux -----
+      if (req.method === 'POST' && url.pathname === '/profil-ajouter') {
+        const body = await readBody(req);
+        if (!client.guilds.cache.has(body.guildId)) return send(404, { error: 'Serveur introuvable.' });
+        const name = String(body.name || '').trim().slice(0, 80);
+        if (!name) return send(400, { error: 'Nom du profil requis.' });
+        const avatar = String(body.avatarUrl || '').trim();
+        if (avatar && !/^https?:\/\/.+/i.test(avatar)) return send(400, { error: 'URL d\'avatar invalide.' });
+        insertProfile.run(body.guildId, name, avatar || null);
+        return send(200, { ok: true });
+      }
+      if (req.method === 'POST' && url.pathname === '/profil-suppr') {
+        const body = await readBody(req);
+        deleteProfile.run(parseInt(body.id, 10), body.guildId);
+        return send(200, { ok: true });
+      }
+
+      // ----- Publier un panneau de tickets (depuis le dashboard) -----
+      // Message + embed personnalisables, envoyés sous un profil (webhook) si choisi.
+      if (req.method === 'POST' && url.pathname === '/ticket-panneau') {
+        const body = await readBody(req);
+        const guild = client.guilds.cache.get(body.guildId);
+        if (!guild) return send(404, { error: 'Serveur introuvable.' });
+        const channel = guild.channels.cache.get(body.channelId);
+        if (!channel?.isTextBased()) return send(400, { error: 'Salon introuvable.' });
+        if (!listTicketTypes.all(guild.id).length) return send(400, { error: 'Ajoutez d\'abord au moins une raison de ticket.' });
+        const { buildPanelPayload } = require('./utils/tickets');
+        const opts = body.options && typeof body.options === 'object' ? body.options : {};
+        const payload = buildPanelPayload(guild.id, opts);
+        // Profil personnalisé → envoi via webhook (nom + avatar).
+        const profile = body.profileId ? getProfile.get(parseInt(body.profileId, 10), guild.id) : null;
+        try {
+          if (profile) {
+            const me = guild.members.me;
+            if (!channel.permissionsFor(me)?.has(require('discord.js').PermissionFlagsBits.ManageWebhooks)) {
+              return send(400, { error: 'Le bot a besoin de la permission « Gérer les webhooks » dans ce salon pour envoyer sous un profil.' });
+            }
+            const webhook = await channel.createWebhook({ name: profile.name.slice(0, 80), avatar: profile.avatar_url || undefined });
+            const msg = await webhook.send({ ...payload, username: profile.name.slice(0, 80), avatarURL: profile.avatar_url || undefined });
+            insertTicketPanel.run(guild.id, channel.id, msg.id, JSON.stringify(opts), webhook.id, webhook.token);
+          } else {
+            const msg = await channel.send(payload);
+            insertTicketPanel.run(guild.id, channel.id, msg.id, JSON.stringify(opts), null, null);
+          }
+        } catch (err) {
+          return send(500, { error: `Publication impossible : ${err.message}` });
+        }
+        return send(200, { ok: true, note: `Panneau publié dans #${channel.name}.` });
       }
 
       // Gestion des types de tickets depuis le dashboard.

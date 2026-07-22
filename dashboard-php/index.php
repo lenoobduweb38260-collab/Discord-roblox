@@ -89,6 +89,9 @@ function demo_parametres(): array {
       ['id' => 1, 'label' => 'Support', 'emoji' => '🛠️', 'description' => 'Une question, un souci ?', 'categorie' => 'TICKETS', 'support' => 'Staff'],
       ['id' => 2, 'label' => 'Plainte', 'emoji' => '⚖️', 'description' => 'Signaler un membre', 'categorie' => 'AIDE', 'support' => 'Modérateur'],
     ],
+    'profils' => [
+      ['id' => 1, 'name' => 'Support Colmar RP', 'avatar' => 'https://cdn.discordapp.com/embed/avatars/2.png'],
+    ],
     'bans' => [],
   ];
 }
@@ -500,7 +503,7 @@ if ($p === 'api-moi' || $p === 'api-serveur' || $p === 'api-global') {
     [$st, $data] = bot_api($gid, '/config', 'POST', ['guildId' => $gid, 'key' => $key, 'value' => $body['value'] ?? null]);
     send_json($st ?: 502, $data ?: ['error' => 'Bot injoignable.']);
   }
-  if (in_array($a, ['tickets-type', 'tickets-type-suppr', 'whitelist-ajouter', 'whitelist-retirer'], true) && $_SERVER['REQUEST_METHOD'] === 'POST') {
+  if (in_array($a, ['tickets-type', 'tickets-type-suppr', 'whitelist-ajouter', 'whitelist-retirer', 'ticket-panneau', 'profil-ajouter', 'profil-suppr'], true) && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $body = json_body();
     $body['guildId'] = $gid;
     [$st, $data] = bot_api($gid, "/$a", 'POST', $body);
@@ -793,6 +796,7 @@ function tog(id, checked){
 
 var ROLE = { creator: false, staff: false, perms: [] };
 var DASH = { nom: 'Mon Bot', accent: '#d8734f', modules: {} };
+var TK = null; // paramètres tickets (raisons, profils) pour la prévisualisation
 function canPerm(p){ return ROLE.creator || (ROLE.perms || []).indexOf(p) >= 0; }
 
 // ----- Accueil : grille des serveurs -----
@@ -1022,18 +1026,42 @@ function loadPage(srv){
         '<button id="ww_add" class="accent">➕ Ajouter</button></div>';
       h += sec('Nouvelle autorisation', '', add, '');
     } else if (page === 'tickets'){
+      TK = p; // mémorise pour la prévisualisation en direct
       h += '<h1 class="pagetitle">Tickets</h1>';
-      // Prévisualisation joueur : ce que verra un membre dans le salon du panneau.
-      var opts = '';
-      p.tickets.forEach(function(t){ opts += '<option>' + (t.emoji ? esc(t.emoji) + ' ' : '') + esc(t.label) + (t.description ? ' — ' + esc(t.description) : '') + '</option>'; });
-      var btns = '';
-      p.tickets.forEach(function(t){ btns += '<button style="background:#5865f2;border:0;color:#fff;pointer-events:none">' + (t.emoji ? esc(t.emoji) + ' ' : '') + esc(t.label) + '</button> '; });
-      var prev = '<div class="dprev"><div class="dtop"><img src="https://cdn.discordapp.com/embed/avatars/1.png"><span class="bn">' + esc(srv ? srv.bot : 'Bot') + '</span><span class="badge">✔ APP</span></div>' +
-        '<div class="dcard"><div class="dt">🎫 Ouvrir un ticket</div><div class="dd">Choisissez une raison pour contacter le staff.</div></div>' +
-        '<div style="margin-top:10px"><div class="flabel">Aperçu — menu déroulant (sélecteur de raison)</div>' +
-        (p.tickets.length ? '<select style="pointer-events:none"><option>🎫 Choisissez une raison…</option>' + opts + '</select>' : '<i style="color:var(--muted)">Ajoutez des raisons ci-dessous.</i>') +
-        '<div class="flabel" style="margin-top:10px">Aperçu — boutons</div><div style="display:flex;gap:6px;flex-wrap:wrap">' + (btns || '<i style="color:var(--muted)">—</i>') + '</div></div></div>';
-      h += sec('👁️ Prévisualisation joueur', 'Ce que verront les membres. Choisissez le mode d\'ouverture (menu ou boutons) en publiant le panneau : <code>/ticket panneau ouverture:menu</code> sur Discord.', prev, '');
+      // ---- Éditeur du panneau : message + embed + profil + salon + preview ----
+      var profOpts = (p.profils || []).map(function(pr){ return '<option value="' + pr.id + '">' + esc(pr.name) + '</option>'; }).join('');
+      var editor = '<div class="cols"><div class="fields">' +
+        '<div class="flabel">Mode d\'ouverture</div><select id="tp_ouv"><option value="menu">📋 Menu déroulant (sélecteur de raison)</option><option value="boutons">🔘 Boutons</option></select>' +
+        '<div class="flabel" style="margin-top:12px">Profil d\'envoi (nom + avatar du bot pour ce message)</div>' +
+        '<select id="tp_prof"><option value="">— Le bot lui-même —</option>' + profOpts + '</select>' +
+        '<div class="flabel" style="margin-top:12px">Message (au-dessus de l\'embed)</div><input id="tp_msg" placeholder="🎫 Besoin d\'aide ?">' +
+        '<div class="flabel" style="margin-top:12px">— Embed (laissez vide pour un simple message) —</div>' +
+        '<label style="display:flex;gap:8px;align-items:center;font-size:13px;margin:6px 0">' + tog('tp_embed', true) + ' Utiliser un embed</label>' +
+        '<div class="flabel">Titre</div><input id="tp_titre" value="Ouvrir un ticket">' +
+        '<div class="flabel" style="margin-top:10px">Description</div><textarea id="tp_desc" rows="3">Choisissez une raison pour contacter le staff.</textarea>' +
+        '<div style="display:flex;gap:9px;flex-wrap:wrap;margin-top:10px">' +
+        '<div><div class="flabel">Couleur</div><input id="tp_col" type="color" value="#d8734f" style="width:64px;height:36px;padding:2px"></div>' +
+        '<div style="flex:1;min-width:180px"><div class="flabel">Auteur (haut de l\'embed)</div><input id="tp_auteur"></div></div>' +
+        '<div class="flabel" style="margin-top:10px">Grande image (URL)</div><input id="tp_img">' +
+        '<div class="flabel" style="margin-top:10px">Miniature (URL)</div><input id="tp_thumb">' +
+        '<div class="flabel" style="margin-top:10px">Pied de page</div><input id="tp_footer">' +
+        '<div class="flabel" style="margin-top:14px">Publier dans le salon</div>' + fsel3b('tp_salon', p.channels) +
+        '<button id="tp_pub" class="accent" style="margin-top:12px">📤 Publier le panneau</button>' +
+        '</div><div style="flex:1;min-width:320px"><div class="flabel">Prévisualisation en direct</div><div id="tp_pv"></div></div></div>';
+      h += sec('🎨 Éditeur du panneau', 'Écrivez le message, créez l\'embed, choisissez un profil d\'envoi et publiez — comme sur Ticket Tool.', editor, '');
+      // ---- Profils d'envoi ----
+      var pf = '';
+      (p.profils || []).forEach(function(pr){
+        pf += '<div class="row">' + (pr.avatar ? '<img src="' + esc(pr.avatar) + '" style="width:26px;height:26px;border-radius:50%">' : '👤') + ' <b>' + esc(pr.name) + '</b>' +
+          '<button class="pf-del" data-id="' + pr.id + '" style="margin-left:auto;padding:4px 11px;font-size:12px">🗑</button></div>';
+      });
+      if (!(p.profils || []).length) pf += '<div class="row" style="color:var(--muted)"><i>Aucun profil — le bot envoie sous son propre nom.</i></div>';
+      pf += '<div class="fields" style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end;margin-top:8px">' +
+        '<div style="min-width:170px"><div class="flabel">Nom du profil</div><input id="pf_nom" placeholder="Support Colmar RP"></div>' +
+        '<div style="flex:1;min-width:220px"><div class="flabel">URL de l\'avatar</div><input id="pf_ava" placeholder="https://…/avatar.png"></div>' +
+        '<button id="pf_add" class="accent">➕ Créer le profil</button></div>';
+      h += sec('👤 Profils d\'envoi', 'Nom + avatar personnalisés : le bot enverra le panneau sous cette identité (via un webhook).', pf, '');
+      // ---- Raisons ----
       var tk = '';
       p.tickets.forEach(function(t){
         tk += '<div class="row">' + (t.emoji ? esc(t.emoji) + ' ' : '') + '<b>' + esc(t.label) + '</b>' + (t.description ? ' <span style="color:var(--muted)">— ' + esc(t.description) + '</span>' : '') +
@@ -1041,7 +1069,7 @@ function loadPage(srv){
           '<button class="tk-del" data-id="' + t.id + '" style="margin-left:auto;padding:4px 11px;font-size:12px">🗑</button></div>';
       });
       if (!p.tickets.length) tk += '<div class="row" style="color:var(--muted)"><i>Aucune raison de ticket.</i></div>';
-      h += sec('Raisons de tickets', 'Chaque raison a sa <b>propre catégorie</b> Discord : un ticket ouvert avec cette raison sera créé dedans. Après un changement, republiez le panneau : <code>/ticket panneau</code>.', tk, '');
+      h += sec('Raisons de tickets', 'Chaque raison a sa <b>propre catégorie</b> Discord : un ticket ouvert avec cette raison sera créé dedans.', tk, '');
       var addt = '<div class="fields">' +
         '<div style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end">' +
         '<div style="min-width:150px"><div class="flabel">Nom de la raison</div><input id="wt_nom" placeholder="Support"></div>' +
@@ -1073,6 +1101,33 @@ function loadPage(srv){
       if (!$('wt_nom').value.trim() || !$('wt_cat').value) { toast('⚠️ Nom et catégorie requis.'); return; }
       api('POST', su('tickets-type'), { label: $('wt_nom').value, emoji: $('wt_emoji').value, categoryId: $('wt_cat').value, supportRoleId: $('wt_role').value || null, description: $('wt_desc') ? $('wt_desc').value : '' }).then(reload);
     };
+    // Éditeur de panneau : prévisualisation en direct + publication.
+    if ($('tp_pv')){
+      ['tp_ouv','tp_prof','tp_msg','tp_embed','tp_titre','tp_desc','tp_col','tp_auteur','tp_img','tp_thumb','tp_footer'].forEach(function(id){
+        var el = $(id); if (el) el.addEventListener(el.type === 'checkbox' ? 'change' : 'input', function(){ prevTicket(srv); });
+      });
+      prevTicket(srv);
+      $('tp_pub').onclick = function(){
+        if (!$('tp_salon').value){ toast('⚠️ Choisissez le salon de publication.', 'err'); return; }
+        if (!(TK.tickets || []).length){ toast('⚠️ Ajoutez au moins une raison.', 'err'); return; }
+        var options = { ouverture: $('tp_ouv').value, texte: $('tp_msg').value };
+        if ($('tp_embed').checked){
+          options.mode = 'embed';
+          options.titre = $('tp_titre').value; options.description = $('tp_desc').value;
+          options.couleur = $('tp_col').value; options.auteur = $('tp_auteur').value;
+          options.image = $('tp_img').value; options.miniature = $('tp_thumb').value; options.footer = $('tp_footer').value;
+        }
+        api('POST', su('ticket-panneau'), { channelId: $('tp_salon').value, options: options, profileId: $('tp_prof').value || null })
+          .then(function(j){ if (j && !j.error) toast('📤 ' + (j.note || 'Panneau publié !'), 'ok'); });
+      };
+    }
+    if ($('pf_add')) $('pf_add').onclick = function(){
+      if (!$('pf_nom').value.trim()){ toast('⚠️ Nom du profil requis.', 'err'); return; }
+      api('POST', su('profil-ajouter'), { name: $('pf_nom').value, avatarUrl: $('pf_ava').value }).then(reload);
+    };
+    Array.prototype.forEach.call(m.querySelectorAll('.pf-del'), function(el){
+      el.onclick = function(){ if (confirm('Supprimer ce profil ?')) api('POST', su('profil-suppr'), { id: el.getAttribute('data-id') }).then(reload); };
+    });
     Array.prototype.forEach.call(m.querySelectorAll('.tk-del'), function(el){
       el.onclick = function(){ if (confirm('Supprimer ce type de ticket ?')) api('POST', su('tickets-type-suppr'), { id: el.getAttribute('data-id') }).then(reload); };
     });
@@ -1103,7 +1158,45 @@ function fsel3(id, label, list){
   list.forEach(function(x){ h += '<option value="' + x.id + '">' + esc(x.name) + '</option>'; });
   return h + '</select>';
 }
+function fsel3b(id, list){
+  var h = '<select id="' + id + '"><option value="">— Choisir un salon —</option>';
+  list.forEach(function(x){ h += '<option value="' + x.id + '">#' + esc(x.name) + '</option>'; });
+  return h + '</select>';
+}
 function gu(a){ return 'index.php?p=api-global&a=' + a; }
+
+// Prévisualisation en direct du panneau de tickets (message + embed + sélecteur/boutons).
+function prevTicket(srv){
+  if (!$('tp_pv') || !TK) return;
+  var prof = null;
+  (TK.profils || []).forEach(function(pr){ if (String(pr.id) === $('tp_prof').value) prof = pr; });
+  var nom = prof ? prof.name : (srv ? srv.bot : 'Bot');
+  var ava = prof && prof.avatar ? prof.avatar : 'https://cdn.discordapp.com/embed/avatars/1.png';
+  var h = '<div class="dprev"><div class="dtop"><img src="' + esc(ava) + '"><span class="bn">' + esc(nom) + '</span><span class="badge">✔ APP</span></div>';
+  if ($('tp_msg').value) h += '<div style="margin:4px 0 6px;white-space:pre-wrap">' + esc($('tp_msg').value) + '</div>';
+  if ($('tp_embed').checked){
+    h += '<div class="dcard" style="border-left-color:' + $('tp_col').value + '">';
+    if ($('tp_auteur').value) h += '<div style="font-size:12.5px;font-weight:600;margin-bottom:4px">' + esc($('tp_auteur').value) + '</div>';
+    if ($('tp_titre').value) h += '<div class="dt">' + esc($('tp_titre').value) + '</div>';
+    if ($('tp_desc').value) h += '<div class="dd">' + esc($('tp_desc').value) + '</div>';
+    if ($('tp_thumb').value) h += '<img src="' + esc($('tp_thumb').value) + '" style="width:60px;height:60px;border-radius:6px;float:right;margin:-30px 0 0">';
+    if ($('tp_img').value) h += '<img src="' + esc($('tp_img').value) + '" style="max-width:100%;border-radius:6px;margin-top:8px">';
+    if ($('tp_footer').value) h += '<div class="df">' + esc($('tp_footer').value) + '</div>';
+    h += '</div>';
+  }
+  // Sélecteur ou boutons selon le mode.
+  if ($('tp_ouv').value === 'menu'){
+    var opts = '';
+    (TK.tickets || []).forEach(function(t){ opts += '<option>' + (t.emoji ? esc(t.emoji) + ' ' : '') + esc(t.label) + (t.description ? ' — ' + esc(t.description) : '') + '</option>'; });
+    h += '<div style="margin-top:10px"><select style="pointer-events:none"><option>🎫 Choisissez une raison…</option>' + opts + '</select></div>';
+  } else {
+    var btns = '';
+    (TK.tickets || []).forEach(function(t){ btns += '<button style="background:#5865f2;border:0;color:#fff;pointer-events:none;margin:2px">' + (t.emoji ? esc(t.emoji) + ' ' : '') + esc(t.label) + '</button>'; });
+    h += '<div style="margin-top:10px;display:flex;gap:4px;flex-wrap:wrap">' + (btns || '<i style="color:var(--muted)">Ajoutez des raisons</i>') + '</div>';
+  }
+  h += '</div>';
+  $('tp_pv').innerHTML = h;
+}
 
 // ================= 🛡️ ESPACE STAFF DU BOT =================
 function staffShell(active, inner){

@@ -196,7 +196,16 @@ CREATE TABLE IF NOT EXISTS ticket_panels (
   guild_id   TEXT NOT NULL,
   channel_id TEXT NOT NULL,
   message_id TEXT NOT NULL,
-  options    TEXT NOT NULL DEFAULT '{}'
+  options    TEXT NOT NULL DEFAULT '{}',
+  webhook_id TEXT,
+  webhook_token TEXT
+);
+
+CREATE TABLE IF NOT EXISTS webhook_profiles (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  guild_id   TEXT NOT NULL,
+  name       TEXT NOT NULL,
+  avatar_url TEXT
 );
 
 CREATE TABLE IF NOT EXISTS app_state (
@@ -282,6 +291,13 @@ for (const column of [
 for (const column of ['description TEXT', 'ping_role_id TEXT']) {
   try {
     db.exec(`ALTER TABLE ticket_types ADD COLUMN ${column}`);
+  } catch {}
+}
+
+// Panneaux de tickets : webhook utilisé pour l'envoi sous un profil personnalisé.
+for (const column of ['webhook_id TEXT', 'webhook_token TEXT']) {
+  try {
+    db.exec(`ALTER TABLE ticket_panels ADD COLUMN ${column}`);
   } catch {}
 }
 
