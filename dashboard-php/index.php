@@ -71,6 +71,7 @@ function demo_parametres(): array {
       'staff_role_ids' => '["10","12"]', 'admin_role_ids' => '["11"]', 'service_role_id' => '13',
       'log_channel_id' => '20', 'level_channel_id' => '21', 'service_channel_id' => '22',
       'staff_channel_id' => '23', 'member_channel_id' => '24', 'update_channel_id' => null,
+      'proof_channel_id' => '26',
       'welcome_message' => 'Bienvenue à {user} sur **{server}** ! 🎉\nPense à lire le règlement.',
       'goodbye_message' => null, 'welcome_mention' => 1,
       'xp_text' => 20, 'xp_voice' => 10, 'xp_cooldown' => 60,
@@ -82,6 +83,7 @@ function demo_parametres(): array {
     'channels' => [
       ['id' => '20', 'name' => 'logs'], ['id' => '21', 'name' => 'niveaux'], ['id' => '22', 'name' => 'services'],
       ['id' => '23', 'name' => 'staff'], ['id' => '24', 'name' => 'bienvenue'], ['id' => '25', 'name' => 'général'],
+      ['id' => '26', 'name' => 'preuves'],
     ],
     'categories' => [['id' => '30', 'name' => 'TICKETS'], ['id' => '31', 'name' => 'AIDE']],
     'whitelist' => [['roleId' => '14', 'managerId' => '15', 'role' => 'Police', 'manager' => 'Gérant Police']],
@@ -125,6 +127,29 @@ function demo_botstaff(): array {
     'grades' => ['Responsable', 'Modérateur', 'Support'],
     'perms' => ['blacklist' => '🚫 Blacklist', 'tickets' => '🎫 Tickets du QG', 'staff' => '🛡️ Gestion du staff'],
   ];
+}
+// Tickets de bannissement remontés au QG (mode staff).
+function demo_qg_tickets(): array {
+  return ['tickets' => [
+    ['id' => 42, 'kind' => 'ban', 'guildName' => 'Colmar RP', 'guildId' => '900000000000000001', 'targetId' => '700000000000000030', 'targetTag' => 'Fraudeur', 'reporterId' => null, 'reason' => 'Ban : publicité + insultes', 'status' => 'ouvert', 'claimedBy' => null, 'resolution' => null, 'at' => '2026-07-22T08:10:00Z'],
+    ['id' => 41, 'kind' => 'ban', 'guildName' => 'Shadow Community', 'guildId' => '900000000000000002', 'targetId' => '700000000000000031', 'targetTag' => 'Troll', 'reporterId' => null, 'reason' => 'Ban : spam', 'status' => 'claim', 'claimedBy' => '800000000000000001', 'resolution' => null, 'at' => '2026-07-21T19:44:00Z'],
+    ['id' => 40, 'kind' => 'ban', 'guildName' => 'Colmar RP', 'guildId' => '900000000000000001', 'targetId' => '700000000000000010', 'targetTag' => 'ScammeurX', 'reporterId' => null, 'reason' => 'Ban : arnaque', 'status' => 'traite', 'claimedBy' => '800000000000000001', 'resolution' => 'blacklist', 'at' => '2026-07-20T13:55:00Z'],
+  ]];
+}
+// Base de données : historique permanent des blacklists.
+function demo_historique(): array {
+  return ['historique' => [
+    ['id' => 3, 'userId' => '700000000000000010', 'tag' => 'ScammeurX', 'action' => 'blacklist', 'reason' => 'Arnaque MrBeast', 'proof' => 'https://cdn.discordapp.com/preuve1.png', 'by' => '800000000000000001', 'at' => '2026-07-20T14:00:00Z'],
+    ['id' => 2, 'userId' => '700000000000000011', 'tag' => null, 'action' => 'blacklist', 'reason' => 'Spam massif', 'proof' => null, 'by' => '0', 'at' => '2026-07-19T09:30:00Z'],
+    ['id' => 1, 'userId' => '700000000000000009', 'tag' => 'Repenti', 'action' => 'deblacklist', 'reason' => null, 'proof' => null, 'by' => '0', 'at' => '2026-07-18T16:20:00Z'],
+  ]];
+}
+// Messages récupérés automatiquement du salon preuves du Discord principal.
+function demo_preuves(): array {
+  return ['preuves' => [
+    ['id' => 5, 'authorId' => '800000000000000001', 'authorTag' => 'Alex', 'content' => 'Preuve arnaque ScammeurX — capture ci-jointe', 'attachments' => ['https://cdn.discordapp.com/preuve1.png'], 'at' => '2026-07-20T13:58:00Z'],
+    ['id' => 4, 'authorId' => '800000000000000002', 'authorTag' => 'Marie', 'content' => 'Logs du spam de Troll', 'attachments' => ['https://cdn.discordapp.com/logs.txt'], 'at' => '2026-07-21T19:40:00Z'],
+  ]];
 }
 
 // ----- Requêtes HTTP sortantes (cURL, sinon flux natifs) -----
@@ -439,6 +464,29 @@ if ($p === 'api-moi' || $p === 'api-serveur' || $p === 'api-global') {
       [$st, $d] = named_bot_api((string) ($_GET['bot'] ?? ''), '/bot-status');
       send_json($st ?: 502, $d ?: ['error' => 'Bot injoignable.']);
     }
+    // 🎫 Tickets de bannissement du QG (lecture : staff).
+    if ($a === 'qg-tickets' && $_SERVER['REQUEST_METHOD'] === 'GET') {
+      if (empty($role['staff'])) send_json(403, ['error' => 'Réservé au staff du bot.']);
+      if (DEMO) send_json(200, demo_qg_tickets());
+      [$st, $d] = first_bot_api('/qg-tickets');
+      send_json($st ?: 502, $d ?: ['error' => 'Bot injoignable.']);
+    }
+    // 🗂️ Base de données : historique des blacklists (recherche via ?q=).
+    if ($a === 'blacklist-historique' && $_SERVER['REQUEST_METHOD'] === 'GET') {
+      if (empty($role['staff'])) send_json(403, ['error' => 'Réservé au staff du bot.']);
+      $q = trim((string) ($_GET['q'] ?? ''));
+      if (DEMO) send_json(200, demo_historique());
+      [$st, $d] = first_bot_api('/blacklist-historique' . ($q !== '' ? '?q=' . rawurlencode($q) : ''));
+      send_json($st ?: 502, $d ?: ['error' => 'Bot injoignable.']);
+    }
+    // 🖼️ Preuves : messages récupérés du salon preuves (recherche via ?q=).
+    if ($a === 'preuves' && $_SERVER['REQUEST_METHOD'] === 'GET') {
+      if (empty($role['staff'])) send_json(403, ['error' => 'Réservé au staff du bot.']);
+      $q = trim((string) ($_GET['q'] ?? ''));
+      if (DEMO) send_json(200, demo_preuves());
+      [$st, $d] = first_bot_api('/preuves' . ($q !== '' ? '?q=' . rawurlencode($q) : ''));
+      send_json($st ?: 502, $d ?: ['error' => 'Bot injoignable.']);
+    }
 
     // Écritures : le bot revérifie la permission via actorId.
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -449,6 +497,7 @@ if ($p === 'api-moi' || $p === 'api-serveur' || $p === 'api-global') {
         'blacklist-ajouter' => '/blacklist-ajouter', 'blacklist-retirer' => '/blacklist-retirer',
         'botstaff-ajouter' => '/botstaff-ajouter', 'botstaff-retirer' => '/botstaff-retirer',
         'botstaff-perm' => '/botstaff-perm', 'botstaff-grade' => '/botstaff-grade', 'botstaff-grade-suppr' => '/botstaff-grade-suppr',
+        'qg-claim' => '/qg-claim', 'qg-invite' => '/qg-invite', 'qg-traiter' => '/qg-traiter',
       ];
       if (isset($map[$a])) {
         [$st, $d] = first_bot_api($map[$a], 'POST', $post);
@@ -1003,6 +1052,8 @@ function loadPage(srv){
         fsel('service_channel_id', 'Salon des services RP', p.channels, cfg.service_channel_id, '# ') + '</div>', '');
       h += sec('Mises à jour du bot', 'Annonces « mise à jour prête / installée » avec mention du staff. Sans salon : #shadow-logs est créé automatiquement (visible du staff uniquement).',
         '<div class="fields">' + fsel('update_channel_id', 'Salon des annonces de mise à jour', p.channels, cfg.update_channel_id, '# ') + '</div>', '');
+      h += sec('🖼️ Salon des preuves', 'Salon du Discord principal où le staff poste les preuves. Le bot y récupère automatiquement chaque message (auteur, texte, pièces jointes) pour la base de données du staff.',
+        '<div class="fields">' + fsel('proof_channel_id', 'Salon des preuves', p.channels, cfg.proof_channel_id, '# ') + '</div>', '');
     } else if (page === 'niveaux'){
       h += '<h1 class="pagetitle">Niveaux</h1>';
       h += sec('Annonces de niveau', 'Salon où le bot annonce les montées de niveau (écrit et vocal).',
@@ -1200,7 +1251,7 @@ function prevTicket(srv){
 
 // ================= 🛡️ ESPACE STAFF DU BOT =================
 function staffShell(active, inner){
-  var tabs = [['blacklist', '🚫 Blacklist'], ['equipe', '🛡️ Équipe du bot']];
+  var tabs = [['blacklist', '🚫 Blacklist'], ['tickets', '🎫 Tickets de ban'], ['bdd', '🗂️ Base de données'], ['equipe', '🛡️ Équipe du bot']];
   var h = '<div class="wrap"><div style="display:flex;align-items:center;gap:14px;margin-bottom:8px">' +
     '<h1 class="pagetitle" style="margin:0">🛡️ Staff du bot</h1>' +
     '<button id="staff-home" style="margin-left:auto">⬅ Mes serveurs</button></div>' +
@@ -1226,6 +1277,7 @@ function renderStaff(tab){
           '<div class="fields" style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end">' +
           '<div style="min-width:210px"><div class="flabel">ID Discord</div><input id="bl_id" placeholder="123456789012345678"></div>' +
           '<div style="flex:1;min-width:220px"><div class="flabel">Raison</div><input id="bl_reason" placeholder="Motif de la blacklist"></div>' +
+          '<div style="flex:1;min-width:220px"><div class="flabel">Preuve (lien, facultatif)</div><input id="bl_proof" placeholder="https://…"></div>' +
           '<button id="bl_add" class="accent">🚫 Blacklister</button></div>', '');
       }
       var list = (d.blacklist || []);
@@ -1240,11 +1292,109 @@ function renderStaff(tab){
       m().innerHTML = h + '</div>';
       if ($('bl_add')) $('bl_add').onclick = function(){
         if (!/^\d{5,25}$/.test($('bl_id').value.trim())) { toast('⚠️ ID Discord invalide.', 'err'); return; }
-        api('POST', gu('blacklist-ajouter'), { userId: $('bl_id').value.trim(), reason: $('bl_reason').value }).then(function(j){ if (j && !j.error){ toast('🚫 ' + (j.tag || 'Utilisateur') + ' blacklisté' + (j.banned != null ? ' (' + j.banned + ' serveur(s))' : ''), 'ok'); renderStaff('blacklist'); } });
+        api('POST', gu('blacklist-ajouter'), { userId: $('bl_id').value.trim(), reason: $('bl_reason').value, proof: ($('bl_proof') ? $('bl_proof').value : '') }).then(function(j){ if (j && !j.error){ toast('🚫 ' + (j.tag || 'Utilisateur') + ' blacklisté' + (j.banned != null ? ' (' + j.banned + ' serveur(s))' : ''), 'ok'); renderStaff('blacklist'); } });
       };
       Array.prototype.forEach.call(m().querySelectorAll('.bl-del'), function(el){
         el.onclick = function(){ if (confirm('Débannir cet utilisateur partout ?')) api('POST', gu('blacklist-retirer'), { userId: el.getAttribute('data-u') }).then(function(j){ if (j && !j.error){ toast('🔓 Blacklist levée', 'ok'); renderStaff('blacklist'); } }); };
       });
+    });
+    return;
+  }
+  // 🎫 Tickets de bannissement remontés au QG
+  if (tab === 'tickets'){
+    api('GET', gu('qg-tickets')).then(function(d){
+      if (!d || d.error) { m().innerHTML = errScreen((d && d.error) || 'Erreur', false); return; }
+      var list = (d.tickets || []);
+      var badge = { 'ouvert': ['🟢 Ouvert', '#3ba55d'], 'claim': ['🖐 Claim', '#faa61a'], 'traite': ['✅ Traité', 'var(--muted)'] };
+      var res = { 'blacklist': '🚫 Blacklist appliquée', 'aucune': '— Aucune action' };
+      var rows = '';
+      list.forEach(function(t){
+        var b = badge[t.status] || ['?', 'var(--muted)'];
+        rows += '<div class="row" style="flex-wrap:wrap;gap:8px" data-id="' + t.id + '">' +
+          '<span style="min-width:44px;font-weight:700">#' + t.id + '</span>' +
+          '<div style="min-width:170px"><b>' + esc(t.targetTag || ('ID ' + t.targetId)) + '</b><div style="color:var(--muted);font-size:11.5px">' + esc(t.targetId) + '</div></div>' +
+          '<div style="min-width:150px;font-size:12.5px">🌐 ' + esc(t.guildName || t.guildId) + '</div>' +
+          '<div style="flex:1;min-width:150px;color:var(--muted);font-size:12.5px">' + (t.reason ? esc(t.reason) : '<i>Sans motif</i>') + '</div>' +
+          '<span class="chip" style="background:' + b[1] + '22;color:' + b[1] + '">' + b[0] + '</span>';
+        if (t.status === 'traite'){
+          rows += '<span style="color:var(--muted);font-size:12px;width:100%">' + (res[t.resolution] || '') + '</span>';
+        } else if (canPerm('tickets')){
+          rows += '<div style="display:flex;gap:5px;flex-wrap:wrap;width:100%;margin-top:4px">' +
+            (t.status !== 'claim' ? '<button class="qg-claim" data-id="' + t.id + '" style="padding:4px 11px;font-size:12px">🖐 Claim</button>' : '<span style="font-size:12px;color:var(--muted);align-self:center">Claim par ' + esc(t.claimedBy || '?') + '</span>') +
+            '<button class="qg-inv" data-id="' + t.id + '" style="padding:4px 11px;font-size:12px">✉️ M\'inviter</button>' +
+            '<button class="qg-none" data-id="' + t.id + '" style="padding:4px 11px;font-size:12px">Ne rien faire</button>' +
+            (canPerm('blacklist') ? '<button class="qg-bl accent" data-id="' + t.id + '" data-tag="' + esc(t.targetTag || t.targetId) + '" style="padding:4px 11px;font-size:12px">🚫 Blacklist + preuves</button>' : '') +
+            '</div>';
+        }
+        rows += '</div>';
+      });
+      if (!list.length) rows = '<div class="row" style="color:var(--muted)"><i>Aucun ticket de bannissement.</i></div>';
+      m().innerHTML = '<div class="fade">' + sec('Tickets de bannissement (' + list.length + ')',
+        'À chaque bannissement sur un serveur du bot, un ticket arrive ici. Claim, faites-vous inviter, puis traitez : « ne rien faire » ou blacklist (preuves obligatoires).', rows, '') + '</div>';
+      Array.prototype.forEach.call(m().querySelectorAll('.qg-claim'), function(el){
+        el.onclick = function(){ api('POST', gu('qg-claim'), { ticketId: el.getAttribute('data-id') }).then(function(j){ if (j && !j.error){ toast('🖐 Ticket claim', 'ok'); renderStaff('tickets'); } }); };
+      });
+      Array.prototype.forEach.call(m().querySelectorAll('.qg-inv'), function(el){
+        el.onclick = function(){ api('POST', gu('qg-invite'), { ticketId: el.getAttribute('data-id') }).then(function(j){ if (j && !j.error){ prompt('Invitation (valable 1h, 1 usage) :', j.url || ''); } }); };
+      });
+      Array.prototype.forEach.call(m().querySelectorAll('.qg-none'), function(el){
+        el.onclick = function(){ if (confirm('Clôturer ce ticket sans action ?')) api('POST', gu('qg-traiter'), { ticketId: el.getAttribute('data-id'), resolution: 'aucune' }).then(function(j){ if (j && !j.error){ toast('✅ Ticket traité', 'ok'); renderStaff('tickets'); } }); };
+      });
+      Array.prototype.forEach.call(m().querySelectorAll('.qg-bl'), function(el){
+        el.onclick = function(){
+          var proof = prompt('Blacklist de ' + el.getAttribute('data-tag') + '.\nPreuves OBLIGATOIRES (lien capture / logs) :', '');
+          if (proof === null) return;
+          if (!proof.trim()) { toast('⚠️ Les preuves sont obligatoires.', 'err'); return; }
+          api('POST', gu('qg-traiter'), { ticketId: el.getAttribute('data-id'), resolution: 'blacklist', proof: proof.trim() }).then(function(j){ if (j && !j.error){ toast('🚫 Blacklist appliquée' + (j.banned != null ? ' (' + j.banned + ' serveur(s))' : ''), 'ok'); renderStaff('tickets'); } });
+        };
+      });
+    });
+    return;
+  }
+  // 🗂️ Base de données : historique des blacklists + preuves du salon principal
+  if (tab === 'bdd'){
+    var draw = function(hist, preuves){
+      var act = { 'blacklist': ['🚫 Blacklist', '#e74c3c'], 'deblacklist': ['🔓 Déban', '#3ba55d'] };
+      var hrows = '';
+      (hist || []).forEach(function(r){
+        var a = act[r.action] || [r.action, 'var(--muted)'];
+        hrows += '<div class="row" style="flex-wrap:wrap;gap:7px">' +
+          '<span class="chip" style="background:' + a[1] + '22;color:' + a[1] + '">' + a[0] + '</span>' +
+          '<div style="min-width:160px"><b>' + esc(r.tag || ('ID ' + r.userId)) + '</b><div style="color:var(--muted);font-size:11.5px">' + esc(r.userId) + '</div></div>' +
+          '<div style="flex:1;min-width:150px;font-size:12.5px">' + (r.reason ? esc(r.reason) : '<i style="color:var(--muted)">—</i>') + '</div>' +
+          (r.proof ? '<a href="' + esc(r.proof) + '" target="_blank" class="chip" style="text-decoration:none">📎 Preuve</a>' : '') +
+          '<span style="color:var(--muted);font-size:11.5px;width:100%">' + esc((r.at || '').replace('T', ' ').replace(/\..*/, '')) + ' · par ' + esc(r.by || '?') + '</span>' +
+          '</div>';
+      });
+      if (!(hist || []).length) hrows = '<div class="row" style="color:var(--muted)"><i>Aucune blacklist enregistrée.</i></div>';
+      var prows = '';
+      (preuves || []).forEach(function(pv){
+        prows += '<div class="row" style="flex-wrap:wrap;gap:6px">' +
+          '<div style="min-width:150px"><b>' + esc(pv.authorTag || pv.authorId) + '</b></div>' +
+          '<div style="flex:1;min-width:170px;font-size:12.5px;white-space:pre-wrap">' + (pv.content ? esc(pv.content) : '') + '</div>' +
+          ((pv.attachments || []).map(function(u){ return '<a href="' + esc(u) + '" target="_blank" class="chip" style="text-decoration:none">📎 Fichier</a>'; }).join('')) +
+          '<span style="color:var(--muted);font-size:11.5px;width:100%">' + esc((pv.at || '').replace('T', ' ').replace(/\..*/, '')) + '</span>' +
+          '</div>';
+      });
+      if (!(preuves || []).length) prows = '<div class="row" style="color:var(--muted)"><i>Aucun message récupéré (configurez le salon des preuves dans Salons & logs).</i></div>';
+      m().innerHTML = '<div class="fade">' +
+        '<div class="fields" style="display:flex;gap:8px;margin-bottom:12px"><input id="bdd_q" placeholder="🔎 Rechercher (ID, pseudo, raison…)" style="flex:1"><button id="bdd_go" class="accent">Rechercher</button></div>' +
+        sec('Historique des blacklists', 'Chaque blacklist / déban depuis le début, avec la preuve fournie.', hrows, '') +
+        sec('🖼️ Salon des preuves', 'Messages récupérés automatiquement dans le salon des preuves du Discord principal.', prows, '') +
+        '</div>';
+      var run = function(){
+        var q = $('bdd_q') ? encodeURIComponent($('bdd_q').value.trim()) : '';
+        m().innerHTML = spinner();
+        Promise.all([api('GET', gu('blacklist-historique') + (q ? '&q=' + q : '')), api('GET', gu('preuves') + (q ? '&q=' + q : ''))]).then(function(r){
+          draw((r[0] && r[0].historique) || [], (r[1] && r[1].preuves) || []);
+        });
+      };
+      if ($('bdd_go')) $('bdd_go').onclick = run;
+      if ($('bdd_q')) $('bdd_q').onkeydown = function(e){ if (e.key === 'Enter') run(); };
+    };
+    Promise.all([api('GET', gu('blacklist-historique')), api('GET', gu('preuves'))]).then(function(r){
+      if (r[0] && r[0].error) { m().innerHTML = errScreen(r[0].error, false); return; }
+      draw((r[0] && r[0].historique) || [], (r[1] && r[1].preuves) || []);
     });
     return;
   }

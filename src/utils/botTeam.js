@@ -30,6 +30,10 @@ const insertBlacklist = db.prepare(
   'INSERT OR REPLACE INTO blacklist (user_id, reason, by_id, at) VALUES (?, ?, ?, ?)'
 );
 const deleteBlacklist = db.prepare('DELETE FROM blacklist WHERE user_id = ?');
+const insertHistory = db.prepare(
+  'INSERT INTO blacklist_history (user_id, tag, action, reason, proof, by_id, guild_id, at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+);
+const listHistory = db.prepare('SELECT * FROM blacklist_history ORDER BY id DESC LIMIT 300');
 
 const getState = db.prepare('SELECT value FROM app_state WHERE key = ?');
 const setStateStmt = db.prepare(
@@ -77,11 +81,14 @@ function staffPermsOf(userId) {
 // Blacklister : enregistrement + MP (raison + serveur de déban) + bannissement
 // sur tous les serveurs du bot. À l'arrivée sur un serveur, un blacklisté est
 // re-banni automatiquement (voir guildMemberAdd) tant qu'il n'est pas retiré.
-async function applyBlacklist(client, userId, reason, byId) {
-  insertBlacklist.run(userId, reason || null, byId, new Date().toISOString());
+async function applyBlacklist(client, userId, reason, byId, proof) {
+  const now = new Date().toISOString();
+  insertBlacklist.run(userId, reason || null, byId, now);
+  const user = await client.users.fetch(userId).catch(() => null);
+  // Journal permanent (base de données consultable par le staff), avec preuve.
+  insertHistory.run(userId, user?.tag || null, 'blacklist', reason || null, proof || null, byId, null, now);
 
   const debanInvite = state('deban_invite');
-  const user = await client.users.fetch(userId).catch(() => null);
   let dmOk = false;
   if (user) {
     const embed = new EmbedBuilder()
@@ -114,8 +121,10 @@ async function applyBlacklist(client, userId, reason, byId) {
   return { dmOk, banned, tag: user?.tag || userId };
 }
 
-async function removeBlacklist(client, userId) {
+async function removeBlacklist(client, userId, byId) {
   deleteBlacklist.run(userId);
+  const user = await client.users.fetch(userId).catch(() => null);
+  insertHistory.run(userId, user?.tag || null, 'deblacklist', null, null, byId || 'staff', null, new Date().toISOString());
   let unbanned = 0;
   for (const guild of client.guilds.cache.values()) {
     const ok = await guild.members
@@ -139,6 +148,7 @@ module.exports = {
   deleteStaff,
   getBlacklistRow,
   listBlacklistRows,
+  listHistory,
   applyBlacklist,
   removeBlacklist,
   state,

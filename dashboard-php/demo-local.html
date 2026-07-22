@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Mon Bot — Dashboard (DÉMO locale)</title>
+<title>Zetku — Dashboard (DÉMO locale)</title>
 <style>  * { box-sizing: border-box; margin: 0; padding: 0; }
   :root { --bg:#1e2126; --bg2:#17191d; --panel:#24272d; --panel2:#2b2f36; --border:#33373f; --text:#e8e9ed;
           --muted:#8f919b; --accent:#d8734f; --accent2:#c05f3d; --green:#43b581; --red:#f04747; --blue:#4d9de0; }
@@ -158,62 +158,21 @@
     .cols { gap:20px; }
     .cols > div { min-width:100%; }
     h1.pagetitle { font-size:22px; margin-bottom:18px; }
-  }
-  .demobar { background:#d8734f; color:#fff; text-align:center; font-size:12.5px; padding:6px; font-weight:600; }
-</style></head><body>
-<div class="demobar">🧪 DÉMO LOCALE (Créateur). Testez : Tickets → Éditeur de panneau (message + embed + profil + preview en direct), Staff, Créateur. Données fictives.</div>
+  }</style>
+</head>
+<body>
+<div style="background:#d8734f;color:#fff;text-align:center;padding:7px 14px;font-size:13px;font-weight:600">🧪 DÉMO LOCALE — données fictives, aucune connexion. Toutes les sections (Staff, Créateur, Tickets, Base de données) sont explorables.</div>
 <div class="nav">
-  <span class="brand" style="cursor:pointer" onclick="renderHome()"><span class="lg">🎛️</span>Mon Bot</span>
-  <span class="links"><a href="#">DOCUMENTATION</a></span>
+  <span class="brand" style="cursor:pointer" onclick="renderHome()"><span class="lg">🎛️</span>Zetku</span>
+  <span class="links"><a href="#" onclick="return false">DOCUMENTATION</a></span>
   <span class="spacer"></span>
   <button class="supportbtn">SUPPORT</button>
-  <span class="me"><span id="h_name"></span></span>
-  <a href="#" onclick="location.reload();return false"><button>Déconnexion</button></a>
+  <span class="me"><img id="h_avatar" style="display:none"><span id="h_name"></span></span>
+  <button onclick="renderHome()">Accueil</button>
 </div>
 <div id="content"><div class="loadbox"><div class="spin"></div>Chargement…</div></div>
 <div id="toast" class="toast"></div>
-<img id="h_avatar" style="display:none">
 <script>
-
-var DEMO_MOI = { user:{id:'0',username:'Démo',avatar:null},
-  role:{creator:true,staff:true,rank:'Créateur',perms:['blacklist','tickets','staff']},
-  dash:{nom:'Mon Bot',accent:'#d8734f',accroche:'Le Roleplay',modules:{apercu:true,module:true,membres:true,roles:true,salons:true,niveaux:true,whitelist:false,tickets:true}},
-  servers:[{id:'900000000000000001',name:'Colmar RP',icon:null,membres:842,bot:'Colmar_rp',enligne:true},
-  {id:'900000000000000002',name:'Shadow Community',icon:null,membres:1287,bot:'Shadow_community',enligne:true},
-  {id:'900000000000000003',name:'Lyon RP',icon:null,membres:356,bot:'Colmar_rp',enligne:false}]};
-var DEMO_APERCU = { serveur:{name:'Colmar RP',membres:842,icon:null},
-  stats:{cartes:128,permis:74,entreprises:12,ticketsOuverts:3,whitelist:41,vehicules:26},
-  top:[{user:'shadow',level:42,xp:18400},{user:'Alex',level:37,xp:14200},{user:'Marie',level:31,xp:9800}] };
-var DEMO_PARAMS = { config:{ rp_enabled:1,rp_locked:0,staff_role_id:'10',admin_role_id:'11',
-  staff_role_ids:'["10","12"]',admin_role_ids:'["11"]',service_role_id:'13',
-  log_channel_id:'20',level_channel_id:'21',service_channel_id:'22',staff_channel_id:'23',member_channel_id:'24',update_channel_id:null,
-  welcome_message:'Bienvenue à {user} sur **{server}** ! 🎉\nPense à lire le règlement.',
-  goodbye_message:null,welcome_mention:1,xp_text:20,xp_voice:10,xp_cooldown:60 },
-  roles:[{id:'10',name:'Staff'},{id:'11',name:'Administration'},{id:'12',name:'Modérateur'},{id:'13',name:'En service'},{id:'14',name:'Police'},{id:'15',name:'Gérant Police'}],
-  channels:[{id:'20',name:'logs'},{id:'21',name:'niveaux'},{id:'22',name:'services'},{id:'23',name:'staff'},{id:'24',name:'bienvenue'},{id:'25',name:'général'},{id:'26',name:'ouvrir-ticket'}],
-  categories:[{id:'30',name:'TICKETS'},{id:'31',name:'AIDE'}],
-  whitelist:[{roleId:'14',managerId:'15',role:'Police',manager:'Gérant Police'}],
-  tickets:[{id:1,label:'Support',emoji:'🛠️',description:'Une question, un souci ?',categorie:'TICKETS',support:'Staff'},
-    {id:2,label:'Plainte',emoji:'⚖️',description:'Signaler un membre',categorie:'AIDE',support:'Modérateur'}],
-  profils:[{id:1,name:'Support Colmar RP',avatar:'https://cdn.discordapp.com/embed/avatars/2.png'}], bans:[] };
-var DEMO_BL = { blacklist:[{userId:'700000000000000010',tag:'ScammeurX',reason:'Arnaque MrBeast',by:'0',at:''},{userId:'700000000000000011',tag:null,reason:'Spam massif',by:'0',at:''}] };
-var DEMO_BS = { staff:[{userId:'800000000000000001',tag:'Alex',rank:'Responsable',perms:['blacklist','tickets','staff']},{userId:'800000000000000002',tag:'Marie',rank:'Modérateur',perms:['tickets']}],
-  grades:['Responsable','Modérateur','Support'], perms:{blacklist:'🚫 Blacklist',tickets:'🎫 Tickets du QG',staff:'🛡️ Gestion du staff'} };
-var DEMO_MODS = {apercu:['📊',"Vue d'ensemble"],module:['🎭','Module RP'],membres:['👋','Arrivées et départs'],roles:['👮','Rôles & sécurité'],salons:['📢','Salons & logs'],niveaux:['📈','Niveaux'],whitelist:['📋','Whitelist métiers'],tickets:['🎫','Tickets']};
-var DEMO_BOTS = [{name:'Colmar_rp',serveurs:2},{name:'Shadow_community',serveurs:1}];
-function demoApi(method, path){
-  return new Promise(function(res){ setTimeout(function(){
-    if (path.indexOf('api-moi') >= 0) return res(JSON.parse(JSON.stringify(DEMO_MOI)));
-    if (path.indexOf('a=apercu') >= 0) return res(JSON.parse(JSON.stringify(DEMO_APERCU)));
-    if (path.indexOf('a=parametres') >= 0) return res(JSON.parse(JSON.stringify(DEMO_PARAMS)));
-    if (path.indexOf('a=blacklist') >= 0 && path.indexOf('-') < 0) return res(JSON.parse(JSON.stringify(DEMO_BL)));
-    if (path.indexOf('a=botstaff') >= 0 && path.indexOf('-') < 0) return res(JSON.parse(JSON.stringify(DEMO_BS)));
-    if (path.indexOf('a=dashconfig') >= 0 && path.indexOf('save') < 0) return res({config:DEMO_MOI.dash,modules:DEMO_MODS,bots:DEMO_BOTS});
-    if (path.indexOf('a=bot-status') >= 0 && path.indexOf('save') < 0) return res({status:{type:'watching',text:'les serveurs RP',presence:'online'},tag:'Colmar_rp#0001'});
-    return res({ ok:true, note:'Démo — action simulée (non enregistrée)' });
-  }, 150); });
-}
-
 var moi = null, gid = null, page = 'apercu';
 function $(id){ return document.getElementById(id); }
 function esc(s){ var d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; }
@@ -227,8 +186,123 @@ function errScreen(msg, retry){
   h += '</div>';
   return h;
 }
+// ===== DÉMO LOCALE : routeur simulant l'API (aucun réseau) =====
+var DB = {
+  moi: { user:{ id:'0', username:'Vous (démo)', avatar:null },
+    role:{ creator:true, staff:true, rank:'Créateur', perms:['blacklist','tickets','staff'] },
+    dash:{ nom:'Zetku', accent:'#d8734f', accroche:'Le Roleplay',
+      modules:{ apercu:true, module:true, membres:true, roles:true, salons:true, niveaux:true, whitelist:false, tickets:true } },
+    servers:[
+      { id:'900000000000000001', name:'Colmar RP', icon:null, membres:842, bot:'Colmar_rp', enligne:true },
+      { id:'900000000000000002', name:'Shadow Community', icon:null, membres:1287, bot:'Shadow_community', enligne:true },
+      { id:'900000000000000003', name:'Lyon RP', icon:null, membres:356, bot:'Colmar_rp', enligne:false } ] },
+  apercu: { serveur:{ name:'Colmar RP', membres:842, icon:null },
+    stats:{ cartes:128, permis:74, entreprises:12, ticketsOuverts:3, whitelist:41, vehicules:26 },
+    top:[ {user:'shadow',level:42,xp:18400}, {user:'Alex',level:37,xp:14200}, {user:'Marie',level:31,xp:9800} ] },
+  params: { config:{ rp_enabled:1, rp_locked:0, staff_role_id:'10', admin_role_id:'11',
+      staff_role_ids:'["10","12"]', admin_role_ids:'["11"]', service_role_id:'13',
+      log_channel_id:'20', level_channel_id:'21', service_channel_id:'22', staff_channel_id:'23',
+      member_channel_id:'24', update_channel_id:null, proof_channel_id:'26',
+      welcome_message:'Bienvenue à {user} sur **{server}** ! 🎉\nPense à lire le règlement.',
+      goodbye_message:null, welcome_mention:1, xp_text:20, xp_voice:10, xp_cooldown:60 },
+    roles:[ {id:'10',name:'Staff'}, {id:'11',name:'Administration'}, {id:'12',name:'Modérateur'},
+      {id:'13',name:'En service'}, {id:'14',name:'Police'}, {id:'15',name:'Gérant Police'} ],
+    channels:[ {id:'20',name:'logs'}, {id:'21',name:'niveaux'}, {id:'22',name:'services'}, {id:'23',name:'staff'},
+      {id:'24',name:'bienvenue'}, {id:'25',name:'général'}, {id:'26',name:'preuves'} ],
+    categories:[ {id:'30',name:'TICKETS'}, {id:'31',name:'AIDE'} ],
+    whitelist:[ {roleId:'14',managerId:'15',role:'Police',manager:'Gérant Police'} ],
+    tickets:[ {id:1,label:'Support',emoji:'🛠️',description:'Une question, un souci ?',categorie:'TICKETS',support:'Staff'},
+      {id:2,label:'Plainte',emoji:'⚖️',description:'Signaler un membre',categorie:'AIDE',support:'Modérateur'} ],
+    profils:[ {id:1,name:'Support Colmar RP',avatar:'https://cdn.discordapp.com/embed/avatars/2.png'} ], bans:[] },
+  blacklist:[ {userId:'700000000000000010',tag:'ScammeurX',reason:'Arnaque MrBeast',by:'0',at:'2026-07-20T14:00:00Z'},
+    {userId:'700000000000000011',tag:null,reason:'Spam massif',by:'0',at:'2026-07-19T09:30:00Z'} ],
+  botstaff:{ staff:[ {userId:'800000000000000001',tag:'Alex',rank:'Responsable',perms:['blacklist','tickets','staff']},
+      {userId:'800000000000000002',tag:'Marie',rank:'Modérateur',perms:['tickets']} ],
+    grades:['Responsable','Modérateur','Support'],
+    perms:{ blacklist:'🚫 Blacklist', tickets:'🎫 Tickets du QG', staff:'🛡️ Gestion du staff' } },
+  qg:[ {id:42,kind:'ban',guildName:'Colmar RP',guildId:'900000000000000001',targetId:'700000000000000030',targetTag:'Fraudeur',reporterId:null,reason:'Ban : publicité + insultes',status:'ouvert',claimedBy:null,resolution:null,at:'2026-07-22T08:10:00Z'},
+    {id:41,kind:'ban',guildName:'Shadow Community',guildId:'900000000000000002',targetId:'700000000000000031',targetTag:'Troll',reporterId:null,reason:'Ban : spam',status:'claim',claimedBy:'800000000000000001',resolution:null,at:'2026-07-21T19:44:00Z'},
+    {id:40,kind:'ban',guildName:'Colmar RP',guildId:'900000000000000001',targetId:'700000000000000010',targetTag:'ScammeurX',reporterId:null,reason:'Ban : arnaque',status:'traite',claimedBy:'800000000000000001',resolution:'blacklist',at:'2026-07-20T13:55:00Z'} ],
+  historique:[ {id:3,userId:'700000000000000010',tag:'ScammeurX',action:'blacklist',reason:'Arnaque MrBeast',proof:'https://cdn.discordapp.com/preuve1.png',by:'800000000000000001',at:'2026-07-20T14:00:00Z'},
+    {id:2,userId:'700000000000000011',tag:null,action:'blacklist',reason:'Spam massif',proof:null,by:'0',at:'2026-07-19T09:30:00Z'},
+    {id:1,userId:'700000000000000009',tag:'Repenti',action:'deblacklist',reason:null,proof:null,by:'0',at:'2026-07-18T16:20:00Z'} ],
+  preuves:[ {id:5,authorId:'800000000000000001',authorTag:'Alex',content:'Preuve arnaque ScammeurX — capture ci-jointe',attachments:['https://cdn.discordapp.com/preuve1.png'],at:'2026-07-20T13:58:00Z'},
+    {id:4,authorId:'800000000000000002',authorTag:'Marie',content:'Logs du spam de Troll',attachments:['https://cdn.discordapp.com/logs.txt'],at:'2026-07-21T19:40:00Z'} ],
+  status:{ type:'watching', text:'les serveurs RP', presence:'online' },
+  dashconfig:null
+};
+DB.dashconfig = { config: DB.moi.dash, modules: {
+    apercu:['📊','Vue d\'ensemble'], module:['🎭','Module RP'], membres:['👋','Arrivées et départs'],
+    roles:['👮','Rôles & sécurité'], salons:['📢','Salons & logs'], niveaux:['📈','Niveaux'],
+    whitelist:['📋','Whitelist métiers'], tickets:['🎫','Tickets'] },
+  bots:[ {name:'Colmar_rp',serveurs:2}, {name:'Shadow_community',serveurs:1} ] };
+function demoQ(list, q, fields){
+  q = String(q||'').trim().toLowerCase(); if (!q) return list;
+  return list.filter(function(r){ return fields.map(function(f){ return r[f]; }).filter(Boolean).some(function(v){ return String(v).toLowerCase().indexOf(q) >= 0; }); });
+}
+function qparam(path, key){ var m = path.match(new RegExp('[?&]' + key + '=([^&]*)')); return m ? decodeURIComponent(m[1]) : ''; }
 function api(method, path, body){
-  return demoApi(method, path).then(function(j){ if (j && j.error) toast('⚠️ ' + j.error, 'err'); return j; });
+  return new Promise(function(resolve){
+    setTimeout(function(){ resolve(demoRoute(method, path, body || {})); }, 90);
+  });
+}
+function demoRoute(method, path, body){
+  try {
+    if (path.indexOf('p=api-moi') >= 0) return DB.moi;
+    // ---- api-serveur ----
+    if (path.indexOf('p=api-serveur') >= 0){
+      var a = qparam(path, 'a');
+      if (a === 'apercu') return DB.apercu;
+      if (a === 'parametres') return DB.params;
+      if (a === 'config'){ if (body.key !== undefined) DB.params.config[body.key] = body.value; return { ok:true }; }
+      if (a === 'tickets-type'){ var id = DB.params.tickets.length ? Math.max.apply(null, DB.params.tickets.map(function(t){return t.id;}))+1 : 1;
+        DB.params.tickets.push({ id:id, label:body.label||'Ticket', emoji:body.emoji||'🎫', description:body.description||'', categorie:body.categorie||'', support:body.support||'' }); return { ok:true }; }
+      if (a === 'tickets-type-suppr'){ DB.params.tickets = DB.params.tickets.filter(function(t){ return String(t.id) !== String(body.id); }); return { ok:true }; }
+      if (a === 'whitelist-ajouter'){ DB.params.whitelist.push({ roleId:body.roleId, managerId:body.managerId, role:'Rôle', manager:'Gérant' }); return { ok:true }; }
+      if (a === 'whitelist-retirer'){ DB.params.whitelist = DB.params.whitelist.filter(function(w){ return w.roleId !== body.roleId; }); return { ok:true }; }
+      if (a === 'ticket-panneau') return { ok:true, note:'Démo — panneau simulé' };
+      if (a === 'profil-ajouter'){ var pid = DB.params.profils.length ? Math.max.apply(null, DB.params.profils.map(function(p){return p.id;}))+1 : 1;
+        DB.params.profils.push({ id:pid, name:body.name||'Profil', avatar:body.avatar||'' }); return { ok:true }; }
+      if (a === 'profil-suppr'){ DB.params.profils = DB.params.profils.filter(function(p){ return String(p.id) !== String(body.id); }); return { ok:true }; }
+      return { ok:true, note:'Démo' };
+    }
+    // ---- api-global ----
+    if (path.indexOf('p=api-global') >= 0){
+      var g = qparam(path, 'a');
+      if (g === 'blacklist' && method === 'GET') return { blacklist: DB.blacklist };
+      if (g === 'botstaff' && method === 'GET') return DB.botstaff;
+      if (g === 'dashconfig' && method === 'GET') return DB.dashconfig;
+      if (g === 'bot-status' && method === 'GET') return { status: DB.status, tag:'Colmar_rp#0001' };
+      if (g === 'qg-tickets' && method === 'GET') return { tickets: DB.qg };
+      if (g === 'blacklist-historique' && method === 'GET') return { historique: demoQ(DB.historique, qparam(path,'q'), ['userId','tag','reason']) };
+      if (g === 'preuves' && method === 'GET') return { preuves: demoQ(DB.preuves, qparam(path,'q'), ['authorId','authorTag','content']) };
+      // écritures
+      if (g === 'blacklist-ajouter'){ var t = { userId:body.userId, tag:'Utilisateur '+body.userId, reason:body.reason||null, by:'0', at:new Date().toISOString() };
+        DB.blacklist.unshift(t); DB.historique.unshift({ id:DB.historique.length+1, userId:body.userId, tag:t.tag, action:'blacklist', reason:body.reason||null, proof:body.proof||null, by:'0', at:t.at });
+        return { ok:true, tag:t.tag, banned:3, dmOk:true }; }
+      if (g === 'blacklist-retirer'){ DB.blacklist = DB.blacklist.filter(function(b){ return b.userId !== body.userId; });
+        DB.historique.unshift({ id:DB.historique.length+1, userId:body.userId, tag:null, action:'deblacklist', reason:null, proof:null, by:'0', at:new Date().toISOString() });
+        return { ok:true, unbanned:3 }; }
+      if (g === 'botstaff-ajouter'){ DB.botstaff.staff.push({ userId:body.userId, tag:'Staff '+body.userId, rank:body.rank||'Support', perms:[] }); return { ok:true }; }
+      if (g === 'botstaff-retirer'){ DB.botstaff.staff = DB.botstaff.staff.filter(function(s){ return s.userId !== body.userId; }); return { ok:true }; }
+      if (g === 'botstaff-perm'){ var s = DB.botstaff.staff.find(function(x){ return x.userId === body.userId; });
+        if (s){ var i = s.perms.indexOf(body.perm); if (body.on && i<0) s.perms.push(body.perm); if (!body.on && i>=0) s.perms.splice(i,1); } return { ok:true }; }
+      if (g === 'botstaff-grade'){ if (body.grade && DB.botstaff.grades.indexOf(body.grade)<0) DB.botstaff.grades.push(body.grade);
+        var m2 = DB.botstaff.staff.find(function(x){ return x.userId === body.userId; }); if (m2 && body.rank) m2.rank = body.rank; return { ok:true }; }
+      if (g === 'botstaff-grade-suppr'){ DB.botstaff.grades = DB.botstaff.grades.filter(function(x){ return x !== body.grade; }); return { ok:true }; }
+      if (g === 'dashconfig-save'){ if (body.config) { DB.moi.dash = body.config; DB.dashconfig.config = body.config; } return { ok:true, config: body.config }; }
+      if (g === 'bot-status-save'){ if (body.status) DB.status = body.status; return { ok:true }; }
+      if (g === 'qg-claim'){ var q1 = DB.qg.find(function(x){ return String(x.id) === String(body.ticketId); }); if (q1){ q1.status='claim'; q1.claimedBy='0'; } return { ok:true }; }
+      if (g === 'qg-invite') return { ok:true, url:'https://discord.gg/demo-invite-1h' };
+      if (g === 'qg-traiter'){ var q2 = DB.qg.find(function(x){ return String(x.id) === String(body.ticketId); });
+        if (q2){ q2.status='traite'; q2.resolution = body.resolution === 'blacklist' ? 'blacklist' : 'aucune';
+          if (body.resolution === 'blacklist'){ DB.blacklist.unshift({ userId:q2.targetId, tag:q2.targetTag, reason:'Ticket QG n°'+q2.id, by:'0', at:new Date().toISOString() });
+            DB.historique.unshift({ id:DB.historique.length+1, userId:q2.targetId, tag:q2.targetTag, action:'blacklist', reason:'Ticket QG n°'+q2.id, proof:body.proof||null, by:'0', at:new Date().toISOString() }); } }
+        return { ok:true, tag:q2 && q2.targetTag, banned:3 }; }
+      return { ok:true, note:'Démo' };
+    }
+    return { error:'Route de démo inconnue : ' + path };
+  } catch (e) { return { error:'Démo : ' + e.message }; }
 }
 function save(key, value){
   api('POST', su('config'), { key: key, value: value }).then(function(j){ if (j && !j.error) toast('✅ Enregistré', 'ok'); });
@@ -447,6 +521,8 @@ function loadPage(srv){
         fsel('service_channel_id', 'Salon des services RP', p.channels, cfg.service_channel_id, '# ') + '</div>', '');
       h += sec('Mises à jour du bot', 'Annonces « mise à jour prête / installée » avec mention du staff. Sans salon : #shadow-logs est créé automatiquement (visible du staff uniquement).',
         '<div class="fields">' + fsel('update_channel_id', 'Salon des annonces de mise à jour', p.channels, cfg.update_channel_id, '# ') + '</div>', '');
+      h += sec('🖼️ Salon des preuves', 'Salon du Discord principal où le staff poste les preuves. Le bot y récupère automatiquement chaque message (auteur, texte, pièces jointes) pour la base de données du staff.',
+        '<div class="fields">' + fsel('proof_channel_id', 'Salon des preuves', p.channels, cfg.proof_channel_id, '# ') + '</div>', '');
     } else if (page === 'niveaux'){
       h += '<h1 class="pagetitle">Niveaux</h1>';
       h += sec('Annonces de niveau', 'Salon où le bot annonce les montées de niveau (écrit et vocal).',
@@ -644,7 +720,7 @@ function prevTicket(srv){
 
 // ================= 🛡️ ESPACE STAFF DU BOT =================
 function staffShell(active, inner){
-  var tabs = [['blacklist', '🚫 Blacklist'], ['equipe', '🛡️ Équipe du bot']];
+  var tabs = [['blacklist', '🚫 Blacklist'], ['tickets', '🎫 Tickets de ban'], ['bdd', '🗂️ Base de données'], ['equipe', '🛡️ Équipe du bot']];
   var h = '<div class="wrap"><div style="display:flex;align-items:center;gap:14px;margin-bottom:8px">' +
     '<h1 class="pagetitle" style="margin:0">🛡️ Staff du bot</h1>' +
     '<button id="staff-home" style="margin-left:auto">⬅ Mes serveurs</button></div>' +
@@ -670,6 +746,7 @@ function renderStaff(tab){
           '<div class="fields" style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end">' +
           '<div style="min-width:210px"><div class="flabel">ID Discord</div><input id="bl_id" placeholder="123456789012345678"></div>' +
           '<div style="flex:1;min-width:220px"><div class="flabel">Raison</div><input id="bl_reason" placeholder="Motif de la blacklist"></div>' +
+          '<div style="flex:1;min-width:220px"><div class="flabel">Preuve (lien, facultatif)</div><input id="bl_proof" placeholder="https://…"></div>' +
           '<button id="bl_add" class="accent">🚫 Blacklister</button></div>', '');
       }
       var list = (d.blacklist || []);
@@ -684,11 +761,109 @@ function renderStaff(tab){
       m().innerHTML = h + '</div>';
       if ($('bl_add')) $('bl_add').onclick = function(){
         if (!/^\d{5,25}$/.test($('bl_id').value.trim())) { toast('⚠️ ID Discord invalide.', 'err'); return; }
-        api('POST', gu('blacklist-ajouter'), { userId: $('bl_id').value.trim(), reason: $('bl_reason').value }).then(function(j){ if (j && !j.error){ toast('🚫 ' + (j.tag || 'Utilisateur') + ' blacklisté' + (j.banned != null ? ' (' + j.banned + ' serveur(s))' : ''), 'ok'); renderStaff('blacklist'); } });
+        api('POST', gu('blacklist-ajouter'), { userId: $('bl_id').value.trim(), reason: $('bl_reason').value, proof: ($('bl_proof') ? $('bl_proof').value : '') }).then(function(j){ if (j && !j.error){ toast('🚫 ' + (j.tag || 'Utilisateur') + ' blacklisté' + (j.banned != null ? ' (' + j.banned + ' serveur(s))' : ''), 'ok'); renderStaff('blacklist'); } });
       };
       Array.prototype.forEach.call(m().querySelectorAll('.bl-del'), function(el){
         el.onclick = function(){ if (confirm('Débannir cet utilisateur partout ?')) api('POST', gu('blacklist-retirer'), { userId: el.getAttribute('data-u') }).then(function(j){ if (j && !j.error){ toast('🔓 Blacklist levée', 'ok'); renderStaff('blacklist'); } }); };
       });
+    });
+    return;
+  }
+  // 🎫 Tickets de bannissement remontés au QG
+  if (tab === 'tickets'){
+    api('GET', gu('qg-tickets')).then(function(d){
+      if (!d || d.error) { m().innerHTML = errScreen((d && d.error) || 'Erreur', false); return; }
+      var list = (d.tickets || []);
+      var badge = { 'ouvert': ['🟢 Ouvert', '#3ba55d'], 'claim': ['🖐 Claim', '#faa61a'], 'traite': ['✅ Traité', 'var(--muted)'] };
+      var res = { 'blacklist': '🚫 Blacklist appliquée', 'aucune': '— Aucune action' };
+      var rows = '';
+      list.forEach(function(t){
+        var b = badge[t.status] || ['?', 'var(--muted)'];
+        rows += '<div class="row" style="flex-wrap:wrap;gap:8px" data-id="' + t.id + '">' +
+          '<span style="min-width:44px;font-weight:700">#' + t.id + '</span>' +
+          '<div style="min-width:170px"><b>' + esc(t.targetTag || ('ID ' + t.targetId)) + '</b><div style="color:var(--muted);font-size:11.5px">' + esc(t.targetId) + '</div></div>' +
+          '<div style="min-width:150px;font-size:12.5px">🌐 ' + esc(t.guildName || t.guildId) + '</div>' +
+          '<div style="flex:1;min-width:150px;color:var(--muted);font-size:12.5px">' + (t.reason ? esc(t.reason) : '<i>Sans motif</i>') + '</div>' +
+          '<span class="chip" style="background:' + b[1] + '22;color:' + b[1] + '">' + b[0] + '</span>';
+        if (t.status === 'traite'){
+          rows += '<span style="color:var(--muted);font-size:12px;width:100%">' + (res[t.resolution] || '') + '</span>';
+        } else if (canPerm('tickets')){
+          rows += '<div style="display:flex;gap:5px;flex-wrap:wrap;width:100%;margin-top:4px">' +
+            (t.status !== 'claim' ? '<button class="qg-claim" data-id="' + t.id + '" style="padding:4px 11px;font-size:12px">🖐 Claim</button>' : '<span style="font-size:12px;color:var(--muted);align-self:center">Claim par ' + esc(t.claimedBy || '?') + '</span>') +
+            '<button class="qg-inv" data-id="' + t.id + '" style="padding:4px 11px;font-size:12px">✉️ M\'inviter</button>' +
+            '<button class="qg-none" data-id="' + t.id + '" style="padding:4px 11px;font-size:12px">Ne rien faire</button>' +
+            (canPerm('blacklist') ? '<button class="qg-bl accent" data-id="' + t.id + '" data-tag="' + esc(t.targetTag || t.targetId) + '" style="padding:4px 11px;font-size:12px">🚫 Blacklist + preuves</button>' : '') +
+            '</div>';
+        }
+        rows += '</div>';
+      });
+      if (!list.length) rows = '<div class="row" style="color:var(--muted)"><i>Aucun ticket de bannissement.</i></div>';
+      m().innerHTML = '<div class="fade">' + sec('Tickets de bannissement (' + list.length + ')',
+        'À chaque bannissement sur un serveur du bot, un ticket arrive ici. Claim, faites-vous inviter, puis traitez : « ne rien faire » ou blacklist (preuves obligatoires).', rows, '') + '</div>';
+      Array.prototype.forEach.call(m().querySelectorAll('.qg-claim'), function(el){
+        el.onclick = function(){ api('POST', gu('qg-claim'), { ticketId: el.getAttribute('data-id') }).then(function(j){ if (j && !j.error){ toast('🖐 Ticket claim', 'ok'); renderStaff('tickets'); } }); };
+      });
+      Array.prototype.forEach.call(m().querySelectorAll('.qg-inv'), function(el){
+        el.onclick = function(){ api('POST', gu('qg-invite'), { ticketId: el.getAttribute('data-id') }).then(function(j){ if (j && !j.error){ prompt('Invitation (valable 1h, 1 usage) :', j.url || ''); } }); };
+      });
+      Array.prototype.forEach.call(m().querySelectorAll('.qg-none'), function(el){
+        el.onclick = function(){ if (confirm('Clôturer ce ticket sans action ?')) api('POST', gu('qg-traiter'), { ticketId: el.getAttribute('data-id'), resolution: 'aucune' }).then(function(j){ if (j && !j.error){ toast('✅ Ticket traité', 'ok'); renderStaff('tickets'); } }); };
+      });
+      Array.prototype.forEach.call(m().querySelectorAll('.qg-bl'), function(el){
+        el.onclick = function(){
+          var proof = prompt('Blacklist de ' + el.getAttribute('data-tag') + '.\nPreuves OBLIGATOIRES (lien capture / logs) :', '');
+          if (proof === null) return;
+          if (!proof.trim()) { toast('⚠️ Les preuves sont obligatoires.', 'err'); return; }
+          api('POST', gu('qg-traiter'), { ticketId: el.getAttribute('data-id'), resolution: 'blacklist', proof: proof.trim() }).then(function(j){ if (j && !j.error){ toast('🚫 Blacklist appliquée' + (j.banned != null ? ' (' + j.banned + ' serveur(s))' : ''), 'ok'); renderStaff('tickets'); } });
+        };
+      });
+    });
+    return;
+  }
+  // 🗂️ Base de données : historique des blacklists + preuves du salon principal
+  if (tab === 'bdd'){
+    var draw = function(hist, preuves){
+      var act = { 'blacklist': ['🚫 Blacklist', '#e74c3c'], 'deblacklist': ['🔓 Déban', '#3ba55d'] };
+      var hrows = '';
+      (hist || []).forEach(function(r){
+        var a = act[r.action] || [r.action, 'var(--muted)'];
+        hrows += '<div class="row" style="flex-wrap:wrap;gap:7px">' +
+          '<span class="chip" style="background:' + a[1] + '22;color:' + a[1] + '">' + a[0] + '</span>' +
+          '<div style="min-width:160px"><b>' + esc(r.tag || ('ID ' + r.userId)) + '</b><div style="color:var(--muted);font-size:11.5px">' + esc(r.userId) + '</div></div>' +
+          '<div style="flex:1;min-width:150px;font-size:12.5px">' + (r.reason ? esc(r.reason) : '<i style="color:var(--muted)">—</i>') + '</div>' +
+          (r.proof ? '<a href="' + esc(r.proof) + '" target="_blank" class="chip" style="text-decoration:none">📎 Preuve</a>' : '') +
+          '<span style="color:var(--muted);font-size:11.5px;width:100%">' + esc((r.at || '').replace('T', ' ').replace(/\..*/, '')) + ' · par ' + esc(r.by || '?') + '</span>' +
+          '</div>';
+      });
+      if (!(hist || []).length) hrows = '<div class="row" style="color:var(--muted)"><i>Aucune blacklist enregistrée.</i></div>';
+      var prows = '';
+      (preuves || []).forEach(function(pv){
+        prows += '<div class="row" style="flex-wrap:wrap;gap:6px">' +
+          '<div style="min-width:150px"><b>' + esc(pv.authorTag || pv.authorId) + '</b></div>' +
+          '<div style="flex:1;min-width:170px;font-size:12.5px;white-space:pre-wrap">' + (pv.content ? esc(pv.content) : '') + '</div>' +
+          ((pv.attachments || []).map(function(u){ return '<a href="' + esc(u) + '" target="_blank" class="chip" style="text-decoration:none">📎 Fichier</a>'; }).join('')) +
+          '<span style="color:var(--muted);font-size:11.5px;width:100%">' + esc((pv.at || '').replace('T', ' ').replace(/\..*/, '')) + '</span>' +
+          '</div>';
+      });
+      if (!(preuves || []).length) prows = '<div class="row" style="color:var(--muted)"><i>Aucun message récupéré (configurez le salon des preuves dans Salons & logs).</i></div>';
+      m().innerHTML = '<div class="fade">' +
+        '<div class="fields" style="display:flex;gap:8px;margin-bottom:12px"><input id="bdd_q" placeholder="🔎 Rechercher (ID, pseudo, raison…)" style="flex:1"><button id="bdd_go" class="accent">Rechercher</button></div>' +
+        sec('Historique des blacklists', 'Chaque blacklist / déban depuis le début, avec la preuve fournie.', hrows, '') +
+        sec('🖼️ Salon des preuves', 'Messages récupérés automatiquement dans le salon des preuves du Discord principal.', prows, '') +
+        '</div>';
+      var run = function(){
+        var q = $('bdd_q') ? encodeURIComponent($('bdd_q').value.trim()) : '';
+        m().innerHTML = spinner();
+        Promise.all([api('GET', gu('blacklist-historique') + (q ? '&q=' + q : '')), api('GET', gu('preuves') + (q ? '&q=' + q : ''))]).then(function(r){
+          draw((r[0] && r[0].historique) || [], (r[1] && r[1].preuves) || []);
+        });
+      };
+      if ($('bdd_go')) $('bdd_go').onclick = run;
+      if ($('bdd_q')) $('bdd_q').onkeydown = function(e){ if (e.key === 'Enter') run(); };
+    };
+    Promise.all([api('GET', gu('blacklist-historique')), api('GET', gu('preuves'))]).then(function(r){
+      if (r[0] && r[0].error) { m().innerHTML = errScreen(r[0].error, false); return; }
+      draw((r[0] && r[0].historique) || [], (r[1] && r[1].preuves) || []);
     });
     return;
   }
@@ -839,5 +1014,6 @@ api('GET', 'index.php?p=api-moi').then(function(j){
   $('h_name').textContent = moi.user.username;
   renderHome();
 });
-
-</script></body></html>
+</script>
+</body>
+</html>

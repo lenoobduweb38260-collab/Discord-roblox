@@ -61,6 +61,7 @@ function startManagedApi(client, baseDir) {
     staff_channel_id: 's',
     member_channel_id: 's',
     update_channel_id: 's',
+    proof_channel_id: 's',
     welcome_message: 't',
     goodbye_message: 't',
     welcome_mention: 'b',
@@ -287,6 +288,48 @@ function startManagedApi(client, baseDir) {
         });
       }
 
+      // ----- 🗂️ Base de données : historique permanent des blacklists -----
+      if (req.method === 'GET' && url.pathname === '/blacklist-historique') {
+        const { listHistory } = require('./utils/botTeam');
+        const q = String(url.searchParams.get('q') || '').trim().toLowerCase();
+        let rows = listHistory.all().map((r) => ({
+          id: r.id,
+          userId: r.user_id,
+          tag: r.tag || client.users.cache.get(r.user_id)?.tag || null,
+          action: r.action,
+          reason: r.reason,
+          proof: r.proof,
+          by: r.by_id,
+          at: r.at,
+        }));
+        if (q) rows = rows.filter((r) => [r.userId, r.tag, r.reason].filter(Boolean).some((v) => String(v).toLowerCase().includes(q)));
+        return send(200, { historique: rows });
+      }
+
+      // ----- 🖼️ Preuves : messages récupérés du salon preuves -----
+      if (req.method === 'GET' && url.pathname === '/preuves') {
+        const q = String(url.searchParams.get('q') || '').trim().toLowerCase();
+        let rows = db
+          .prepare('SELECT * FROM proof_messages ORDER BY id DESC LIMIT 200')
+          .all()
+          .map((r) => ({
+            id: r.id,
+            authorId: r.author_id,
+            authorTag: r.author_tag,
+            content: r.content,
+            attachments: (() => {
+              try {
+                return JSON.parse(r.attachments || '[]');
+              } catch {
+                return [];
+              }
+            })(),
+            at: r.at,
+          }));
+        if (q) rows = rows.filter((r) => [r.authorId, r.authorTag, r.content].filter(Boolean).some((v) => String(v).toLowerCase().includes(q)));
+        return send(200, { preuves: rows });
+      }
+
       // ----- 🚫 Blacklist globale du bot (mode staff du dashboard) -----
       if (url.pathname.startsWith('/blacklist')) {
         const { hasPerm, isCreator, listBlacklistRows, getBlacklistRow, applyBlacklist, removeBlacklist } = require('./utils/botTeam');
@@ -311,13 +354,61 @@ function startManagedApi(client, baseDir) {
           const userId = String(body.userId || '').trim();
           if (!/^\d{5,25}$/.test(userId)) return send(400, { error: 'ID Discord invalide.' });
           if (await isCreator(client, userId)) return send(400, { error: 'Le créateur du bot ne peut pas être blacklisté.' });
-          const result = await applyBlacklist(client, userId, String(body.reason || '').slice(0, 500) || null, who);
+          const result = await applyBlacklist(client, userId, String(body.reason || '').slice(0, 500) || null, who, String(body.proof || '').slice(0, 1000) || null);
           return send(200, { ok: true, tag: result.tag, banned: result.banned, dmOk: result.dmOk });
         }
         if (url.pathname === '/blacklist-retirer') {
           if (!getBlacklistRow.get(String(body.userId || ''))) return send(404, { error: 'Non blacklisté.' });
-          const result = await removeBlacklist(client, String(body.userId));
+          const result = await removeBlacklist(client, String(body.userId), who);
           return send(200, { ok: true, unbanned: result.unbanned });
+        }
+      }
+
+      // ----- 🎫 Tickets de bannissement du QG (mode staff du dashboard) -----
+      if (url.pathname.startsWith('/qg')) {
+        const { hasPerm, applyBlacklist } = require('./utils/botTeam');
+        const setClaim = db.prepare('UPDATE bot_tickets SET status = ?, claimed_by = ? WHERE id = ?');
+        const setDone = db.prepare("UPDATE bot_tickets SET status = 'traite', resolution = ?, proof = ? WHERE id = ?");
+        const getT = db.prepare('SELECT * FROM bot_tickets WHERE id = ?');
+        if (req.method === 'GET' && url.pathname === '/qg-tickets') {
+          const rows = db.prepare('SELECT * FROM bot_tickets ORDER BY id DESC LIMIT 100').all().map((t) => ({
+            id: t.id, kind: t.kind, guildName: t.guild_name, guildId: t.guild_id,
+            targetId: t.target_id, targetTag: t.target_tag, reporterId: t.reporter_id,
+            reason: t.reason, status: t.status, claimedBy: t.claimed_by, resolution: t.resolution, at: t.created_at,
+          }));
+          return send(200, { tickets: rows });
+        }
+        const body = await readBody(req);
+        const who = String(body.actorId || '');
+        if (!(await hasPerm(client, who, 'tickets'))) return send(403, { error: 'Permission 🎫 Tickets du QG requise.' });
+        const ticket = getT.get(parseInt(body.ticketId, 10));
+        if (!ticket) return send(404, { error: 'Ticket introuvable.' });
+        if (url.pathname === '/qg-claim') {
+          if (ticket.claimed_by && ticket.claimed_by !== who) return send(400, { error: `Déjà claim.` });
+          setClaim.run('claim', who, ticket.id);
+          return send(200, { ok: true });
+        }
+        if (url.pathname === '/qg-invite') {
+          const guild = client.guilds.cache.get(ticket.guild_id);
+          if (!guild) return send(400, { error: 'Le bot n\'est plus sur ce serveur.' });
+          const chan = guild.channels.cache.find((c) => c.isTextBased() && !c.isThread() && c.permissionsFor(guild.members.me)?.has(require('discord.js').PermissionFlagsBits.CreateInstantInvite));
+          if (!chan) return send(400, { error: 'Le bot ne peut pas créer d\'invitation ici.' });
+          const invite = await chan.createInvite({ maxAge: 3600, maxUses: 1, unique: true, reason: `Ticket QG n°${ticket.id}` }).catch(() => null);
+          if (!invite) return send(500, { error: 'Création de l\'invitation impossible.' });
+          return send(200, { ok: true, url: invite.url });
+        }
+        if (url.pathname === '/qg-traiter') {
+          if (ticket.status === 'traite') return send(400, { error: 'Ticket déjà traité.' });
+          if (body.resolution === 'blacklist') {
+            if (!(await hasPerm(client, who, 'blacklist'))) return send(403, { error: 'Permission 🚫 Blacklist requise.' });
+            const proof = String(body.proof || '').trim();
+            if (!proof) return send(400, { error: 'Preuves obligatoires pour appliquer une blacklist.' });
+            const result = await applyBlacklist(client, ticket.target_id, `Ticket QG n°${ticket.id}${ticket.reason ? ` — ${ticket.reason}` : ''}`, who, proof.slice(0, 1000));
+            setDone.run('blacklist', proof.slice(0, 1000), ticket.id);
+            return send(200, { ok: true, tag: result.tag, banned: result.banned });
+          }
+          setDone.run('aucune', null, ticket.id);
+          return send(200, { ok: true });
         }
       }
 

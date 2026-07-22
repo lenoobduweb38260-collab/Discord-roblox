@@ -228,6 +228,30 @@ CREATE TABLE IF NOT EXISTS bot_staff (
   added_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS blacklist_history (
+  id        INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id   TEXT NOT NULL,
+  tag       TEXT,
+  action    TEXT NOT NULL,
+  reason    TEXT,
+  proof     TEXT,
+  by_id     TEXT NOT NULL,
+  guild_id  TEXT,
+  at        TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS proof_messages (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  guild_id    TEXT NOT NULL,
+  channel_id  TEXT NOT NULL,
+  message_id  TEXT NOT NULL UNIQUE,
+  author_id   TEXT NOT NULL,
+  author_tag  TEXT,
+  content     TEXT,
+  attachments TEXT,
+  at          TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS bot_tickets (
   id          INTEGER PRIMARY KEY AUTOINCREMENT,
   kind        TEXT NOT NULL,
@@ -280,11 +304,17 @@ for (const column of [
   'update_channel_id TEXT',
   'staff_role_ids TEXT',
   'admin_role_ids TEXT',
+  'proof_channel_id TEXT',
 ]) {
   try {
     db.exec(`ALTER TABLE guild_config ADD COLUMN ${column}`);
   } catch {}
 }
+
+// Tickets du QG : preuve fournie à la blacklist.
+try {
+  db.exec('ALTER TABLE bot_tickets ADD COLUMN proof TEXT');
+} catch {}
 
 // Types de tickets : description (option du sélecteur de raison) et
 // ping_role_id (rôle mentionné à l'ouverture, sinon le support).
@@ -313,6 +343,7 @@ const DEFAULT_CONFIG = {
   staff_channel_id: null,
   member_channel_id: null,
   update_channel_id: null,
+  proof_channel_id: null,
   welcome_message: null,
   goodbye_message: null,
   welcome_mention: 0,
