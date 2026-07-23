@@ -90,6 +90,12 @@ module.exports = {
       return require('../commands/partenariat').handleButton(interaction);
     }
 
+    // ----- Vgache : bouton « Réclamer » -----
+    if (interaction.isButton() && interaction.customId.startsWith('vg:claim:')) {
+      if (!interaction.inGuild()) return;
+      return require('../commands/vgache').handleButton(interaction);
+    }
+
     // ----- Sélecteur de raison du panneau de tickets (menu déroulant) -----
     if (interaction.isStringSelectMenu() && interaction.customId === 'tktmenu') {
       if (!interaction.inGuild()) return;

@@ -349,6 +349,22 @@ CREATE TABLE IF NOT EXISTS deleted_messages (
   attachments    TEXT,
   at             TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS gacha_characters (
+  id        INTEGER PRIMARY KEY AUTOINCREMENT,
+  name      TEXT NOT NULL,
+  image_url TEXT,
+  added_by  TEXT,
+  added_at  TEXT
+);
+
+CREATE TABLE IF NOT EXISTS gacha_owned (
+  guild_id     TEXT NOT NULL,
+  character_id INTEGER NOT NULL,
+  user_id      TEXT NOT NULL,
+  at           TEXT NOT NULL,
+  PRIMARY KEY (guild_id, character_id)
+);
 `);
 
 // Migration : ajoute les colonnes manquantes aux bases créées avant leur
