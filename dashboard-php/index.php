@@ -95,8 +95,8 @@ function demo_parametres(): array {
     'categories' => [['id' => '30', 'name' => 'TICKETS'], ['id' => '31', 'name' => 'AIDE']],
     'whitelist' => [['roleId' => '14', 'managerId' => '15', 'role' => 'Police', 'manager' => 'Gérant Police']],
     'tickets' => [
-      ['id' => 1, 'label' => 'Support', 'emoji' => '🛠️', 'description' => 'Une question, un souci ?', 'categorie' => 'TICKETS', 'support' => 'Staff'],
-      ['id' => 2, 'label' => 'Plainte', 'emoji' => '⚖️', 'description' => 'Signaler un membre', 'categorie' => 'AIDE', 'support' => 'Modérateur'],
+      ['id' => 1, 'label' => 'Support', 'emoji' => '🛠️', 'description' => 'Une question, un souci ?', 'categorie' => 'TICKETS', 'support' => 'Staff', 'supports' => [['id' => '10', 'name' => 'Staff'], ['id' => '12', 'name' => 'Modérateur']]],
+      ['id' => 2, 'label' => 'Plainte', 'emoji' => '⚖️', 'description' => 'Signaler un membre', 'categorie' => 'AIDE', 'support' => 'Modérateur', 'supports' => [['id' => '12', 'name' => 'Modérateur']]],
     ],
     'profils' => [
       ['id' => 1, 'name' => 'Support Colmar RP', 'avatar' => 'https://cdn.discordapp.com/embed/avatars/2.png'],
@@ -1327,8 +1327,9 @@ function loadPage(srv){
       // ---- Raisons ----
       var tk = '';
       p.tickets.forEach(function(t){
+        var sup = (t.supports && t.supports.length) ? t.supports.map(function(s){ return '@' + esc(s.name); }).join(' ') : (t.support ? '@' + esc(t.support) : '');
         tk += '<div class="row">' + (t.emoji ? esc(t.emoji) + ' ' : '') + '<b>' + esc(t.label) + '</b>' + (t.description ? ' <span style="color:var(--muted)">— ' + esc(t.description) + '</span>' : '') +
-          '<span style="color:var(--muted);font-size:12px">📁 ' + esc(t.categorie) + (t.support ? ' · 🛎️ @' + esc(t.support) : '') + '</span>' +
+          '<span style="color:var(--muted);font-size:12px">📁 ' + esc(t.categorie) + (sup ? ' · 🛎️ ' + sup : '') + '</span>' +
           '<button class="tk-del" data-id="' + t.id + '" style="margin-left:auto;padding:4px 11px;font-size:12px">🗑</button></div>';
       });
       if (!p.tickets.length) tk += '<div class="row" style="color:var(--muted)"><i>Aucune raison de ticket.</i></div>';
@@ -1338,7 +1339,9 @@ function loadPage(srv){
         '<div style="min-width:150px"><div class="flabel">Nom de la raison</div><input id="wt_nom" placeholder="Support"></div>' +
         '<div style="min-width:80px;max-width:100px"><div class="flabel">Emoji</div><input id="wt_emoji" placeholder="🎫"></div>' +
         '<div style="flex:1;min-width:200px">' + fsel3('wt_cat', 'Catégorie dédiée à cette raison', p.categories) + '</div>' +
-        '<div style="flex:1;min-width:170px">' + fsel2('wt_role', 'Rôle support (optionnel)', p.roles) + '</div></div>' +
+        '<div style="flex:1;min-width:200px"><div class="flabel">Rôles support (plusieurs possibles)</div>' +
+        '<select id="wt_roles" multiple size="4" style="height:auto">' + (p.roles || []).map(function(r){ return '<option value="' + r.id + '">@' + esc(r.name) + '</option>'; }).join('') + '</select>' +
+        '<div style="color:var(--muted);font-size:11px;margin-top:3px">Ctrl (Windows) ou ⌘ (Mac) pour en sélectionner plusieurs.</div></div></div>' +
         '<div class="flabel" style="margin-top:10px">Description (affichée sous la raison dans le menu déroulant)</div><input id="wt_desc" placeholder="Ex : Une question, un souci ? Ouvrez ici.">' +
         '<button id="wt_add" class="accent" style="margin-top:10px">➕ Ajouter la raison</button></div>';
       h += sec('Nouvelle raison (avec sa catégorie)', 'La config avancée du sélecteur : chaque raison peut pointer vers une catégorie différente.', addt, '');
@@ -1362,7 +1365,8 @@ function loadPage(srv){
     });
     if ($('wt_add')) $('wt_add').onclick = function(){
       if (!$('wt_nom').value.trim() || !$('wt_cat').value) { toast('⚠️ Nom et catégorie requis.'); return; }
-      api('POST', su('tickets-type'), { label: $('wt_nom').value, emoji: $('wt_emoji').value, categoryId: $('wt_cat').value, supportRoleId: $('wt_role').value || null, description: $('wt_desc') ? $('wt_desc').value : '' }).then(reload);
+      var wtRoles = $('wt_roles') ? Array.prototype.slice.call($('wt_roles').selectedOptions).map(function(o){ return o.value; }) : [];
+      api('POST', su('tickets-type'), { label: $('wt_nom').value, emoji: $('wt_emoji').value, categoryId: $('wt_cat').value, supportRoleIds: wtRoles, description: $('wt_desc') ? $('wt_desc').value : '' }).then(reload);
     };
     // Éditeur de panneau : prévisualisation en direct + publication.
     if ($('tp_pv')){

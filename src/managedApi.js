@@ -27,7 +27,7 @@ function startManagedApi(client, baseDir) {
     });
 
   const insertTicketType = db.prepare(
-    'INSERT INTO ticket_types (guild_id, label, emoji, category_id, support_role_id, description) VALUES (?, ?, ?, ?, ?, ?)'
+    'INSERT INTO ticket_types (guild_id, label, emoji, category_id, support_role_id, description, support_role_ids) VALUES (?, ?, ?, ?, ?, ?, ?)'
   );
   const deleteTicketType = db.prepare('DELETE FROM ticket_types WHERE id = ? AND guild_id = ?');
   const getTicketTypeByLabel = db.prepare('SELECT * FROM ticket_types WHERE guild_id = ? AND label = ?');
@@ -167,14 +167,24 @@ function startManagedApi(client, baseDir) {
           role: guild.roles.cache.get(m.role_id)?.name || m.role_id,
           manager: guild.roles.cache.get(m.manager_role_id)?.name || m.manager_role_id,
         }));
-        const tickets = listTicketTypes.all(guild.id).map((t) => ({
-          id: t.id,
-          label: t.label,
-          emoji: t.emoji,
-          description: t.description || null,
-          categorie: guild.channels.cache.get(t.category_id)?.name || t.category_id || '?',
-          support: t.support_role_id ? guild.roles.cache.get(t.support_role_id)?.name || t.support_role_id : null,
-        }));
+        const tickets = listTicketTypes.all(guild.id).map((t) => {
+          let roleIds = [];
+          try {
+            const arr = JSON.parse(t.support_role_ids || '[]');
+            if (Array.isArray(arr) && arr.length) roleIds = arr.map(String);
+          } catch {}
+          if (!roleIds.length && t.support_role_id) roleIds = [String(t.support_role_id)];
+          const supports = roleIds.map((id) => ({ id, name: guild.roles.cache.get(id)?.name || id }));
+          return {
+            id: t.id,
+            label: t.label,
+            emoji: t.emoji,
+            description: t.description || null,
+            categorie: guild.channels.cache.get(t.category_id)?.name || t.category_id || '?',
+            support: supports[0]?.name || null,
+            supports,
+          };
+        });
         const bans = listBans.all().map((b) => ({
           userId: b.user_id,
           name: client.users.cache.get(b.user_id)?.tag || null,
@@ -246,9 +256,16 @@ function startManagedApi(client, baseDir) {
         if (countTicketTypes.get(guild.id).n >= 25) return send(400, { error: 'Maximum 25 types (limite des boutons Discord).' });
         const category = guild.channels.cache.get(body.categoryId);
         if (!category || category.type !== ChannelType.GuildCategory) return send(400, { error: 'Catégorie invalide.' });
-        const supportRole = body.supportRoleId ? guild.roles.cache.get(body.supportRoleId) : null;
+        // Plusieurs rôles support possibles (supportRoleIds) ; compat : supportRoleId.
+        const rawRoleIds = Array.isArray(body.supportRoleIds)
+          ? body.supportRoleIds
+          : (body.supportRoleId ? [body.supportRoleId] : []);
+        const roleIds = [...new Set(rawRoleIds.map(String).filter((id) => guild.roles.cache.has(id)))];
         const description = String(body.description || '').trim().slice(0, 100) || null;
-        insertTicketType.run(guild.id, label, String(body.emoji || '').trim() || null, category.id, supportRole?.id || null, description);
+        insertTicketType.run(
+          guild.id, label, String(body.emoji || '').trim() || null, category.id,
+          roleIds[0] || null, description, roleIds.length ? JSON.stringify(roleIds) : null
+        );
         return send(200, { ok: true, note: 'Republiez le panneau (/ticket panneau) pour afficher la nouvelle raison.' });
       }
       if (req.method === 'POST' && url.pathname === '/tickets-type-suppr') {
