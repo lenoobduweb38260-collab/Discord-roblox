@@ -277,6 +277,7 @@ module.exports = {
   allowDm: true, // utilisable en message privé avec le bot
   userInstall: true, // installable sur un compte utilisateur → enregistrement GLOBAL
   botModule: 'interact', // désactivable par bot via MODULE_INTERACT=off
+  guildModule: 'interact', // désactivable PAR SERVEUR via /config (désactivé par défaut)
   moduleBlocked,
   data: new SlashCommandBuilder()
     .setName('interact')

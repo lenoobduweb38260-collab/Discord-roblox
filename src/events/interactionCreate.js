@@ -105,6 +105,14 @@ module.exports = {
       return require('../commands/vgache').handleButton(interaction);
     }
 
+    // ----- Patch notes : modal + boutons (créateur) -----
+    if (
+      (interaction.isModalSubmit() && interaction.customId === 'pn:modal') ||
+      (interaction.isButton() && interaction.customId.startsWith('pn:'))
+    ) {
+      return require('../commands/patchnote').handle(interaction);
+    }
+
     // ----- Sélecteur de raison du panneau de tickets (menu déroulant) -----
     if (interaction.isStringSelectMenu() && interaction.customId === 'tktmenu') {
       if (!interaction.inGuild()) return;
@@ -208,7 +216,15 @@ module.exports = {
     // (elles sont aussi retirées de la liste du serveur par la synchronisation).
     if (command.module === 'rp' && interaction.inGuild() && !cfg.rp_enabled) {
       return interaction.reply({
-        content: '⛔ Le **Module RP** n\'est pas activé sur ce serveur. Un staff peut l\'activer via `/config` → 🎭 Module RP.',
+        content: '⛔ Le **Module RP** n\'est pas activé sur ce serveur. Un staff peut l\'activer via `/config` → 🎭 Modules.',
+        flags: MessageFlags.Ephemeral,
+      });
+    }
+
+    // Module Interactions : désactivé par défaut, activable par serveur via /config.
+    if (command.guildModule === 'interact' && interaction.inGuild() && !cfg.interact_enabled) {
+      return interaction.reply({
+        content: '⛔ Le **module Interactions** n\'est pas activé sur ce serveur. Un staff peut l\'activer via `/config` → 🎭 Modules.',
         flags: MessageFlags.Ephemeral,
       });
     }

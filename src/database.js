@@ -388,6 +388,8 @@ for (const column of [
   'partner_channel_id TEXT',
   'level_image_url TEXT',
   'goodbye_channel_id TEXT',
+  'patch_channel_id TEXT',
+  'interact_enabled INTEGER',
 ]) {
   try {
     db.exec(`ALTER TABLE guild_config ADD COLUMN ${column}`);
@@ -470,6 +472,8 @@ const DEFAULT_CONFIG = {
   verified_role_id: null,
   captcha_channel_id: null,
   partner_channel_id: null,
+  patch_channel_id: null,
+  interact_enabled: 0,
   level_image_url: null,
   xp_text: 20,
   xp_voice: 10,

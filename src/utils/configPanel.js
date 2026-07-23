@@ -15,6 +15,7 @@ const {
 const { db, getGuildConfig, setGuildConfig } = require('../database');
 const { COLORS, sendLog, logEmbed } = require('./embeds');
 const { GRADES, getGrade, staffRoleIds, adminRoleIds } = require('./permissions');
+const { supportRoleIds } = require('./tickets');
 
 // Panneau central de configuration : /config ouvre une vue d'ensemble avec un
 // menu de catégories ; chaque catégorie se règle via des sélecteurs de rôles,
@@ -37,6 +38,7 @@ const CHANNEL_COLUMNS = {
   update_channel_id: '📦 Salon des annonces de mise à jour',
   proof_channel_id: '🖼️ Salon des preuves (staff du bot)',
   partner_channel_id: '🤝 Salon des partenariats',
+  patch_channel_id: '📝 Salon des patch notes',
   captcha_channel_id: '🤖 Salon du captcha',
 };
 
@@ -54,7 +56,7 @@ const insertTicketType = db.prepare(
   'INSERT INTO ticket_types (guild_id, label, emoji, category_id, support_role_id) VALUES (?, ?, ?, ?, ?)'
 );
 const deleteTicketTypeStmt = db.prepare('DELETE FROM ticket_types WHERE id = ? AND guild_id = ?');
-const setTicketSupport = db.prepare('UPDATE ticket_types SET support_role_id = ? WHERE id = ? AND guild_id = ?');
+const setTicketSupport = db.prepare('UPDATE ticket_types SET support_role_id = ?, support_role_ids = ? WHERE id = ? AND guild_id = ?');
 
 // Création d'un type de ticket en deux étapes (formulaire nom/emoji, puis
 // catégorie) : mémoire temporaire entre les deux interactions.
@@ -152,7 +154,7 @@ function mainView(guild) {
       .setCustomId('cfgcat')
       .setPlaceholder('⚙️ Choisissez une catégorie à configurer…')
       .addOptions(
-        { label: 'Module RP', value: 'rp', emoji: '🎭', description: 'Cartes, permis, entreprises, assurances, service' },
+        { label: 'Modules (RP, Interactions)', value: 'rp', emoji: '🎭', description: 'Activer/désactiver le Module RP et les Interactions' },
         { label: 'Rôles', value: 'roles', emoji: '👮', description: 'Staff, administration, en service' },
         { label: 'Salons', value: 'salons', emoji: '📢', description: 'Logs, niveaux, service, staff' },
         { label: 'XP & niveaux', value: 'xp', emoji: '📈', description: 'XP texte, XP vocal, cooldown' },
@@ -343,11 +345,22 @@ function rpView(guild) {
           ? '\n\n🔒 Ce réglage est **verrouillé par l\'administrateur du bot** : il ne peut être modifié que depuis le gestionnaire des bots.'
           : '')
     );
+  const interactOn = Boolean(cfg.interact_enabled);
+  embed.addFields({
+    name: '🎮 Module Interactions',
+    value:
+      `État : ${interactOn ? '🟢 **Activé**' : '🔴 **Désactivé**'}\n` +
+      '`/interact` (câlin, tape, gifle… façon Nekotina). Désactivé par défaut.',
+  });
   const row = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('cfgrpon').setLabel('Activer le Module RP').setEmoji('🟢').setStyle(ButtonStyle.Success).setDisabled(enabled || locked),
-    new ButtonBuilder().setCustomId('cfgrpoff').setLabel('Désactiver').setEmoji('🔴').setStyle(ButtonStyle.Danger).setDisabled(!enabled || locked)
+    new ButtonBuilder().setCustomId('cfgrpoff').setLabel('Désactiver le RP').setEmoji('🔴').setStyle(ButtonStyle.Danger).setDisabled(!enabled || locked)
   );
-  return { embeds: [embed], components: [row, backRow()] };
+  const rowInteract = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('cfginton').setLabel('Activer les Interactions').setEmoji('🎮').setStyle(ButtonStyle.Success).setDisabled(interactOn),
+    new ButtonBuilder().setCustomId('cfgintoff').setLabel('Désactiver').setEmoji('🔴').setStyle(ButtonStyle.Danger).setDisabled(!interactOn)
+  );
+  return { embeds: [embed], components: [row, rowInteract, backRow()] };
 }
 
 // ----- Catégorie : réseaux sociaux (annonces lives / nouvelles vidéos) -----
@@ -384,7 +397,8 @@ function ticketsView(guild, selectedId = null) {
     ? types
         .map((t) => {
           const cat = guild.channels.cache.get(t.category_id)?.name || t.category_id || '?';
-          const support = t.support_role_id ? ` — support <@&${t.support_role_id}>` : '';
+          const roles = supportRoleIds(t).map((r) => `<@&${r}>`).join(' ');
+          const support = roles ? ` — support ${roles}` : '';
           return `• ${t.emoji ? t.emoji + ' ' : ''}**${t.label}** — catégorie « ${cat} »${support}`;
         })
         .join('\n')
@@ -416,12 +430,13 @@ function ticketsView(guild, selectedId = null) {
   }
   const selected = selectedId ? types.find((t) => t.id === selectedId) : null;
   if (selected) {
+    const current = supportRoleIds(selected);
     const menu = new RoleSelectMenuBuilder()
       .setCustomId(`cfgtktrole:${selected.id}`)
-      .setPlaceholder(`🛎️ Rôle support de « ${selected.label} »`.slice(0, 150))
+      .setPlaceholder(`🛎️ Rôles support de « ${selected.label} » (plusieurs possibles)`.slice(0, 150))
       .setMinValues(1)
-      .setMaxValues(1);
-    if (selected.support_role_id) menu.setDefaultRoles(selected.support_role_id);
+      .setMaxValues(10);
+    if (current.length) menu.setDefaultRoles(current.slice(0, 10));
     components.push(new ActionRowBuilder().addComponents(menu));
   }
   const buttons = [
@@ -618,6 +633,18 @@ async function handleConfigInteraction(interaction) {
       return;
     }
 
+    // Module Interactions : activer / désactiver (par serveur).
+    if (id === 'cfginton' || id === 'cfgintoff') {
+      const enable = id === 'cfginton' ? 1 : 0;
+      setGuildConfig(interaction.guildId, 'interact_enabled', enable);
+      await interaction.update(rpView(interaction.guild));
+      await sendLog(
+        interaction.guild,
+        logEmbed('🎮 Module Interactions', `Interactions ${enable ? 'activées' : 'désactivées'} par <@${interaction.user.id}>.`, enable ? COLORS.SUCCESS : COLORS.DANGER)
+      );
+      return;
+    }
+
     // ----- Tickets : sélection, création (formulaire → catégorie), support, suppression -----
     if (id === 'cfgtktsel') {
       return await interaction.update(ticketsView(interaction.guild, Number(interaction.values[0])));
@@ -674,12 +701,12 @@ async function handleConfigInteraction(interaction) {
       const typeId = Number(id.split(':')[1]);
       const type = getTicketType.get(typeId, interaction.guildId);
       if (!type) return await interaction.update(ticketsView(interaction.guild));
-      const roleId = interaction.values[0];
-      setTicketSupport.run(roleId, typeId, interaction.guildId);
+      const roleIds = [...new Set(interaction.values.map(String))].slice(0, 10);
+      setTicketSupport.run(roleIds[0] || null, roleIds.length ? JSON.stringify(roleIds) : null, typeId, interaction.guildId);
       await interaction.update(ticketsView(interaction.guild, typeId));
       await sendLog(
         interaction.guild,
-        logEmbed('🎫 Rôle support défini', `**${type.label}** → <@&${roleId}>\nPar <@${interaction.user.id}>`, COLORS.INFO)
+        logEmbed('🎫 Rôles support définis', `**${type.label}** → ${roleIds.map((r) => `<@&${r}>`).join(' ')}\nPar <@${interaction.user.id}>`, COLORS.INFO)
       );
       return;
     }
