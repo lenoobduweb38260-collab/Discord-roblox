@@ -332,6 +332,36 @@ for (const column of ['webhook_id TEXT', 'webhook_token TEXT']) {
   } catch {}
 }
 
+// ----- 🌐 Identité RP globale -----
+// Les cartes d'identité, permis, entreprises (patrons/employés) et assurances
+// sont PARTAGÉS sur tous les serveurs : ils utilisent tous la même portée
+// « GLOBAL » comme guild_id, si bien qu'une fiche est identique partout et
+// suit la personne sur chaque serveur où le bot est présent. Le reste (niveaux,
+// service, whitelist métier, salons, rôles) reste propre à chaque serveur.
+const RP_SCOPE = 'GLOBAL';
+
+// Migration unique : rapatrie les données existantes (créées par serveur) vers
+// la portée globale, en évitant les doublons (on garde la plus ancienne par
+// personne / par nom d'entreprise).
+try {
+  const done = db.prepare("SELECT value FROM app_state WHERE key = 'rp_global_migrated'").get();
+  if (!done) {
+    db.transaction(() => {
+      db.exec("DELETE FROM identity_cards WHERE rowid NOT IN (SELECT MIN(rowid) FROM identity_cards GROUP BY user_id)");
+      db.prepare('UPDATE identity_cards SET guild_id = ?').run(RP_SCOPE);
+      db.exec("DELETE FROM permits WHERE rowid NOT IN (SELECT MIN(rowid) FROM permits GROUP BY user_id)");
+      db.prepare('UPDATE permits SET guild_id = ?').run(RP_SCOPE);
+      db.exec("DELETE FROM enterprises WHERE id NOT IN (SELECT MIN(id) FROM enterprises GROUP BY name COLLATE NOCASE)");
+      db.prepare('UPDATE enterprises SET guild_id = ?').run(RP_SCOPE);
+      db.prepare('UPDATE insured_vehicles SET guild_id = ?').run(RP_SCOPE);
+    })();
+    db.prepare("INSERT OR REPLACE INTO app_state (key, value) VALUES ('rp_global_migrated', '1')").run();
+    console.log('🌐 Identité RP migrée en portée globale (cartes, permis, entreprises, assurances partagés partout).');
+  }
+} catch (err) {
+  console.warn(`⚠️ Migration RP globale ignorée : ${err.message}`);
+}
+
 const DEFAULT_CONFIG = {
   staff_role_id: null,
   admin_role_id: null,
@@ -370,4 +400,4 @@ function setGuildConfig(guildId, key, value) {
   db.prepare(`UPDATE guild_config SET ${key} = ? WHERE guild_id = ?`).run(value, guildId);
 }
 
-module.exports = { db, getGuildConfig, setGuildConfig };
+module.exports = { db, getGuildConfig, setGuildConfig, RP_SCOPE };

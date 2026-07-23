@@ -9,7 +9,9 @@ const path = require('path');
 
 function startManagedApi(client, baseDir) {
   const { EmbedBuilder, ChannelType } = require('discord.js');
-  const { db, getGuildConfig, setGuildConfig } = require('./database');
+  const { db, getGuildConfig, setGuildConfig, RP_SCOPE } = require('./database');
+  // Entités RP partagées sur tous les serveurs (comptées en portée globale).
+  const GLOBAL_COUNT = new Set(['cartes', 'permis', 'entreprises', 'vehicules']);
 
   const readBody = (req) =>
     new Promise((resolve) => {
@@ -118,7 +120,9 @@ function startManagedApi(client, baseDir) {
         const roleName = (id) => (id ? `@${guild.roles.cache.get(id)?.name || id}` : null);
         const chanName = (id) => (id ? `#${guild.channels.cache.get(id)?.name || id}` : null);
         const stats = {};
-        for (const [key, stmt] of Object.entries(countStmts)) stats[key] = stmt.get(guild.id).n;
+        for (const [key, stmt] of Object.entries(countStmts)) {
+          stats[key] = stmt.get(GLOBAL_COUNT.has(key) ? RP_SCOPE : guild.id).n;
+        }
         const top = topNiveaux.all(guild.id).map((r) => ({
           user: client.users.cache.get(r.user_id)?.username || r.user_id,
           level: r.text_level,

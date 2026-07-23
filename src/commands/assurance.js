@@ -1,5 +1,5 @@
 const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
-const { db } = require('../database');
+const { db, RP_SCOPE } = require('../database');
 const { COLORS, sendLog, logEmbed, frDateTime } = require('../utils/embeds');
 const { GRADES, getGrade } = require('../utils/permissions');
 
@@ -69,7 +69,7 @@ module.exports = {
 
   async autocomplete(interaction) {
     const focused = interaction.options.getFocused();
-    const rows = searchInsurerNames.all(interaction.guildId, `%${focused}%`);
+    const rows = searchInsurerNames.all(RP_SCOPE, `%${focused}%`);
     await interaction.respond(rows.map((r) => ({ name: r.name, value: r.name })));
   },
 
@@ -78,7 +78,7 @@ module.exports = {
 
     if (sub === 'assigner') {
       const nom = interaction.options.getString('entreprise').trim();
-      const ent = getByName.get(interaction.guildId, nom);
+      const ent = getByName.get(RP_SCOPE, nom);
       if (!ent) {
         return interaction.reply({ content: `❌ Entreprise **${nom}** introuvable.`, flags: MessageFlags.Ephemeral });
       }
@@ -89,7 +89,7 @@ module.exports = {
       const vehicule = interaction.options.getString('vehicule');
       const plaque = interaction.options.getString('plaque');
       const result = insertVehicle.run(
-        interaction.guildId, ent.id, client.id, vehicule, plaque, interaction.user.id, new Date().toISOString()
+        RP_SCOPE, ent.id, client.id, vehicule, plaque, interaction.user.id, new Date().toISOString()
       );
       const embed = new EmbedBuilder()
         .setColor(COLORS.SUCCESS)
@@ -117,7 +117,7 @@ module.exports = {
 
     if (sub === 'retirer') {
       const numero = interaction.options.getInteger('numero');
-      const vehicle = getVehicle.get(numero, interaction.guildId);
+      const vehicle = getVehicle.get(numero, RP_SCOPE);
       if (!vehicle) {
         return interaction.reply({ content: `❌ Contrat n°${numero} introuvable.`, flags: MessageFlags.Ephemeral });
       }
@@ -149,14 +149,14 @@ module.exports = {
       let vehicles;
       let title;
       if (nom) {
-        const ent = getByName.get(interaction.guildId, nom.trim());
+        const ent = getByName.get(RP_SCOPE, nom.trim());
         if (!ent) {
           return interaction.reply({ content: `❌ Entreprise **${nom}** introuvable.`, flags: MessageFlags.Ephemeral });
         }
         vehicles = vehiclesByEnterprise.all(ent.id);
         title = `🛡️ Véhicules assurés chez ${ent.name}`;
       } else if (client) {
-        vehicles = vehiclesByOwner.all(interaction.guildId, client.id);
+        vehicles = vehiclesByOwner.all(RP_SCOPE, client.id);
         title = `🛡️ Véhicules assurés de ${client.username}`;
       } else {
         return interaction.reply({

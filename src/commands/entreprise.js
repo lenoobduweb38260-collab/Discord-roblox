@@ -5,7 +5,7 @@ const {
   EmbedBuilder,
   MessageFlags,
 } = require('discord.js');
-const { db } = require('../database');
+const { db, RP_SCOPE } = require('../database');
 const { buildEnterpriseEmbed, sendLog, logEmbed, COLORS } = require('../utils/embeds');
 const { GRADES, getGrade } = require('../utils/permissions');
 
@@ -161,14 +161,14 @@ module.exports = {
     .addSubcommand((sub) =>
       sub
         .setName('retirer-membre')
-        .setDescription('[Staff] Retirer un membre (patron + employé) de toutes les entreprises de CE serveur')
-        .addUserOption((o) => o.setName('utilisateur').setDescription('Membre à retirer partout sur ce serveur').setRequired(true))
+        .setDescription('[Staff] Retirer un membre (patron + employé) de toutes les entreprises')
+        .addUserOption((o) => o.setName('utilisateur').setDescription('Membre à retirer de toutes les entreprises').setRequired(true))
     )
     .addSubcommand((sub) => sub.setName('liste').setDescription('Liste des entreprises du serveur')),
 
   async autocomplete(interaction) {
     const focused = interaction.options.getFocused();
-    const rows = searchNames.all(interaction.guildId, `%${focused}%`);
+    const rows = searchNames.all(RP_SCOPE, `%${focused}%`);
     await interaction.respond(rows.map((r) => ({ name: r.name, value: r.name })));
   },
 
@@ -185,16 +185,16 @@ module.exports = {
 
     if (sub === 'retirer-membre') {
       const user = interaction.options.getUser('utilisateur');
-      const heads = removeHeadEverywhere.run(user.id, interaction.guildId).changes;
-      const emps = removeEmployeeEverywhere.run(user.id, interaction.guildId).changes;
+      const heads = removeHeadEverywhere.run(user.id, RP_SCOPE).changes;
+      const emps = removeEmployeeEverywhere.run(user.id, RP_SCOPE).changes;
       if (!heads && !emps) {
         return interaction.reply({
-          content: `ℹ️ <@${user.id}> n'était ni patron ni employé d'une entreprise de ce serveur.`,
+          content: `ℹ️ <@${user.id}> n'était ni patron ni employé d'une entreprise.`,
           flags: MessageFlags.Ephemeral,
         });
       }
       await interaction.reply({
-        content: `🧹 <@${user.id}> retiré de **${heads}** direction(s) et **${emps}** poste(s) d'employé sur ce serveur.`,
+        content: `🧹 <@${user.id}> retiré de **${heads}** direction(s) et **${emps}** poste(s) d'employé.`,
       });
       await sendLog(
         interaction.guild,
@@ -209,7 +209,7 @@ module.exports = {
 
     if (sub === 'creer') {
       const nom = interaction.options.getString('nom').trim();
-      if (getByName.get(interaction.guildId, nom)) {
+      if (getByName.get(RP_SCOPE, nom)) {
         return interaction.reply({ content: `❌ L'entreprise **${nom}** existe déjà.`, flags: MessageFlags.Ephemeral });
       }
       const assurance = interaction.options.getString('assurance') === 'oui';
@@ -218,7 +218,7 @@ module.exports = {
       const patron = interaction.options.getUser('patron');
 
       const result = insertEnterprise.run(
-        interaction.guildId,
+        RP_SCOPE,
         nom,
         interaction.options.getString('description'),
         mediaUrl,
@@ -256,7 +256,7 @@ module.exports = {
     }
 
     if (sub === 'liste') {
-      const rows = listAll.all(interaction.guildId);
+      const rows = listAll.all(RP_SCOPE);
       if (!rows.length) {
         return interaction.reply({ content: '❌ Aucune entreprise sur ce serveur.', flags: MessageFlags.Ephemeral });
       }
@@ -273,7 +273,7 @@ module.exports = {
 
     // Toutes les sous-commandes restantes ciblent une entreprise par nom.
     const nom = interaction.options.getString('nom').trim();
-    const ent = getByName.get(interaction.guildId, nom);
+    const ent = getByName.get(RP_SCOPE, nom);
     if (!ent) {
       return interaction.reply({ content: `❌ Entreprise **${nom}** introuvable.`, flags: MessageFlags.Ephemeral });
     }
@@ -304,7 +304,7 @@ module.exports = {
       }
 
       const column = { nom: 'name', description: 'description', media: 'media_url' }[champ];
-      if (champ === 'nom' && getByName.get(interaction.guildId, valeur)) {
+      if (champ === 'nom' && getByName.get(RP_SCOPE, valeur)) {
         return interaction.reply({ content: `❌ Une entreprise nommée **${valeur}** existe déjà.`, flags: MessageFlags.Ephemeral });
       }
       db.prepare(`UPDATE enterprises SET ${column} = ? WHERE id = ?`).run(valeur, ent.id);

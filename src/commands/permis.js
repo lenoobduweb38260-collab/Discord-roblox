@@ -1,5 +1,5 @@
 const { SlashCommandBuilder, MessageFlags } = require('discord.js');
-const { db } = require('../database');
+const { db, RP_SCOPE } = require('../database');
 const { generatePermitNumber } = require('../utils/ids');
 const { buildPermitEmbed, sendLog, logEmbed, COLORS } = require('../utils/embeds');
 const { GRADES, getGrade } = require('../utils/permissions');
@@ -85,13 +85,13 @@ module.exports = {
     const user = interaction.options.getUser('utilisateur') || interaction.user;
 
     if (sub === 'delivrer') {
-      if (!getCard.get(interaction.guildId, user.id)) {
+      if (!getCard.get(RP_SCOPE, user.id)) {
         return interaction.reply({
           content: `❌ <@${user.id}> doit d'abord avoir une **carte d'identité** (\`/carte creer\`).`,
           flags: MessageFlags.Ephemeral,
         });
       }
-      if (getPermit.get(interaction.guildId, user.id)) {
+      if (getPermit.get(RP_SCOPE, user.id)) {
         return interaction.reply({
           content: `❌ <@${user.id}> possède déjà un permis.`,
           flags: MessageFlags.Ephemeral,
@@ -99,8 +99,8 @@ module.exports = {
       }
       const number = generatePermitNumber();
       const issuedAt = new Date().toISOString(); // délivrance : date + heure du jour
-      insertPermit.run(number, interaction.guildId, user.id, issuedAt, interaction.user.id);
-      const permit = getPermit.get(interaction.guildId, user.id);
+      insertPermit.run(number, RP_SCOPE, user.id, issuedAt, interaction.user.id);
+      const permit = getPermit.get(RP_SCOPE, user.id);
       await interaction.reply({
         content: `✅ Permis délivré à <@${user.id}> — numéro : \`${number}\``,
         embeds: [buildPermitEmbed(permit, user)],
@@ -112,7 +112,7 @@ module.exports = {
       return;
     }
 
-    const permit = getPermit.get(interaction.guildId, user.id);
+    const permit = getPermit.get(RP_SCOPE, user.id);
     if (!permit) {
       return interaction.reply({ content: `❌ <@${user.id}> n'a pas de permis.`, flags: MessageFlags.Ephemeral });
     }
@@ -126,8 +126,8 @@ module.exports = {
       const raison = interaction.options.getString('raison') || 'Aucune raison précisée';
       const newPoints = Math.max(0, permit.points - amount);
       const stillValid = newPoints > 0 ? permit.valid : 0;
-      updatePoints.run(newPoints, stillValid, interaction.guildId, user.id);
-      const updated = getPermit.get(interaction.guildId, user.id);
+      updatePoints.run(newPoints, stillValid, RP_SCOPE, user.id);
+      const updated = getPermit.get(RP_SCOPE, user.id);
       await interaction.reply({
         content:
           `⚠️ **${amount}** point(s) retiré(s) à <@${user.id}> — reste **${newPoints}/12**.` +
@@ -148,8 +148,8 @@ module.exports = {
     if (sub === 'ajouter-points') {
       const amount = interaction.options.getInteger('points');
       const newPoints = Math.min(12, permit.points + amount);
-      updatePoints.run(newPoints, permit.valid, interaction.guildId, user.id);
-      const updated = getPermit.get(interaction.guildId, user.id);
+      updatePoints.run(newPoints, permit.valid, RP_SCOPE, user.id);
+      const updated = getPermit.get(RP_SCOPE, user.id);
       await interaction.reply({
         content: `✅ **${amount}** point(s) rendu(s) à <@${user.id}> — total **${newPoints}/12**.`,
         embeds: [buildPermitEmbed(updated, user)],
@@ -159,8 +159,8 @@ module.exports = {
 
     if (sub === 'invalider') {
       const raison = interaction.options.getString('raison') || 'Aucune raison précisée';
-      setValid.run(0, interaction.guildId, user.id);
-      const updated = getPermit.get(interaction.guildId, user.id);
+      setValid.run(0, RP_SCOPE, user.id);
+      const updated = getPermit.get(RP_SCOPE, user.id);
       await interaction.reply({
         content: `❌ Permis de <@${user.id}> **invalidé**.`,
         embeds: [buildPermitEmbed(updated, user)],
@@ -173,8 +173,8 @@ module.exports = {
     }
 
     if (sub === 'revalider') {
-      setValid.run(1, interaction.guildId, user.id);
-      const updated = getPermit.get(interaction.guildId, user.id);
+      setValid.run(1, RP_SCOPE, user.id);
+      const updated = getPermit.get(RP_SCOPE, user.id);
       await interaction.reply({
         content: `✅ Permis de <@${user.id}> **revalidé**.`,
         embeds: [buildPermitEmbed(updated, user)],
@@ -183,7 +183,7 @@ module.exports = {
     }
 
     if (sub === 'supprimer') {
-      deletePermit.run(interaction.guildId, user.id);
+      deletePermit.run(RP_SCOPE, user.id);
       await interaction.reply({ content: `🗑️ Permis \`${permit.permit_number}\` de <@${user.id}> supprimé.` });
       await sendLog(
         interaction.guild,

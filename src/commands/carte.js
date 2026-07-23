@@ -1,5 +1,5 @@
 const { SlashCommandBuilder, MessageFlags } = require('discord.js');
-const { db } = require('../database');
+const { db, RP_SCOPE } = require('../database');
 const { generateCardId } = require('../utils/ids');
 const { buildCardEmbed, sendLog, logEmbed, COLORS } = require('../utils/embeds');
 const { GRADES, getGrade } = require('../utils/permissions');
@@ -109,7 +109,7 @@ module.exports = {
 
     if (sub === 'creer') {
       const user = interaction.options.getUser('utilisateur');
-      if (getCardByUser.get(interaction.guildId, user.id)) {
+      if (getCardByUser.get(RP_SCOPE, user.id)) {
         return interaction.reply({
           content: `❌ <@${user.id}> possède déjà une carte d'identité. Utilisez \`/carte modifier\` ou \`/carte supprimer\`.`,
           flags: MessageFlags.Ephemeral,
@@ -120,7 +120,7 @@ module.exports = {
       const cardId = generateCardId();
       const card = {
         card_id: cardId,
-        guild_id: interaction.guildId,
+        guild_id: RP_SCOPE,
         user_id: user.id,
         rp_nom: interaction.options.getString('nom'),
         rp_prenom: interaction.options.getString('prenom'),
@@ -153,7 +153,7 @@ module.exports = {
 
     if (sub === 'voir') {
       const user = interaction.options.getUser('utilisateur') || interaction.user;
-      const card = getCardByUser.get(interaction.guildId, user.id);
+      const card = getCardByUser.get(RP_SCOPE, user.id);
       if (!card) {
         return interaction.reply({
           content: `❌ Aucune carte d'identité trouvée pour <@${user.id}>.`,
@@ -175,13 +175,13 @@ module.exports = {
       }
       let cards = [];
       if (idDiscord) {
-        const card = getCardByUser.get(interaction.guildId, idDiscord.trim());
+        const card = getCardByUser.get(RP_SCOPE, idDiscord.trim());
         if (card) cards.push(card);
       } else if (idCarte) {
-        const card = getCardById.get(interaction.guildId, idCarte.trim().toUpperCase());
+        const card = getCardById.get(RP_SCOPE, idCarte.trim().toUpperCase());
         if (card) cards.push(card);
       } else {
-        cards = searchByDiscordName.all(interaction.guildId, `%${nomDiscord.trim()}%`);
+        cards = searchByDiscordName.all(RP_SCOPE, `%${nomDiscord.trim()}%`);
       }
       if (!cards.length) {
         return interaction.reply({ content: '❌ Aucune carte trouvée avec ces critères.', flags: MessageFlags.Ephemeral });
@@ -202,15 +202,15 @@ module.exports = {
       const user = interaction.options.getUser('utilisateur');
       const champ = interaction.options.getString('champ');
       const valeur = interaction.options.getString('valeur');
-      const card = getCardByUser.get(interaction.guildId, user.id);
+      const card = getCardByUser.get(RP_SCOPE, user.id);
       if (!card) {
         return interaction.reply({ content: `❌ <@${user.id}> n'a pas de carte d'identité.`, flags: MessageFlags.Ephemeral });
       }
       const column = EDITABLE_FIELDS[champ];
       db.prepare(`UPDATE identity_cards SET ${column} = ? WHERE guild_id = ? AND user_id = ?`).run(
-        valeur, interaction.guildId, user.id
+        valeur, RP_SCOPE, user.id
       );
-      const updated = getCardByUser.get(interaction.guildId, user.id);
+      const updated = getCardByUser.get(RP_SCOPE, user.id);
       await interaction.reply({
         content: `✅ Champ **${champ}** mis à jour pour <@${user.id}>.`,
         embeds: [buildCardEmbed(updated, user)],
@@ -224,11 +224,11 @@ module.exports = {
 
     if (sub === 'supprimer') {
       const user = interaction.options.getUser('utilisateur');
-      const card = getCardByUser.get(interaction.guildId, user.id);
+      const card = getCardByUser.get(RP_SCOPE, user.id);
       if (!card) {
         return interaction.reply({ content: `❌ <@${user.id}> n'a pas de carte d'identité.`, flags: MessageFlags.Ephemeral });
       }
-      deleteCard.run(interaction.guildId, user.id);
+      deleteCard.run(RP_SCOPE, user.id);
       await interaction.reply({ content: `🗑️ Carte \`${card.card_id}\` de <@${user.id}> supprimée.` });
       await sendLog(
         interaction.guild,

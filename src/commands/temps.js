@@ -1,5 +1,5 @@
 const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
-const { db } = require('../database');
+const { db, RP_SCOPE } = require('../database');
 const { COLORS } = require('../utils/embeds');
 const { GRADES, getGrade } = require('../utils/permissions');
 
@@ -51,7 +51,7 @@ function computeTimes(guildId) {
 function managedFactions(interaction) {
   const isStaff = getGrade(interaction.member) >= GRADES.STAFF;
   const factions = [];
-  for (const ent of listEnterprises.all(interaction.guildId)) {
+  for (const ent of listEnterprises.all(RP_SCOPE)) {
     if (isStaff || isHead.get(ent.id, interaction.user.id)) {
       factions.push({ name: `🏢 ${ent.name}`, value: `ent:${ent.id}` });
     }
@@ -96,13 +96,13 @@ module.exports = {
     // Résolution de la faction : valeur du menu (ent:/role:), sinon nom saisi.
     let faction = null;
     if (raw.startsWith('ent:')) {
-      const ent = getEnterprise.get(Number(raw.slice(4)), interaction.guildId);
+      const ent = getEnterprise.get(Number(raw.slice(4)), RP_SCOPE);
       if (ent) faction = { type: 'ent', ent };
     } else if (raw.startsWith('role:')) {
       const role = interaction.guild.roles.cache.get(raw.slice(5));
       if (role) faction = { type: 'role', role };
     } else {
-      const ent = getEnterpriseByName.get(interaction.guildId, raw);
+      const ent = getEnterpriseByName.get(RP_SCOPE, raw);
       if (ent) faction = { type: 'ent', ent };
       else {
         const role = interaction.guild.roles.cache.find((r) => r.name.toLowerCase() === raw.toLowerCase());
