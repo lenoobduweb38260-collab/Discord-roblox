@@ -12,6 +12,7 @@ const {
 const { GRADES } = require('../utils/permissions');
 const { getGuildConfig } = require('../database');
 const { isCreator } = require('../utils/botTeam');
+const patch = require('../utils/patchNotes');
 
 // Patch notes : le créateur rédige une note (mise à jour / retrait /
 // amélioration / fix) UNIQUEMENT côté utilisateurs (jamais ce qui touche le
@@ -20,19 +21,15 @@ const { isCreator } = require('../utils/botTeam');
 const drafts = new Map();
 let counter = 0;
 
+// Réutilise le constructeur partagé (4 catégories + mention « effet immédiat »).
 function buildEmbed(fields) {
-  const embed = new EmbedBuilder().setColor(0x5865f2).setTitle(`📝 ${fields.titre || 'Note de mise à jour'}`).setTimestamp();
-  const sections = [
-    ['🆕 Mises à jour', fields.maj],
-    ['✨ Améliorations', fields.amelio],
-    ['🔧 Corrections', fields.fix],
-    ['➖ Retraits', fields.retrait],
-  ];
-  for (const [name, value] of sections) {
-    if (value && value.trim()) embed.addFields({ name, value: value.trim().slice(0, 1024) });
-  }
-  embed.setFooter({ text: 'Note de mise à jour du bot' });
-  return embed;
+  return patch.buildEmbed({
+    title: fields.titre || 'Note de mise à jour',
+    ajout: fields.maj,
+    fix: fields.fix,
+    amelioration: fields.amelio,
+    retrait: fields.retrait,
+  });
 }
 
 function modal() {
@@ -47,10 +44,10 @@ function modal() {
       new ActionRowBuilder().addComponents(
         new TextInputBuilder().setCustomId('titre').setLabel('Titre / version').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(100).setPlaceholder('ex : v1.0.60')
       ),
-      f('maj', '🆕 Mises à jour', 'Nouveautés visibles par les membres'),
-      f('amelio', '✨ Améliorations', 'Ce qui a été amélioré'),
-      f('fix', '🔧 Corrections', 'Bugs corrigés'),
-      f('retrait', '➖ Retraits', 'Ce qui a été retiré')
+      f('maj', '🆕 Ajout', 'Nouveautés visibles par les membres'),
+      f('amelio', '✨ Amélioration', 'Ce qui a été amélioré'),
+      f('fix', '🔧 Fix', 'Bugs corrigés'),
+      f('retrait', '➖ Retrait', 'Ce qui a été retiré')
     );
 }
 
@@ -110,7 +107,10 @@ module.exports = {
       if (!cfg.patch_channel_id) continue;
       const channel = await guild.channels.fetch(cfg.patch_channel_id).catch(() => null);
       if (channel?.isTextBased()) {
-        const ok = await channel.send({ embeds: [embed] }).then(() => true).catch(() => false);
+        const ok = await channel
+          .send({ content: '@here', embeds: [embed], allowedMentions: { parse: ['everyone'] } })
+          .then(() => true)
+          .catch(() => false);
         if (ok) count++;
       }
     }

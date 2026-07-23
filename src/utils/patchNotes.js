@@ -1,0 +1,160 @@
+// ----- 📝 Notes de mise à jour (patch notes) automatiques -----
+// Le bot publie lui-même ses notes de mise à jour dans le salon configuré par
+// serveur (patch_channel_id). Elles sont TOUJOURS découpées en 4 catégories —
+// 🆕 Ajout / 🔧 Fix / ✨ Amélioration / ➖ Retrait — et indiquent clairement que
+// les changements prennent effet immédiatement.
+//
+// Fonctionnement :
+//  • La 1re entrée (id « initial ») récapitule TOUT ce qui a été fait depuis le
+//    début et est annoncée UNE SEULE FOIS avec @everyone.
+//  • Chaque entrée suivante = une version, annoncée avec @here (ses changements
+//    uniquement).
+//  • Un marqueur en base (app_state『patch_notes_pos』) mémorise la dernière
+//    entrée déjà publiée : à chaque démarrage, seules les nouvelles sont
+//    envoyées.
+//
+// ⚠️ Règle : les notes ne concernent QUE les utilisateurs. Rien de ce qui
+// touche l'équipe/le staff du bot n'y figure.
+
+const { EmbedBuilder } = require('discord.js');
+const { db, getGuildConfig } = require('../database');
+
+const IMMEDIATE = '⚡ **Ces changements prennent effet immédiatement.**';
+
+// ----- Journal des versions -----
+const RELEASES = [
+  {
+    id: 'initial',
+    title: 'Récapitulatif complet — tout ce que le bot propose',
+    everyone: true,
+    ajout: [
+      '🪪 Cartes d\'identité RP partagées sur tous les serveurs (`/carte`)',
+      '🚗 Permis de conduire à points (`/permis`)',
+      '🏢 Entreprises avec patrons & employés (`/entreprise`)',
+      '🛡️ Assurances véhicule (`/assurance`)',
+      '🌐 Identité RP globale : cartes, permis et entreprises suivent le joueur partout',
+      '🧑‍💼 Prises de service et pointage (`/service`, `/arrivee`, `/depart`)',
+      '📋 Whitelist métiers avec attribution automatique du rôle (`/whitelist`)',
+      '📈 Niveaux écrit & vocal avec carte personnalisable (`/niveau`)',
+      '🎫 Tickets avec catégories et plusieurs rôles support (`/ticket`)',
+      '🔨 Modération : `/ban`, `/kick`, `/mute`, `/unmute`, `/banglobal`',
+      '⚠️ Avertissements RP à points (`/warnrp`)',
+      '⛔ Blacklist RP & ✅ Whitelist RP (recherche intégrée, tri auto)',
+      '🗂️ Casier RP pour suivre les blacklists (`/casier`)',
+      '🕵️ Snipe : récupération des messages supprimés/modifiés (`/snipe`)',
+      '🛡️ Sécurité : anti-nuke, anti-spam et anti-injection',
+      '🤖 Captcha de vérification à l\'arrivée des membres',
+      '👋 Messages de bienvenue et de départ (salon de départ séparé)',
+      '🤝 Partenariats : proposition → validation staff → publication auto',
+      '🎮 Interactions façon Nekotina : câlins, bisous, tapes… (`/interact`)',
+      '🎴 Vgache : gacha de VTubeuses Twitch francophones (`/vgache`)',
+      '⚔️ Aventure SAO : 100 étages d\'Aincrad, boss, badges, XP auto & AFK (`/sao`)',
+      '🎵 Musique en vocal : YouTube, Spotify, Deezer, SoundCloud (`/musique`)',
+      '🔊 Logs vocaux et logs de rôles (création / modification / suppression)',
+      '📢 Réseaux sociaux : lives Twitch, vidéos YouTube/TikTok/X/Reddit (`/reseaux`)',
+      '🛑 Protection anti-scam par image',
+      '📝 Salon de patch notes configurable + ces notes automatiques',
+      '⚙️ Panneau `/config` centralisé avec aperçus d\'embed en direct',
+    ],
+    fix: [
+      '🏢 Les médias d\'entreprise acceptent désormais un fichier ET un lien',
+      '🔒 Diverses corrections de stabilité et de sécurité',
+    ],
+    amelioration: [
+      '🔎 Aperçu en direct de chaque message/embed avant son envoi dans un salon',
+      '🎫 Plusieurs rôles support configurables par type de ticket',
+      '🔤 Blacklist/Whitelist RP triées par ordre alphabétique avec recherche',
+      '🌍 Interactions traduites automatiquement selon la langue de chaque membre',
+      '🎭 Modules activables par serveur (RP, Interactions, Aventure SAO)',
+      '⚙️ Toute la configuration regroupée dans `/config`, mise à jour en direct',
+    ],
+    retrait: ['Aucun retrait — c\'est la version de lancement 🎉'],
+  },
+];
+
+// Découpe une catégorie en champs d'embed (max 1024 caractères par champ).
+function addChunked(embed, name, value) {
+  const raw = Array.isArray(value) ? value.slice() : String(value || '').split('\n');
+  const bullets = raw
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .map((l) => (l.startsWith('•') ? l : `• ${l}`));
+  if (!bullets.length) return;
+  let buf = [];
+  let len = 0;
+  let part = 0;
+  const flush = () => {
+    if (!buf.length) return;
+    embed.addFields({ name: part === 0 ? name : `${name} (suite)`, value: buf.join('\n').slice(0, 1024) });
+    buf = [];
+    len = 0;
+    part += 1;
+  };
+  for (const b of bullets) {
+    if (len + b.length + 1 > 1000) flush();
+    buf.push(b);
+    len += b.length + 1;
+  }
+  flush();
+}
+
+// Construit l'embed d'une note à partir d'une entrée { title, ajout, fix,
+// amelioration, retrait }. Chaque catégorie accepte un tableau OU un texte.
+function buildEmbed(entry) {
+  const embed = new EmbedBuilder()
+    .setColor(0x5865f2)
+    .setTitle(`📝 ${entry.title || 'Note de mise à jour'}`)
+    .setDescription(IMMEDIATE)
+    .setTimestamp();
+  addChunked(embed, '🆕 Ajout', entry.ajout);
+  addChunked(embed, '🔧 Fix', entry.fix);
+  addChunked(embed, '✨ Amélioration', entry.amelioration);
+  addChunked(embed, '➖ Retrait', entry.retrait);
+  embed.setFooter({ text: 'Note de mise à jour du bot' });
+  return embed;
+}
+
+const getPos = db.prepare("SELECT value FROM app_state WHERE key = 'patch_notes_pos'");
+const setPos = db.prepare("INSERT OR REPLACE INTO app_state (key, value) VALUES ('patch_notes_pos', ?)");
+
+// Publie une note dans le salon patch note de chaque serveur qui en a configuré un.
+async function broadcast(client, entry) {
+  const embed = buildEmbed(entry);
+  const mention = entry.everyone ? '@everyone' : '@here';
+  let count = 0;
+  for (const guild of client.guilds.cache.values()) {
+    try {
+      const cfg = getGuildConfig(guild.id);
+      if (!cfg.patch_channel_id) continue;
+      const channel = await guild.channels.fetch(cfg.patch_channel_id).catch(() => null);
+      if (!channel?.isTextBased()) continue;
+      const ok = await channel
+        .send({ content: mention, embeds: [embed], allowedMentions: { parse: ['everyone'] } })
+        .then(() => true)
+        .catch(() => false);
+      if (ok) count += 1;
+    } catch {
+      // un serveur en échec ne doit pas bloquer les autres
+    }
+  }
+  return count;
+}
+
+// Au démarrage : publie toute entrée pas encore annoncée (dans l'ordre).
+async function start(client) {
+  let pos;
+  try {
+    const row = getPos.get();
+    pos = row ? parseInt(row.value, 10) : -1;
+  } catch {
+    pos = -1;
+  }
+  if (Number.isNaN(pos)) pos = -1;
+  for (let i = pos + 1; i < RELEASES.length; i++) {
+    const count = await broadcast(client, RELEASES[i]);
+    setPos.run(String(i));
+    console.log(`📝 Patch note « ${RELEASES[i].id} » publiée dans ${count} salon(s).`);
+  }
+}
+
+module.exports = { start, buildEmbed, RELEASES };

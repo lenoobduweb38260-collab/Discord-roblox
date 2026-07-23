@@ -280,6 +280,15 @@ async function start() {
     }
   });
 
+  // Notes de mise à jour automatiques : publie dans chaque salon patch note
+  // configuré les versions pas encore annoncées (la 1re fois : récapitulatif
+  // complet avec @everyone ; ensuite : chaque nouvelle version avec @here).
+  client.once(Events.ClientReady, () => {
+    require('./utils/patchNotes')
+      .start(client)
+      .catch((err) => console.warn(`⚠️ Notes de mise à jour non publiées : ${err.message}`));
+  });
+
   // Statut personnalisé du bot (défini par le créateur), réappliqué au démarrage.
   client.once(Events.ClientReady, () => {
     try {
