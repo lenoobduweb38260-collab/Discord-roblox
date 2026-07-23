@@ -21,6 +21,18 @@ module.exports = {
     }
 
     const cfg = getGuildConfig(message.guild.id);
+
+    // Anti-spam + filtre de contenu malveillant (si activé sur ce serveur).
+    if (cfg.antispam_enabled) {
+      const handled = await require('../utils/messageGuard')
+        .guard(message, cfg)
+        .catch((err) => {
+          console.error('Erreur messageGuard :', err);
+          return false;
+        });
+      if (handled) return;
+    }
+
     const key = `${message.guild.id}:${message.author.id}`;
     const now = Date.now();
     const last = cooldowns.get(key) || 0;

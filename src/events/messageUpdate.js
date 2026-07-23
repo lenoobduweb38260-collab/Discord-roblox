@@ -1,5 +1,6 @@
 const { Events } = require('discord.js');
 const { sendLog, logEmbed, COLORS } = require('../utils/embeds');
+const { record } = require('../utils/snipe');
 
 const trim = (text) => (text && text.length > 700 ? `${text.slice(0, 700)}…` : text);
 
@@ -14,6 +15,16 @@ module.exports = {
     if (!newMessage.guild || !newMessage.author || newMessage.author.bot) return;
     // Ignore les « modifications » sans changement de texte (ex : aperçu de lien ajouté).
     if (oldMessage.content === newMessage.content) return;
+
+    record({
+      guildId: newMessage.guild.id,
+      channelId: newMessage.channelId,
+      authorId: newMessage.author.id,
+      authorTag: newMessage.author.tag,
+      kind: 'edit',
+      content: newMessage.content || null,
+      beforeContent: oldMessage.content || null,
+    });
 
     const before = trim(oldMessage.content) || '*Contenu indisponible (message non mis en cache)*';
     const after = trim(newMessage.content) || '*Vide*';

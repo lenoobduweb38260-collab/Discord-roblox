@@ -53,7 +53,10 @@ module.exports = {
       return;
     }
 
-    // 2) Embed d'arrivée dans le salon membres configuré.
+    // 2) Captcha de vérification (si activé).
+    await require('../utils/captcha').onJoin(member).catch(() => null);
+
+    // 3) Embed d'arrivée dans le salon membres configuré.
     const cfg = getGuildConfig(member.guild.id);
     if (!cfg.member_channel_id) return;
     const channel = await member.guild.channels.fetch(cfg.member_channel_id).catch(() => null);

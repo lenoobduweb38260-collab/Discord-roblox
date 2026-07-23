@@ -67,6 +67,21 @@ module.exports = {
       return require('../utils/rpList').handleSearchInteraction(interaction);
     }
 
+    // ----- Captcha de vérification -----
+    if (
+      (interaction.isButton() && interaction.customId === 'captcha:verify') ||
+      (interaction.isModalSubmit() && interaction.customId === 'captcha:check')
+    ) {
+      if (!interaction.inGuild()) return;
+      return require('../utils/captcha').handle(interaction);
+    }
+
+    // ----- Partenariats : bouton de validation staff -----
+    if (interaction.isButton() && interaction.customId.startsWith('partner:')) {
+      if (!interaction.inGuild()) return;
+      return require('../commands/partenariat').handleButton(interaction);
+    }
+
     // ----- Sélecteur de raison du panneau de tickets (menu déroulant) -----
     if (interaction.isStringSelectMenu() && interaction.customId === 'tktmenu') {
       if (!interaction.inGuild()) return;

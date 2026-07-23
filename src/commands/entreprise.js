@@ -112,6 +112,14 @@ module.exports = {
     )
     .addSubcommand((sub) =>
       sub
+        .setName('media')
+        .setDescription('[Staff] Changer le média : fichier OU lien (photo/GIF/vidéo/YouTube)')
+        .addStringOption((o) => o.setName('nom').setDescription('Entreprise').setRequired(true).setAutocomplete(true))
+        .addAttachmentOption((o) => o.setName('fichier').setDescription('Glissez un fichier (photo/GIF/vidéo)').setRequired(false))
+        .addStringOption((o) => o.setName('lien').setDescription('Ou un lien (imgur, GIF, vidéo, YouTube…)').setRequired(false))
+    )
+    .addSubcommand((sub) =>
+      sub
         .setName('supprimer')
         .setDescription('[Staff] Supprimer une entreprise')
         .addStringOption((o) =>
@@ -203,6 +211,31 @@ module.exports = {
           `<@${user.id}> retiré de toutes les entreprises du serveur (${heads} patron, ${emps} employé) par <@${interaction.user.id}>.`,
           COLORS.WARNING
         )
+      );
+      return;
+    }
+
+    if (sub === 'media') {
+      const ent = getByName.get(RP_SCOPE, interaction.options.getString('nom').trim());
+      if (!ent) {
+        return interaction.reply({ content: '❌ Entreprise introuvable.', flags: MessageFlags.Ephemeral });
+      }
+      const fichier = interaction.options.getAttachment('fichier');
+      const lien = interaction.options.getString('lien');
+      const url = fichier?.url || (lien ? lien.trim() : null);
+      if (!url) {
+        return interaction.reply({ content: '❌ Fournissez un **fichier** (glissez-le) OU un **lien**.', flags: MessageFlags.Ephemeral });
+      }
+      db.prepare('UPDATE enterprises SET media_url = ? WHERE id = ?').run(url, ent.id);
+      const updated = getById.get(ent.id);
+      const { embed, extraContent } = enterpriseReply(updated);
+      await interaction.reply({
+        content: `${extraContent ? `${extraContent}\n` : ''}✅ Média de **${ent.name}** mis à jour.`,
+        embeds: [embed],
+      });
+      await sendLog(
+        interaction.guild,
+        logEmbed('🏢 Média modifié', `**${ent.name}** — média mis à jour par <@${interaction.user.id}>.`, COLORS.INFO)
       );
       return;
     }

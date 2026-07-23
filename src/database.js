@@ -336,6 +336,19 @@ CREATE TABLE IF NOT EXISTS rp_boards (
   message_id TEXT NOT NULL,
   PRIMARY KEY (guild_id, kind)
 );
+
+CREATE TABLE IF NOT EXISTS deleted_messages (
+  id             INTEGER PRIMARY KEY AUTOINCREMENT,
+  guild_id       TEXT NOT NULL,
+  channel_id     TEXT NOT NULL,
+  author_id      TEXT,
+  author_tag     TEXT,
+  kind           TEXT NOT NULL,
+  content        TEXT,
+  before_content TEXT,
+  attachments    TEXT,
+  at             TEXT NOT NULL
+);
 `);
 
 // Migration : ajoute les colonnes manquantes aux bases créées avant leur
@@ -351,6 +364,14 @@ for (const column of [
   'staff_role_ids TEXT',
   'admin_role_ids TEXT',
   'proof_channel_id TEXT',
+  'antispam_enabled INTEGER',
+  'antinuke_enabled INTEGER',
+  'captcha_enabled INTEGER',
+  'verified_role_id TEXT',
+  'captcha_channel_id TEXT',
+  'partner_channel_id TEXT',
+  'level_image_url TEXT',
+  'goodbye_channel_id TEXT',
 ]) {
   try {
     db.exec(`ALTER TABLE guild_config ADD COLUMN ${column}`);
@@ -423,9 +444,17 @@ const DEFAULT_CONFIG = {
   proof_channel_id: null,
   welcome_message: null,
   goodbye_message: null,
+  goodbye_channel_id: null,
   welcome_mention: 0,
   rp_enabled: 0,
   rp_locked: 0,
+  antispam_enabled: 0,
+  antinuke_enabled: 0,
+  captcha_enabled: 0,
+  verified_role_id: null,
+  captcha_channel_id: null,
+  partner_channel_id: null,
+  level_image_url: null,
   xp_text: 20,
   xp_voice: 10,
   xp_cooldown: 60,
