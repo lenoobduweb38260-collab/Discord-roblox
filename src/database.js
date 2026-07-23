@@ -290,6 +290,16 @@ CREATE TABLE IF NOT EXISTS scam_images (
   added_by TEXT NOT NULL,
   added_at TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS warn_rp (
+  id       INTEGER PRIMARY KEY AUTOINCREMENT,
+  guild_id TEXT NOT NULL,
+  user_id  TEXT NOT NULL,
+  delta    INTEGER NOT NULL,
+  reason   TEXT,
+  by_id    TEXT NOT NULL,
+  at       TEXT NOT NULL
+);
 `);
 
 // Migration : ajoute les colonnes manquantes aux bases créées avant leur
