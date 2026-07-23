@@ -55,13 +55,49 @@ module.exports = {
   grade: GRADES.EVERYONE,
   data: new SlashCommandBuilder()
     .setName('patchnote')
-    .setDescription('[Créateur] Rédiger et publier une note de mise à jour (côté utilisateurs)'),
+    .setDescription('[Créateur] Notes de mise à jour : rédiger ou forcer la publication')
+    .addSubcommand((s) =>
+      s.setName('ecrire').setDescription('[Créateur] Rédiger et publier une note (côté utilisateurs)')
+    )
+    .addSubcommand((s) =>
+      s
+        .setName('forcer')
+        .setDescription('[Créateur] Forcer la publication des notes automatiques')
+        .addStringOption((o) =>
+          o
+            .setName('cible')
+            .setDescription('Que publier ? (défaut : dernière version)')
+            .setRequired(false)
+            .addChoices(
+              { name: 'Dernière version (@here)', value: 'derniere' },
+              { name: 'En attente (non encore annoncées)', value: 'attente' },
+              { name: 'Récapitulatif complet (@everyone)', value: 'initial' }
+            )
+        )
+    ),
 
   async execute(interaction) {
     if (!(await isCreator(interaction.client, interaction.user.id))) {
       return interaction.reply({ content: '⛔ Réservé au créateur du bot.', flags: MessageFlags.Ephemeral });
     }
-    return interaction.showModal(modal());
+    const sub = interaction.options.getSubcommand();
+
+    if (sub === 'ecrire') {
+      return interaction.showModal(modal());
+    }
+
+    // forcer : publie depuis le journal automatique.
+    const cible = interaction.options.getString('cible') || 'derniere';
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+    const res = await patch.forcePublish(interaction.client, cible);
+    if (res.mode === 'attente') {
+      return interaction.editReply(
+        res.entries
+          ? `✅ ${res.entries} note(s) en attente publiée(s) dans **${res.count}** salon(s).`
+          : 'ℹ️ Aucune note en attente : toutes les versions du journal ont déjà été annoncées.'
+      );
+    }
+    return interaction.editReply(`✅ Note « ${res.title} » (${res.mention}) publiée dans **${res.count}** salon(s).`);
   },
 
   async handle(interaction) {

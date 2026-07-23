@@ -70,6 +70,26 @@ const RELEASES = [
     ],
     retrait: ['Aucun retrait — c\'est la version de lancement 🎉'],
   },
+  {
+    id: 'entreprises-police-2026-07',
+    title: 'Entreprises, assurances, police & whitelist',
+    ajout: [
+      '🎨 Assurance véhicule : la **couleur** du véhicule est désormais demandée et affichée',
+      '⚖️ Nouveau **casier judiciaire** (`/casierjudiciaire`) réservé aux rôles Police',
+      '🎭 La **Whitelist RP** attribue automatiquement un rôle configurable au membre',
+    ],
+    fix: [
+      '🏢 Correction d\'un plantage de `/entreprise` quand le média n\'était pas un lien valide',
+      '🛡️ Correction du message « entreprise introuvable » lors du choix des types d\'assurance',
+    ],
+    amelioration: [
+      '📋 Un gérant peut être autorisé à whitelister **plusieurs rôles métier** d\'un coup',
+      '🚗 Retrait de points de permis désormais possible pour la **police** (en plus du staff)',
+      '🏢 `/entreprise modifier` : nouveau champ **« type d\'assurance »** pour changer les types',
+      '⚙️ `/config` : rôles **Police** et **rôle Whitelist RP** configurables',
+    ],
+    retrait: [],
+  },
 ];
 
 // Découpe une catégorie en champs d'embed (max 1024 caractères par champ).
@@ -140,21 +160,44 @@ async function broadcast(client, entry) {
   return count;
 }
 
-// Au démarrage : publie toute entrée pas encore annoncée (dans l'ordre).
-async function start(client) {
-  let pos;
+function currentPos() {
   try {
     const row = getPos.get();
-    pos = row ? parseInt(row.value, 10) : -1;
+    const n = row ? parseInt(row.value, 10) : -1;
+    return Number.isNaN(n) ? -1 : n;
   } catch {
-    pos = -1;
+    return -1;
   }
-  if (Number.isNaN(pos)) pos = -1;
-  for (let i = pos + 1; i < RELEASES.length; i++) {
+}
+
+// Au démarrage : publie toute entrée pas encore annoncée (dans l'ordre).
+async function start(client) {
+  for (let i = currentPos() + 1; i < RELEASES.length; i++) {
     const count = await broadcast(client, RELEASES[i]);
     setPos.run(String(i));
     console.log(`📝 Patch note « ${RELEASES[i].id} » publiée dans ${count} salon(s).`);
   }
 }
 
-module.exports = { start, buildEmbed, RELEASES };
+// Publication forcée (commande créateur) :
+//  • 'attente'  → publie les entrées pas encore annoncées (comme au démarrage,
+//                 fait avancer le marqueur : pas de renvoi au prochain reboot)
+//  • 'initial'  → renvoie le récapitulatif complet (@everyone) sans toucher au marqueur
+//  • 'derniere' → renvoie la dernière entrée du journal sans toucher au marqueur
+async function forcePublish(client, which = 'derniere') {
+  if (which === 'attente') {
+    let entries = 0;
+    let count = 0;
+    for (let i = currentPos() + 1; i < RELEASES.length; i++) {
+      count += await broadcast(client, RELEASES[i]);
+      setPos.run(String(i));
+      entries += 1;
+    }
+    return { mode: 'attente', entries, count };
+  }
+  const entry = which === 'initial' ? RELEASES[0] : RELEASES[RELEASES.length - 1];
+  const count = await broadcast(client, entry);
+  return { mode: which, title: entry.title, mention: entry.everyone ? '@everyone' : '@here', count };
+}
+
+module.exports = { start, forcePublish, buildEmbed, RELEASES };
