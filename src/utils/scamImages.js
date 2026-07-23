@@ -1,6 +1,10 @@
 const crypto = require('crypto');
-const { db } = require('../database');
+const { db, RP_SCOPE } = require('../database');
 const { sendLog, logEmbed, COLORS } = require('./embeds');
+
+// Portée globale des échantillons : ceux ajoutés par le créateur valent sur
+// TOUS les serveurs du bot (même sentinelle 'GLOBAL' que l'identité RP).
+const GLOBAL_SCOPE = RP_SCOPE;
 
 // Détection d'images scam par échantillons : chaque échantillon est stocké
 // avec son empreinte exacte (SHA-256) et son empreinte perceptuelle (dHash
@@ -17,6 +21,8 @@ const insertSample = db.prepare(
 );
 const deleteSample = db.prepare('DELETE FROM scam_images WHERE id = ? AND guild_id = ?');
 const getSample = db.prepare('SELECT * FROM scam_images WHERE id = ? AND guild_id = ?');
+const getSampleById = db.prepare('SELECT * FROM scam_images WHERE id = ?');
+const listGlobalSamples = db.prepare('SELECT * FROM scam_images WHERE guild_id = ? ORDER BY id');
 const insertGlobalBan = db.prepare(
   'INSERT OR REPLACE INTO global_bans (user_id, reason, banned_by, banned_at) VALUES (?, ?, ?, ?)'
 );
@@ -70,7 +76,9 @@ async function downloadImage(url) {
 // Analyse les pièces jointes d'un message ; supprime + bannit en cas de
 // correspondance. Renvoie true si le message a été traité comme scam.
 async function scanMessage(message) {
-  const samples = listSamples.all(message.guildId);
+  // Échantillons de CE serveur + échantillons globaux (ajoutés par le créateur,
+  // valables partout).
+  const samples = [...listSamples.all(message.guildId), ...listGlobalSamples.all(GLOBAL_SCOPE)];
   if (!samples.length) return false;
 
   for (const att of message.attachments.values()) {
@@ -114,4 +122,16 @@ async function scanMessage(message) {
   return false;
 }
 
-module.exports = { listSamples, insertSample, deleteSample, getSample, hashesFor, downloadImage, scanMessage, MAX_SIZE };
+module.exports = {
+  listSamples,
+  listGlobalSamples,
+  insertSample,
+  deleteSample,
+  getSample,
+  getSampleById,
+  hashesFor,
+  downloadImage,
+  scanMessage,
+  MAX_SIZE,
+  GLOBAL_SCOPE,
+};
