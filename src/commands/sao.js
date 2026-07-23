@@ -117,6 +117,7 @@ function badgesText(keys) {
 
 module.exports = {
   grade: GRADES.EVERYONE,
+  public: true, // module de jeu : réponses visibles par tout le monde dans le salon
   guildModule: 'sao', // module désactivé par défaut, activable par serveur via /config
   data: new SlashCommandBuilder()
     .setName('sao')
