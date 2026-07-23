@@ -32,6 +32,14 @@ const getEmployees = db.prepare('SELECT user_id FROM enterprise_employees WHERE 
 const addEmployee = db.prepare('INSERT OR IGNORE INTO enterprise_employees (enterprise_id, user_id) VALUES (?, ?)');
 const removeEmployee = db.prepare('DELETE FROM enterprise_employees WHERE enterprise_id = ? AND user_id = ?');
 
+// Retrait d'un membre (patron ET employé) de TOUTES les entreprises du serveur courant.
+const removeHeadEverywhere = db.prepare(
+  'DELETE FROM enterprise_heads WHERE user_id = ? AND enterprise_id IN (SELECT id FROM enterprises WHERE guild_id = ?)'
+);
+const removeEmployeeEverywhere = db.prepare(
+  'DELETE FROM enterprise_employees WHERE user_id = ? AND enterprise_id IN (SELECT id FROM enterprises WHERE guild_id = ?)'
+);
+
 function insuranceMenu(enterpriseId) {
   return new ActionRowBuilder().addComponents(
     new StringSelectMenuBuilder()
@@ -150,6 +158,12 @@ module.exports = {
           o.setName('nom').setDescription('Entreprise').setRequired(true).setAutocomplete(true)
         )
     )
+    .addSubcommand((sub) =>
+      sub
+        .setName('retirer-membre')
+        .setDescription('[Staff] Retirer un membre (patron + employé) de toutes les entreprises de CE serveur')
+        .addUserOption((o) => o.setName('utilisateur').setDescription('Membre à retirer partout sur ce serveur').setRequired(true))
+    )
     .addSubcommand((sub) => sub.setName('liste').setDescription('Liste des entreprises du serveur')),
 
   async autocomplete(interaction) {
@@ -167,6 +181,30 @@ module.exports = {
         content: '⛔ Sécurité : cette sous-commande est réservée au **staff**.',
         flags: MessageFlags.Ephemeral,
       });
+    }
+
+    if (sub === 'retirer-membre') {
+      const user = interaction.options.getUser('utilisateur');
+      const heads = removeHeadEverywhere.run(user.id, interaction.guildId).changes;
+      const emps = removeEmployeeEverywhere.run(user.id, interaction.guildId).changes;
+      if (!heads && !emps) {
+        return interaction.reply({
+          content: `ℹ️ <@${user.id}> n'était ni patron ni employé d'une entreprise de ce serveur.`,
+          flags: MessageFlags.Ephemeral,
+        });
+      }
+      await interaction.reply({
+        content: `🧹 <@${user.id}> retiré de **${heads}** direction(s) et **${emps}** poste(s) d'employé sur ce serveur.`,
+      });
+      await sendLog(
+        interaction.guild,
+        logEmbed(
+          '🏢 Membre retiré des entreprises',
+          `<@${user.id}> retiré de toutes les entreprises du serveur (${heads} patron, ${emps} employé) par <@${interaction.user.id}>.`,
+          COLORS.WARNING
+        )
+      );
+      return;
     }
 
     if (sub === 'creer') {
