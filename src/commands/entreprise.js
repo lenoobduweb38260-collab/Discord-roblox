@@ -103,11 +103,12 @@ module.exports = {
               { name: 'nom', value: 'nom' },
               { name: 'description', value: 'description' },
               { name: 'media (photo/GIF/vidéo)', value: 'media' },
-              { name: 'assurance (oui/non)', value: 'assurance' }
+              { name: 'assurance (oui/non)', value: 'assurance' },
+              { name: 'type d\'assurance', value: 'types' }
             )
         )
         .addStringOption((o) =>
-          o.setName('valeur').setDescription('Nouvelle valeur (pour assurance : oui/non)').setRequired(true)
+          o.setName('valeur').setDescription('Nouvelle valeur (assurance : oui/non ; type d\'assurance : laisser vide)').setRequired(false)
         )
     )
     .addSubcommand((sub) =>
@@ -226,6 +227,9 @@ module.exports = {
       if (!url) {
         return interaction.reply({ content: '❌ Fournissez un **fichier** (glissez-le) OU un **lien**.', flags: MessageFlags.Ephemeral });
       }
+      if (!/^https?:\/\//i.test(url)) {
+        return interaction.reply({ content: '❌ Le **lien** doit être une URL (http…). Glissez plutôt un fichier si besoin.', flags: MessageFlags.Ephemeral });
+      }
       db.prepare('UPDATE enterprises SET media_url = ? WHERE id = ?').run(url, ent.id);
       const updated = getById.get(ent.id);
       const { embed, extraContent } = enterpriseReply(updated);
@@ -247,7 +251,10 @@ module.exports = {
       }
       const assurance = interaction.options.getString('assurance') === 'oui';
       const attachment = interaction.options.getAttachment('media');
-      const mediaUrl = attachment?.url || interaction.options.getString('media_url') || null;
+      // On n'accepte qu'une vraie URL comme média (un fichier fournit toujours
+      // une URL ; un texte comme « non » est ignoré plutôt que stocké).
+      const rawUrl = attachment?.url || interaction.options.getString('media_url');
+      const mediaUrl = /^https?:\/\//i.test((rawUrl || '').trim()) ? rawUrl.trim() : null;
       const patron = interaction.options.getUser('patron');
 
       const result = insertEnterprise.run(
@@ -318,9 +325,26 @@ module.exports = {
 
     if (sub === 'modifier') {
       const champ = interaction.options.getString('champ');
-      const valeur = interaction.options.getString('valeur').trim();
+      const valeur = (interaction.options.getString('valeur') || '').trim();
+
+      // Modifier directement les types d'assurance (sans re-basculer oui/non).
+      if (champ === 'types') {
+        if (!ent.insurance) {
+          return interaction.reply({
+            content: `❌ **${ent.name}** ne propose pas d'assurances. Activez d'abord l'assurance (champ **assurance** → \`oui\`).`,
+            flags: MessageFlags.Ephemeral,
+          });
+        }
+        return interaction.reply({
+          content: `📋 Modifier les types d'assurance de **${ent.name}** — sélectionnez le(s) nouveau(x) type(s) :`,
+          components: [insuranceMenu(ent.id)],
+        });
+      }
 
       if (champ === 'assurance') {
+        if (!valeur) {
+          return interaction.reply({ content: '❌ Précisez `oui` ou `non` pour l\'assurance.', flags: MessageFlags.Ephemeral });
+        }
         const oui = valeur.toLowerCase() === 'oui';
         db.prepare('UPDATE enterprises SET insurance = ?, insurance_types = ? WHERE id = ?').run(
           oui ? 1 : 0, '[]', ent.id
@@ -336,7 +360,32 @@ module.exports = {
         return interaction.reply({ content: extraContent || undefined, embeds: [embed] });
       }
 
-      const column = { nom: 'name', description: 'description', media: 'media_url' }[champ];
+      // Média : autoriser l'effacement (« non »/« aucun »/vide) et refuser une
+      // valeur qui n'est pas une URL (évite de stocker « non » comme lien).
+      if (champ === 'media') {
+        const cleared = !valeur || ['non', 'aucun', 'aucune', 'none', 'vide', '-'].includes(valeur.toLowerCase());
+        if (!cleared && !/^https?:\/\//i.test(valeur)) {
+          return interaction.reply({ content: '❌ Le média doit être un **lien** (http…), ou `non` pour le retirer.', flags: MessageFlags.Ephemeral });
+        }
+        db.prepare('UPDATE enterprises SET media_url = ? WHERE id = ?').run(cleared ? null : valeur, ent.id);
+        const updated = getById.get(ent.id);
+        const { embed, extraContent } = enterpriseReply(updated);
+        await interaction.reply({
+          content: `✅ Média ${cleared ? 'retiré' : 'mis à jour'}.${extraContent ? `\n${extraContent}` : ''}`,
+          embeds: [embed],
+        });
+        await sendLog(
+          interaction.guild,
+          logEmbed('🏢 Entreprise modifiée', `**${ent.name}** : média ${cleared ? 'retiré' : 'modifié'} par <@${interaction.user.id}>.`, COLORS.INFO)
+        );
+        return;
+      }
+
+      // nom / description : valeur obligatoire.
+      if (!valeur) {
+        return interaction.reply({ content: '❌ Indiquez une **valeur** pour ce champ.', flags: MessageFlags.Ephemeral });
+      }
+      const column = { nom: 'name', description: 'description' }[champ];
       if (champ === 'nom' && getByName.get(RP_SCOPE, valeur)) {
         return interaction.reply({ content: `❌ Une entreprise nommée **${valeur}** existe déjà.`, flags: MessageFlags.Ephemeral });
       }

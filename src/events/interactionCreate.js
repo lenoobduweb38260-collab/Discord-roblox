@@ -146,7 +146,10 @@ module.exports = {
       }
       const entId = Number(interaction.customId.split(':')[1]);
       const ent = getEnterprise.get(entId);
-      if (!ent || ent.guild_id !== interaction.guildId) {
+      // Les entreprises sont en portée GLOBALE (partagées sur tous les serveurs) :
+      // on ne compare donc pas guild_id à celui du serveur courant, sinon la
+      // sélection des types d'assurance échouerait toujours (« introuvable »).
+      if (!ent) {
         return interaction.update({ content: '❌ Entreprise introuvable.', embeds: [], components: [] });
       }
       setInsuranceTypes.run(JSON.stringify(interaction.values), entId);

@@ -14,7 +14,7 @@ const {
 } = require('discord.js');
 const { db, getGuildConfig, setGuildConfig } = require('../database');
 const { COLORS, sendLog, logEmbed } = require('./embeds');
-const { GRADES, getGrade, staffRoleIds, adminRoleIds } = require('./permissions');
+const { GRADES, getGrade, staffRoleIds, adminRoleIds, policeRoleIds } = require('./permissions');
 const { supportRoleIds } = require('./tickets');
 
 // Panneau central de configuration : /config ouvre une vue d'ensemble avec un
@@ -26,6 +26,7 @@ const ROLE_COLUMNS = {
   admin_role_id: '🛡️ Rôle Administration',
   service_role_id: '🧑‍💼 Rôle « En service »',
   verified_role_id: '🤖 Rôle vérifié (captcha)',
+  wlrp_role_id: '✅ Rôle Whitelist RP',
 };
 
 const CHANNEL_COLUMNS = {
@@ -172,6 +173,7 @@ function rolesView(guild) {
   const cfg = getGuildConfig(guild.id);
   const staffIds = staffRoleIds(cfg);
   const adminIds = adminRoleIds(cfg);
+  const policeIds = policeRoleIds(cfg);
   const embed = new EmbedBuilder()
     .setColor(COLORS.INFO)
     .setTitle('👮 Configuration — Rôles')
@@ -179,10 +181,10 @@ function rolesView(guild) {
       [
         `👮 Rôles Staff : ${staffIds.map((id) => `<@&${id}>`).join(' ') || '*Non configuré*'}`,
         `🛡️ Rôles Administration : ${adminIds.map((id) => `<@&${id}>`).join(' ') || '*Non configuré*'}`,
+        `🚓 Rôles Police : ${policeIds.map((id) => `<@&${id}>`).join(' ') || '*Non configuré*'}`,
         `🧑‍💼 Rôle « En service » : ${show(cfg.service_role_id, 'role')}`,
       ].join('\n') +
-        '\n\nSélectionnez **un ou plusieurs rôles** dans les menus Staff/Administration — ' +
-        'tous les membres ayant l\'un de ces rôles auront le grade correspondant.'
+        '\n\nSélectionnez **un ou plusieurs rôles** dans les menus. 🚓 La **police** peut consulter le casier judiciaire (`/casierjudiciaire`) et retirer des points de permis.'
     );
   const staffMenu = new RoleSelectMenuBuilder()
     .setCustomId('cfgmrole:staff')
@@ -196,6 +198,12 @@ function rolesView(guild) {
     .setMinValues(1)
     .setMaxValues(10);
   if (adminIds.length) adminMenu.setDefaultRoles(adminIds.slice(0, 10));
+  const policeMenu = new RoleSelectMenuBuilder()
+    .setCustomId('cfgmrole:police')
+    .setPlaceholder('🚓 Rôles Police (plusieurs possibles)')
+    .setMinValues(0)
+    .setMaxValues(10);
+  if (policeIds.length) policeMenu.setDefaultRoles(policeIds.slice(0, 10));
   const serviceMenu = new RoleSelectMenuBuilder()
     .setCustomId('cfgrole:service_role_id')
     .setPlaceholder('🧑‍💼 Rôle « En service »')
@@ -207,6 +215,7 @@ function rolesView(guild) {
     components: [
       new ActionRowBuilder().addComponents(staffMenu),
       new ActionRowBuilder().addComponents(adminMenu),
+      new ActionRowBuilder().addComponents(policeMenu),
       new ActionRowBuilder().addComponents(serviceMenu),
       backRow(),
     ],
@@ -314,18 +323,33 @@ function securiteView(guild) {
 
 // ----- Catégorie : whitelist métiers (lecture + rappel des commandes) -----
 function whitelistView(guild) {
+  const cfg = getGuildConfig(guild.id);
   const embed = new EmbedBuilder()
     .setColor(COLORS.INFO)
-    .setTitle('📋 Configuration — Whitelist métiers')
+    .setTitle('📋 Configuration — Whitelist')
     .setDescription(whitelistSummary(guild.id))
-    .addFields({
-      name: 'Gérer les autorisations',
-      value:
-        '• `/whitelist config ajouter role:@Métier gerant:@Gérant` — autoriser un gérant *(admin)*\n' +
-        '• `/whitelist config retirer role:@Métier [gerant:@Gérant]` — retirer *(admin)*\n' +
-        '• `/whitelist ajouter utilisateur:@membre role:@Métier` — whitelister une recrue',
-    });
-  return { embeds: [embed], components: [backRow()] };
+    .addFields(
+      {
+        name: '🧑‍🏭 Whitelist métiers — gérer les autorisations',
+        value:
+          '• `/whitelist config ajouter gerant:@Gérant role:@Métier [role2 …]` — autoriser un gérant sur **un ou plusieurs** rôles *(admin)*\n' +
+          '• `/whitelist config retirer role:@Métier [gerant:@Gérant]` — retirer *(admin)*\n' +
+          '• `/whitelist ajouter utilisateur:@membre role:@Métier` — whitelister une recrue',
+      },
+      {
+        name: '✅ Whitelist RP — rôle attribué',
+        value:
+          `Rôle donné automatiquement quand le staff whiteliste RP quelqu'un (\`/whitelistrp ajouter\`) : ${show(cfg.wlrp_role_id, 'role')}\n` +
+          '_Sélectionnez-le ci-dessous (menu vide = aucun rôle attribué)._',
+      }
+    );
+  const wlrpMenu = new RoleSelectMenuBuilder()
+    .setCustomId('cfgrole:wlrp_role_id')
+    .setPlaceholder('✅ Rôle attribué à la Whitelist RP')
+    .setMinValues(0)
+    .setMaxValues(1);
+  if (cfg.wlrp_role_id) wlrpMenu.setDefaultRoles(cfg.wlrp_role_id);
+  return { embeds: [embed], components: [new ActionRowBuilder().addComponents(wlrpMenu), backRow()] };
 }
 
 // ----- Catégorie : Module RP (cartes, permis, entreprises, assurances, service) -----
@@ -576,36 +600,43 @@ async function handleConfigInteraction(interaction) {
           flags: MessageFlags.Ephemeral,
         });
       }
-      const roleId = interaction.values[0];
+      const roleId = interaction.values[0] || null; // menu vide = retrait
       setGuildConfig(interaction.guildId, col, roleId);
-      await interaction.update(col === 'verified_role_id' ? securiteView(interaction.guild) : rolesView(interaction.guild));
+      const viewFor = { verified_role_id: securiteView, wlrp_role_id: whitelistView };
+      await interaction.update((viewFor[col] || rolesView)(interaction.guild));
       await sendLog(
         interaction.guild,
-        logEmbed('⚙️ Configuration modifiée', `${ROLE_COLUMNS[col]} → <@&${roleId}>\nPar <@${interaction.user.id}>`, COLORS.INFO)
+        logEmbed('⚙️ Configuration modifiée', `${ROLE_COLUMNS[col]} → ${roleId ? `<@&${roleId}>` : '*retiré*'}\nPar <@${interaction.user.id}>`, COLORS.INFO)
       );
       return;
     }
 
-    // Rôles staff / administration MULTIPLES.
+    // Rôles staff / administration / police MULTIPLES.
     if (id.startsWith('cfgmrole:')) {
-      const kind = id.split(':')[1]; // 'staff' | 'admin'
-      if (!['staff', 'admin'].includes(kind)) return;
-      // Sécurité grade élevé : seuls les admins touchent aux rôles Administration.
-      if (kind === 'admin' && grade < GRADES.ADMIN) {
+      const kind = id.split(':')[1]; // 'staff' | 'admin' | 'police'
+      if (!['staff', 'admin', 'police'].includes(kind)) return;
+      // Sécurité grade élevé : les rôles Administration ET Police (pouvoirs
+      // élevés : casier judiciaire, retrait de points) sont réservés aux admins.
+      if ((kind === 'admin' || kind === 'police') && grade < GRADES.ADMIN) {
         return await interaction.reply({
-          content: '⛔ Sécurité : seul un membre de l\'**administration** peut changer les rôles Administration.',
+          content: `⛔ Sécurité : seul un membre de l\'**administration** peut changer les rôles ${kind === 'admin' ? 'Administration' : 'Police'}.`,
           flags: MessageFlags.Ephemeral,
         });
       }
       const ids = interaction.values.slice(0, 10);
-      setGuildConfig(interaction.guildId, `${kind}_role_ids`, JSON.stringify(ids));
-      setGuildConfig(interaction.guildId, `${kind}_role_id`, ids[0] || null); // compatibilité colonne historique
+      if (kind === 'police') {
+        setGuildConfig(interaction.guildId, 'police_role_ids', JSON.stringify(ids));
+      } else {
+        setGuildConfig(interaction.guildId, `${kind}_role_ids`, JSON.stringify(ids));
+        setGuildConfig(interaction.guildId, `${kind}_role_id`, ids[0] || null); // compatibilité colonne historique
+      }
       await interaction.update(rolesView(interaction.guild));
+      const label = { staff: 'Staff', admin: 'Administration', police: 'Police' }[kind];
       await sendLog(
         interaction.guild,
         logEmbed(
           '⚙️ Configuration modifiée',
-          `Rôles ${kind === 'staff' ? 'Staff' : 'Administration'} → ${ids.map((r) => `<@&${r}>`).join(' ')}\nPar <@${interaction.user.id}>`,
+          `Rôles ${label} → ${ids.length ? ids.map((r) => `<@&${r}>`).join(' ') : '*aucun*'}\nPar <@${interaction.user.id}>`,
           COLORS.INFO
         )
       );

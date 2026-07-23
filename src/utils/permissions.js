@@ -20,6 +20,14 @@ function parseRoleList(single, json) {
 }
 const staffRoleIds = (cfg) => parseRoleList(cfg.staff_role_id, cfg.staff_role_ids);
 const adminRoleIds = (cfg) => parseRoleList(cfg.admin_role_id, cfg.admin_role_ids);
+const policeRoleIds = (cfg) => parseRoleList(null, cfg.police_role_ids);
+
+// Le membre fait-il partie de la police ? (un des rôles police configurés)
+function isPolice(member, config) {
+  if (!member || !member.roles?.cache) return false;
+  const cfg = config || getGuildConfig(member.guild.id);
+  return policeRoleIds(cfg).some((id) => member.roles.cache.has(id));
+}
 
 function getGrade(member, config) {
   // Membre absent ou objet brut (contexte app utilisateur hors serveur du
@@ -43,4 +51,4 @@ function getGrade(member, config) {
   return GRADES.EVERYONE;
 }
 
-module.exports = { GRADES, GRADE_NAMES, getGrade, staffRoleIds, adminRoleIds };
+module.exports = { GRADES, GRADE_NAMES, getGrade, staffRoleIds, adminRoleIds, policeRoleIds, isPolice };

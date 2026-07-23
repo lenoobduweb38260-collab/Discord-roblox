@@ -78,9 +78,12 @@ module.exports = {
         .addSubcommand((sub) =>
           sub
             .setName('ajouter')
-            .setDescription('[Admin] Autoriser un rôle gérant à whitelister un rôle métier')
-            .addRoleOption((o) => o.setName('role').setDescription('Rôle métier (ex : @Policier)').setRequired(true))
+            .setDescription('[Admin] Autoriser un gérant à whitelister un ou plusieurs rôles métier')
             .addRoleOption((o) => o.setName('gerant').setDescription('Rôle gérant autorisé (ex : @Gérant Police)').setRequired(true))
+            .addRoleOption((o) => o.setName('role').setDescription('Rôle métier (ex : @Policier)').setRequired(true))
+            .addRoleOption((o) => o.setName('role2').setDescription('2e rôle métier (facultatif)').setRequired(false))
+            .addRoleOption((o) => o.setName('role3').setDescription('3e rôle métier (facultatif)').setRequired(false))
+            .addRoleOption((o) => o.setName('role4').setDescription('4e rôle métier (facultatif)').setRequired(false))
         )
         .addSubcommand((sub) =>
           sub
@@ -113,15 +116,25 @@ module.exports = {
         if (gerant.id === interaction.guild.id) {
           return interaction.reply({ content: '❌ @everyone ne peut pas être un rôle gérant.', flags: MessageFlags.Ephemeral });
         }
-        addManager.run(interaction.guildId, role.id, gerant.id);
+        // Un gérant peut être autorisé sur PLUSIEURS rôles métier d'un coup.
+        const metierRoles = [];
+        for (const key of ['role', 'role2', 'role3', 'role4']) {
+          const r = interaction.options.getRole(key);
+          if (r && r.id !== interaction.guild.id && !metierRoles.some((m) => m.id === r.id)) metierRoles.push(r);
+        }
+        if (!metierRoles.length) {
+          return interaction.reply({ content: '❌ Indiquez au moins un rôle métier valide.', flags: MessageFlags.Ephemeral });
+        }
+        for (const r of metierRoles) addManager.run(interaction.guildId, r.id, gerant.id);
+        const list = metierRoles.map((r) => `${r}`).join(', ');
         await interaction.reply({
-          content: `✅ Les membres ayant le rôle ${gerant} peuvent désormais whitelister le rôle métier ${role}.`,
+          content: `✅ Les membres ayant le rôle ${gerant} peuvent désormais whitelister : ${list}.`,
         });
         await sendLog(
           interaction.guild,
           logEmbed(
             '📋 Whitelist configurée',
-            `<@${interaction.user.id}> a autorisé <@&${gerant.id}> à whitelister <@&${role.id}>.`,
+            `<@${interaction.user.id}> a autorisé <@&${gerant.id}> à whitelister ${metierRoles.map((r) => `<@&${r.id}>`).join(', ')}.`,
             COLORS.SUCCESS
           )
         );

@@ -11,8 +11,8 @@ const isHead = db.prepare('SELECT 1 FROM enterprise_heads WHERE enterprise_id = 
 const isEmployee = db.prepare('SELECT 1 FROM enterprise_employees WHERE enterprise_id = ? AND user_id = ?');
 
 const insertVehicle = db.prepare(`
-  INSERT INTO insured_vehicles (guild_id, enterprise_id, owner_id, vehicle, plate, assigned_by, created_at)
-  VALUES (?, ?, ?, ?, ?, ?, ?)
+  INSERT INTO insured_vehicles (guild_id, enterprise_id, owner_id, vehicle, plate, color, assigned_by, created_at)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 `);
 const getVehicle = db.prepare('SELECT * FROM insured_vehicles WHERE id = ? AND guild_id = ?');
 const deleteVehicle = db.prepare('DELETE FROM insured_vehicles WHERE id = ?');
@@ -49,6 +49,7 @@ module.exports = {
         )
         .addUserOption((o) => o.setName('client').setDescription('Propriétaire du véhicule (assuré)').setRequired(true))
         .addStringOption((o) => o.setName('vehicule').setDescription('Véhicule (marque/modèle)').setRequired(true))
+        .addStringOption((o) => o.setName('couleur').setDescription('Couleur du véhicule').setRequired(true))
         .addStringOption((o) => o.setName('plaque').setDescription('Plaque d\'immatriculation RP').setRequired(false))
     )
     .addSubcommand((sub) =>
@@ -87,9 +88,10 @@ module.exports = {
 
       const client = interaction.options.getUser('client');
       const vehicule = interaction.options.getString('vehicule');
+      const couleur = interaction.options.getString('couleur');
       const plaque = interaction.options.getString('plaque');
       const result = insertVehicle.run(
-        RP_SCOPE, ent.id, client.id, vehicule, plaque, interaction.user.id, new Date().toISOString()
+        RP_SCOPE, ent.id, client.id, vehicule, plaque, couleur, interaction.user.id, new Date().toISOString()
       );
       const embed = new EmbedBuilder()
         .setColor(COLORS.SUCCESS)
@@ -99,6 +101,7 @@ module.exports = {
           { name: '🏢 Assureur', value: ent.name, inline: true },
           { name: '👤 Assuré', value: `<@${client.id}>`, inline: true },
           { name: '🚗 Véhicule', value: vehicule, inline: true },
+          { name: '🎨 Couleur', value: couleur, inline: true },
           { name: '🔢 Plaque', value: plaque || '*Non renseignée*', inline: true },
           { name: '✍️ Assigné par', value: `<@${interaction.user.id}>`, inline: true }
         )
@@ -169,7 +172,7 @@ module.exports = {
       }
       const lines = vehicles.slice(0, 25).map(
         (v) =>
-          `**n°${v.id}** — 🚗 ${v.vehicle}${v.plate ? ` (\`${v.plate}\`)` : ''} — assuré : <@${v.owner_id}> — le ${frDateTime(v.created_at)}`
+          `**n°${v.id}** — 🚗 ${v.vehicle}${v.color ? ` 🎨 ${v.color}` : ''}${v.plate ? ` (\`${v.plate}\`)` : ''} — assuré : <@${v.owner_id}> — le ${frDateTime(v.created_at)}`
       );
       const embed = new EmbedBuilder().setColor(COLORS.INFO).setTitle(title).setDescription(lines.join('\n'));
       return interaction.reply({ embeds: [embed] });

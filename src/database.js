@@ -389,6 +389,17 @@ CREATE TABLE IF NOT EXISTS sao_badges (
   earned_at TEXT,
   PRIMARY KEY (guild_id, user_id, badge)
 );
+
+CREATE TABLE IF NOT EXISTS criminal_records (
+  id       INTEGER PRIMARY KEY AUTOINCREMENT,
+  guild_id TEXT NOT NULL,
+  user_id  TEXT NOT NULL,
+  offense  TEXT NOT NULL,
+  sanction TEXT,
+  note     TEXT,
+  by_id    TEXT NOT NULL,
+  at       TEXT NOT NULL
+);
 `);
 
 // Migration : ajoute les colonnes manquantes aux bases créées avant leur
@@ -415,11 +426,18 @@ for (const column of [
   'patch_channel_id TEXT',
   'interact_enabled INTEGER',
   'sao_enabled INTEGER',
+  'police_role_ids TEXT',
+  'wlrp_role_id TEXT',
 ]) {
   try {
     db.exec(`ALTER TABLE guild_config ADD COLUMN ${column}`);
   } catch {}
 }
+
+// Assurance véhicule : couleur du véhicule (ajoutée après coup).
+try {
+  db.exec('ALTER TABLE insured_vehicles ADD COLUMN color TEXT');
+} catch {}
 
 // Tickets du QG : preuve fournie à la blacklist.
 try {
@@ -478,6 +496,8 @@ const DEFAULT_CONFIG = {
   staff_role_ids: null,
   admin_role_ids: null,
   service_role_id: null,
+  police_role_ids: null,
+  wlrp_role_id: null,
   log_channel_id: null,
   level_channel_id: null,
   service_channel_id: null,

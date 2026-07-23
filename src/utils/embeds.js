@@ -18,6 +18,10 @@ const GIF_HOSTS = /(tenor\.com|giphy\.com|gfycat\.com)/i;
 // le contenu du message pour que Discord génère un lecteur vidéo.
 function classifyMedia(url) {
   if (!url) return { type: 'none' };
+  // Sécurité : setImage exige une vraie URL. Une valeur non-URL (ex : « non »
+  // saisie à la place d'un lien) doit être ignorée, jamais transmise à
+  // setImage (sinon Discord lève une erreur et casse l'affichage).
+  if (!/^https?:\/\/\S+$/i.test(String(url).trim())) return { type: 'none' };
   if (VIDEO_EXT.test(url)) return { type: 'video', url };
   if (IMAGE_EXT.test(url) || GIF_HOSTS.test(url)) return { type: 'image', url };
   return { type: 'image', url }; // par défaut on tente l'image

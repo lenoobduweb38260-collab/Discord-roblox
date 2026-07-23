@@ -2,7 +2,7 @@ const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 const { db, RP_SCOPE } = require('../database');
 const { generatePermitNumber } = require('../utils/ids');
 const { buildPermitEmbed, sendLog, logEmbed, COLORS } = require('../utils/embeds');
-const { GRADES, getGrade } = require('../utils/permissions');
+const { GRADES, getGrade, isPolice } = require('../utils/permissions');
 
 const getPermit = db.prepare('SELECT * FROM permits WHERE guild_id = ? AND user_id = ?');
 const getCard = db.prepare('SELECT * FROM identity_cards WHERE guild_id = ? AND user_id = ?');
@@ -35,7 +35,7 @@ module.exports = {
     .addSubcommand((sub) =>
       sub
         .setName('retirer-points')
-        .setDescription('[Staff] Retirer des points (0 point = permis invalide)')
+        .setDescription('[Staff/Police] Retirer des points (0 point = permis invalide)')
         .addUserOption((o) => o.setName('utilisateur').setDescription('Membre concerné').setRequired(true))
         .addIntegerOption((o) =>
           o.setName('points').setDescription('Points à retirer').setRequired(true).setMinValue(1).setMaxValue(12)
@@ -74,8 +74,10 @@ module.exports = {
   async execute(interaction) {
     const sub = interaction.options.getSubcommand();
     const isStaff = getGrade(interaction.member) >= GRADES.STAFF;
+    // Le retrait de points est ouvert au staff ET à la police (rôles configurés).
+    const canRemovePoints = isStaff || isPolice(interaction.member);
 
-    if (sub !== 'voir' && !isStaff) {
+    if (sub !== 'voir' && !isStaff && !(sub === 'retirer-points' && canRemovePoints)) {
       return interaction.reply({
         content: '⛔ Sécurité : cette sous-commande est réservée au **staff**.',
         flags: MessageFlags.Ephemeral,

@@ -1,7 +1,26 @@
 const { SlashCommandBuilder, ChannelType, MessageFlags } = require('discord.js');
 const { GRADES } = require('./permissions');
 const { COLORS, sendLog, logEmbed } = require('./embeds');
+const { getGuildConfig } = require('../database');
 const rp = require('./rpList');
+
+// Whitelist RP : attribue (ou retire) le rôle configuré (wlrp_role_id) au
+// membre. Renvoie un petit texte à ajouter à la réponse. Sans rôle configuré
+// ou en cas d'échec (hiérarchie), on n'échoue pas la commande.
+async function applyWhitelistRole(interaction, kind, userId, add) {
+  if (kind !== 'wlrp') return '';
+  const roleId = getGuildConfig(interaction.guildId).wlrp_role_id;
+  if (!roleId) return '';
+  const member = await interaction.guild.members.fetch(userId).catch(() => null);
+  if (!member) return '';
+  try {
+    if (add) await member.roles.add(roleId, `Whitelist RP par ${interaction.user.tag}`);
+    else await member.roles.remove(roleId, `Retrait Whitelist RP par ${interaction.user.tag}`);
+    return `\n🎭 Rôle <@&${roleId}> ${add ? 'attribué' : 'retiré'}.`;
+  } catch {
+    return `\n⚠️ Rôle <@&${roleId}> non ${add ? 'attribué' : 'retiré'} (vérifiez la hiérarchie et la permission **Gérer les rôles** du bot).`;
+  }
+}
 
 // Fabrique la commande d'une liste RP (Blacklist RP ou Whitelist RP) : même
 // structure, seul le « kind » et les libellés changent.
@@ -65,7 +84,8 @@ function makeRpListCommand({ kind, name, label, verb }) {
         const raison = interaction.options.getString('raison')?.slice(0, 300) || null;
         rp.add(kind, interaction.guildId, { userId: user.id, robloxName: roblox, discordTag: user.tag, reason: raison, byId: interaction.user.id });
         await rp.refreshBoard(interaction.client, kind, interaction.guildId);
-        await interaction.reply({ content: `✅ **${roblox}** (<@${user.id}>) ajouté à la **${label} RP**.${raison ? `\n**Raison :** ${raison}` : ''}` });
+        const roleNote = await applyWhitelistRole(interaction, kind, user.id, true);
+        await interaction.reply({ content: `✅ **${roblox}** (<@${user.id}>) ajouté à la **${label} RP**.${raison ? `\n**Raison :** ${raison}` : ''}${roleNote}` });
         await sendLog(
           interaction.guild,
           logEmbed(`${label} RP — ajout`, `🎮 **${roblox}** · <@${user.id}> ajouté par <@${interaction.user.id}>.${raison ? `\n**Raison :** ${raison}` : ''}`, COLORS.INFO)
@@ -78,7 +98,8 @@ function makeRpListCommand({ kind, name, label, verb }) {
         return interaction.reply({ content: `❌ <@${user.id}> n'est pas dans la ${label} RP active.`, flags: MessageFlags.Ephemeral });
       }
       await rp.refreshBoard(interaction.client, kind, interaction.guildId);
-      await interaction.reply({ content: `🧹 <@${user.id}> retiré de la **${label} RP** (conservé au casier \`/casier\`).` });
+      const roleNote = await applyWhitelistRole(interaction, kind, user.id, false);
+      await interaction.reply({ content: `🧹 <@${user.id}> retiré de la **${label} RP** (conservé au casier \`/casier\`).${roleNote}` });
       await sendLog(
         interaction.guild,
         logEmbed(`${label} RP — retrait`, `<@${user.id}> retiré par <@${interaction.user.id}> (gardé au casier).`, COLORS.INFO)
