@@ -300,6 +300,42 @@ CREATE TABLE IF NOT EXISTS warn_rp (
   by_id    TEXT NOT NULL,
   at       TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS blacklist_rp (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  guild_id    TEXT NOT NULL,
+  user_id     TEXT NOT NULL,
+  roblox_name TEXT,
+  discord_tag TEXT,
+  reason      TEXT,
+  active      INTEGER NOT NULL DEFAULT 1,
+  by_id       TEXT NOT NULL,
+  at          TEXT NOT NULL,
+  removed_by  TEXT,
+  removed_at  TEXT
+);
+
+CREATE TABLE IF NOT EXISTS whitelist_rp (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  guild_id    TEXT NOT NULL,
+  user_id     TEXT NOT NULL,
+  roblox_name TEXT,
+  discord_tag TEXT,
+  reason      TEXT,
+  active      INTEGER NOT NULL DEFAULT 1,
+  by_id       TEXT NOT NULL,
+  at          TEXT NOT NULL,
+  removed_by  TEXT,
+  removed_at  TEXT
+);
+
+CREATE TABLE IF NOT EXISTS rp_boards (
+  guild_id   TEXT NOT NULL,
+  kind       TEXT NOT NULL,
+  channel_id TEXT NOT NULL,
+  message_id TEXT NOT NULL,
+  PRIMARY KEY (guild_id, kind)
+);
 `);
 
 // Migration : ajoute les colonnes manquantes aux bases créées avant leur

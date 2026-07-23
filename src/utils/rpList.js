@@ -1,0 +1,149 @@
+const {
+  EmbedBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  ModalBuilder,
+  TextInputBuilder,
+  TextInputStyle,
+  MessageFlags,
+} = require('discord.js');
+const { db } = require('../database');
+
+// Listes RP partagées : Blacklist RP (kind « blrp ») et Whitelist RP (« wlrp »).
+// Même structure : un embed « panneau » posté dans un salon, trié par ordre
+// alphabétique du pseudo Roblox, mis à jour à chaque modification, avec un
+// bouton de recherche. Le retrait garde l'entrée (active = 0) → casier.
+
+const TABLES = { blrp: 'blacklist_rp', wlrp: 'whitelist_rp' };
+const META = {
+  blrp: { title: '🚫 Blacklist RP', color: 0xe74c3c, empty: 'Aucune blacklist RP pour le moment.' },
+  wlrp: { title: '✅ Whitelist RP', color: 0x2ecc71, empty: 'Aucune whitelist RP pour le moment.' },
+};
+
+function prep(kind) {
+  const t = TABLES[kind];
+  return {
+    add: db.prepare(
+      `INSERT INTO ${t} (guild_id, user_id, roblox_name, discord_tag, reason, active, by_id, at) VALUES (?, ?, ?, ?, ?, 1, ?, ?)`
+    ),
+    activeOf: db.prepare(`SELECT * FROM ${t} WHERE guild_id = ? AND user_id = ? AND active = 1`),
+    listActive: db.prepare(
+      `SELECT * FROM ${t} WHERE guild_id = ? AND active = 1 ORDER BY (roblox_name IS NULL), roblox_name COLLATE NOCASE, discord_tag COLLATE NOCASE`
+    ),
+    historyOf: db.prepare(`SELECT * FROM ${t} WHERE guild_id = ? AND user_id = ? ORDER BY id DESC`),
+    remove: db.prepare(
+      `UPDATE ${t} SET active = 0, removed_by = ?, removed_at = ? WHERE guild_id = ? AND user_id = ? AND active = 1`
+    ),
+  };
+}
+const STMTS = { blrp: prep('blrp'), wlrp: prep('wlrp') };
+
+const getBoard = db.prepare('SELECT * FROM rp_boards WHERE guild_id = ? AND kind = ?');
+const setBoard = db.prepare(
+  'INSERT INTO rp_boards (guild_id, kind, channel_id, message_id) VALUES (?, ?, ?, ?) ' +
+    'ON CONFLICT(guild_id, kind) DO UPDATE SET channel_id = excluded.channel_id, message_id = excluded.message_id'
+);
+
+function entryLine(r, i) {
+  return (
+    `**${i + 1}.** 🎮 **${r.roblox_name || '?'}** · <@${r.user_id}> (\`${r.user_id}\`)` +
+    `${r.discord_tag ? ` — ${r.discord_tag}` : ''}${r.reason ? `\n   📄 ${r.reason}` : ''}`
+  );
+}
+
+// Embed du panneau (ou des résultats de recherche si `filter` est fourni).
+function renderEmbed(kind, guildId, filter) {
+  const meta = META[kind];
+  let rows = STMTS[kind].listActive.all(guildId);
+  const q = String(filter || '').trim().toLowerCase();
+  if (q) {
+    rows = rows.filter((r) =>
+      [r.roblox_name, r.user_id, r.discord_tag, r.reason].filter(Boolean).some((v) => String(v).toLowerCase().includes(q))
+    );
+  }
+  const lines = rows.map(entryLine);
+  const embed = new EmbedBuilder()
+    .setColor(meta.color)
+    .setTitle(`${meta.title}${q ? ' — recherche' : ''} (${rows.length})`)
+    .setTimestamp();
+  let body = lines.join('\n\n');
+  if (body.length > 4096) {
+    body = body.slice(0, 4000);
+    embed.setFooter({ text: 'Liste tronquée — affinez avec 🔎 Rechercher.' });
+  }
+  embed.setDescription(body || `*${q ? 'Aucun résultat.' : meta.empty}*`);
+  return embed;
+}
+
+function searchRow(kind) {
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId(`rprpsearch:${kind}`).setLabel('Rechercher').setEmoji('🔎').setStyle(ButtonStyle.Secondary)
+  );
+}
+
+// Publie (ou remplace) le panneau dans un salon et mémorise sa référence.
+async function postBoard(kind, channel, guildId) {
+  const msg = await channel.send({ embeds: [renderEmbed(kind, guildId)], components: [searchRow(kind)] });
+  setBoard.run(guildId, kind, channel.id, msg.id);
+  return msg;
+}
+
+// Réédite le panneau existant (après chaque ajout/retrait).
+async function refreshBoard(client, kind, guildId) {
+  const board = getBoard.get(guildId, kind);
+  if (!board) return;
+  try {
+    const channel = await client.channels.fetch(board.channel_id).catch(() => null);
+    if (!channel?.isTextBased()) return;
+    const msg = await channel.messages.fetch(board.message_id).catch(() => null);
+    if (!msg) return;
+    await msg.edit({ embeds: [renderEmbed(kind, guildId)], components: [searchRow(kind)] });
+  } catch {
+    /* le panneau a pu être supprimé : on ignore */
+  }
+}
+
+function add(kind, guildId, { userId, robloxName, discordTag, reason, byId }) {
+  STMTS[kind].add.run(guildId, userId, robloxName || null, discordTag || null, reason || null, byId, new Date().toISOString());
+}
+function remove(kind, guildId, userId, byId) {
+  return STMTS[kind].remove.run(byId, new Date().toISOString(), guildId, userId).changes > 0;
+}
+const activeOf = (kind, guildId, userId) => STMTS[kind].activeOf.get(guildId, userId);
+const historyOf = (kind, guildId, userId) => STMTS[kind].historyOf.all(guildId, userId);
+
+// Bouton 🔎 → modal ; soumission du modal → résultats éphémères.
+async function handleSearchInteraction(interaction) {
+  if (interaction.isButton()) {
+    const kind = interaction.customId.split(':')[1];
+    const modal = new ModalBuilder().setCustomId(`rprpmodal:${kind}`).setTitle(META[kind]?.title || 'Recherche');
+    modal.addComponents(
+      new ActionRowBuilder().addComponents(
+        new TextInputBuilder()
+          .setCustomId('q')
+          .setLabel('Pseudo Roblox, @ Discord, ID ou raison')
+          .setStyle(TextInputStyle.Short)
+          .setRequired(true)
+          .setMaxLength(100)
+      )
+    );
+    return interaction.showModal(modal);
+  }
+  // Modal submit
+  const kind = interaction.customId.split(':')[1];
+  const q = interaction.fields.getTextInputValue('q');
+  return interaction.reply({ embeds: [renderEmbed(kind, interaction.guildId, q)], flags: MessageFlags.Ephemeral });
+}
+
+module.exports = {
+  META,
+  add,
+  remove,
+  activeOf,
+  historyOf,
+  renderEmbed,
+  postBoard,
+  refreshBoard,
+  handleSearchInteraction,
+};

@@ -58,6 +58,15 @@ module.exports = {
       return handleTicketButton(interaction);
     }
 
+    // ----- Recherche dans les panneaux Blacklist/Whitelist RP -----
+    if (
+      (interaction.isButton() && interaction.customId.startsWith('rprpsearch:')) ||
+      (interaction.isModalSubmit() && interaction.customId.startsWith('rprpmodal:'))
+    ) {
+      if (!interaction.inGuild()) return;
+      return require('../utils/rpList').handleSearchInteraction(interaction);
+    }
+
     // ----- Sélecteur de raison du panneau de tickets (menu déroulant) -----
     if (interaction.isStringSelectMenu() && interaction.customId === 'tktmenu') {
       if (!interaction.inGuild()) return;
