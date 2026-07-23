@@ -10,8 +10,10 @@ module.exports = {
   name: Events.GuildMemberRemove,
   async execute(member) {
     const cfg = getGuildConfig(member.guild.id);
-    if (!cfg.member_channel_id) return;
-    const channel = await member.guild.channels.fetch(cfg.member_channel_id).catch(() => null);
+    // Salon de départ dédié si configuré, sinon le salon des arrivées.
+    const channelId = cfg.goodbye_channel_id || cfg.member_channel_id;
+    if (!channelId) return;
+    const channel = await member.guild.channels.fetch(channelId).catch(() => null);
     if (!channel?.isTextBased()) return;
 
     const joinedAt = member.joinedAt; // peut être inconnu si le membre n'était pas en cache
