@@ -154,7 +154,7 @@ function mainView(guild) {
       .setCustomId('cfgcat')
       .setPlaceholder('⚙️ Choisissez une catégorie à configurer…')
       .addOptions(
-        { label: 'Modules (RP, Interactions)', value: 'rp', emoji: '🎭', description: 'Activer/désactiver le Module RP et les Interactions' },
+        { label: 'Modules (RP, Interactions, SAO)', value: 'rp', emoji: '🎭', description: 'Activer/désactiver RP, Interactions et Aventure SAO' },
         { label: 'Rôles', value: 'roles', emoji: '👮', description: 'Staff, administration, en service' },
         { label: 'Salons', value: 'salons', emoji: '📢', description: 'Logs, niveaux, service, staff' },
         { label: 'XP & niveaux', value: 'xp', emoji: '📈', description: 'XP texte, XP vocal, cooldown' },
@@ -352,6 +352,13 @@ function rpView(guild) {
       `État : ${interactOn ? '🟢 **Activé**' : '🔴 **Désactivé**'}\n` +
       '`/interact` (câlin, tape, gifle… façon Nekotina). Désactivé par défaut.',
   });
+  const saoOn = Boolean(cfg.sao_enabled);
+  embed.addFields({
+    name: '⚔️ Module Aventure SAO',
+    value:
+      `État : ${saoOn ? '🟢 **Activé**' : '🔴 **Désactivé**'}\n` +
+      '`/sao` : jeu d\'aventure (100 étages d\'Aincrad) — badges, XP auto, gains AFK. Désactivé par défaut.',
+  });
   const row = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('cfgrpon').setLabel('Activer le Module RP').setEmoji('🟢').setStyle(ButtonStyle.Success).setDisabled(enabled || locked),
     new ButtonBuilder().setCustomId('cfgrpoff').setLabel('Désactiver le RP').setEmoji('🔴').setStyle(ButtonStyle.Danger).setDisabled(!enabled || locked)
@@ -360,7 +367,11 @@ function rpView(guild) {
     new ButtonBuilder().setCustomId('cfginton').setLabel('Activer les Interactions').setEmoji('🎮').setStyle(ButtonStyle.Success).setDisabled(interactOn),
     new ButtonBuilder().setCustomId('cfgintoff').setLabel('Désactiver').setEmoji('🔴').setStyle(ButtonStyle.Danger).setDisabled(!interactOn)
   );
-  return { embeds: [embed], components: [row, rowInteract, backRow()] };
+  const rowSao = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('cfgsaoon').setLabel('Activer l\'Aventure SAO').setEmoji('⚔️').setStyle(ButtonStyle.Success).setDisabled(saoOn),
+    new ButtonBuilder().setCustomId('cfgsaooff').setLabel('Désactiver').setEmoji('🔴').setStyle(ButtonStyle.Danger).setDisabled(!saoOn)
+  );
+  return { embeds: [embed], components: [row, rowInteract, rowSao, backRow()] };
 }
 
 // ----- Catégorie : réseaux sociaux (annonces lives / nouvelles vidéos) -----
@@ -641,6 +652,18 @@ async function handleConfigInteraction(interaction) {
       await sendLog(
         interaction.guild,
         logEmbed('🎮 Module Interactions', `Interactions ${enable ? 'activées' : 'désactivées'} par <@${interaction.user.id}>.`, enable ? COLORS.SUCCESS : COLORS.DANGER)
+      );
+      return;
+    }
+
+    // Module Aventure SAO : activer / désactiver (par serveur).
+    if (id === 'cfgsaoon' || id === 'cfgsaooff') {
+      const enable = id === 'cfgsaoon' ? 1 : 0;
+      setGuildConfig(interaction.guildId, 'sao_enabled', enable);
+      await interaction.update(rpView(interaction.guild));
+      await sendLog(
+        interaction.guild,
+        logEmbed('⚔️ Module Aventure SAO', `Aventure SAO ${enable ? 'activée' : 'désactivée'} par <@${interaction.user.id}>.`, enable ? COLORS.SUCCESS : COLORS.DANGER)
       );
       return;
     }

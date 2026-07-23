@@ -365,6 +365,30 @@ CREATE TABLE IF NOT EXISTS gacha_owned (
   at           TEXT NOT NULL,
   PRIMARY KEY (guild_id, character_id)
 );
+
+CREATE TABLE IF NOT EXISTS sao_players (
+  guild_id   TEXT NOT NULL,
+  user_id    TEXT NOT NULL,
+  floor      INTEGER NOT NULL DEFAULT 1,
+  level      INTEGER NOT NULL DEFAULT 1,
+  xp         INTEGER NOT NULL DEFAULT 0,
+  hp         INTEGER NOT NULL DEFAULT 150,
+  col        INTEGER NOT NULL DEFAULT 0,
+  weapon     INTEGER NOT NULL DEFAULT 0,
+  title      TEXT,
+  last_hunt  TEXT,
+  last_afk   TEXT,
+  created_at TEXT,
+  PRIMARY KEY (guild_id, user_id)
+);
+
+CREATE TABLE IF NOT EXISTS sao_badges (
+  guild_id  TEXT NOT NULL,
+  user_id   TEXT NOT NULL,
+  badge     TEXT NOT NULL,
+  earned_at TEXT,
+  PRIMARY KEY (guild_id, user_id, badge)
+);
 `);
 
 // Migration : ajoute les colonnes manquantes aux bases créées avant leur
@@ -390,6 +414,7 @@ for (const column of [
   'goodbye_channel_id TEXT',
   'patch_channel_id TEXT',
   'interact_enabled INTEGER',
+  'sao_enabled INTEGER',
 ]) {
   try {
     db.exec(`ALTER TABLE guild_config ADD COLUMN ${column}`);
@@ -474,6 +499,7 @@ const DEFAULT_CONFIG = {
   partner_channel_id: null,
   patch_channel_id: null,
   interact_enabled: 0,
+  sao_enabled: 0,
   level_image_url: null,
   xp_text: 20,
   xp_voice: 10,

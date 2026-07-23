@@ -105,6 +105,12 @@ module.exports = {
       return require('../commands/vgache').handleButton(interaction);
     }
 
+    // ----- Aventure SAO : boutons de combat / chasse / forge -----
+    if (interaction.isButton() && interaction.customId.startsWith('sao:')) {
+      if (!interaction.inGuild()) return;
+      return require('../commands/sao').handleButton(interaction);
+    }
+
     // ----- Patch notes : modal + boutons (créateur) -----
     if (
       (interaction.isModalSubmit() && interaction.customId === 'pn:modal') ||
@@ -221,10 +227,12 @@ module.exports = {
       });
     }
 
-    // Module Interactions : désactivé par défaut, activable par serveur via /config.
-    if (command.guildModule === 'interact' && interaction.inGuild() && !cfg.interact_enabled) {
+    // Modules par serveur (désactivés par défaut, activables via /config) :
+    // chaque commande déclare `guildModule` et la config porte `<module>_enabled`.
+    if (command.guildModule && interaction.inGuild() && !cfg[`${command.guildModule}_enabled`]) {
+      const labels = { interact: 'Interactions', sao: 'Aventure SAO' };
       return interaction.reply({
-        content: '⛔ Le **module Interactions** n\'est pas activé sur ce serveur. Un staff peut l\'activer via `/config` → 🎭 Modules.',
+        content: `⛔ Le **module ${labels[command.guildModule] || command.guildModule}** n'est pas activé sur ce serveur. Un staff peut l'activer via \`/config\` → 🎭 Modules.`,
         flags: MessageFlags.Ephemeral,
       });
     }
