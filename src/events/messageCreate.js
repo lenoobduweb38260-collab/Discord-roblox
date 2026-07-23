@@ -33,6 +33,12 @@ module.exports = {
       if (handled) return;
     }
 
+    // Réponse IA supervisée : sur mention du bot, il propose une réponse au
+    // créateur en MP (ne bloque pas l'XP ; inactif sans AI_API_KEY).
+    if (process.env.AI_API_KEY && message.mentions.has(message.client.user) && !message.mentions.everyone) {
+      require('../utils/aiResponder').onMention(message).catch(() => null);
+    }
+
     const key = `${message.guild.id}:${message.author.id}`;
     const now = Date.now();
     const last = cooldowns.get(key) || 0;

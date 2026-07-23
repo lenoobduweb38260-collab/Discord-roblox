@@ -26,6 +26,14 @@ module.exports = {
       return;
     }
 
+    // ----- Réponse IA supervisée (interactions en MP du créateur) -----
+    if (
+      (interaction.isButton() || interaction.isStringSelectMenu()) &&
+      interaction.customId?.startsWith('ai:')
+    ) {
+      return require('../utils/aiResponder').handle(interaction);
+    }
+
     // ----- Boutons des interactions Nekotina (/interact) — serveurs ET MP -----
     if (interaction.isButton() && interaction.customId.startsWith('itx')) {
       const interact = require('../commands/interact');
