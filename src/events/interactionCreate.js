@@ -34,6 +34,15 @@ module.exports = {
       return require('../utils/aiResponder').handle(interaction);
     }
 
+    // ----- Éditeur d'embed avec aperçu en direct (/embed, patch notes…) -----
+    if (
+      (interaction.isButton() || interaction.isChannelSelectMenu() || interaction.isModalSubmit()) &&
+      (interaction.customId?.startsWith('emb:') || interaction.customId?.startsWith('embm:'))
+    ) {
+      if (!interaction.inGuild()) return;
+      return require('../utils/embedComposer').handle(interaction);
+    }
+
     // ----- Boutons des interactions Nekotina (/interact) — serveurs ET MP -----
     if (interaction.isButton() && interaction.customId.startsWith('itx')) {
       const interact = require('../commands/interact');
