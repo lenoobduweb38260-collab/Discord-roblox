@@ -24,6 +24,7 @@ const ROLE_COLUMNS = {
   staff_role_id: '👮 Rôle Staff',
   admin_role_id: '🛡️ Rôle Administration',
   service_role_id: '🧑‍💼 Rôle « En service »',
+  verified_role_id: '🤖 Rôle vérifié (captcha)',
 };
 
 const CHANNEL_COLUMNS = {
@@ -32,7 +33,11 @@ const CHANNEL_COLUMNS = {
   service_channel_id: '🧑‍💼 Salon des prises/fins de service',
   staff_channel_id: '📣 Salon des arrivées/départs staff',
   member_channel_id: '👋 Salon des arrivées/départs des membres',
+  goodbye_channel_id: '📤 Salon des départs (sinon = arrivées)',
   update_channel_id: '📦 Salon des annonces de mise à jour',
+  proof_channel_id: '🖼️ Salon des preuves (staff du bot)',
+  partner_channel_id: '🤝 Salon des partenariats',
+  captcha_channel_id: '🤖 Salon du captcha',
 };
 
 const show = (id, kind) => (id ? (kind === 'role' ? `<@&${id}>` : `<#${id}>`) : '*Non configuré*');
@@ -151,6 +156,7 @@ function mainView(guild) {
         { label: 'Rôles', value: 'roles', emoji: '👮', description: 'Staff, administration, en service' },
         { label: 'Salons', value: 'salons', emoji: '📢', description: 'Logs, niveaux, service, staff' },
         { label: 'XP & niveaux', value: 'xp', emoji: '📈', description: 'XP texte, XP vocal, cooldown' },
+        { label: 'Sécurité', value: 'securite', emoji: '🛡️', description: 'Anti-spam, anti-nuke, captcha' },
         { label: 'Whitelist métiers', value: 'whitelist', emoji: '📋', description: 'Autorisations des gérants' },
         { label: 'Tickets', value: 'tickets', emoji: '🎫', description: 'Types de tickets, catégories, rôles support' },
         { label: 'Réseaux sociaux', value: 'reseaux', emoji: '📡', description: 'Annonces des lives et nouvelles vidéos' }
@@ -260,6 +266,48 @@ function xpView(guild) {
     new ButtonBuilder().setCustomId('cfgxp').setLabel('✏️ Modifier les valeurs').setStyle(ButtonStyle.Primary)
   );
   return { embeds: [embed], components: [row, backRow()] };
+}
+
+// ----- Catégorie : Sécurité (anti-spam, anti-nuke, captcha) -----
+function securiteView(guild) {
+  const cfg = getGuildConfig(guild.id);
+  const on = (v) => (v ? '✅ activé' : '❌ désactivé');
+  const embed = new EmbedBuilder()
+    .setColor(COLORS.INFO)
+    .setTitle('🛡️ Configuration — Sécurité')
+    .setDescription(
+      [
+        `🚨 **Anti-spam + filtre anti-injection** : ${on(cfg.antispam_enabled)}`,
+        '   ↳ bloque flood, invitations, mentions massives, arnaques, zalgo',
+        `💣 **Anti-nuke** : ${on(cfg.antinuke_enabled)}`,
+        '   ↳ quarantaine en cas d\'actions destructives massives',
+        `🤖 **Captcha à l'arrivée** : ${on(cfg.captcha_enabled)}`,
+        `   ↳ Rôle vérifié : ${show(cfg.verified_role_id, 'role')} · Salon : ${show(cfg.captcha_channel_id, 'channel')}`,
+      ].join('\n')
+    )
+    .setFooter({ text: 'Boutons = activer/désactiver • Menus = rôle vérifié et salon du captcha' });
+  const toggles = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('cfgsec:antispam_enabled').setLabel('Anti-spam').setEmoji(cfg.antispam_enabled ? '🟢' : '🔴').setStyle(cfg.antispam_enabled ? ButtonStyle.Success : ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('cfgsec:antinuke_enabled').setLabel('Anti-nuke').setEmoji(cfg.antinuke_enabled ? '🟢' : '🔴').setStyle(cfg.antinuke_enabled ? ButtonStyle.Success : ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('cfgsec:captcha_enabled').setLabel('Captcha').setEmoji(cfg.captcha_enabled ? '🟢' : '🔴').setStyle(cfg.captcha_enabled ? ButtonStyle.Success : ButtonStyle.Secondary)
+  );
+  const roleMenu = new RoleSelectMenuBuilder()
+    .setCustomId('cfgrole:verified_role_id')
+    .setPlaceholder('🤖 Rôle donné après le captcha')
+    .setMinValues(1)
+    .setMaxValues(1);
+  if (cfg.verified_role_id) roleMenu.setDefaultRoles(cfg.verified_role_id);
+  const chanMenu = new ChannelSelectMenuBuilder()
+    .setCustomId('cfgchan:captcha_channel_id')
+    .setPlaceholder('🤖 Salon du captcha')
+    .setChannelTypes(ChannelType.GuildText)
+    .setMinValues(1)
+    .setMaxValues(1);
+  if (cfg.captcha_channel_id) chanMenu.setDefaultChannels(cfg.captcha_channel_id);
+  return {
+    embeds: [embed],
+    components: [toggles, new ActionRowBuilder().addComponents(roleMenu), new ActionRowBuilder().addComponents(chanMenu), backRow()],
+  };
 }
 
 // ----- Catégorie : whitelist métiers (lecture + rappel des commandes) -----
@@ -432,7 +480,8 @@ function ticketModal() {
     );
 }
 
-const CATEGORY_VIEWS = { rp: rpView, roles: rolesView, salons: salonsView, xp: xpView, whitelist: whitelistView, tickets: ticketsView, reseaux: reseauxView };
+const CATEGORY_VIEWS = { rp: rpView, roles: rolesView, salons: salonsView, xp: xpView, securite: securiteView, whitelist: whitelistView, tickets: ticketsView, reseaux: reseauxView };
+const SECURITY_TOGGLES = new Set(['antispam_enabled', 'antinuke_enabled', 'captcha_enabled']);
 
 function xpModal(cfg) {
   const field = (id, label, value) =>
@@ -477,6 +526,20 @@ async function handleConfigInteraction(interaction) {
       return await interaction.update(view(interaction.guild));
     }
 
+    // Sécurité : bascule anti-spam / anti-nuke / captcha.
+    if (id.startsWith('cfgsec:')) {
+      const col = id.split(':')[1];
+      if (!SECURITY_TOGGLES.has(col)) return;
+      const next = getGuildConfig(interaction.guildId)[col] ? 0 : 1;
+      setGuildConfig(interaction.guildId, col, next);
+      await interaction.update(securiteView(interaction.guild));
+      await sendLog(
+        interaction.guild,
+        logEmbed('🛡️ Sécurité modifiée', `\`${col}\` → ${next ? 'activé' : 'désactivé'} par <@${interaction.user.id}>.`, COLORS.INFO)
+      );
+      return;
+    }
+
     if (id.startsWith('cfgrole:')) {
       const col = id.split(':')[1];
       if (!(col in ROLE_COLUMNS)) return;
@@ -489,7 +552,7 @@ async function handleConfigInteraction(interaction) {
       }
       const roleId = interaction.values[0];
       setGuildConfig(interaction.guildId, col, roleId);
-      await interaction.update(rolesView(interaction.guild));
+      await interaction.update(col === 'verified_role_id' ? securiteView(interaction.guild) : rolesView(interaction.guild));
       await sendLog(
         interaction.guild,
         logEmbed('⚙️ Configuration modifiée', `${ROLE_COLUMNS[col]} → <@&${roleId}>\nPar <@${interaction.user.id}>`, COLORS.INFO)
@@ -647,7 +710,7 @@ async function handleConfigInteraction(interaction) {
       if (!(col in CHANNEL_COLUMNS)) return;
       const channelId = interaction.values[0];
       setGuildConfig(interaction.guildId, col, channelId);
-      await interaction.update(salonsView(interaction.guild, col));
+      await interaction.update(col === 'captcha_channel_id' ? securiteView(interaction.guild) : salonsView(interaction.guild, col));
       await sendLog(
         interaction.guild,
         logEmbed('⚙️ Configuration modifiée', `${CHANNEL_COLUMNS[col]} → <#${channelId}>\nPar <@${interaction.user.id}>`, COLORS.INFO)
