@@ -316,9 +316,10 @@ try {
   db.exec('ALTER TABLE bot_tickets ADD COLUMN proof TEXT');
 } catch {}
 
-// Types de tickets : description (option du sélecteur de raison) et
-// ping_role_id (rôle mentionné à l'ouverture, sinon le support).
-for (const column of ['description TEXT', 'ping_role_id TEXT']) {
+// Types de tickets : description (option du sélecteur de raison),
+// ping_role_id (rôle mentionné à l'ouverture, sinon le support) et
+// support_role_ids (plusieurs rôles support par type, JSON).
+for (const column of ['description TEXT', 'ping_role_id TEXT', 'support_role_ids TEXT']) {
   try {
     db.exec(`ALTER TABLE ticket_types ADD COLUMN ${column}`);
   } catch {}

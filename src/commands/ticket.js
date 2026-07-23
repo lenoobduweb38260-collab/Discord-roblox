@@ -9,6 +9,7 @@ const {
   updatePanelOptions,
   buildPanelPayload,
   parseColor,
+  supportRoleIds,
 } = require('../utils/tickets');
 const { COLORS, sendLog, logEmbed } = require('../utils/embeds');
 const { GRADES } = require('../utils/permissions');
@@ -71,6 +72,8 @@ module.exports = {
             o.setName('categorie').setDescription('Catégorie où créer les salons de ce type').addChannelTypes(ChannelType.GuildCategory).setRequired(true)
           )
           .addRoleOption((o) => o.setName('role_support').setDescription('Rôle qui voit et gère ces tickets').setRequired(false))
+          .addRoleOption((o) => o.setName('role_support2').setDescription('2ᵉ rôle support (facultatif)').setRequired(false))
+          .addRoleOption((o) => o.setName('role_support3').setDescription('3ᵉ rôle support (facultatif)').setRequired(false))
           .addStringOption((o) => o.setName('emoji').setDescription('Emoji du bouton/du sélecteur (ex : 🛠️)').setRequired(false))
           .addStringOption((o) => o.setName('description').setDescription('Description de la raison (affichée dans le menu déroulant)').setRequired(false))
       )
@@ -115,14 +118,20 @@ module.exports = {
         return interaction.reply({ content: '❌ Maximum 25 types de tickets (limite des boutons Discord).', flags: MessageFlags.Ephemeral });
       }
       const categorie = interaction.options.getChannel('categorie');
-      const role = interaction.options.getRole('role_support');
+      const roles = ['role_support', 'role_support2', 'role_support3']
+        .map((k) => interaction.options.getRole(k))
+        .filter(Boolean);
+      const roleIds = [...new Set(roles.map((r) => r.id))];
       const emoji = interaction.options.getString('emoji');
       const description = interaction.options.getString('description')?.slice(0, 100) || null;
-      insertType.run(interaction.guildId, nom, emoji, categorie.id, role?.id || null, description);
+      insertType.run(
+        interaction.guildId, nom, emoji, categorie.id,
+        roleIds[0] || null, description, roleIds.length ? JSON.stringify(roleIds) : null
+      );
       await interaction.reply({
         content:
           `✅ Type **${emoji ? `${emoji} ` : ''}${nom}** créé → salons dans **${categorie.name}**` +
-          `${role ? `, géré par ${role}` : ''}.\n💡 Pensez à republier ou modifier le panneau (\`/ticket panneau\`) pour afficher le nouveau bouton.`,
+          `${roles.length ? `, géré par ${roles.map((r) => r.toString()).join(' ')}` : ''}.\n💡 Pensez à republier ou modifier le panneau (\`/ticket panneau\`) pour afficher le nouveau bouton.`,
       });
       await sendLog(
         interaction.guild,
@@ -149,10 +158,10 @@ module.exports = {
       if (!types.length) {
         return interaction.reply({ content: '📋 Aucun type de ticket (`/ticket type-ajouter`).', flags: MessageFlags.Ephemeral });
       }
-      const lines = types.map(
-        (t) =>
-          `• ${t.emoji ? `${t.emoji} ` : ''}**${t.label}** — catégorie <#${t.category_id}>${t.support_role_id ? ` — support <@&${t.support_role_id}>` : ''}`
-      );
+      const lines = types.map((t) => {
+        const roles = supportRoleIds(t).map((id) => `<@&${id}>`).join(' ');
+        return `• ${t.emoji ? `${t.emoji} ` : ''}**${t.label}** — catégorie <#${t.category_id}>${roles ? ` — support ${roles}` : ''}`;
+      });
       const embed = new EmbedBuilder().setColor(COLORS.INFO).setTitle(`🎫 Types de tickets (${types.length})`).setDescription(lines.join('\n'));
       return interaction.reply({ embeds: [embed] });
     }

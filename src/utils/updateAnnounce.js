@@ -63,7 +63,10 @@ async function resolveUpdateChannel(guild) {
 }
 
 // Envoie l'embed sur tous les serveurs, avec mention du rôle staff configuré.
-async function broadcast(client, embed) {
+// Avec { track: true }, renvoie les références des messages envoyés (pour les
+// supprimer une fois la mise à jour installée).
+async function broadcast(client, embed, { track = false } = {}) {
+  const sent = [];
   for (const guild of client.guilds.cache.values()) {
     try {
       const channel = await resolveUpdateChannel(guild);
@@ -73,11 +76,29 @@ async function broadcast(client, embed) {
         .filter((id) => guild.roles.cache.has(id))
         .map((id) => `<@&${id}>`)
         .join(' ');
-      await channel.send({ content: ping || undefined, embeds: [embed] });
+      const msg = await channel.send({ content: ping || undefined, embeds: [embed] });
+      if (track && msg) sent.push({ c: channel.id, m: msg.id });
     } catch (err) {
       console.warn(`⚠️ Annonce de mise à jour impossible sur ${guild.name} : ${err.message}`);
     }
   }
+  return sent;
+}
+
+// Supprime les messages « mise à jour prête » précédemment envoyés (appelé une
+// fois la mise à jour installée).
+async function deleteReadyMessages(client) {
+  let refs = [];
+  try {
+    refs = JSON.parse(state('update_ready_msgs') || '[]');
+  } catch {}
+  for (const ref of refs) {
+    try {
+      const channel = await client.channels.fetch(ref.c).catch(() => null);
+      if (channel?.isTextBased()) await channel.messages.delete(ref.m).catch(() => null);
+    } catch {}
+  }
+  setState.run('update_ready_msgs', '[]');
 }
 
 // Une nouvelle release est-elle prête ? (annoncée une seule fois par version)
@@ -91,17 +112,22 @@ async function checkReadyUpdate(client) {
     if (!latest || latest === current) return;
     if (state('last_announced_update') === latest) return;
     setState.run('last_announced_update', latest);
+    // Nouvelle version annoncée : on nettoie d'abord un éventuel ancien message
+    // « prête » resté d'une version précédente.
+    await deleteReadyMessages(client);
     const embed = new EmbedBuilder()
       .setColor(0xf1c40f)
       .setTitle('📦 Mise à jour prête !')
       .setDescription(
         `Une nouvelle version du bot est disponible : **${current} → ${latest}**.\n\n` +
-          '• `/update` — installer et redémarrer **maintenant**\n' +
-          '• Sinon, elle sera installée automatiquement au **prochain redémarrage** du bot.'
+          '• `/update` (ou `/forceupdate`) — installer et redémarrer **maintenant**\n' +
+          '• Sinon, elle sera installée automatiquement au **prochain redémarrage** du bot.\n\n' +
+          '_Ce message disparaîtra automatiquement une fois la mise à jour installée._'
       )
       .setTimestamp()
       .setFooter({ text: 'Annonce automatique de mise à jour' });
-    await broadcast(client, embed);
+    const sent = await broadcast(client, embed, { track: true });
+    setState.run('update_ready_msgs', JSON.stringify(sent));
     console.log(`📦 Mise à jour ${latest} annoncée au staff de chaque serveur.`);
   } catch (err) {
     console.warn(`⚠️ Vérification des mises à jour : ${err.message}`);
@@ -114,6 +140,9 @@ async function announceInstalled(client) {
   const last = state('last_running_version');
   setState.run('last_running_version', current);
   if (!last || last === current) return;
+  // Le bot vient d'être mis à jour : on retire le message « mise à jour prête »
+  // (qui disait qu'il fallait mettre à jour) puis on confirme l'installation.
+  await deleteReadyMessages(client);
   const embed = new EmbedBuilder()
     .setColor(0x2ecc71)
     .setTitle('✅ Mise à jour installée')

@@ -355,6 +355,7 @@ function startManagedApi(client, baseDir) {
           if (!/^\d{5,25}$/.test(userId)) return send(400, { error: 'ID Discord invalide.' });
           if (await isCreator(client, userId)) return send(400, { error: 'Le créateur du bot ne peut pas être blacklisté.' });
           const result = await applyBlacklist(client, userId, String(body.reason || '').slice(0, 500) || null, who, String(body.proof || '').slice(0, 1000) || null);
+          if (result.immune) return send(400, { error: 'Utilisateur immunisé (créateur ou liste d\'immunité) — blacklist refusée.' });
           return send(200, { ok: true, tag: result.tag, banned: result.banned, dmOk: result.dmOk });
         }
         if (url.pathname === '/blacklist-retirer') {
@@ -404,6 +405,7 @@ function startManagedApi(client, baseDir) {
             const proof = String(body.proof || '').trim();
             if (!proof) return send(400, { error: 'Preuves obligatoires pour appliquer une blacklist.' });
             const result = await applyBlacklist(client, ticket.target_id, `Ticket QG n°${ticket.id}${ticket.reason ? ` — ${ticket.reason}` : ''}`, who, proof.slice(0, 1000));
+            if (result.immune) return send(400, { error: 'Utilisateur immunisé — blacklist refusée.' });
             setDone.run('blacklist', proof.slice(0, 1000), ticket.id);
             return send(200, { ok: true, tag: result.tag, banned: result.banned });
           }

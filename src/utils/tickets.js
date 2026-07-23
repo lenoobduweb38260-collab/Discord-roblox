@@ -17,9 +17,20 @@ const listTypes = db.prepare('SELECT * FROM ticket_types WHERE guild_id = ? ORDE
 const getType = db.prepare('SELECT * FROM ticket_types WHERE id = ? AND guild_id = ?');
 const getTypeByLabel = db.prepare('SELECT * FROM ticket_types WHERE guild_id = ? AND label = ?');
 const insertType = db.prepare(
-  'INSERT INTO ticket_types (guild_id, label, emoji, category_id, support_role_id, description) VALUES (?, ?, ?, ?, ?, ?)'
+  'INSERT INTO ticket_types (guild_id, label, emoji, category_id, support_role_id, description, support_role_ids) VALUES (?, ?, ?, ?, ?, ?, ?)'
 );
 const deleteType = db.prepare('DELETE FROM ticket_types WHERE id = ?');
+
+// Rôles support d'un type : plusieurs rôles possibles (support_role_ids, JSON).
+// Compatibilité : si absent, on retombe sur l'ancien champ support_role_id.
+function supportRoleIds(type) {
+  if (!type) return [];
+  try {
+    const arr = JSON.parse(type.support_role_ids || '[]');
+    if (Array.isArray(arr) && arr.length) return [...new Set(arr.filter(Boolean).map(String))];
+  } catch {}
+  return type.support_role_id ? [String(type.support_role_id)] : [];
+}
 
 const insertTicket = db.prepare(
   "INSERT INTO tickets (guild_id, type_id, channel_id, user_id, status, opened_at) VALUES (?, ?, ?, ?, 'ouvert', ?)"
@@ -111,7 +122,7 @@ function buildPanelPayload(guildId, options = {}) {
 
 function canManageTicket(member, ticketType) {
   if (getGrade(member) >= GRADES.STAFF) return true;
-  return Boolean(ticketType?.support_role_id && member.roles.cache.has(ticketType.support_role_id));
+  return supportRoleIds(ticketType).some((roleId) => member.roles.cache.has(roleId));
 }
 
 async function openTicket(interaction, typeId) {
@@ -142,13 +153,14 @@ async function openTicket(interaction, typeId) {
     PermissionFlagsBits.AttachFiles,
     PermissionFlagsBits.EmbedLinks,
   ];
+  const roleIds = supportRoleIds(type);
   const overwrites = [
     { id: interaction.guild.id, deny: [PermissionFlagsBits.ViewChannel] },
     { id: interaction.user.id, allow: allowPerms },
     { id: interaction.client.user.id, allow: [...allowPerms, PermissionFlagsBits.ManageChannels] },
   ];
-  if (type.support_role_id) overwrites.push({ id: type.support_role_id, allow: allowPerms });
-  if (cfg.staff_role_id && cfg.staff_role_id !== type.support_role_id) {
+  for (const roleId of roleIds) overwrites.push({ id: roleId, allow: allowPerms });
+  if (cfg.staff_role_id && !roleIds.includes(String(cfg.staff_role_id))) {
     overwrites.push({ id: cfg.staff_role_id, allow: allowPerms });
   }
 
@@ -172,12 +184,13 @@ async function openTicket(interaction, typeId) {
   );
   const ticketId = result.lastInsertRowid;
 
+  const roleMentions = roleIds.map((id) => `<@&${id}>`).join(' ');
   const intro = new EmbedBuilder()
     .setColor(COLORS.PRIMARY)
     .setTitle(`🎫 Ticket ${type.emoji ? `${type.emoji} ` : ''}${type.label} — n°${num}`)
     .setDescription(
       `Bonjour <@${interaction.user.id}> ! Décrivez votre demande, ` +
-        `${type.support_role_id ? `l'équipe <@&${type.support_role_id}>` : 'le staff'} vous répondra dès que possible.`
+        `${roleMentions ? `l'équipe ${roleMentions}` : 'le staff'} vous répondra dès que possible.`
     )
     .setFooter({ text: 'Utilisez le bouton ci-dessous pour fermer le ticket.' })
     .setTimestamp();
@@ -185,7 +198,7 @@ async function openTicket(interaction, typeId) {
     new ButtonBuilder().setCustomId(`tktclose:${ticketId}`).setLabel('Fermer le ticket').setEmoji('🔒').setStyle(ButtonStyle.Danger)
   );
   await channel.send({
-    content: `<@${interaction.user.id}>${type.support_role_id ? ` <@&${type.support_role_id}>` : ''}`,
+    content: `<@${interaction.user.id}>${roleMentions ? ` ${roleMentions}` : ''}`,
     embeds: [intro],
     components: [closeRow],
   });
@@ -299,6 +312,7 @@ module.exports = {
   getTypeByLabel,
   insertType,
   deleteType,
+  supportRoleIds,
   insertPanel,
   lastPanel,
   updatePanelOptions,

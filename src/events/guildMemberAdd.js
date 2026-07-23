@@ -9,9 +9,13 @@ const ts = (date, style = 'F') => `<t:${Math.floor(date.getTime() / 1000)}:${sty
 module.exports = {
   name: Events.GuildMemberAdd,
   async execute(member) {
-    // 0) Blacklist de l'équipe du bot : un blacklisté ne peut PAS rejoindre un
+    // 0) Immunité : le créateur et les IDs protégés ne sont jamais bannis
+    // automatiquement (blacklist / ban global), même s'ils y figurent.
+    const { getBlacklistRow, state, isImmune } = require('../utils/botTeam');
+    if (await isImmune(member.client, member.id)) return;
+
+    // 0 bis) Blacklist de l'équipe du bot : un blacklisté ne peut PAS rejoindre un
     // serveur où le système est actif — MP (raison + serveur de déban) puis ban.
-    const { getBlacklistRow, state } = require('../utils/botTeam');
     const bl = getBlacklistRow.get(member.id);
     if (bl) {
       const debanInvite = state('deban_invite');

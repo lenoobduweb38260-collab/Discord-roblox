@@ -2,6 +2,9 @@ const { SlashCommandBuilder, PermissionFlagsBits, MessageFlags } = require('disc
 const { db } = require('../database');
 const { sendLog, logEmbed, COLORS } = require('../utils/embeds');
 const { GRADES } = require('../utils/permissions');
+const { isImmune } = require('../utils/botTeam');
+
+const IMMUNE_MSG = '🛡️ Cet utilisateur est **immunisé** (créateur du bot ou liste d\'immunité) : action refusée.';
 
 const insertGlobalBan = db.prepare(
   'INSERT OR REPLACE INTO global_bans (user_id, reason, banned_by, banned_at) VALUES (?, ?, ?, ?)'
@@ -24,6 +27,9 @@ module.exports = [
       ),
     async execute(interaction) {
       const user = interaction.options.getUser('utilisateur');
+      if (await isImmune(interaction.client, user.id)) {
+        return interaction.reply({ content: IMMUNE_MSG, flags: MessageFlags.Ephemeral });
+      }
       const raison = interaction.options.getString('raison') || 'Aucune raison précisée';
       const jours = interaction.options.getInteger('jours_messages') || 0;
       await interaction.guild.members.ban(user.id, {
@@ -47,6 +53,9 @@ module.exports = [
       .addStringOption((o) => o.setName('raison').setDescription("Raison de l'expulsion").setRequired(false)),
     async execute(interaction) {
       const user = interaction.options.getUser('utilisateur');
+      if (await isImmune(interaction.client, user.id)) {
+        return interaction.reply({ content: IMMUNE_MSG, flags: MessageFlags.Ephemeral });
+      }
       const raison = interaction.options.getString('raison') || 'Aucune raison précisée';
       const member = await interaction.guild.members.fetch(user.id).catch(() => null);
       if (!member) {
@@ -74,6 +83,9 @@ module.exports = [
       .addStringOption((o) => o.setName('raison').setDescription('Raison du mute').setRequired(false)),
     async execute(interaction) {
       const user = interaction.options.getUser('utilisateur');
+      if (await isImmune(interaction.client, user.id)) {
+        return interaction.reply({ content: IMMUNE_MSG, flags: MessageFlags.Ephemeral });
+      }
       const duree = interaction.options.getInteger('duree');
       const raison = interaction.options.getString('raison') || 'Aucune raison précisée';
       const member = await interaction.guild.members.fetch(user.id).catch(() => null);
@@ -137,6 +149,9 @@ module.exports = [
       await interaction.deferReply();
 
       if (sub === 'ajouter') {
+        if (await isImmune(interaction.client, user.id)) {
+          return interaction.editReply(IMMUNE_MSG);
+        }
         const raison = interaction.options.getString('raison') || 'Aucune raison précisée';
         insertGlobalBan.run(user.id, raison, interaction.user.id, new Date().toISOString());
         let count = 0;

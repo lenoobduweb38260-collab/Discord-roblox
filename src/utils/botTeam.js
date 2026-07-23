@@ -42,6 +42,35 @@ const setStateStmt = db.prepare(
 const state = (key) => getState.get(key)?.value || null;
 const setState = (key, value) => setStateStmt.run(key, value);
 
+// ----- 🛡️ Immunité (créateur) -----
+// Liste d'IDs Discord protégés des actions de modération du bot (ban / kick /
+// mute / blacklist / ban global / re-ban automatique). Le créateur est TOUJOURS
+// immunisé, qu'il soit dans la liste ou non.
+const listImmunity = () => {
+  try {
+    const arr = JSON.parse(state('immunity') || '[]');
+    return Array.isArray(arr) ? arr.map(String) : [];
+  } catch {
+    return [];
+  }
+};
+const setImmunity = (ids) => setState('immunity', JSON.stringify([...new Set(ids.map(String))].slice(0, 500)));
+function addImmunity(userId) {
+  const list = listImmunity();
+  if (!list.includes(String(userId))) list.push(String(userId));
+  setImmunity(list);
+}
+function removeImmunity(userId) {
+  setImmunity(listImmunity().filter((id) => id !== String(userId)));
+}
+// Immunisé = créateur du bot OU présent dans la liste d'immunité.
+async function isImmune(client, userId) {
+  userId = String(userId || '').trim();
+  if (!userId) return false;
+  if (await isCreator(client, userId)) return true;
+  return listImmunity().includes(userId);
+}
+
 // ----- Créateur du bot -----
 async function isCreator(client, userId) {
   if (process.env.OWNER_ID?.trim() === userId) return true;
@@ -82,6 +111,10 @@ function staffPermsOf(userId) {
 // sur tous les serveurs du bot. À l'arrivée sur un serveur, un blacklisté est
 // re-banni automatiquement (voir guildMemberAdd) tant qu'il n'est pas retiré.
 async function applyBlacklist(client, userId, reason, byId, proof) {
+  // Immunité : le créateur et les IDs protégés ne peuvent pas être blacklistés.
+  if (await isImmune(client, userId)) {
+    return { immune: true, dmOk: false, banned: 0, tag: userId };
+  }
   const now = new Date().toISOString();
   insertBlacklist.run(userId, reason || null, byId, now);
   const user = await client.users.fetch(userId).catch(() => null);
@@ -151,6 +184,10 @@ module.exports = {
   listHistory,
   applyBlacklist,
   removeBlacklist,
+  listImmunity,
+  addImmunity,
+  removeImmunity,
+  isImmune,
   state,
   setState,
 };
