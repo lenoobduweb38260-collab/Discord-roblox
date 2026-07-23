@@ -184,7 +184,8 @@ function rolesView(guild) {
         `🚓 Rôles Police : ${policeIds.map((id) => `<@&${id}>`).join(' ') || '*Non configuré*'}`,
         `🧑‍💼 Rôle « En service » : ${show(cfg.service_role_id, 'role')}`,
       ].join('\n') +
-        '\n\nSélectionnez **un ou plusieurs rôles** dans les menus. 🚓 La **police** peut consulter le casier judiciaire (`/casierjudiciaire`) et retirer des points de permis.'
+        '\n\n➕ Sélectionner un rôle dans un menu **l\'ajoute** à la liste (les rôles s\'accumulent). 🧹 Utilisez les boutons **Vider** pour repartir de zéro.' +
+        '\n🚓 La **police** peut consulter le casier judiciaire (`/casierjudiciaire`) et retirer des points de permis.'
     );
   const staffMenu = new RoleSelectMenuBuilder()
     .setCustomId('cfgmrole:staff')
@@ -210,6 +211,12 @@ function rolesView(guild) {
     .setMinValues(1)
     .setMaxValues(1);
   if (cfg.service_role_id) serviceMenu.setDefaultRoles(cfg.service_role_id);
+  const bottom = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('cfgback').setLabel('⬅ Retour').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('cfgrolereset:staff').setLabel('Vider Staff').setEmoji('🧹').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('cfgrolereset:admin').setLabel('Vider Admin').setEmoji('🧹').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('cfgrolereset:police').setLabel('Vider Police').setEmoji('🧹').setStyle(ButtonStyle.Secondary)
+  );
   return {
     embeds: [embed],
     components: [
@@ -217,7 +224,7 @@ function rolesView(guild) {
       new ActionRowBuilder().addComponents(adminMenu),
       new ActionRowBuilder().addComponents(policeMenu),
       new ActionRowBuilder().addComponents(serviceMenu),
-      backRow(),
+      bottom,
     ],
   };
 }
@@ -479,6 +486,7 @@ function ticketsView(guild, selectedId = null) {
   ];
   if (selected) {
     buttons.push(
+      new ButtonBuilder().setCustomId(`cfgtktrolereset:${selected.id}`).setLabel('Vider support').setEmoji('🧹').setStyle(ButtonStyle.Secondary),
       new ButtonBuilder().setCustomId(`cfgtktdel:${selected.id}`).setLabel('🗑 Supprimer ce type').setStyle(ButtonStyle.Danger)
     );
   }
@@ -623,7 +631,12 @@ async function handleConfigInteraction(interaction) {
           flags: MessageFlags.Ephemeral,
         });
       }
-      const ids = interaction.values.slice(0, 10);
+      // Fusion avec l'existant : sélectionner un rôle l'AJOUTE (les menus
+      // « remplacent » la sélection, donc sans fusion un 2e ajout écraserait
+      // le 1er et un seul rôle resterait). Le retrait passe par « Vider ».
+      const cfg = getGuildConfig(interaction.guildId);
+      const existing = kind === 'staff' ? staffRoleIds(cfg) : kind === 'admin' ? adminRoleIds(cfg) : policeRoleIds(cfg);
+      const ids = [...new Set([...existing, ...interaction.values])].slice(0, 10);
       if (kind === 'police') {
         setGuildConfig(interaction.guildId, 'police_role_ids', JSON.stringify(ids));
       } else {
@@ -639,6 +652,31 @@ async function handleConfigInteraction(interaction) {
           `Rôles ${label} → ${ids.length ? ids.map((r) => `<@&${r}>`).join(' ') : '*aucun*'}\nPar <@${interaction.user.id}>`,
           COLORS.INFO
         )
+      );
+      return;
+    }
+
+    // Bouton « Vider » : réinitialise une liste de rôles (staff/admin/police).
+    if (id.startsWith('cfgrolereset:')) {
+      const kind = id.split(':')[1];
+      if (!['staff', 'admin', 'police'].includes(kind)) return;
+      if ((kind === 'admin' || kind === 'police') && grade < GRADES.ADMIN) {
+        return await interaction.reply({
+          content: `⛔ Sécurité : seul un membre de l\'**administration** peut vider les rôles ${kind === 'admin' ? 'Administration' : 'Police'}.`,
+          flags: MessageFlags.Ephemeral,
+        });
+      }
+      if (kind === 'police') {
+        setGuildConfig(interaction.guildId, 'police_role_ids', '[]');
+      } else {
+        setGuildConfig(interaction.guildId, `${kind}_role_ids`, '[]');
+        setGuildConfig(interaction.guildId, `${kind}_role_id`, null);
+      }
+      await interaction.update(rolesView(interaction.guild));
+      const label = { staff: 'Staff', admin: 'Administration', police: 'Police' }[kind];
+      await sendLog(
+        interaction.guild,
+        logEmbed('⚙️ Configuration modifiée', `Rôles ${label} **vidés** par <@${interaction.user.id}>.`, COLORS.WARNING)
       );
       return;
     }
@@ -755,12 +793,27 @@ async function handleConfigInteraction(interaction) {
       const typeId = Number(id.split(':')[1]);
       const type = getTicketType.get(typeId, interaction.guildId);
       if (!type) return await interaction.update(ticketsView(interaction.guild));
-      const roleIds = [...new Set(interaction.values.map(String))].slice(0, 10);
+      // Fusion : les rôles support s'accumulent (voir Rôles). Retrait = « Vider support ».
+      const roleIds = [...new Set([...supportRoleIds(type), ...interaction.values.map(String)])].slice(0, 10);
       setTicketSupport.run(roleIds[0] || null, roleIds.length ? JSON.stringify(roleIds) : null, typeId, interaction.guildId);
       await interaction.update(ticketsView(interaction.guild, typeId));
       await sendLog(
         interaction.guild,
         logEmbed('🎫 Rôles support définis', `**${type.label}** → ${roleIds.map((r) => `<@&${r}>`).join(' ')}\nPar <@${interaction.user.id}>`, COLORS.INFO)
+      );
+      return;
+    }
+
+    // Bouton « Vider support » : réinitialise les rôles support d'un type de ticket.
+    if (id.startsWith('cfgtktrolereset:')) {
+      const typeId = Number(id.split(':')[1]);
+      const type = getTicketType.get(typeId, interaction.guildId);
+      if (!type) return await interaction.update(ticketsView(interaction.guild));
+      setTicketSupport.run(null, null, typeId, interaction.guildId);
+      await interaction.update(ticketsView(interaction.guild, typeId));
+      await sendLog(
+        interaction.guild,
+        logEmbed('🎫 Rôles support vidés', `**${type.label}** : rôles support réinitialisés par <@${interaction.user.id}>.`, COLORS.WARNING)
       );
       return;
     }
