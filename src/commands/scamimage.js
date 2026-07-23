@@ -18,7 +18,7 @@ module.exports = {
   grade: GRADES.EVERYONE, // contrôle strict : créateur du bot uniquement (voir execute)
   data: new SlashCommandBuilder()
     .setName('scamimage')
-    .setDescription('[Créateur] Anti-scam global : bannit quiconque poste une image échantillon (valable sur tous les serveurs)')
+    .setDescription('[Créateur] Anti-scam global : bannit qui poste une image échantillon (tous serveurs)')
     .addSubcommand((sub) =>
       sub
         .setName('ajouter')
