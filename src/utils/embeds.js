@@ -1,5 +1,27 @@
 const { EmbedBuilder } = require('discord.js');
-const { getGuildConfig } = require('../database');
+const { getGuildConfig, db } = require('../database');
+
+// Entreprises (portée globale) où la personne est patron ou employé — sert à
+// afficher son/ses métier(s) sur la carte d'identité.
+const headEnterprisesOf = db.prepare(
+  'SELECT e.name FROM enterprises e JOIN enterprise_heads h ON h.enterprise_id = e.id WHERE h.user_id = ? ORDER BY e.name COLLATE NOCASE'
+);
+const employeeEnterprisesOf = db.prepare(
+  'SELECT e.name FROM enterprises e JOIN enterprise_employees emp ON emp.enterprise_id = e.id WHERE emp.user_id = ? ORDER BY e.name COLLATE NOCASE'
+);
+
+function enterprisesSummary(userId) {
+  try {
+    const heads = headEnterprisesOf.all(userId).map((r) => r.name);
+    const emps = employeeEnterprisesOf.all(userId).map((r) => r.name);
+    const parts = [];
+    for (const name of heads) parts.push(`👑 **${name}** (patron)`);
+    for (const name of emps) if (!heads.includes(name)) parts.push(`👥 **${name}** (employé)`);
+    return parts.length ? parts.join('\n') : null;
+  } catch {
+    return null;
+  }
+}
 
 const COLORS = {
   PRIMARY: 0x5865f2,
@@ -71,6 +93,8 @@ function buildCardEmbed(card, user) {
       { name: '📖 Background', value: card.background || '*Aucun*', inline: false },
     )
     .setFooter({ text: `Carte créée le ${frDateTime(card.created_at)}` });
+  const jobs = enterprisesSummary(card.user_id);
+  if (jobs) embed.addFields({ name: '🏢 Entreprise(s) / métier', value: jobs.slice(0, 1024), inline: false });
   if (user) embed.setThumbnail(user.displayAvatarURL({ size: 256 }));
   if (card.photo_url) embed.setImage(card.photo_url);
   return embed;

@@ -434,10 +434,20 @@ for (const column of [
   } catch {}
 }
 
-// Assurance véhicule : couleur du véhicule (ajoutée après coup).
-try {
-  db.exec('ALTER TABLE insured_vehicles ADD COLUMN color TEXT');
-} catch {}
+// Assurance véhicule : couleur, photo, statut police (recherché / fourrière)
+// et dates de validité (validation → expiration).
+for (const column of [
+  'color TEXT',
+  'media_url TEXT',
+  'wanted INTEGER NOT NULL DEFAULT 0',
+  'impounded INTEGER NOT NULL DEFAULT 0',
+  'valid_from TEXT',
+  'valid_until TEXT',
+]) {
+  try {
+    db.exec(`ALTER TABLE insured_vehicles ADD COLUMN ${column}`);
+  } catch {}
+}
 
 // Tickets du QG : preuve fournie à la blacklist.
 try {

@@ -49,6 +49,7 @@ async function replyProfile(interaction, user) {
 module.exports = {
   module: 'rp', // fait partie du Module RP activable dans /config
   grade: GRADES.STAFF,
+  public: true, // `/warnrp voir` s'affiche pour tout le monde (les actions restent privées)
   data: new SlashCommandBuilder()
     .setName('warnrp')
     .setDescription('[Staff] Warn RP : gère les points RP d\'un membre (base 7)')
@@ -96,6 +97,7 @@ module.exports = {
         sub === 'warn'
           ? `🔻 Warn RP appliqué à <@${user.id}> : **-${points}** point(s).\n**Solde : ${total} / ${BASE}**${raison ? `\n**Raison :** ${raison}` : ''}`
           : `🔺 <@${user.id}> a récupéré **+${points}** point(s).\n**Solde : ${total} / ${BASE}**${raison ? `\n**Raison :** ${raison}` : ''}`,
+      flags: MessageFlags.Ephemeral, // l'action reste privée ; seul `voir` est public
     });
     await sendLog(
       interaction.guild,
