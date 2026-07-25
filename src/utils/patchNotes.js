@@ -90,6 +90,22 @@ const RELEASES = [
     ],
     retrait: [],
   },
+  {
+    id: 'assurance-carte-warn-2026-07b',
+    title: 'Assurances, cartes & warns',
+    ajout: [
+      '🚗 Assurance véhicule : **photo** du véhicule et **dates de validité** (validation → expiration, avec valide/expirée)',
+      '🚓 Statut police d\'un véhicule : 🚨 recherché et 🅿️ fourrière, via `/assurance statut`',
+      '🔎 `/assurance voir <n°>` : consulter un contrat (photo, validité, statut police)',
+      '🏢 `/carte voir` affiche désormais l\'**entreprise et le métier** de la personne (patron/employé)',
+    ],
+    amelioration: [
+      '👁️ `/warnrp voir` est désormais **visible par tout le monde** (les actions warn/points restent privées)',
+      '⚙️ `/config` : les rôles (Staff, Admin, Police, support tickets) **s\'accumulent** à l\'ajout au lieu de se remplacer',
+    ],
+    fix: [],
+    retrait: [],
+  },
 ];
 
 // Découpe une catégorie en champs d'embed (max 1024 caractères par champ).
