@@ -7,6 +7,9 @@ const {
   ChannelType,
   PermissionFlagsBits,
   AttachmentBuilder,
+  ModalBuilder,
+  TextInputBuilder,
+  TextInputStyle,
   MessageFlags,
 } = require('discord.js');
 const { db, getGuildConfig } = require('../database');
@@ -139,6 +142,179 @@ function buildPanelPayload(guildId, options = {}) {
     payload.embeds = [];
   }
   return payload;
+}
+
+// ----- 🏗️ Constructeur de panneau (création & modification) -----
+// Le contenu texte (titre, description, message, pied de page) se saisit dans
+// un MODAL à champs « paragraphe » : on peut y faire de VRAIS retours à la
+// ligne (touche Entrée). L'image/GIF s'envoie via une pièce jointe uploadée
+// depuis le PC (option de la commande, car un modal n'accepte pas de fichier).
+// À la modification, si plusieurs panneaux existent, on choisit lequel via un
+// menu déroulant.
+const listPanels = db.prepare('SELECT * FROM ticket_panels WHERE guild_id = ? ORDER BY id DESC');
+const getPanelById = db.prepare('SELECT * FROM ticket_panels WHERE id = ? AND guild_id = ?');
+
+// Mémoire temporaire entre la commande, la sélection et le modal.
+const pendingPanels = new Map(); // `${guildId}:${userId}` → { action, channelId, panelId, opts, existing }
+const panelKey = (interaction) => `${interaction.guildId}:${interaction.user.id}`;
+const safeJson = (s) => {
+  try {
+    return JSON.parse(s || '{}') || {};
+  } catch {
+    return {};
+  }
+};
+
+// Modal de contenu : 4 champs, pré-remplis à la modification.
+function panelTextModal(existing = {}) {
+  const field = (id, label, value, style, max) => {
+    const input = new TextInputBuilder().setCustomId(id).setLabel(label).setStyle(style).setRequired(false).setMaxLength(max);
+    if (value) input.setValue(String(value).slice(0, max));
+    return new ActionRowBuilder().addComponents(input);
+  };
+  return new ModalBuilder()
+    .setCustomId('tktpanmodal')
+    .setTitle('🎫 Contenu du panneau')
+    .addComponents(
+      field('pan_titre', 'Titre de l\'embed (facultatif)', existing.titre, TextInputStyle.Short, 256),
+      field('pan_desc', 'Description — Entrée = saut de ligne', existing.description, TextInputStyle.Paragraph, 4000),
+      field('pan_texte', 'Message au-dessus (facultatif)', existing.texte, TextInputStyle.Paragraph, 2000),
+      field('pan_footer', 'Pied de page (facultatif)', existing.footer, TextInputStyle.Short, 2048)
+    );
+}
+
+// Étape 1 (création) : mémorise les options de commande puis ouvre le modal.
+async function startPanelCreate(interaction, opts) {
+  pendingPanels.set(panelKey(interaction), { action: 'create', channelId: opts.channelId, opts: opts.options, existing: {} });
+  await interaction.showModal(panelTextModal({}));
+}
+
+// Étape 1 (modification) : choisit le panneau (menu si plusieurs) puis le modal.
+async function startPanelModify(interaction, opts) {
+  const panels = listPanels.all(interaction.guildId);
+  if (!panels.length) {
+    return interaction.reply({
+      content: '❌ Aucun panneau à modifier : publiez-en un avec `/ticket panneau`.',
+      flags: MessageFlags.Ephemeral,
+    });
+  }
+  pendingPanels.set(panelKey(interaction), { action: 'modify', opts: opts.options, existing: {} });
+  if (panels.length === 1) return openModifyModal(interaction, panels[0]);
+  const menu = new StringSelectMenuBuilder()
+    .setCustomId('tktpansel')
+    .setPlaceholder('🎫 Quel panneau modifier ?')
+    .addOptions(
+      panels.slice(0, 25).map((p) => {
+        const o = safeJson(p.options);
+        const chan = interaction.guild.channels.cache.get(p.channel_id);
+        const preview = String(o.titre || o.texte || o.description || 'Panneau').replace(/\s+/g, ' ').trim().slice(0, 50) || 'Panneau';
+        return {
+          label: `#${chan?.name || 'salon'} — ${preview}`.slice(0, 100),
+          value: String(p.id),
+          description: `Publié dans #${chan?.name || p.channel_id}`.slice(0, 100),
+        };
+      })
+    );
+  return interaction.reply({
+    content: '🎫 Plusieurs panneaux existent — choisissez celui à modifier :',
+    components: [new ActionRowBuilder().addComponents(menu)],
+    flags: MessageFlags.Ephemeral,
+  });
+}
+
+// Ouvre le modal pré-rempli avec le contenu existant du panneau choisi.
+async function openModifyModal(interaction, panel) {
+  const key = panelKey(interaction);
+  const pending = pendingPanels.get(key) || { action: 'modify', opts: {}, existing: {} };
+  pending.panelId = panel.id;
+  pending.existing = safeJson(panel.options);
+  pendingPanels.set(key, pending);
+  await interaction.showModal(panelTextModal(pending.existing));
+}
+
+// Étape 2 : le modal est validé → construit et publie / met à jour le panneau.
+async function finishPanel(interaction) {
+  const key = panelKey(interaction);
+  const pending = pendingPanels.get(key);
+  if (!pending) {
+    return interaction.reply({ content: '❌ Session expirée — relancez `/ticket panneau`.', flags: MessageFlags.Ephemeral });
+  }
+  pendingPanels.delete(key);
+  const val = (id) => interaction.fields.getTextInputValue(id).trim();
+  // Options finales : existant (modif) < options de commande < textes du modal.
+  const merged = { ...(pending.existing || {}) };
+  for (const [k, v] of Object.entries(pending.opts || {})) {
+    if (v !== undefined && v !== null && v !== '') merged[k] = v;
+  }
+  // Les 4 champs texte sont pré-remplis : leur valeur (même vidée) fait foi.
+  for (const [k, id] of [['titre', 'pan_titre'], ['description', 'pan_desc'], ['texte', 'pan_texte'], ['footer', 'pan_footer']]) {
+    const v = val(id);
+    if (v) merged[k] = v;
+    else delete merged[k];
+  }
+  if (merged.couleur && parseColor(merged.couleur) === null) {
+    return interaction.reply({ content: '❌ Couleur invalide : utilisez un code hex, ex `#5865F2`.', flags: MessageFlags.Ephemeral });
+  }
+  const payload = buildPanelPayload(interaction.guildId, merged);
+
+  if (pending.action === 'create') {
+    const channel = await interaction.guild.channels.fetch(pending.channelId).catch(() => null);
+    if (!channel?.isTextBased()) {
+      return interaction.reply({ content: '❌ Salon du panneau introuvable.', flags: MessageFlags.Ephemeral });
+    }
+    let message;
+    try {
+      message = await channel.send(payload);
+    } catch (err) {
+      return interaction.reply({
+        content: `❌ Publication impossible dans ${channel} : ${err.message}\nVérifiez les permissions **Voir le salon** / **Envoyer des messages** / **Intégrer des liens** du bot.`,
+        flags: MessageFlags.Ephemeral,
+      });
+    }
+    insertPanel.run(interaction.guildId, channel.id, message.id, JSON.stringify(merged));
+    await interaction.reply({ content: `✅ Panneau publié dans ${channel}. Modifiez-le avec \`/ticket panneau-modifier\`.`, flags: MessageFlags.Ephemeral });
+    await sendLog(interaction.guild, logEmbed('🎫 Panneau publié', `Panneau publié dans <#${channel.id}> par <@${interaction.user.id}>.`, COLORS.INFO));
+    return;
+  }
+
+  // Modification
+  const panel = getPanelById.get(pending.panelId, interaction.guildId);
+  if (!panel) return interaction.reply({ content: '❌ Panneau introuvable (peut-être supprimé).', flags: MessageFlags.Ephemeral });
+  const channel = await interaction.guild.channels.fetch(panel.channel_id).catch(() => null);
+  const message = channel ? await channel.messages.fetch(panel.message_id).catch(() => null) : null;
+  if (!message) {
+    return interaction.reply({
+      content: '❌ Le message du panneau a été supprimé — republiez-en un avec `/ticket panneau`.',
+      flags: MessageFlags.Ephemeral,
+    });
+  }
+  try {
+    await message.edit(payload);
+  } catch (err) {
+    return interaction.reply({ content: `❌ Modification impossible : ${err.message}`, flags: MessageFlags.Ephemeral });
+  }
+  updatePanelOptions.run(JSON.stringify(merged), panel.id);
+  await interaction.reply({ content: `✅ Panneau mis à jour dans <#${panel.channel_id}>.`, flags: MessageFlags.Ephemeral });
+  await sendLog(interaction.guild, logEmbed('🎫 Panneau modifié', `Panneau dans <#${panel.channel_id}> mis à jour par <@${interaction.user.id}>.`, COLORS.INFO));
+}
+
+// Routeur des interactions du constructeur (menu de sélection + modal).
+async function handlePanelBuilder(interaction) {
+  try {
+    if (interaction.isStringSelectMenu() && interaction.customId === 'tktpansel') {
+      const panel = getPanelById.get(Number(interaction.values[0]), interaction.guildId);
+      if (!panel) return await interaction.update({ content: '❌ Panneau introuvable.', components: [] });
+      return await openModifyModal(interaction, panel);
+    }
+    if (interaction.isModalSubmit() && interaction.customId === 'tktpanmodal') {
+      return await finishPanel(interaction);
+    }
+  } catch (err) {
+    console.error('Erreur constructeur de panneau :', err);
+    const payload = { content: '❌ Une erreur est survenue sur le panneau.', flags: MessageFlags.Ephemeral };
+    if (interaction.replied || interaction.deferred) await interaction.followUp(payload).catch(() => null);
+    else await interaction.reply(payload).catch(() => null);
+  }
 }
 
 function canManageTicket(member, ticketType) {
@@ -340,5 +516,8 @@ module.exports = {
   buildPanelPayload,
   parseColor,
   safeEmoji,
+  startPanelCreate,
+  startPanelModify,
+  handlePanelBuilder,
   handleTicketButton,
 };

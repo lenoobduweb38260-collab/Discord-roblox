@@ -4,24 +4,31 @@ const {
   getTypeByLabel,
   insertType,
   deleteType,
-  insertPanel,
-  lastPanel,
-  updatePanelOptions,
-  buildPanelPayload,
   parseColor,
   supportRoleIds,
   safeEmoji,
+  startPanelCreate,
+  startPanelModify,
 } = require('../utils/tickets');
 const { COLORS, sendLog, logEmbed } = require('../utils/embeds');
 const { GRADES } = require('../utils/permissions');
 
-// Récupère les options de personnalisation du panneau depuis l'interaction.
+// Récupère les options de commande du panneau (le TEXTE — titre, description,
+// message, pied de page — se saisit ensuite dans un modal pour permettre les
+// vrais retours à la ligne). L'image peut être une pièce jointe uploadée
+// depuis le PC (photo/GIF) OU une URL.
 function readPanelOptions(interaction) {
   const opts = {};
-  for (const key of ['mode', 'ouverture', 'selecteur_texte', 'texte', 'titre', 'description', 'couleur', 'image', 'miniature', 'footer']) {
+  for (const key of ['mode', 'ouverture', 'selecteur_texte', 'couleur']) {
     const value = interaction.options.getString(key);
     if (value !== null) opts[key] = value;
   }
+  const imageFile = interaction.options.getAttachment('image');
+  const imageUrl = interaction.options.getString('image_url');
+  if (imageFile?.url || imageUrl) opts.image = imageFile?.url || imageUrl;
+  const thumbFile = interaction.options.getAttachment('miniature');
+  const thumbUrl = interaction.options.getString('miniature_url');
+  if (thumbFile?.url || thumbUrl) opts.miniature = thumbFile?.url || thumbUrl;
   return opts;
 }
 
@@ -49,13 +56,11 @@ function addPanelOptions(sub, modeRequired, withSalon) {
         .addChoices({ name: '📋 Menu déroulant (sélecteur de raison)', value: 'menu' }, { name: '🔘 Boutons', value: 'boutons' })
     )
     .addStringOption((o) => o.setName('selecteur_texte').setDescription('Texte affiché dans le menu déroulant').setRequired(false))
-    .addStringOption((o) => o.setName('texte').setDescription('Texte du message (\\n = saut de ligne)').setRequired(false))
-    .addStringOption((o) => o.setName('titre').setDescription('Titre de l\'embed').setRequired(false))
-    .addStringOption((o) => o.setName('description').setDescription('Description de l\'embed (\\n = saut de ligne)').setRequired(false))
-    .addStringOption((o) => o.setName('couleur').setDescription('Couleur de l\'embed (hex, ex : #5865F2)').setRequired(false))
-    .addStringOption((o) => o.setName('image').setDescription('URL de l\'image de l\'embed (photo/GIF)').setRequired(false))
-    .addStringOption((o) => o.setName('miniature').setDescription('URL de la miniature de l\'embed').setRequired(false))
-    .addStringOption((o) => o.setName('footer').setDescription('Pied de page de l\'embed').setRequired(false));
+    .addAttachmentOption((o) => o.setName('image').setDescription('Image/GIF de l\'embed — uploadée depuis votre PC').setRequired(false))
+    .addStringOption((o) => o.setName('image_url').setDescription('…ou l\'URL de l\'image de l\'embed').setRequired(false))
+    .addAttachmentOption((o) => o.setName('miniature').setDescription('Miniature de l\'embed — uploadée depuis votre PC').setRequired(false))
+    .addStringOption((o) => o.setName('miniature_url').setDescription('…ou l\'URL de la miniature').setRequired(false))
+    .addStringOption((o) => o.setName('couleur').setDescription('Couleur de l\'embed (hex, ex : #5865F2)').setRequired(false));
 }
 
 module.exports = {
@@ -181,54 +186,18 @@ module.exports = {
         return interaction.reply({ content: '❌ Couleur invalide : utilisez un code hex, ex `#5865F2`.', flags: MessageFlags.Ephemeral });
       }
       const salon = interaction.options.getChannel('salon') || interaction.channel;
-      const payload = buildPanelPayload(interaction.guildId, opts);
-      let message;
-      try {
-        message = await salon.send(payload);
-      } catch (err) {
-        return interaction.reply({
-          content:
-            `❌ Impossible de publier le panneau dans ${salon} : ${err.message}\n` +
-            'Vérifiez que le bot a bien les permissions **Voir le salon**, **Envoyer des messages** et **Intégrer des liens** dans ce salon.',
-          flags: MessageFlags.Ephemeral,
-        });
-      }
-      insertPanel.run(interaction.guildId, salon.id, message.id, JSON.stringify(opts));
-      await interaction.reply({
-        content: `✅ Panneau publié dans ${salon}. Modifiez-le à tout moment avec \`/ticket panneau-modifier\`.`,
-      });
-      await sendLog(
-        interaction.guild,
-        logEmbed('🎫 Panneau publié', `Panneau de tickets publié dans <#${salon.id}> par <@${interaction.user.id}>.`, COLORS.INFO)
-      );
-      return;
+      // Le texte (titre/description/message/pied) se saisit dans un modal → on
+      // ouvre le modal ici ; la publication se fait à sa validation.
+      return startPanelCreate(interaction, { channelId: salon.id, options: opts });
     }
 
     if (sub === 'panneau-modifier') {
-      const panel = lastPanel.get(interaction.guildId);
-      if (!panel) {
-        return interaction.reply({ content: '❌ Aucun panneau à modifier : publiez-en un avec `/ticket panneau`.', flags: MessageFlags.Ephemeral });
-      }
-      const channel = await interaction.guild.channels.fetch(panel.channel_id).catch(() => null);
-      const message = channel ? await channel.messages.fetch(panel.message_id).catch(() => null) : null;
-      if (!message) {
-        return interaction.reply({
-          content: '❌ Le message du panneau a été supprimé : republiez-en un avec `/ticket panneau`.',
-          flags: MessageFlags.Ephemeral,
-        });
-      }
-      const newOpts = readPanelOptions(interaction);
-      if (newOpts.couleur && parseColor(newOpts.couleur) === null) {
+      const opts = readPanelOptions(interaction);
+      if (opts.couleur && parseColor(opts.couleur) === null) {
         return interaction.reply({ content: '❌ Couleur invalide : utilisez un code hex, ex `#5865F2`.', flags: MessageFlags.Ephemeral });
       }
-      // Fusion : les options fournies remplacent les anciennes, le reste est conservé.
-      const merged = { ...JSON.parse(panel.options || '{}'), ...newOpts };
-      updatePanelOptions.run(JSON.stringify(merged), panel.id);
-      await message.edit(buildPanelPayload(interaction.guildId, merged));
-      await interaction.reply({
-        content: `✅ Panneau mis à jour dans <#${panel.channel_id}> (boutons resynchronisés avec les types).`,
-      });
-      return;
+      // Choisit le panneau (menu si plusieurs) puis ouvre le modal pré-rempli.
+      return startPanelModify(interaction, { options: opts });
     }
   },
 };

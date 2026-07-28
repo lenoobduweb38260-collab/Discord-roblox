@@ -75,6 +75,15 @@ module.exports = {
       return handleTicketButton(interaction);
     }
 
+    // ----- Constructeur de panneau : sélection du panneau + modal de contenu -----
+    if (
+      (interaction.isStringSelectMenu() && interaction.customId === 'tktpansel') ||
+      (interaction.isModalSubmit() && interaction.customId === 'tktpanmodal')
+    ) {
+      if (!interaction.inGuild()) return;
+      return require('../utils/tickets').handlePanelBuilder(interaction);
+    }
+
     // ----- Recherche dans les panneaux Blacklist/Whitelist RP -----
     if (
       (interaction.isButton() && interaction.customId.startsWith('rprpsearch:')) ||

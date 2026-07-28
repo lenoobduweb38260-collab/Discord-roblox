@@ -119,6 +119,19 @@ const RELEASES = [
     ],
     retrait: [],
   },
+  {
+    id: 'ticket-panneau-2026-07d',
+    title: 'Panneau de tickets : contenu, image & modification',
+    ajout: [
+      '🖼️ Image/GIF du panneau de tickets : vous pouvez maintenant **l\'uploader depuis votre PC** (en plus de l\'URL)',
+    ],
+    amelioration: [
+      '✏️ Le **texte du panneau** (titre, description, message, pied de page) se saisit dans un **formulaire** : on peut enfin y faire de **vrais retours à la ligne**',
+      '🗂️ `/ticket panneau-modifier` : quand plusieurs panneaux existent, un **menu permet de choisir lequel modifier**',
+    ],
+    fix: [],
+    retrait: [],
+  },
 ];
 
 // Découpe une catégorie en champs d'embed (max 1024 caractères par champ).
