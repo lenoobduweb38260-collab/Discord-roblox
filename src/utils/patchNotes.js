@@ -114,7 +114,9 @@ const RELEASES = [
       '😀 La bulle propose les **emojis du serveur** ainsi que des emojis classiques prêts à l\'emploi',
     ],
     ajout: [],
-    fix: [],
+    fix: [
+      '🎫 Correction d\'un **plantage du panneau de tickets** (`/ticket panneau`) lorsqu\'un type utilisait un emoji non valide : les emojis incorrects sont désormais ignorés au lieu de bloquer l\'affichage',
+    ],
     retrait: [],
   },
 ];

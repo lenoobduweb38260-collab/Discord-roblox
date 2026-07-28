@@ -10,6 +10,7 @@ const {
   buildPanelPayload,
   parseColor,
   supportRoleIds,
+  safeEmoji,
 } = require('../utils/tickets');
 const { COLORS, sendLog, logEmbed } = require('../utils/embeds');
 const { GRADES } = require('../utils/permissions');
@@ -122,7 +123,10 @@ module.exports = {
         .map((k) => interaction.options.getRole(k))
         .filter(Boolean);
       const roleIds = [...new Set(roles.map((r) => r.id))];
-      const emoji = interaction.options.getString('emoji');
+      // On ne stocke l'emoji QUE s'il est valide (emoji Unicode ou perso au bon
+      // format) : un « :nom: » ou du texte casserait l'affichage du panneau.
+      const emojiRaw = interaction.options.getString('emoji');
+      const emoji = safeEmoji(emojiRaw) ? emojiRaw.trim() : null;
       const description = interaction.options.getString('description')?.slice(0, 100) || null;
       insertType.run(
         interaction.guildId, nom, emoji, categorie.id,
@@ -131,7 +135,9 @@ module.exports = {
       await interaction.reply({
         content:
           `✅ Type **${emoji ? `${emoji} ` : ''}${nom}** créé → salons dans **${categorie.name}**` +
-          `${roles.length ? `, géré par ${roles.map((r) => r.toString()).join(' ')}` : ''}.\n💡 Pensez à republier ou modifier le panneau (\`/ticket panneau\`) pour afficher le nouveau bouton.`,
+          `${roles.length ? `, géré par ${roles.map((r) => r.toString()).join(' ')}` : ''}.` +
+          `${emojiRaw && !emoji ? '\n⚠️ L\'emoji fourni n\'était pas valide (utilisez un vrai emoji ou un emoji du serveur) : type créé **sans emoji**.' : ''}` +
+          '\n💡 Pensez à republier ou modifier le panneau (`/ticket panneau`) pour afficher le nouveau bouton.',
       });
       await sendLog(
         interaction.guild,
@@ -176,7 +182,17 @@ module.exports = {
       }
       const salon = interaction.options.getChannel('salon') || interaction.channel;
       const payload = buildPanelPayload(interaction.guildId, opts);
-      const message = await salon.send(payload);
+      let message;
+      try {
+        message = await salon.send(payload);
+      } catch (err) {
+        return interaction.reply({
+          content:
+            `❌ Impossible de publier le panneau dans ${salon} : ${err.message}\n` +
+            'Vérifiez que le bot a bien les permissions **Voir le salon**, **Envoyer des messages** et **Intégrer des liens** dans ce salon.',
+          flags: MessageFlags.Ephemeral,
+        });
+      }
       insertPanel.run(interaction.guildId, salon.id, message.id, JSON.stringify(opts));
       await interaction.reply({
         content: `✅ Panneau publié dans ${salon}. Modifiez-le à tout moment avec \`/ticket panneau-modifier\`.`,

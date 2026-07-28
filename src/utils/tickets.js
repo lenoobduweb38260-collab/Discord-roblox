@@ -56,6 +56,29 @@ function parseColor(value) {
   return m ? parseInt(m[1], 16) : null;
 }
 
+// Sécurité emoji : n'accepte QUE des emojis réellement valides, sinon renvoie
+// null. C'est essentiel car un emoji invalide (ex : un shortcode « :nom: » ou
+// du texte saisi à la main) est accepté localement par discord.js mais REFUSÉ
+// par l'API Discord à l'envoi → le panneau entier planterait. On ne transmet
+// donc à Discord qu'un emoji personnalisé au bon format `<:nom:id>` /
+// `<a:nom:id>`, ou un vrai emoji Unicode.
+const CUSTOM_EMOJI_RE = /^<(a)?:([a-zA-Z0-9_]{2,32}):(\d{17,20})>$/;
+function safeEmoji(raw) {
+  if (!raw) return null;
+  const s = String(raw).trim();
+  if (!s) return null;
+  const m = s.match(CUSTOM_EMOJI_RE);
+  if (m) return { id: m[3], name: m[2], animated: Boolean(m[1]) };
+  // Unicode : doit contenir un pictogramme emoji et rester court (les séquences
+  // ZWJ comme les emojis composés sont tolérées).
+  try {
+    if (/\p{Extended_Pictographic}/u.test(s) && [...s].length <= 12) return s;
+  } catch {
+    // moteur regex sans \p{...} : on retombe sur « pas d'emoji » par prudence
+  }
+  return null;
+}
+
 const nl = (s) => (s ? String(s).replace(/\\n/g, '\n') : s);
 
 // Construit le message du panneau (message basique OU embed personnalisable)
@@ -73,11 +96,8 @@ function buildPanelPayload(guildId, options = {}) {
         types.slice(0, 25).map((t) => {
           const opt = { label: String(t.label).slice(0, 100), value: String(t.id) };
           if (t.description) opt.description = String(t.description).slice(0, 100);
-          if (t.emoji) {
-            try {
-              opt.emoji = t.emoji;
-            } catch {}
-          }
+          const emoji = safeEmoji(t.emoji);
+          if (emoji) opt.emoji = emoji;
           return opt;
         })
       );
@@ -91,9 +111,10 @@ function buildPanelPayload(guildId, options = {}) {
               .setCustomId(`tktopen:${t.id}`)
               .setLabel(t.label)
               .setStyle(ButtonStyle.Primary);
-            if (t.emoji) {
+            const emoji = safeEmoji(t.emoji);
+            if (emoji) {
               try {
-                button.setEmoji(t.emoji);
+                button.setEmoji(emoji);
               } catch {}
             }
             return button;
@@ -318,5 +339,6 @@ module.exports = {
   updatePanelOptions,
   buildPanelPayload,
   parseColor,
+  safeEmoji,
   handleTicketButton,
 };
