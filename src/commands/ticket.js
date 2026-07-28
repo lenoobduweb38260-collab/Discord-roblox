@@ -8,6 +8,8 @@ const {
   supportRoleIds,
   safeEmoji,
   setTypeEnabled,
+  openTicketFor,
+  addMemberToTicket,
   startPanelCreate,
   startPanelModify,
 } = require('../utils/tickets');
@@ -101,6 +103,19 @@ module.exports = {
           .setName('debloquer')
           .setDescription('Réactiver une raison de ticket bloquée')
           .addStringOption((o) => o.setName('nom').setDescription('Raison à réactiver').setRequired(true).setAutocomplete(true))
+      )
+      .addSubcommand((sub) =>
+        sub
+          .setName('ajouter')
+          .setDescription('Ajouter un membre au ticket courant (à utiliser dans le salon du ticket)')
+          .addUserOption((o) => o.setName('membre').setDescription('Membre à ajouter au ticket').setRequired(true))
+      )
+      .addSubcommand((sub) =>
+        sub
+          .setName('creer-pour')
+          .setDescription('Ouvrir un ticket au nom d\'un membre')
+          .addUserOption((o) => o.setName('membre').setDescription('Membre pour qui ouvrir le ticket').setRequired(true))
+          .addStringOption((o) => o.setName('raison').setDescription('Type / raison du ticket').setRequired(true).setAutocomplete(true))
       )
       .addSubcommand((sub) => sub.setName('types').setDescription('Voir les types de tickets configurés'));
     builder.addSubcommand((sub) =>
@@ -208,6 +223,20 @@ module.exports = {
         )
       );
       return;
+    }
+
+    if (sub === 'ajouter') {
+      return addMemberToTicket(interaction, interaction.options.getUser('membre'));
+    }
+
+    if (sub === 'creer-pour') {
+      const membre = interaction.options.getUser('membre');
+      const raison = interaction.options.getString('raison').trim();
+      const type = getTypeByLabel.get(interaction.guildId, raison);
+      if (!type) {
+        return interaction.reply({ content: `❌ Raison **${raison}** introuvable. Choisissez un type existant.`, flags: MessageFlags.Ephemeral });
+      }
+      return openTicketFor(interaction, type.id, membre);
     }
 
     if (sub === 'types') {

@@ -168,6 +168,19 @@ const RELEASES = [
     amelioration: [],
     retrait: [],
   },
+  {
+    id: 'ticket-membres-2026-07h',
+    title: 'Tickets : ajouter un membre & ouvrir pour quelqu\'un',
+    ajout: [
+      '➕ `/ticket ajouter` : **ajouter un membre** à un ticket en cours (à utiliser dans le salon du ticket)',
+      '🎫 `/ticket creer-pour` : **ouvrir un ticket au nom d\'un membre** (par le staff)',
+    ],
+    fix: [
+      '🔁 Menu déroulant des raisons : on peut désormais **re-sélectionner la même raison** (le menu se réinitialise après chaque choix)',
+    ],
+    amelioration: [],
+    retrait: [],
+  },
 ];
 
 // Découpe une catégorie en champs d'embed (max 1024 caractères par champ).

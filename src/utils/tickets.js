@@ -45,6 +45,7 @@ const insertTicket = db.prepare(
   "INSERT INTO tickets (guild_id, type_id, channel_id, user_id, status, opened_at) VALUES (?, ?, ?, ?, 'ouvert', ?)"
 );
 const getTicket = db.prepare('SELECT * FROM tickets WHERE id = ? AND guild_id = ?');
+const getTicketByChannel = db.prepare('SELECT * FROM tickets WHERE guild_id = ? AND channel_id = ?');
 const getOpenTicket = db.prepare(
   "SELECT * FROM tickets WHERE guild_id = ? AND user_id = ? AND type_id = ? AND status = 'ouvert'"
 );
@@ -160,6 +161,7 @@ function buildPanelPayload(guildId, options = {}) {
 // menu déroulant.
 const listPanels = db.prepare('SELECT * FROM ticket_panels WHERE guild_id = ? ORDER BY id DESC');
 const getPanelById = db.prepare('SELECT * FROM ticket_panels WHERE id = ? AND guild_id = ?');
+const getPanelByMessage = db.prepare('SELECT * FROM ticket_panels WHERE guild_id = ? AND message_id = ?');
 
 // Mémoire temporaire entre la commande, la sélection et le modal.
 const pendingPanels = new Map(); // `${guildId}:${userId}` → { action, channelId, panelId, opts, existing }
@@ -329,6 +331,58 @@ function canManageTicket(member, ticketType) {
   return supportRoleIds(ticketType).some((roleId) => member.roles.cache.has(roleId));
 }
 
+// Crée réellement le salon du ticket pour `owner` (User) et y poste le message
+// d'accueil avec le bouton de fermeture. Renvoie { channel, num }. Utilisé à la
+// fois par l'ouverture normale et par la création par le staff (`creer-pour`).
+async function provisionTicket(guild, type, owner) {
+  const cfg = getGuildConfig(guild.id);
+  const num = String(countTickets.get(guild.id).n + 1).padStart(4, '0');
+  const allowPerms = [
+    PermissionFlagsBits.ViewChannel,
+    PermissionFlagsBits.SendMessages,
+    PermissionFlagsBits.ReadMessageHistory,
+    PermissionFlagsBits.AttachFiles,
+    PermissionFlagsBits.EmbedLinks,
+  ];
+  const roleIds = supportRoleIds(type);
+  const overwrites = [
+    { id: guild.id, deny: [PermissionFlagsBits.ViewChannel] },
+    { id: owner.id, allow: allowPerms },
+    { id: guild.client.user.id, allow: [...allowPerms, PermissionFlagsBits.ManageChannels] },
+  ];
+  for (const roleId of roleIds) overwrites.push({ id: roleId, allow: allowPerms });
+  if (cfg.staff_role_id && !roleIds.includes(String(cfg.staff_role_id))) {
+    overwrites.push({ id: cfg.staff_role_id, allow: allowPerms });
+  }
+  const channel = await guild.channels.create({
+    name: `ticket-${num}-${owner.username}`.slice(0, 90),
+    type: ChannelType.GuildText,
+    parent: type.category_id || null,
+    permissionOverwrites: overwrites,
+    topic: `Ticket ${type.label} de ${owner.tag} (${owner.id})`,
+  });
+  const result = insertTicket.run(guild.id, type.id, channel.id, owner.id, new Date().toISOString());
+  const roleMentions = roleIds.map((id) => `<@&${id}>`).join(' ');
+  const intro = new EmbedBuilder()
+    .setColor(COLORS.PRIMARY)
+    .setTitle(`🎫 Ticket ${type.emoji ? `${type.emoji} ` : ''}${type.label} — n°${num}`)
+    .setDescription(
+      `Bonjour <@${owner.id}> ! Décrivez votre demande, ` +
+        `${roleMentions ? `l'équipe ${roleMentions}` : 'le staff'} vous répondra dès que possible.`
+    )
+    .setFooter({ text: 'Utilisez le bouton ci-dessous pour fermer le ticket.' })
+    .setTimestamp();
+  const closeRow = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId(`tktclose:${result.lastInsertRowid}`).setLabel('Fermer le ticket').setEmoji('🔒').setStyle(ButtonStyle.Danger)
+  );
+  await channel.send({
+    content: `<@${owner.id}>${roleMentions ? ` ${roleMentions}` : ''}`,
+    embeds: [intro],
+    components: [closeRow],
+  });
+  return { channel, num };
+}
+
 async function openTicket(interaction, typeId) {
   const type = getType.get(typeId, interaction.guildId);
   if (!type) {
@@ -359,69 +413,90 @@ async function openTicket(interaction, typeId) {
     closeTicketStmt.run(new Date().toISOString(), 'auto (salon supprimé)', existing.id);
   }
 
-  const cfg = getGuildConfig(interaction.guildId);
-  const num = String(countTickets.get(interaction.guildId).n + 1).padStart(4, '0');
-  const allowPerms = [
-    PermissionFlagsBits.ViewChannel,
-    PermissionFlagsBits.SendMessages,
-    PermissionFlagsBits.ReadMessageHistory,
-    PermissionFlagsBits.AttachFiles,
-    PermissionFlagsBits.EmbedLinks,
-  ];
-  const roleIds = supportRoleIds(type);
-  const overwrites = [
-    { id: interaction.guild.id, deny: [PermissionFlagsBits.ViewChannel] },
-    { id: interaction.user.id, allow: allowPerms },
-    { id: interaction.client.user.id, allow: [...allowPerms, PermissionFlagsBits.ManageChannels] },
-  ];
-  for (const roleId of roleIds) overwrites.push({ id: roleId, allow: allowPerms });
-  if (cfg.staff_role_id && !roleIds.includes(String(cfg.staff_role_id))) {
-    overwrites.push({ id: cfg.staff_role_id, allow: allowPerms });
-  }
-
-  let channel;
+  let res;
   try {
-    channel = await interaction.guild.channels.create({
-      name: `ticket-${num}-${interaction.user.username}`.slice(0, 90),
-      type: ChannelType.GuildText,
-      parent: type.category_id || null,
-      permissionOverwrites: overwrites,
-      topic: `Ticket ${type.label} de ${interaction.user.tag} (${interaction.user.id})`,
-    });
+    res = await provisionTicket(interaction.guild, type, interaction.user);
   } catch (err) {
     return interaction.editReply(
       `❌ Impossible de créer le salon : ${err.message}\nVérifiez que le bot a **Gérer les salons** et que la catégorie n'est pas pleine (50 salons max).`
     );
   }
-
-  const result = insertTicket.run(
-    interaction.guildId, type.id, channel.id, interaction.user.id, new Date().toISOString()
-  );
-  const ticketId = result.lastInsertRowid;
-
-  const roleMentions = roleIds.map((id) => `<@&${id}>`).join(' ');
-  const intro = new EmbedBuilder()
-    .setColor(COLORS.PRIMARY)
-    .setTitle(`🎫 Ticket ${type.emoji ? `${type.emoji} ` : ''}${type.label} — n°${num}`)
-    .setDescription(
-      `Bonjour <@${interaction.user.id}> ! Décrivez votre demande, ` +
-        `${roleMentions ? `l'équipe ${roleMentions}` : 'le staff'} vous répondra dès que possible.`
-    )
-    .setFooter({ text: 'Utilisez le bouton ci-dessous pour fermer le ticket.' })
-    .setTimestamp();
-  const closeRow = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId(`tktclose:${ticketId}`).setLabel('Fermer le ticket').setEmoji('🔒').setStyle(ButtonStyle.Danger)
-  );
-  await channel.send({
-    content: `<@${interaction.user.id}>${roleMentions ? ` ${roleMentions}` : ''}`,
-    embeds: [intro],
-    components: [closeRow],
-  });
-
-  await interaction.editReply(`✅ Votre ticket est ouvert : ${channel}`);
+  await interaction.editReply(`✅ Votre ticket est ouvert : ${res.channel}`);
   await sendLog(
     interaction.guild,
-    logEmbed('🎫 Ticket ouvert', `Ticket **${type.label}** n°${num} ouvert par <@${interaction.user.id}> → <#${channel.id}>`, COLORS.INFO)
+    logEmbed('🎫 Ticket ouvert', `Ticket **${type.label}** n°${res.num} ouvert par <@${interaction.user.id}> → <#${res.channel.id}>`, COLORS.INFO)
+  );
+}
+
+// Ouverture d'un ticket PAR LE STAFF pour un membre donné (commande /ticket creer-pour).
+async function openTicketFor(interaction, typeId, targetUser) {
+  const type = getType.get(typeId, interaction.guildId);
+  if (!type) {
+    return interaction.reply({ content: '❌ Type de ticket introuvable.', flags: MessageFlags.Ephemeral });
+  }
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+  const existing = getOpenTicket.get(interaction.guildId, targetUser.id, type.id);
+  if (existing) {
+    const channel = await interaction.guild.channels.fetch(existing.channel_id).catch(() => null);
+    if (channel) {
+      return interaction.editReply({
+        content: `❌ <@${targetUser.id}> a déjà un ticket **${type.label}** ouvert : <#${existing.channel_id}>`,
+      });
+    }
+    closeTicketStmt.run(new Date().toISOString(), 'auto (salon supprimé)', existing.id);
+  }
+  let res;
+  try {
+    res = await provisionTicket(interaction.guild, type, targetUser);
+  } catch (err) {
+    return interaction.editReply(`❌ Impossible de créer le salon : ${err.message}\nVérifiez que le bot a **Gérer les salons**.`);
+  }
+  await interaction.editReply(`✅ Ticket **${type.label}** ouvert pour <@${targetUser.id}> : ${res.channel}`);
+  await sendLog(
+    interaction.guild,
+    logEmbed('🎫 Ticket ouvert par le staff', `Ticket **${type.label}** n°${res.num} ouvert pour <@${targetUser.id}> par <@${interaction.user.id}> → <#${res.channel.id}>`, COLORS.INFO)
+  );
+}
+
+// Ajoute un membre au ticket courant (commande /ticket ajouter, dans le salon).
+async function addMemberToTicket(interaction, targetUser) {
+  const ticket = getTicketByChannel.get(interaction.guildId, interaction.channelId);
+  if (!ticket || ticket.status !== 'ouvert') {
+    return interaction.reply({
+      content: '❌ Cette commande doit être utilisée **dans un salon de ticket ouvert**.',
+      flags: MessageFlags.Ephemeral,
+    });
+  }
+  const type = ticket.type_id ? getType.get(ticket.type_id, interaction.guildId) : null;
+  const isOwner = interaction.user.id === ticket.user_id;
+  if (!isOwner && !canManageTicket(interaction.member, type)) {
+    return interaction.reply({
+      content: '⛔ Seuls l\'auteur du ticket, l\'équipe support ou le staff peuvent ajouter un membre.',
+      flags: MessageFlags.Ephemeral,
+    });
+  }
+  // Vérifs synchrones faites → on accuse réception avant l'appel réseau.
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+  const ok = await interaction.channel.permissionOverwrites
+    .edit(targetUser.id, {
+      ViewChannel: true,
+      SendMessages: true,
+      ReadMessageHistory: true,
+      AttachFiles: true,
+      EmbedLinks: true,
+    })
+    .then(() => true)
+    .catch(() => false);
+  if (!ok) {
+    return interaction.editReply('❌ Impossible d\'ajouter ce membre (le bot a-t-il **Gérer les permissions** ?).');
+  }
+  await interaction.channel
+    .send({ content: `➕ <@${targetUser.id}> a été ajouté au ticket par <@${interaction.user.id}>.` })
+    .catch(() => null);
+  await interaction.editReply(`✅ <@${targetUser.id}> a été ajouté au ticket.`);
+  await sendLog(
+    interaction.guild,
+    logEmbed('🎫 Membre ajouté à un ticket', `<@${targetUser.id}> ajouté au ticket <#${interaction.channelId}> par <@${interaction.user.id}>.`, COLORS.INFO)
   );
 }
 
@@ -527,11 +602,32 @@ async function deleteTicket(interaction, ticketId) {
   await interaction.channel.delete('Ticket supprimé').catch(() => null);
 }
 
+// Après une sélection dans le menu de raisons, on ré-édite le panneau pour que
+// Discord « oublie » la sélection : sinon recliquer la MÊME raison ne déclenche
+// rien (le menu la considère déjà sélectionnée).
+async function resetPanelMenu(interaction) {
+  const msg = interaction.message;
+  if (!msg) return;
+  try {
+    const panel = getPanelByMessage.get(interaction.guildId, msg.id);
+    if (panel) {
+      await msg.edit(buildPanelPayload(interaction.guildId, safeJson(panel.options)));
+    } else {
+      await msg.edit({ components: msg.components.map((c) => (c.toJSON ? c.toJSON() : c)) });
+    }
+  } catch {
+    // sans importance : le ticket est déjà traité
+  }
+}
+
 async function handleTicketButton(interaction) {
   try {
     // Sélecteur de raison (menu déroulant) : la valeur choisie = l'ID du type.
     if (interaction.isStringSelectMenu() && interaction.customId === 'tktmenu') {
-      return await openTicket(interaction, Number(interaction.values[0]));
+      await openTicket(interaction, Number(interaction.values[0]));
+      // Réinitialise le menu pour permettre de re-choisir la même raison.
+      await resetPanelMenu(interaction);
+      return;
     }
     const [prefix, rawId] = interaction.customId.split(':');
     const id = Number(rawId);
@@ -562,6 +658,8 @@ module.exports = {
   parseColor,
   safeEmoji,
   setTypeEnabled,
+  openTicketFor,
+  addMemberToTicket,
   startPanelCreate,
   startPanelModify,
   handlePanelBuilder,
