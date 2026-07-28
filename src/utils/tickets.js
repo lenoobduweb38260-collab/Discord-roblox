@@ -342,20 +342,23 @@ async function openTicket(interaction, typeId) {
       flags: MessageFlags.Ephemeral,
     });
   }
+  // On accuse réception IMMÉDIATEMENT — avant tout appel réseau — pour tenir
+  // dans la fenêtre de 3 s de Discord (sinon « Unknown interaction » sur une
+  // connexion un peu lente). Tout le reste passe ensuite par editReply.
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
   // Un seul ticket ouvert par membre et par type.
   const existing = getOpenTicket.get(interaction.guildId, interaction.user.id, type.id);
   if (existing) {
     const channel = await interaction.guild.channels.fetch(existing.channel_id).catch(() => null);
     if (channel) {
-      return interaction.reply({
+      return interaction.editReply({
         content: `❌ Vous avez déjà un ticket **${type.label}** ouvert : <#${existing.channel_id}>`,
-        flags: MessageFlags.Ephemeral,
       });
     }
     closeTicketStmt.run(new Date().toISOString(), 'auto (salon supprimé)', existing.id);
   }
 
-  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
   const cfg = getGuildConfig(interaction.guildId);
   const num = String(countTickets.get(interaction.guildId).n + 1).padStart(4, '0');
   const allowPerms = [
@@ -537,6 +540,9 @@ async function handleTicketButton(interaction) {
     if (prefix === 'tktdel') return await deleteTicket(interaction, id);
   } catch (err) {
     console.error('Erreur ticket :', err);
+    // Interaction morte (réponse trop tardive ou en double) : inutile — et
+    // impossible — de répondre à nouveau, on évite juste une 2ᵉ erreur bruyante.
+    if (err?.code === 10062 || err?.code === 40060) return;
     const payload = { content: '❌ Une erreur est survenue sur ce ticket.', flags: MessageFlags.Ephemeral };
     if (interaction.replied || interaction.deferred) await interaction.followUp(payload).catch(() => null);
     else await interaction.reply(payload).catch(() => null);

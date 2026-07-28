@@ -158,6 +158,16 @@ const RELEASES = [
     fix: [],
     retrait: [],
   },
+  {
+    id: 'ticket-fiabilite-2026-07g',
+    title: 'Tickets plus fiables à l\'ouverture',
+    fix: [
+      '🎫 Ouverture de ticket plus fiable : le bot **répond immédiatement** avant de créer le salon, ce qui réduit les erreurs « interaction expirée » sur les connexions un peu lentes',
+    ],
+    ajout: [],
+    amelioration: [],
+    retrait: [],
+  },
 ];
 
 // Découpe une catégorie en champs d'embed (max 1024 caractères par champ).
