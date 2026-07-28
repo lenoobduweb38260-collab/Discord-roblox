@@ -7,6 +7,7 @@ const {
   parseColor,
   supportRoleIds,
   safeEmoji,
+  setTypeEnabled,
   startPanelCreate,
   startPanelModify,
 } = require('../utils/tickets');
@@ -89,6 +90,18 @@ module.exports = {
           .setDescription('Retirer un type de ticket')
           .addStringOption((o) => o.setName('nom').setDescription('Type à retirer').setRequired(true).setAutocomplete(true))
       )
+      .addSubcommand((sub) =>
+        sub
+          .setName('bloquer')
+          .setDescription('Fermer temporairement une raison de ticket (plus ouvrable)')
+          .addStringOption((o) => o.setName('nom').setDescription('Raison à bloquer').setRequired(true).setAutocomplete(true))
+      )
+      .addSubcommand((sub) =>
+        sub
+          .setName('debloquer')
+          .setDescription('Réactiver une raison de ticket bloquée')
+          .addStringOption((o) => o.setName('nom').setDescription('Raison à réactiver').setRequired(true).setAutocomplete(true))
+      )
       .addSubcommand((sub) => sub.setName('types').setDescription('Voir les types de tickets configurés'));
     builder.addSubcommand((sub) =>
       addPanelOptions(sub.setName('panneau').setDescription('Publier le panneau de tickets dans un salon'), true, true)
@@ -104,12 +117,15 @@ module.exports = {
   })(),
 
   async autocomplete(interaction) {
+    const sub = interaction.options.getSubcommand();
     const focused = interaction.options.getFocused().toLowerCase();
-    const types = listTypes
-      .all(interaction.guildId)
-      .filter((t) => t.label.toLowerCase().includes(focused))
-      .slice(0, 25);
-    await interaction.respond(types.map((t) => ({ name: t.label, value: t.label })));
+    let types = listTypes.all(interaction.guildId).filter((t) => t.label.toLowerCase().includes(focused));
+    // « bloquer » ne propose que les raisons actives ; « debloquer » que les bloquées.
+    if (sub === 'bloquer') types = types.filter((t) => t.enabled !== 0);
+    else if (sub === 'debloquer') types = types.filter((t) => t.enabled === 0);
+    await interaction.respond(
+      types.slice(0, 25).map((t) => ({ name: `${t.enabled === 0 ? '🔒 ' : ''}${t.label}`.slice(0, 100), value: t.label }))
+    );
   },
 
   async execute(interaction) {
@@ -164,6 +180,36 @@ module.exports = {
       return;
     }
 
+    if (sub === 'bloquer' || sub === 'debloquer') {
+      const nom = interaction.options.getString('nom').trim();
+      const type = getTypeByLabel.get(interaction.guildId, nom);
+      if (!type) {
+        return interaction.reply({ content: `❌ Raison **${nom}** introuvable.`, flags: MessageFlags.Ephemeral });
+      }
+      const block = sub === 'bloquer';
+      if (block === (type.enabled === 0)) {
+        return interaction.reply({
+          content: `ℹ️ La raison **${nom}** est déjà ${block ? 'bloquée' : 'active'}.`,
+          flags: MessageFlags.Ephemeral,
+        });
+      }
+      setTypeEnabled(interaction.guildId, type.id, block ? 0 : 1);
+      await interaction.reply({
+        content: block
+          ? `🔒 Raison **${nom}** **bloquée** : plus personne ne peut ouvrir ce type de ticket. Republiez le panneau (\`/ticket panneau-modifier\`) pour retirer le bouton. Réactivez-la avec \`/ticket debloquer\`.`
+          : `🔓 Raison **${nom}** **réactivée** : elle est de nouveau ouvrable. Republiez le panneau (\`/ticket panneau-modifier\`) pour réafficher le bouton.`,
+      });
+      await sendLog(
+        interaction.guild,
+        logEmbed(
+          block ? '🔒 Raison de ticket bloquée' : '🔓 Raison de ticket réactivée',
+          `**${nom}** ${block ? 'bloquée' : 'réactivée'} par <@${interaction.user.id}>.`,
+          block ? COLORS.WARNING : COLORS.SUCCESS
+        )
+      );
+      return;
+    }
+
     if (sub === 'types') {
       const types = listTypes.all(interaction.guildId);
       if (!types.length) {
@@ -171,9 +217,14 @@ module.exports = {
       }
       const lines = types.map((t) => {
         const roles = supportRoleIds(t).map((id) => `<@&${id}>`).join(' ');
-        return `• ${t.emoji ? `${t.emoji} ` : ''}**${t.label}** — catégorie <#${t.category_id}>${roles ? ` — support ${roles}` : ''}`;
+        const blocked = t.enabled === 0 ? ' — 🔒 **bloquée**' : '';
+        return `• ${t.emoji ? `${t.emoji} ` : ''}**${t.label}** — catégorie <#${t.category_id}>${roles ? ` — support ${roles}` : ''}${blocked}`;
       });
-      const embed = new EmbedBuilder().setColor(COLORS.INFO).setTitle(`🎫 Types de tickets (${types.length})`).setDescription(lines.join('\n'));
+      const nbBlocked = types.filter((t) => t.enabled === 0).length;
+      const embed = new EmbedBuilder()
+        .setColor(COLORS.INFO)
+        .setTitle(`🎫 Types de tickets (${types.length}${nbBlocked ? `, dont ${nbBlocked} 🔒` : ''})`)
+        .setDescription(lines.join('\n'));
       return interaction.reply({ embeds: [embed] });
     }
 

@@ -455,9 +455,10 @@ try {
 } catch {}
 
 // Types de tickets : description (option du sélecteur de raison),
-// ping_role_id (rôle mentionné à l'ouverture, sinon le support) et
-// support_role_ids (plusieurs rôles support par type, JSON).
-for (const column of ['description TEXT', 'ping_role_id TEXT', 'support_role_ids TEXT']) {
+// ping_role_id (rôle mentionné à l'ouverture, sinon le support),
+// support_role_ids (plusieurs rôles support par type, JSON) et enabled
+// (raison bloquée = 0 : plus ouvrable tant qu'elle n'est pas réactivée).
+for (const column of ['description TEXT', 'ping_role_id TEXT', 'support_role_ids TEXT', 'enabled INTEGER NOT NULL DEFAULT 1']) {
   try {
     db.exec(`ALTER TABLE ticket_types ADD COLUMN ${column}`);
   } catch {}

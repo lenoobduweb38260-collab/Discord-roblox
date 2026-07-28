@@ -132,6 +132,19 @@ const RELEASES = [
     fix: [],
     retrait: [],
   },
+  {
+    id: 'ticket-bloquer-2026-07e',
+    title: 'Bloquer / réactiver une raison de ticket',
+    ajout: [
+      '🔒 Nouvelle commande `/ticket bloquer` : **ferme temporairement** une raison de ticket — plus personne ne peut l\'ouvrir',
+      '🔓 `/ticket debloquer` : **réactive** une raison mise en pause, sans avoir à la recréer',
+    ],
+    amelioration: [
+      '🎫 `/ticket types` indique désormais les raisons **bloquées** 🔒',
+    ],
+    fix: [],
+    retrait: [],
+  },
 ];
 
 // Découpe une catégorie en champs d'embed (max 1024 caractères par champ).

@@ -442,7 +442,8 @@ function ticketsView(guild, selectedId = null) {
           const cat = guild.channels.cache.get(t.category_id)?.name || t.category_id || '?';
           const roles = supportRoleIds(t).map((r) => `<@&${r}>`).join(' ');
           const support = roles ? ` — support ${roles}` : '';
-          return `• ${t.emoji ? t.emoji + ' ' : ''}**${t.label}** — catégorie « ${cat} »${support}`;
+          const blocked = t.enabled === 0 ? ' — 🔒 bloquée' : '';
+          return `• ${t.emoji ? t.emoji + ' ' : ''}**${t.label}** — catégorie « ${cat} »${support}${blocked}`;
         })
         .join('\n')
     : '*Aucun type de ticket configuré*';

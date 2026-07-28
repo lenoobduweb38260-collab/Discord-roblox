@@ -23,6 +23,12 @@ const insertType = db.prepare(
   'INSERT INTO ticket_types (guild_id, label, emoji, category_id, support_role_id, description, support_role_ids) VALUES (?, ?, ?, ?, ?, ?, ?)'
 );
 const deleteType = db.prepare('DELETE FROM ticket_types WHERE id = ?');
+const setTypeEnabledStmt = db.prepare('UPDATE ticket_types SET enabled = ? WHERE id = ? AND guild_id = ?');
+
+// Bloque (enabled = 0) ou réactive (1) une raison de ticket.
+function setTypeEnabled(guildId, id, enabled) {
+  return setTypeEnabledStmt.run(enabled ? 1 : 0, id, guildId);
+}
 
 // Rôles support d'un type : plusieurs rôles possibles (support_role_ids, JSON).
 // Compatibilité : si absent, on retombe sur l'ancien champ support_role_id.
@@ -87,7 +93,8 @@ const nl = (s) => (s ? String(s).replace(/\\n/g, '\n') : s);
 // Construit le message du panneau (message basique OU embed personnalisable)
 // avec un bouton par type de ticket configuré.
 function buildPanelPayload(guildId, options = {}) {
-  const types = listTypes.all(guildId);
+  // Une raison bloquée (enabled = 0) n'apparaît plus dans le panneau.
+  const types = listTypes.all(guildId).filter((t) => t.enabled !== 0);
   const rows = [];
   // Mécanisme d'ouverture : « menu » = sélecteur de raison (menu déroulant,
   // façon Ticket Tool) ; sinon un bouton par raison.
@@ -327,6 +334,14 @@ async function openTicket(interaction, typeId) {
   if (!type) {
     return interaction.reply({ content: '❌ Ce type de ticket n\'existe plus.', flags: MessageFlags.Ephemeral });
   }
+  // Raison bloquée : on refuse l'ouverture (le bouton peut encore exister sur un
+  // ancien panneau tant qu'il n'a pas été republié).
+  if (type.enabled === 0) {
+    return interaction.reply({
+      content: `🔒 La raison **${type.label}** est temporairement indisponible. Réessayez plus tard.`,
+      flags: MessageFlags.Ephemeral,
+    });
+  }
   // Un seul ticket ouvert par membre et par type.
   const existing = getOpenTicket.get(interaction.guildId, interaction.user.id, type.id);
   if (existing) {
@@ -516,6 +531,7 @@ module.exports = {
   buildPanelPayload,
   parseColor,
   safeEmoji,
+  setTypeEnabled,
   startPanelCreate,
   startPanelModify,
   handlePanelBuilder,
