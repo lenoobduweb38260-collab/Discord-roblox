@@ -145,6 +145,19 @@ const RELEASES = [
     fix: [],
     retrait: [],
   },
+  {
+    id: 'ticket-fermeture-auto-2026-07f',
+    title: 'Tickets : fermeture, archive & suppression auto',
+    ajout: [
+      '📄 Nouveau **salon de transcripts** configurable dans `/config` → Salons (par défaut : le salon de logs)',
+    ],
+    amelioration: [
+      '🔒 Fermer un ticket **envoie le transcript** (100 derniers messages) puis **supprime le salon automatiquement** — plus besoin du bouton « Supprimer »',
+      '📄 Le transcript part dans le **salon dédié** s\'il est configuré, sinon dans le **salon de logs** par défaut',
+    ],
+    fix: [],
+    retrait: [],
+  },
 ];
 
 // Découpe une catégorie en champs d'embed (max 1024 caractères par champ).

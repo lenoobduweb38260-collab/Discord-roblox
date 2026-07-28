@@ -422,6 +422,50 @@ async function openTicket(interaction, typeId) {
   );
 }
 
+// Salon de destination du transcript : salon dédié configuré, sinon — par
+// défaut — le salon de logs de sécurité.
+async function transcriptChannelOf(guild) {
+  const cfg = getGuildConfig(guild.id);
+  const id = cfg.ticket_transcript_channel_id || cfg.log_channel_id;
+  if (!id) return null;
+  const channel = await guild.channels.fetch(id).catch(() => null);
+  return channel?.isTextBased() ? channel : null;
+}
+
+// Génère et envoie le transcript (100 derniers messages) du salon du ticket.
+// Renvoie true si un transcript a été posté, false sinon (aucun salon dispo).
+async function sendTranscript(interaction, ticket, byId) {
+  try {
+    const target = await transcriptChannelOf(interaction.guild);
+    if (!target) return false;
+    const type = ticket.type_id ? getType.get(ticket.type_id, interaction.guildId) : null;
+    const messages = await interaction.channel.messages.fetch({ limit: 100 }).catch(() => null);
+    const lines = messages
+      ? [...messages.values()]
+          .reverse()
+          .map((m) => `[${new Date(m.createdTimestamp).toLocaleString('fr-FR')}] ${m.author.tag} : ${m.content || '(embed/fichier)'}`)
+      : ['(historique indisponible)'];
+    const file = new AttachmentBuilder(Buffer.from(lines.join('\n') || '(vide)', 'utf8'), {
+      name: `transcript-ticket-${ticket.id}.txt`,
+    });
+    await target.send({
+      embeds: [
+        logEmbed(
+          '🎫 Ticket fermé & archivé',
+          `Ticket ${type ? `**${type.label}** ` : ''}de <@${ticket.user_id}>, fermé par <@${byId}> — transcript ci-joint.`,
+          COLORS.WARNING
+        ),
+      ],
+      files: [file],
+    });
+    return true;
+  } catch {
+    return false; // le transcript ne doit jamais bloquer la fermeture
+  }
+}
+
+// Fermeture d'un ticket : envoie le transcript puis SUPPRIME le salon
+// automatiquement (après un court délai pour laisser lire le message).
 async function closeTicket(interaction, ticketId) {
   const ticket = getTicket.get(ticketId, interaction.guildId);
   if (!ticket || ticket.status !== 'ouvert') {
@@ -436,25 +480,33 @@ async function closeTicket(interaction, ticketId) {
     });
   }
   closeTicketStmt.run(new Date().toISOString(), interaction.user.id, ticket.id);
-  // L'auteur perd l'accès au salon ; le support garde la main.
-  await interaction.channel.permissionOverwrites
-    .edit(ticket.user_id, { ViewChannel: false })
-    .catch(() => null);
+  // On accuse réception TOUT DE SUITE (fenêtre Discord de 3 s), AVANT l'archivage
+  // et la suppression, qui peuvent prendre un peu de temps (récupération des
+  // messages + envoi du fichier). Sinon, sur une connexion lente, la réponse
+  // arriverait trop tard (« Unknown interaction »).
   const embed = new EmbedBuilder()
     .setColor(COLORS.WARNING)
     .setTitle('🔒 Ticket fermé')
-    .setDescription(`Fermé par <@${interaction.user.id}>. L'équipe peut consulter le salon puis le supprimer.`)
+    .setDescription(
+      `Fermé par <@${interaction.user.id}>.\n` +
+        '📄 Transcript envoyé dans les logs (si un salon est configuré).\n' +
+        '🗑️ Ce salon va être **supprimé automatiquement**…'
+    )
     .setTimestamp();
-  const row = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId(`tktdel:${ticket.id}`).setLabel('Supprimer le salon').setEmoji('🗑️').setStyle(ButtonStyle.Danger)
-  );
-  await interaction.reply({ embeds: [embed], components: [row] });
+  await interaction.reply({ embeds: [embed] }).catch(() => null);
+  // Travail plus lent APRÈS l'accusé de réception.
+  await sendTranscript(interaction, ticket, interaction.user.id);
   await sendLog(
     interaction.guild,
     logEmbed('🎫 Ticket fermé', `Ticket n°${ticket.id} (<#${ticket.channel_id}>) fermé par <@${interaction.user.id}>.`, COLORS.WARNING)
   );
+  const channel = interaction.channel;
+  setTimeout(() => {
+    channel.delete('Ticket fermé — suppression automatique').catch(() => null);
+  }, 5000);
 }
 
+// Bouton hérité « Supprimer le salon » (anciens tickets fermés) : archive puis supprime.
 async function deleteTicket(interaction, ticketId) {
   const ticket = getTicket.get(ticketId, interaction.guildId);
   if (!ticket) {
@@ -468,36 +520,8 @@ async function deleteTicket(interaction, ticketId) {
     });
   }
   await interaction.reply({ content: '🗑️ Transcript en cours puis suppression du salon…' });
-
-  // Transcript (100 derniers messages) envoyé dans le salon de logs.
-  try {
-    const cfg = getGuildConfig(interaction.guildId);
-    if (cfg.log_channel_id) {
-      const logChannel = await interaction.guild.channels.fetch(cfg.log_channel_id).catch(() => null);
-      if (logChannel?.isTextBased()) {
-        const messages = await interaction.channel.messages.fetch({ limit: 100 });
-        const lines = [...messages.values()]
-          .reverse()
-          .map((m) => `[${new Date(m.createdTimestamp).toLocaleString('fr-FR')}] ${m.author.tag} : ${m.content || '(embed/fichier)'}`);
-        const file = new AttachmentBuilder(Buffer.from(lines.join('\n') || '(vide)', 'utf8'), {
-          name: `transcript-ticket-${ticket.id}.txt`,
-        });
-        await logChannel.send({
-          embeds: [
-            logEmbed(
-              '🎫 Ticket supprimé',
-              `Ticket n°${ticket.id} de <@${ticket.user_id}> supprimé par <@${interaction.user.id}> — transcript ci-joint.`,
-              COLORS.DANGER
-            ),
-          ],
-          files: [file],
-        });
-      }
-    }
-  } catch {
-    // le transcript ne doit pas empêcher la suppression
-  }
-  await interaction.channel.delete().catch(() => null);
+  await sendTranscript(interaction, ticket, interaction.user.id);
+  await interaction.channel.delete('Ticket supprimé').catch(() => null);
 }
 
 async function handleTicketButton(interaction) {

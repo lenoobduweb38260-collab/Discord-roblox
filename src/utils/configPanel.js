@@ -42,6 +42,7 @@ const CHANNEL_COLUMNS = {
   partner_channel_id: '🤝 Salon des partenariats',
   patch_channel_id: '📝 Salon des patch notes',
   captcha_channel_id: '🤖 Salon du captcha',
+  ticket_transcript_channel_id: '📄 Salon des transcripts de tickets (défaut : logs)',
 };
 
 const show = (id, kind) => (id ? (kind === 'role' ? `<@&${id}>` : `<#${id}>`) : '*Non configuré*');

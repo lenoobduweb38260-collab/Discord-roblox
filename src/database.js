@@ -428,6 +428,7 @@ for (const column of [
   'sao_enabled INTEGER',
   'police_role_ids TEXT',
   'wlrp_role_id TEXT',
+  'ticket_transcript_channel_id TEXT',
 ]) {
   try {
     db.exec(`ALTER TABLE guild_config ADD COLUMN ${column}`);
@@ -516,6 +517,7 @@ const DEFAULT_CONFIG = {
   member_channel_id: null,
   update_channel_id: null,
   proof_channel_id: null,
+  ticket_transcript_channel_id: null,
   welcome_message: null,
   goodbye_message: null,
   goodbye_channel_id: null,
