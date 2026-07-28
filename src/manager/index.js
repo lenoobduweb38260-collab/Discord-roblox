@@ -76,7 +76,7 @@ function rt(name) {
 
 function addLine(r, line, isErr = false) {
   if (!line) return;
-  const stamped = `[${new Date().toLocaleTimeString('fr-FR')}] ${line}`;
+  const stamped = `[${new Date().toLocaleTimeString('fr-FR', { timeZone: 'Europe/Paris' })}] ${line}`;
   r.logs.push(stamped);
   if (r.logs.length > 1000) r.logs.splice(0, r.logs.length - 1000);
   r.logSeq++;
@@ -527,7 +527,7 @@ function diagnosticText(name) {
     fileLog = raw.split('\n').slice(-30).join('\n');
   } catch {}
   return [
-    `=== Diagnostic du bot « ${name} » — ${new Date().toLocaleString('fr-FR')} ===`,
+    `=== Diagnostic du bot « ${name} » — ${new Date().toLocaleString('fr-FR', { timeZone: 'Europe/Paris' })} ===`,
     `Gestionnaire v${VERSION} · ${process.platform} · Bot ${bot?.version || '?'} · Repo ${bot?.repo || '?'} · Statut ${r.status}`,
     '',
     '--- Console d\'erreurs (mémoire) ---',

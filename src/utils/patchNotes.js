@@ -181,6 +181,16 @@ const RELEASES = [
     amelioration: [],
     retrait: [],
   },
+  {
+    id: 'heure-francaise-2026-07i',
+    title: 'Heures toujours en heure française',
+    amelioration: [
+      '🕐 Toutes les dates/heures affichées par le bot (dont les **transcripts** de tickets) sont désormais **toujours en heure française** (Europe/Paris), quel que soit l\'hébergement',
+    ],
+    ajout: [],
+    fix: [],
+    retrait: [],
+  },
 ];
 
 // Découpe une catégorie en champs d'embed (max 1024 caractères par champ).

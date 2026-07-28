@@ -521,7 +521,10 @@ async function sendTranscript(interaction, ticket, byId) {
     const lines = messages
       ? [...messages.values()]
           .reverse()
-          .map((m) => `[${new Date(m.createdTimestamp).toLocaleString('fr-FR')}] ${m.author.tag} : ${m.content || '(embed/fichier)'}`)
+          .map(
+            (m) =>
+              `[${new Date(m.createdTimestamp).toLocaleString('fr-FR', { timeZone: 'Europe/Paris' })}] ${m.author.tag} : ${m.content || '(embed/fichier)'}`
+          )
       : ['(historique indisponible)'];
     const file = new AttachmentBuilder(Buffer.from(lines.join('\n') || '(vide)', 'utf8'), {
       name: `transcript-ticket-${ticket.id}.txt`,
