@@ -106,6 +106,17 @@ const RELEASES = [
     fix: [],
     retrait: [],
   },
+  {
+    id: 'ticket-emoji-picker-2026-07c',
+    title: 'Emoji des tickets en un clic',
+    amelioration: [
+      '🎫 Création d\'un type de ticket : l\'emoji se choisit désormais dans une **bulle cliquable** — plus besoin de le taper à la main',
+      '😀 La bulle propose les **emojis du serveur** ainsi que des emojis classiques prêts à l\'emploi',
+    ],
+    ajout: [],
+    fix: [],
+    retrait: [],
+  },
 ];
 
 // Découpe une catégorie en champs d'embed (max 1024 caractères par champ).

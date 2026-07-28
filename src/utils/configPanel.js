@@ -16,6 +16,7 @@ const { db, getGuildConfig, setGuildConfig } = require('../database');
 const { COLORS, sendLog, logEmbed } = require('./embeds');
 const { GRADES, getGrade, staffRoleIds, adminRoleIds, policeRoleIds } = require('./permissions');
 const { supportRoleIds } = require('./tickets');
+const { isCreator } = require('./botTeam');
 
 // Panneau central de configuration : /config ouvre une vue d'ensemble avec un
 // menu de catégories ; chaque catégorie se règle via des sélecteurs de rôles,
@@ -59,8 +60,8 @@ const insertTicketType = db.prepare(
 const deleteTicketTypeStmt = db.prepare('DELETE FROM ticket_types WHERE id = ? AND guild_id = ?');
 const setTicketSupport = db.prepare('UPDATE ticket_types SET support_role_id = ?, support_role_ids = ? WHERE id = ? AND guild_id = ?');
 
-// Création d'un type de ticket en deux étapes (formulaire nom/emoji, puis
-// catégorie) : mémoire temporaire entre les deux interactions.
+// Création d'un type de ticket en trois étapes (formulaire nom → bulle emoji →
+// catégorie) : mémoire temporaire entre les interactions.
 const pendingTicketTypes = new Map(); // `${guildId}:${userId}` → { label, emoji }
 
 function whitelistSummary(guildId) {
@@ -495,13 +496,13 @@ function ticketsView(guild, selectedId = null) {
   return { embeds: [embed], components };
 }
 
-// Étape 2 de la création : choix de la catégorie Discord des salons de tickets.
-function ticketCategoryView(pendingLabel) {
+// Étape 3 de la création : choix de la catégorie Discord des salons de tickets.
+function ticketCategoryView(pendingLabel, emoji) {
   const embed = new EmbedBuilder()
     .setColor(COLORS.INFO)
     .setTitle('🎫 Nouveau type de ticket')
     .setDescription(
-      `Type « **${pendingLabel}** » : choisissez la **catégorie Discord** où les salons de ce type de ticket seront créés.`
+      `Type « ${emoji ? `${emoji} ` : ''}**${pendingLabel}** » : choisissez la **catégorie Discord** où les salons de ce type de ticket seront créés.`
     );
   const row = new ActionRowBuilder().addComponents(
     new ChannelSelectMenuBuilder()
@@ -515,6 +516,8 @@ function ticketCategoryView(pendingLabel) {
 }
 
 function ticketModal() {
+  // Seul le nom est saisi ici : l'emoji se choisit ensuite dans une « bulle »
+  // (menu déroulant) car un modal Discord n'accepte que des champs texte.
   return new ModalBuilder()
     .setCustomId('cfgtktmodal')
     .setTitle('🎫 Nouveau type de ticket')
@@ -526,16 +529,84 @@ function ticketModal() {
           .setStyle(TextInputStyle.Short)
           .setRequired(true)
           .setMaxLength(60)
-      ),
-      new ActionRowBuilder().addComponents(
-        new TextInputBuilder()
-          .setCustomId('tkt_emoji')
-          .setLabel('Emoji (optionnel)')
-          .setStyle(TextInputStyle.Short)
-          .setRequired(false)
-          .setMaxLength(30)
       )
     );
+}
+
+// ----- 😀 Bulle de choix d'emoji (étape entre le nom et la catégorie) -----
+// Un modal ne peut contenir que du texte : impossible d'y mettre un sélecteur
+// d'emoji. On propose donc une étape dédiée avec un menu déroulant (« bulle »)
+// listant les emojis du serveur + des emojis classiques, et — pour le créateur
+// du bot — TOUS les emojis de tous les serveurs du bot. 25 options max par menu
+// Discord, d'où la pagination.
+const CURATED_EMOJIS = [
+  ['🎫', 'Ticket'], ['🛎️', 'Assistance'], ['❓', 'Question'], ['❗', 'Important'],
+  ['💬', 'Discussion'], ['📩', 'Message'], ['🆘', 'Aide'], ['🐛', 'Bug / signalement'],
+  ['🔧', 'Technique'], ['⚙️', 'Paramètres'], ['💡', 'Idée / suggestion'], ['📝', 'Note'],
+  ['💰', 'Boutique'], ['🛒', 'Achat'], ['🤝', 'Partenariat'], ['📢', 'Annonce'],
+  ['⚖️', 'Réclamation'], ['🚨', 'Urgence'], ['🔒', 'Confidentiel'], ['👮', 'Staff'],
+  ['🎮', 'Jeu'], ['🎁', 'Cadeau'], ['⭐', 'Premium'], ['❤️', 'Coup de cœur'],
+  ['📦', 'Commande'], ['🏷️', 'Autre'], ['✅', 'Validation'], ['🚀', 'Candidature'],
+  ['🎨', 'Création'], ['🔔', 'Rappel'],
+];
+const EMOJIS_PER_PAGE = 25;
+
+// Construit la liste (stable) des emojis proposés : classiques, puis emojis du
+// serveur, puis (créateur uniquement) tous les emojis accessibles au bot.
+function emojiEntries(guild, client, creator) {
+  const entries = [];
+  const seen = new Set();
+  const push = (value, name, emoji) => {
+    if (!value || seen.has(value)) return;
+    seen.add(value);
+    entries.push({ value, name, emoji });
+  };
+  for (const [char, name] of CURATED_EMOJIS) push(char, name, char);
+  if (guild?.emojis?.cache) {
+    for (const e of guild.emojis.cache.values()) {
+      push(e.toString(), e.name || 'emoji', { id: e.id, name: e.name || 'emoji', animated: Boolean(e.animated) });
+    }
+  }
+  if (creator && client?.emojis?.cache) {
+    for (const e of client.emojis.cache.values()) {
+      push(e.toString(), e.name || 'emoji', { id: e.id, name: e.name || 'emoji', animated: Boolean(e.animated) });
+    }
+  }
+  return entries;
+}
+
+function ticketEmojiView(pendingLabel, guild, client, creator, page = 0) {
+  const entries = emojiEntries(guild, client, creator);
+  const totalPages = Math.max(1, Math.ceil(entries.length / EMOJIS_PER_PAGE));
+  const p = Math.max(0, Math.min(Number(page) || 0, totalPages - 1));
+  const slice = entries.slice(p * EMOJIS_PER_PAGE, p * EMOJIS_PER_PAGE + EMOJIS_PER_PAGE);
+  const embed = new EmbedBuilder()
+    .setColor(COLORS.INFO)
+    .setTitle('🎫 Nouveau type de ticket')
+    .setDescription(
+      `Type « **${pendingLabel}** » : choisissez un **emoji** dans la petite bulle ci-dessous 👇\n` +
+        `Emojis du **serveur**${creator ? ' et de **tous les serveurs du bot**' : ''}, plus des emojis classiques.\n` +
+        `Page **${p + 1}/${totalPages}** • ou « Sans emoji » pour n'en mettre aucun.`
+    );
+  const menu = new StringSelectMenuBuilder()
+    .setCustomId(`cfgtktemoji:${p}`)
+    .setPlaceholder('😀 Choisissez un emoji…')
+    .addOptions(
+      slice.map((e) => {
+        const opt = { label: String(e.name).slice(0, 100) || 'emoji', value: String(e.value).slice(0, 100) };
+        try {
+          opt.emoji = e.emoji;
+        } catch {}
+        return opt;
+      })
+    );
+  const nav = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId(`cfgtktemojipg:${p - 1}`).setLabel('◀ Précédent').setStyle(ButtonStyle.Secondary).setDisabled(p <= 0),
+    new ButtonBuilder().setCustomId(`cfgtktemojipg:${p + 1}`).setLabel('Suivant ▶').setStyle(ButtonStyle.Secondary).setDisabled(p >= totalPages - 1),
+    new ButtonBuilder().setCustomId('cfgtktnoemoji').setLabel('Sans emoji').setEmoji('🚫').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId('cfgback').setLabel('⬅ Annuler').setStyle(ButtonStyle.Secondary)
+  );
+  return { embeds: [embed], components: [new ActionRowBuilder().addComponents(menu), nav] };
 }
 
 const CATEGORY_VIEWS = { rp: rpView, roles: rolesView, salons: salonsView, xp: xpView, securite: securiteView, whitelist: whitelistView, tickets: ticketsView, reseaux: reseauxView };
@@ -754,16 +825,46 @@ async function handleConfigInteraction(interaction) {
 
     if (id === 'cfgtktmodal') {
       const label = interaction.fields.getTextInputValue('tkt_nom').trim().slice(0, 60);
-      const emoji = interaction.fields.getTextInputValue('tkt_emoji').trim() || null;
       if (!label) {
         return await interaction.reply({ content: '❌ Le nom du type est requis.', flags: MessageFlags.Ephemeral });
       }
       if (getTicketTypeByLabel.get(interaction.guildId, label)) {
         return await interaction.reply({ content: `❌ Le type « ${label} » existe déjà.`, flags: MessageFlags.Ephemeral });
       }
-      pendingTicketTypes.set(`${interaction.guildId}:${interaction.user.id}`, { label, emoji });
-      if (interaction.isFromMessage()) return await interaction.update(ticketCategoryView(label));
-      return await interaction.reply({ ...ticketCategoryView(label), flags: MessageFlags.Ephemeral });
+      pendingTicketTypes.set(`${interaction.guildId}:${interaction.user.id}`, { label, emoji: null });
+      const creator = await isCreator(interaction.client, interaction.user.id);
+      const view = ticketEmojiView(label, interaction.guild, interaction.client, creator, 0);
+      if (interaction.isFromMessage()) return await interaction.update(view);
+      return await interaction.reply({ ...view, flags: MessageFlags.Ephemeral });
+    }
+
+    // Bulle emoji : changement de page.
+    if (id.startsWith('cfgtktemojipg:')) {
+      const pending = pendingTicketTypes.get(`${interaction.guildId}:${interaction.user.id}`);
+      if (!pending) return await interaction.update(ticketsView(interaction.guild));
+      const creator = await isCreator(interaction.client, interaction.user.id);
+      const page = Number(id.split(':')[1]) || 0;
+      return await interaction.update(ticketEmojiView(pending.label, interaction.guild, interaction.client, creator, page));
+    }
+
+    // Bulle emoji : un emoji a été choisi → étape catégorie.
+    if (id.startsWith('cfgtktemoji:')) {
+      const pendingKey = `${interaction.guildId}:${interaction.user.id}`;
+      const pending = pendingTicketTypes.get(pendingKey);
+      if (!pending) return await interaction.update(ticketsView(interaction.guild));
+      pending.emoji = interaction.values[0] || null;
+      pendingTicketTypes.set(pendingKey, pending);
+      return await interaction.update(ticketCategoryView(pending.label, pending.emoji));
+    }
+
+    // Bulle emoji : « Sans emoji » → étape catégorie sans emoji.
+    if (id === 'cfgtktnoemoji') {
+      const pendingKey = `${interaction.guildId}:${interaction.user.id}`;
+      const pending = pendingTicketTypes.get(pendingKey);
+      if (!pending) return await interaction.update(ticketsView(interaction.guild));
+      pending.emoji = null;
+      pendingTicketTypes.set(pendingKey, pending);
+      return await interaction.update(ticketCategoryView(pending.label, null));
     }
 
     if (id === 'cfgtktcat') {
