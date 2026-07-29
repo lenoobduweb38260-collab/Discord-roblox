@@ -548,19 +548,34 @@ async function sendTranscript(interaction, ticket, byId) {
 // Fermeture d'un ticket : envoie le transcript puis SUPPRIME le salon
 // automatiquement (après un court délai pour laisser lire le message).
 async function closeTicket(interaction, ticketId) {
-  const ticket = getTicket.get(ticketId, interaction.guildId);
-  if (!ticket || ticket.status !== 'ouvert') {
-    return interaction.reply({ content: '❌ Ticket introuvable ou déjà fermé.', flags: MessageFlags.Ephemeral });
+  const channel = interaction.channel;
+  // Recherche ROBUSTE : d'abord par salon (le bouton est DANS le salon du
+  // ticket → le plus fiable), puis par id. La base peut être désynchronisée
+  // (plusieurs instances du bot, redémarrage, base réinitialisée) : dans ce cas
+  // on ferme QUAND MÊME le salon s'il ressemble à un ticket, pour ne jamais
+  // bloquer la fermeture (« ticket introuvable »).
+  const ticket =
+    getTicketByChannel.get(interaction.guildId, interaction.channelId) ||
+    getTicket.get(ticketId, interaction.guildId) ||
+    null;
+  const topic = String(channel?.topic || '');
+  const topicOwnerId = (topic.match(/\((\d{5,})\)\s*$/) || [])[1] || null;
+  const looksLikeTicket = !!channel && (String(channel.name || '').startsWith('ticket-') || !!topicOwnerId);
+  if (!ticket && !looksLikeTicket) {
+    return interaction.reply({ content: '❌ Ce salon n\'est pas un ticket.', flags: MessageFlags.Ephemeral });
   }
-  const type = ticket.type_id ? getType.get(ticket.type_id, interaction.guildId) : null;
-  const isOwner = interaction.user.id === ticket.user_id;
+  const type = ticket?.type_id ? getType.get(ticket.type_id, interaction.guildId) : null;
+  const isOwner = interaction.user.id === (ticket?.user_id || topicOwnerId);
   if (!isOwner && !canManageTicket(interaction.member, type)) {
     return interaction.reply({
       content: '⛔ Seuls l\'auteur du ticket, l\'équipe support ou le staff peuvent le fermer.',
       flags: MessageFlags.Ephemeral,
     });
   }
-  closeTicketStmt.run(new Date().toISOString(), interaction.user.id, ticket.id);
+  // Marque fermé si une ligne encore ouverte existe (sinon on supprime quand même).
+  if (ticket && ticket.status === 'ouvert') {
+    closeTicketStmt.run(new Date().toISOString(), interaction.user.id, ticket.id);
+  }
   // On accuse réception TOUT DE SUITE (fenêtre Discord de 3 s), AVANT l'archivage
   // et la suppression, qui peuvent prendre un peu de temps (récupération des
   // messages + envoi du fichier). Sinon, sur une connexion lente, la réponse
@@ -576,12 +591,15 @@ async function closeTicket(interaction, ticketId) {
     .setTimestamp();
   await interaction.reply({ embeds: [embed] }).catch(() => null);
   // Travail plus lent APRÈS l'accusé de réception.
-  await sendTranscript(interaction, ticket, interaction.user.id);
+  await sendTranscript(
+    interaction,
+    ticket || { id: ticketId || 0, type_id: null, user_id: topicOwnerId || interaction.user.id },
+    interaction.user.id
+  );
   await sendLog(
     interaction.guild,
-    logEmbed('🎫 Ticket fermé', `Ticket n°${ticket.id} (<#${ticket.channel_id}>) fermé par <@${interaction.user.id}>.`, COLORS.WARNING)
+    logEmbed('🎫 Ticket fermé', `Ticket ${ticket ? `n°${ticket.id} ` : ''}(<#${interaction.channelId}>) fermé par <@${interaction.user.id}>.`, COLORS.WARNING)
   );
-  const channel = interaction.channel;
   setTimeout(() => {
     channel.delete('Ticket fermé — suppression automatique').catch(() => null);
   }, 5000);

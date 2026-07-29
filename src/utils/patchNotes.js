@@ -191,6 +191,16 @@ const RELEASES = [
     fix: [],
     retrait: [],
   },
+  {
+    id: 'ticket-fermeture-robuste-2026-07j',
+    title: 'Fermeture de ticket plus fiable',
+    fix: [
+      '🔒 Fermer un ticket ne renvoie plus « Ticket introuvable » à tort : le ticket est retrouvé **par son salon**, et le salon est **fermé/supprimé quand même** même si la base est momentanément désynchronisée',
+    ],
+    ajout: [],
+    amelioration: [],
+    retrait: [],
+  },
 ];
 
 // Découpe une catégorie en champs d'embed (max 1024 caractères par champ).
