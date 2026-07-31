@@ -201,6 +201,22 @@ const RELEASES = [
     amelioration: [],
     retrait: [],
   },
+  {
+    id: 'assurance-types-niveaux-2026-07k',
+    title: '4 types d\'assurance, niveaux par serveur',
+    ajout: [
+      '🛡️ `/assurance assigner` propose désormais **4 types de contrat** : 🚗 Véhicule, 🏠 Maison (bâtiment + unité), 🏢 Entreprise et ⚕️ Santé — chacun avec ses propres champs',
+      '📊 `/config` → 📈 XP & niveaux : le **système de niveaux s\'active/désactive par serveur**',
+    ],
+    amelioration: [
+      '📢 Les montées de niveau ne s\'annoncent plus que dans le **salon dédié** configuré (plus d\'annonces dans n\'importe quel salon)',
+      '🔴 Un véhicule **recherché** ou **en fourrière** est signalé par un **rond rouge** bien visible (fiche et liste des contrats)',
+      '📅 L\'option `debut` des assurances s\'appelle désormais **`delivrance`**',
+      '🏢 Chaque type de contrat vérifie que l\'assureur a coché le **type d\'assurance correspondant** (Véhicule/Habitation/Entreprise/Maladie)',
+    ],
+    fix: [],
+    retrait: [],
+  },
 ];
 
 // Découpe une catégorie en champs d'embed (max 1024 caractères par champ).

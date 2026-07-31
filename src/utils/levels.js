@@ -36,8 +36,16 @@ const updateVoiceStmt = db.prepare(
   'UPDATE levels SET voice_xp = ?, voice_level = ? WHERE guild_id = ? AND user_id = ?'
 );
 
+// Système de niveaux activé sur ce serveur ? (NULL = oui, comportement
+// historique ; désactivable par serveur via /config → 📈 XP & niveaux.)
+function levelsEnabled(guildId) {
+  return getGuildConfig(guildId).levels_enabled !== 0;
+}
+
 // Ajoute de l'XP (type: 'text' | 'voice') et renvoie {leveledUp, newLevel}.
+// Ne fait RIEN si le système de niveaux est désactivé sur le serveur.
 function addXp(guildId, userId, type, amount) {
+  if (!levelsEnabled(guildId)) return { leveledUp: false, newLevel: 0 };
   upsertStmt.run(guildId, userId);
   const row = getStmt.get(guildId, userId);
   const xpKey = type === 'voice' ? 'voice_xp' : 'text_xp';
@@ -71,15 +79,15 @@ function getLeaderboard(guildId, type, limit = 10) {
   return type === 'voice' ? topVoiceStmt.all(guildId, limit) : topTextStmt.all(guildId, limit);
 }
 
-// Annonce la montée de niveau dans le salon configuré (ou le salon de repli fourni).
+// Annonce la montée de niveau UNIQUEMENT dans le salon configuré (/config →
+// Salons → 📈). Sans salon configuré, aucune annonce n'est envoyée — les
+// montées de niveau ne s'affichent plus dans n'importe quel salon.
+// (Le paramètre fallbackChannel est conservé pour compatibilité mais ignoré.)
 async function announceLevelUp(guild, userId, type, newLevel, fallbackChannel = null) {
   try {
     const cfg = getGuildConfig(guild.id);
-    let channel = null;
-    if (cfg.level_channel_id) {
-      channel = await guild.channels.fetch(cfg.level_channel_id).catch(() => null);
-    }
-    if (!channel) channel = fallbackChannel;
+    if (!cfg.level_channel_id) return;
+    const channel = await guild.channels.fetch(cfg.level_channel_id).catch(() => null);
     if (!channel?.isTextBased()) return;
     const label = type === 'voice' ? 'vocal 🎙️' : 'écrit ✍️';
     const embed = new EmbedBuilder()
@@ -91,4 +99,4 @@ async function announceLevelUp(guild, userId, type, newLevel, fallbackChannel = 
   }
 }
 
-module.exports = { xpForLevel, totalXpForLevel, levelFromXp, addXp, getLevels, getLeaderboard, announceLevelUp };
+module.exports = { xpForLevel, totalXpForLevel, levelFromXp, addXp, getLevels, getLeaderboard, announceLevelUp, levelsEnabled };

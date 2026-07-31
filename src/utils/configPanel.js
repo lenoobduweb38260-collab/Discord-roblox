@@ -273,17 +273,28 @@ function salonsView(guild, selectedCol = null) {
 // ----- Catégorie : XP -----
 function xpView(guild) {
   const cfg = getGuildConfig(guild.id);
+  const enabled = cfg.levels_enabled !== 0; // NULL = activé (historique)
   const embed = new EmbedBuilder()
     .setColor(COLORS.INFO)
     .setTitle('📈 Configuration — XP & niveaux')
     .addFields(
+      { name: '📊 Système de niveaux', value: enabled ? '🟢 **Activé**' : '🔴 **Désactivé**', inline: true },
       { name: '✍️ XP texte', value: `**${cfg.xp_text}** XP/message`, inline: true },
       { name: '🎙️ XP vocal', value: `**${cfg.xp_voice}** XP/minute`, inline: true },
-      { name: '⏱️ Cooldown texte', value: `**${cfg.xp_cooldown}** secondes`, inline: true }
+      { name: '⏱️ Cooldown texte', value: `**${cfg.xp_cooldown}** secondes`, inline: true },
+      { name: '📢 Salon des annonces', value: cfg.level_channel_id ? `<#${cfg.level_channel_id}>` : '*Non configuré — aucune annonce*', inline: true }
     )
-    .setDescription('Cliquez sur **Modifier** pour changer les valeurs.');
+    .setDescription(
+      'Cliquez sur **Modifier** pour changer les valeurs.\n' +
+        '📢 Les montées de niveau ne s\'annoncent QUE dans le salon configuré (⚙️ Salons → 📈).'
+    );
   const row = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId('cfgxp').setLabel('✏️ Modifier les valeurs').setStyle(ButtonStyle.Primary)
+    new ButtonBuilder().setCustomId('cfgxp').setLabel('✏️ Modifier les valeurs').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder()
+      .setCustomId(enabled ? 'cfglvloff' : 'cfglvlon')
+      .setLabel(enabled ? 'Désactiver les niveaux' : 'Activer les niveaux')
+      .setEmoji(enabled ? '🔴' : '🟢')
+      .setStyle(enabled ? ButtonStyle.Danger : ButtonStyle.Success)
   );
   return { embeds: [embed], components: [row, backRow()] };
 }
@@ -794,6 +805,18 @@ async function handleConfigInteraction(interaction) {
       await sendLog(
         interaction.guild,
         logEmbed('🎮 Module Interactions', `Interactions ${enable ? 'activées' : 'désactivées'} par <@${interaction.user.id}>.`, enable ? COLORS.SUCCESS : COLORS.DANGER)
+      );
+      return;
+    }
+
+    // Système de niveaux : activer / désactiver (par serveur).
+    if (id === 'cfglvlon' || id === 'cfglvloff') {
+      const enable = id === 'cfglvlon' ? 1 : 0;
+      setGuildConfig(interaction.guildId, 'levels_enabled', enable);
+      await interaction.update(xpView(interaction.guild));
+      await sendLog(
+        interaction.guild,
+        logEmbed('📈 Système de niveaux', `Niveaux ${enable ? 'activés' : 'désactivés'} par <@${interaction.user.id}>.`, enable ? COLORS.SUCCESS : COLORS.DANGER)
       );
       return;
     }

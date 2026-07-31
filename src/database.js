@@ -429,6 +429,7 @@ for (const column of [
   'police_role_ids TEXT',
   'wlrp_role_id TEXT',
   'ticket_transcript_channel_id TEXT',
+  'levels_enabled INTEGER', // NULL = activé (comportement historique)
 ]) {
   try {
     db.exec(`ALTER TABLE guild_config ADD COLUMN ${column}`);
@@ -437,6 +438,8 @@ for (const column of [
 
 // Assurance véhicule : couleur, photo, statut police (recherché / fourrière)
 // et dates de validité (validation → expiration).
+// Types de contrat : ins_type (Véhicule/Maison/Entreprise/Santé — NULL = ancien
+// contrat véhicule), building/unit_label (Maison), target_ent (Entreprise).
 for (const column of [
   'color TEXT',
   'media_url TEXT',
@@ -444,6 +447,10 @@ for (const column of [
   'impounded INTEGER NOT NULL DEFAULT 0',
   'valid_from TEXT',
   'valid_until TEXT',
+  'ins_type TEXT',
+  'building TEXT',
+  'unit_label TEXT',
+  'target_ent TEXT',
 ]) {
   try {
     db.exec(`ALTER TABLE insured_vehicles ADD COLUMN ${column}`);
@@ -533,6 +540,7 @@ const DEFAULT_CONFIG = {
   patch_channel_id: null,
   interact_enabled: 0,
   sao_enabled: 0,
+  levels_enabled: 1,
   level_image_url: null,
   xp_text: 20,
   xp_voice: 10,
