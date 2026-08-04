@@ -69,9 +69,11 @@ function makeRpListCommand({ kind, name, label, verb }) {
       }
 
       if (sub === 'panneau') {
+        // Accusé de réception avant l'envoi du panneau (appel réseau).
+        await interaction.deferReply({ flags: MessageFlags.Ephemeral }).catch(() => {});
         const channel = interaction.options.getChannel('salon') || interaction.channel;
         await rp.postBoard(kind, channel, interaction.guildId);
-        return interaction.reply({ content: `✅ Panneau **${label} RP** publié dans ${channel} (mis à jour automatiquement).`, flags: MessageFlags.Ephemeral });
+        return interaction.editReply(`✅ Panneau **${label} RP** publié dans ${channel} (mis à jour automatiquement).`).catch(() => {});
       }
 
       const user = interaction.options.getUser('utilisateur');
@@ -80,12 +82,14 @@ function makeRpListCommand({ kind, name, label, verb }) {
         if (rp.activeOf(kind, interaction.guildId, user.id)) {
           return interaction.reply({ content: `⚠️ <@${user.id}> est déjà dans la ${label} RP.`, flags: MessageFlags.Ephemeral });
         }
+        // Accusé de réception avant la mise à jour du panneau + rôle (réseau).
+        await interaction.deferReply().catch(() => {});
         const roblox = interaction.options.getString('roblox').trim().slice(0, 60);
         const raison = interaction.options.getString('raison')?.slice(0, 300) || null;
         rp.add(kind, interaction.guildId, { userId: user.id, robloxName: roblox, discordTag: user.tag, reason: raison, byId: interaction.user.id });
         await rp.refreshBoard(interaction.client, kind, interaction.guildId);
         const roleNote = await applyWhitelistRole(interaction, kind, user.id, true);
-        await interaction.reply({ content: `✅ **${roblox}** (<@${user.id}>) ajouté à la **${label} RP**.${raison ? `\n**Raison :** ${raison}` : ''}${roleNote}` });
+        await interaction.editReply(`✅ **${roblox}** (<@${user.id}>) ajouté à la **${label} RP**.${raison ? `\n**Raison :** ${raison}` : ''}${roleNote}`).catch(() => {});
         await sendLog(
           interaction.guild,
           logEmbed(`${label} RP — ajout`, `🎮 **${roblox}** · <@${user.id}> ajouté par <@${interaction.user.id}>.${raison ? `\n**Raison :** ${raison}` : ''}`, COLORS.INFO)
@@ -97,9 +101,10 @@ function makeRpListCommand({ kind, name, label, verb }) {
       if (!rp.remove(kind, interaction.guildId, user.id, interaction.user.id)) {
         return interaction.reply({ content: `❌ <@${user.id}> n'est pas dans la ${label} RP active.`, flags: MessageFlags.Ephemeral });
       }
+      await interaction.deferReply().catch(() => {});
       await rp.refreshBoard(interaction.client, kind, interaction.guildId);
       const roleNote = await applyWhitelistRole(interaction, kind, user.id, false);
-      await interaction.reply({ content: `🧹 <@${user.id}> retiré de la **${label} RP** (conservé au casier \`/casier\`).${roleNote}` });
+      await interaction.editReply(`🧹 <@${user.id}> retiré de la **${label} RP** (conservé au casier \`/casier\`).${roleNote}`).catch(() => {});
       await sendLog(
         interaction.guild,
         logEmbed(`${label} RP — retrait`, `<@${user.id}> retiré par <@${interaction.user.id}> (gardé au casier).`, COLORS.INFO)

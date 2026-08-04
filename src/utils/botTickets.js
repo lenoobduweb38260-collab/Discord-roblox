@@ -186,6 +186,9 @@ async function handleButton(interaction) {
       if (!(await hasPerm(interaction.client, interaction.user.id, 'blacklist'))) {
         return interaction.update({ content: '⛔ Il vous manque la permission 🚫 Blacklist pour cette décision.', components: [] });
       }
+      // Accusé de réception AVANT le MP + bans multi-serveurs (plusieurs
+      // secondes), sinon « l'application ne répond pas ».
+      await interaction.deferUpdate().catch(() => {});
       const result = await applyBlacklist(
         interaction.client,
         ticket.target_id,
@@ -194,7 +197,7 @@ async function handleButton(interaction) {
       );
       setTicketDone.run('blacklist', ticket.id);
       await refreshTicketMessage(interaction.client, getTicket.get(ticket.id));
-      return interaction.update({
+      return interaction.editReply({
         content:
           `🚫 **${result.tag}** blacklisté (ticket n°${ticket.id}) : banni sur **${result.banned}** serveur(s), ` +
           `MP ${result.dmOk ? 'envoyé ✅' : 'impossible (MP fermés) ⚠️'}.`,

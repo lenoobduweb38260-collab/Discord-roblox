@@ -230,6 +230,23 @@ const RELEASES = [
     fix: [],
     retrait: [],
   },
+  {
+    id: 'dashboard-monde-2026-08b',
+    title: 'Dashboard : entrez dans l\'Aincrad 🗡️',
+    ajout: [
+      '🗡️ **Page d\'accueil immersive** : séquence LINK START, château d\'Aincrad flottant, étoiles filantes et citations de la série',
+      '📜 **Composez votre page d\'accueil** : messages défilants (annonces, événements…) éditables depuis l\'espace Créateur — ajoutez, réordonnez, supprimez',
+      '🤖 **Choix du bot à inviter** : la page d\'accueil propose chaque bot (Shadow Community, Colmar RP…) — le visiteur ajoute exactement celui qu\'il veut',
+      '👑 **Sections créateur par bot** : le créateur voit TOUS les serveurs de chaque bot (même sans y être membre) et peut les configurer à distance',
+    ],
+    amelioration: [
+      '✨ **Interface connectée refaite** : fenêtres système translucides, cartes serveur façon carte de quête, barre de vie SAO sous le pseudo, lueurs cyan',
+    ],
+    fix: [
+      '🚫 **/blacklist répond à nouveau** : l\'action est accusée immédiatement puis exécutée (MP + bans multi-serveurs) — fini « l\'application ne répond pas »',
+    ],
+    retrait: [],
+  },
 ];
 
 // Découpe une catégorie en champs d'embed (max 1024 caractères par champ).

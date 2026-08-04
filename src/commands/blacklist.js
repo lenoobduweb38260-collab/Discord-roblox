@@ -46,16 +46,26 @@ module.exports = {
   async execute(interaction) {
     const sub = interaction.options.getSubcommand();
 
+    // On accuse TOUJOURS réception immédiatement : blacklister envoie un MP puis
+    // bannit sur chaque serveur (plusieurs secondes) — sans defer, Discord
+    // affiche « l'application ne répond pas » au bout de 3 s.
+    await interaction.deferReply().catch(() => {});
+    const publicReply = (content) => interaction.editReply(content).catch(() => {});
+    const privateReply = async (content) => {
+      await interaction.deleteReply().catch(() => {});
+      return interaction.followUp({ content, flags: MessageFlags.Ephemeral }).catch(() => {});
+    };
+
     if (sub === 'serveur-deban') {
       if (!(await isCreator(interaction.client, interaction.user.id))) {
-        return interaction.reply({ content: '⛔ Sécurité : seul le **créateur du bot** peut définir le serveur de déban.', flags: MessageFlags.Ephemeral });
+        return privateReply('⛔ Sécurité : seul le **créateur du bot** peut définir le serveur de déban.');
       }
       const invitation = interaction.options.getString('invitation').trim();
       if (!/^https?:\/\/(www\.)?(discord\.gg|discord\.com\/invite)\//i.test(invitation)) {
-        return interaction.reply({ content: '❌ Lien invalide : attendu un lien discord.gg ou discord.com/invite.', flags: MessageFlags.Ephemeral });
+        return privateReply('❌ Lien invalide : attendu un lien discord.gg ou discord.com/invite.');
       }
       setState('deban_invite', invitation);
-      return interaction.reply(`🔓 Serveur de déban enregistré : ${invitation}\nIl sera joint au MP de chaque utilisateur blacklisté.`);
+      return publicReply(`🔓 Serveur de déban enregistré : ${invitation}\nIl sera joint au MP de chaque utilisateur blacklisté.`);
     }
 
     if (sub === 'liste') {
@@ -72,29 +82,29 @@ module.exports = {
             : '*Personne n\'est blacklisté.*'
         )
         .setFooter({ text: state('deban_invite') ? 'Serveur de déban configuré ✅' : 'Serveur de déban non configuré — /blacklist serveur-deban' });
-      return interaction.reply({ embeds: [embed] });
+      return publicReply({ embeds: [embed] });
     }
 
     // ajouter / retirer : permission 🚫 Blacklist requise.
     if (!(await hasPerm(interaction.client, interaction.user.id, 'blacklist'))) {
-      return interaction.reply({
-        content: '⛔ Sécurité : réservé au **staff du bot** disposant de la permission 🚫 Blacklist.',
-        flags: MessageFlags.Ephemeral,
-      });
+      return privateReply('⛔ Sécurité : réservé au **staff du bot** disposant de la permission 🚫 Blacklist.');
     }
 
     const target = interaction.options.getUser('utilisateur');
 
     if (sub === 'ajouter') {
       if (target.id === interaction.user.id) {
-        return interaction.reply({ content: '❌ Vous ne pouvez pas vous blacklister vous-même.', flags: MessageFlags.Ephemeral });
+        return privateReply('❌ Vous ne pouvez pas vous blacklister vous-même.');
       }
       if (await isCreator(interaction.client, target.id)) {
-        return interaction.reply({ content: '⛔ Le créateur du bot ne peut pas être blacklisté.', flags: MessageFlags.Ephemeral });
+        return privateReply('⛔ Le créateur du bot ne peut pas être blacklisté.');
       }
       const reason = interaction.options.getString('raison');
       const result = await applyBlacklist(interaction.client, target.id, reason, interaction.user.id);
-      return interaction.reply(
+      if (result.immune) {
+        return privateReply('⛔ Cet utilisateur est **immunisé** : il ne peut pas être blacklisté.');
+      }
+      return publicReply(
         `🚫 **${result.tag}** blacklisté.\n` +
           `• MP ${result.dmOk ? 'envoyé ✅' : 'impossible (MP fermés) ⚠️'}${state('deban_invite') ? ' (avec le serveur de déban)' : ' — ⚠️ aucun serveur de déban configuré'}\n` +
           `• Banni sur **${result.banned}** serveur(s) — il sera re-banni automatiquement à chaque arrivée.`
@@ -103,10 +113,10 @@ module.exports = {
 
     if (sub === 'retirer') {
       if (!getBlacklistRow.get(target.id)) {
-        return interaction.reply({ content: `❌ <@${target.id}> n'est pas blacklisté.`, flags: MessageFlags.Ephemeral });
+        return privateReply(`❌ <@${target.id}> n'est pas blacklisté.`);
       }
-      const result = await removeBlacklist(interaction.client, target.id);
-      return interaction.reply(`🔓 Blacklist de <@${target.id}> levée — débanni sur **${result.unbanned}** serveur(s).`);
+      const result = await removeBlacklist(interaction.client, target.id, interaction.user.id);
+      return publicReply(`🔓 Blacklist de <@${target.id}> levée — débanni sur **${result.unbanned}** serveur(s).`);
     }
   },
 };

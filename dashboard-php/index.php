@@ -263,7 +263,7 @@ function guild_map(): array {
       foreach ($data['guilds'] ?? [] as $g) {
         if (!isset($map[$g['id']])) {
           $map[$g['id']] = $bot['name'];
-          $infos[$g['id']] = ['name' => $g['name'], 'memberCount' => $g['memberCount'] ?? null];
+          $infos[$g['id']] = ['name' => $g['name'], 'memberCount' => $g['memberCount'] ?? null, 'icon' => $g['icon'] ?? null];
         }
       }
     }
@@ -426,6 +426,56 @@ function my_bots(): array {
   return array_values($bots);
 }
 
+// Nom d'affichage d'un bot : « Shadow_community » → « Shadow Community »,
+// « Colmar_rp » → « Colmar RP ».
+function bot_label(string $name): string {
+  $words = preg_split('/[_\-]+/', $name) ?: [$name];
+  $words = array_map(fn($w) => strtolower($w) === 'rp' ? 'RP' : ucfirst($w), $words);
+  return trim(implode(' ', $words));
+}
+
+// Catalogue des bots de l'agent avec leur lien d'invitation (chaque bot a son
+// propre CLIENT_ID) — affiché sur la page d'accueil pour que le visiteur
+// choisisse LE bot qu'il veut inviter sur son serveur. Cache fichier 5 min.
+function bots_catalog(): array {
+  if (DEMO) {
+    return [
+      ['name' => 'Shadow_community', 'invite' => 'https://discord.com/oauth2/authorize?client_id=100000000000000001&scope=bot+applications.commands&permissions=8', 'serveurs' => 1],
+      ['name' => 'Colmar_rp', 'invite' => 'https://discord.com/oauth2/authorize?client_id=100000000000000002&scope=bot+applications.commands&permissions=8', 'serveurs' => 2],
+    ];
+  }
+  $file = __DIR__ . '/cache-bots.php';
+  $old = null;
+  $raw = @file_get_contents($file);
+  if ($raw !== false && str_starts_with($raw, CACHE_PREFIX)) {
+    $old = json_decode(substr($raw, strlen(CACHE_PREFIX)), true);
+    if (is_array($old) && isset($old['at']) && time() - $old['at'] < 300) return $old['bots'] ?? [];
+  }
+  [$st, $etat] = agent_call('/agent/etat');
+  if ($st !== 200) {
+    // Agent injoignable : on garde l'ancien catalogue et on ne réessaie que
+    // dans 60 s (cache anti-daté) — la page d'accueil reste rapide.
+    $bots = is_array($old) ? ($old['bots'] ?? []) : [];
+    @file_put_contents($file, CACHE_PREFIX . json_encode(['at' => time() - 240, 'bots' => $bots]));
+    return $bots;
+  }
+  [$map] = guild_map();
+  $counts = [];
+  foreach ($map as $b) $counts[$b] = ($counts[$b] ?? 0) + 1;
+  $bots = [];
+  foreach ($etat['bots'] ?? [] as $bot) {
+    if (($bot['status'] ?? '') !== 'demarre') continue;
+    [$st2, $inv] = agent_call('/agent/bots/' . rawurlencode($bot['name']) . '/invitation');
+    $bots[] = [
+      'name' => $bot['name'],
+      'invite' => ($st2 === 200 && !empty($inv['url'])) ? $inv['url'] : null,
+      'serveurs' => $counts[$bot['name']] ?? 0,
+    ];
+  }
+  @file_put_contents($file, CACHE_PREFIX . json_encode(['at' => time(), 'bots' => $bots]));
+  return $bots;
+}
+
 // Modules du dashboard (activables par le créateur). Ordre = ordre d'affichage.
 const DASH_MODULES = [
   'apercu' => ['📊', 'Vue d\'ensemble'],
@@ -443,12 +493,35 @@ function dash_defaults(): array {
     'accent' => '#4dc3ff',
     'accroche' => 'Le Roleplay',
     'modules' => array_fill_keys(array_keys(DASH_MODULES), true),
+    'annonces' => [],
   ];
 }
 function dash_config_get(): array {
-  if (DEMO) $cfg = ['nom' => 'Zetku', 'accent' => '#4dc3ff', 'accroche' => 'Le Roleplay', 'modules' => ['apercu' => true, 'module' => true, 'membres' => true, 'roles' => true, 'salons' => true, 'niveaux' => true, 'whitelist' => false, 'tickets' => true]];
+  if (DEMO) $cfg = ['nom' => 'Zetku', 'accent' => '#4dc3ff', 'accroche' => 'Le Roleplay', 'modules' => ['apercu' => true, 'module' => true, 'membres' => true, 'roles' => true, 'salons' => true, 'niveaux' => true, 'whitelist' => false, 'tickets' => true], 'annonces' => [
+    ['titre' => '🎉 Ouverture de la saison 3', 'texte' => 'Le serveur rouvre ses portes vendredi à 20 h — nouvelles entreprises, nouveaux métiers et une carte agrandie !'],
+    ['titre' => '🛠️ Maintenance', 'texte' => 'Une maintenance est prévue dimanche matin. Le bot restera disponible pendant toute la durée.'],
+    ['titre' => '⚔️ Événement PvP', 'texte' => 'Tournoi d\'arène samedi soir : inscrivez-vous avec /ticket, les 3 premiers gagnent un grade exclusif.'],
+  ]];
   else { [$st, $d] = first_bot_api('/dashboard-config'); $cfg = ($st === 200 && !empty($d['config'])) ? $d['config'] : []; }
-  return array_replace_recursive(dash_defaults(), is_array($cfg) ? $cfg : []);
+  $cfg = array_replace_recursive(dash_defaults(), is_array($cfg) ? $cfg : []);
+  // Les annonces sont une LISTE : on prend telles quelles celles enregistrées
+  // (array_replace_recursive fusionnerait mal des listes de tailles différentes).
+  if (isset($cfg['annonces']) && !is_array($cfg['annonces'])) $cfg['annonces'] = [];
+  return $cfg;
+}
+// Version mise en cache 60 s pour la page d'accueil publique : évite un
+// aller-retour agent à CHAQUE visite anonyme.
+function dash_config_cached(): array {
+  if (DEMO) return dash_config_get();
+  $file = __DIR__ . '/cache-dash.php';
+  $raw = @file_get_contents($file);
+  if ($raw !== false && str_starts_with($raw, CACHE_PREFIX)) {
+    $c = json_decode(substr($raw, strlen(CACHE_PREFIX)), true);
+    if (is_array($c) && isset($c['at'], $c['cfg']) && time() - $c['at'] < 60) return $c['cfg'];
+  }
+  $cfg = dash_config_get();
+  @file_put_contents($file, CACHE_PREFIX . json_encode(['at' => time(), 'cfg' => $cfg]));
+  return $cfg;
 }
 
 function send_json(int $code, array $data): never {
@@ -622,13 +695,14 @@ HTML;
   exit;
 }
 
-// « Ajouter à Discord » : lien d'invitation du premier bot en ligne de l'agent.
+// « Ajouter à Discord » : lien d'invitation d'un bot précis (?bot=nom) —
+// chaque bot a son propre CLIENT_ID, l'utilisateur choisit EXACTEMENT lequel
+// il veut sur son serveur. Sans ?bot, premier bot en ligne (comme avant).
 if ($p === 'inviter') {
-  [, $etat] = agent_call('/agent/etat');
-  foreach ($etat['bots'] ?? [] as $bot) {
-    [$st2, $inv] = agent_call('/agent/bots/' . rawurlencode($bot['name']) . '/invitation');
-    if ($st2 === 200 && !empty($inv['url'])) {
-      header('Location: ' . $inv['url']);
+  $want = (string) ($_GET['bot'] ?? '');
+  foreach (bots_catalog() as $b) {
+    if (($want === '' || $b['name'] === $want) && !empty($b['invite'])) {
+      header('Location: ' . $b['invite']);
       exit;
     }
   }
@@ -651,11 +725,28 @@ if ($p === 'api-moi' || $p === 'api-serveur' || $p === 'api-global') {
   if ($p === 'api-moi') {
     $role = my_role();
     $dash = dash_config_get();
-    if (DEMO) send_json(200, ['user' => $_SESSION['user'], 'servers' => demo_servers(), 'role' => $role, 'dash' => $dash]);
+    if (DEMO) {
+      $out = ['user' => $_SESSION['user'], 'servers' => demo_servers(), 'role' => $role, 'dash' => $dash];
+      if (!empty($role['creator'])) {
+        // Sections créateur : TOUS les serveurs de chaque bot (même ceux où le
+        // créateur n'est pas membre — ex. « Berlin RP » ci-dessous).
+        $tous = array_merge(demo_servers(), [
+          ['id' => '900000000000000004', 'name' => 'Berlin RP', 'icon' => null, 'membres' => 204, 'bot' => 'Colmar_rp', 'enligne' => true, 'creatorOnly' => true],
+        ]);
+        $byBot = [];
+        foreach ($tous as $s) $byBot[$s['bot']][] = $s;
+        $pb = [];
+        foreach ($byBot as $b => $list) $pb[] = ['bot' => $b, 'label' => bot_label($b), 'servers' => $list];
+        $out['parBot'] = $pb;
+      }
+      send_json(200, $out);
+    }
     [$map, $infos] = guild_map();
     $servers = [];
+    $mine = [];
     foreach ($_SESSION['guilds'] as $g) {
       if (!isset($map[$g['id']]) || !manages_guild($g['id'])) continue;
+      $mine[$g['id']] = true;
       $servers[] = [
         'id' => $g['id'],
         'name' => $g['name'],
@@ -665,7 +756,27 @@ if ($p === 'api-moi' || $p === 'api-serveur' || $p === 'api-global') {
         'enligne' => true,
       ];
     }
-    send_json(200, ['user' => $_SESSION['user'], 'servers' => $servers, 'role' => $role, 'dash' => $dash]);
+    $out = ['user' => $_SESSION['user'], 'servers' => $servers, 'role' => $role, 'dash' => $dash];
+    // ⚙️ Créateur : une section PAR BOT listant TOUS les serveurs où ce bot est
+    // présent — y compris ceux où le créateur n'est pas membre (accès créateur).
+    if (!empty($role['creator'])) {
+      $byBot = [];
+      foreach ($map as $gid2 => $bname) {
+        $byBot[$bname][] = [
+          'id' => $gid2,
+          'name' => $infos[$gid2]['name'] ?? $gid2,
+          'icon' => $infos[$gid2]['icon'] ?? null,
+          'membres' => $infos[$gid2]['memberCount'] ?? null,
+          'bot' => $bname,
+          'enligne' => true,
+          'creatorOnly' => empty($mine[$gid2]),
+        ];
+      }
+      $pb = [];
+      foreach ($byBot as $b => $list) $pb[] = ['bot' => $b, 'label' => bot_label($b), 'servers' => $list];
+      $out['parBot'] = $pb;
+    }
+    send_json(200, $out);
   }
 
   // ----- Espace Staff / Créateur (données globales du bot) -----
@@ -746,6 +857,9 @@ if ($p === 'api-moi' || $p === 'api-serveur' || $p === 'api-global') {
       if ($a === 'dashconfig-save') {
         if (empty($role['creator'])) send_json(403, ['error' => 'Réservé au créateur du bot.']);
         [$st, $d] = first_bot_api('/dashboard-config', 'POST', ['actorId' => $uid, 'config' => $post['config'] ?? []]);
+        // La page d'accueil publique utilise un cache 60 s : on l'invalide pour
+        // que les nouveaux messages défilants apparaissent immédiatement.
+        if ($st === 200) @unlink(__DIR__ . '/cache-dash.php');
         send_json($st ?: 502, $d ?: ['error' => 'Bot injoignable.']);
       }
       if ($a === 'bot-status-save') {
@@ -773,7 +887,12 @@ if ($p === 'api-moi' || $p === 'api-serveur' || $p === 'api-global') {
   $gid = $_GET['gid'] ?? '';
   $a = $_GET['a'] ?? '';
   if (!preg_match('/^\d{5,25}$/', $gid)) send_json(400, ['error' => 'Serveur invalide.']);
-  if (!manages_guild($gid)) send_json(403, ['error' => 'Vous n\'administrez pas ce serveur.']);
+  // Le CRÉATEUR du bot peut gérer tous les serveurs où ses bots sont présents,
+  // même sans y être membre ; les autres doivent administrer le serveur.
+  if (!manages_guild($gid)) {
+    $roleSrv = my_role();
+    if (empty($roleSrv['creator'])) send_json(403, ['error' => 'Vous n\'administrez pas ce serveur.']);
+  }
 
   // 🧪 Démo : données fictives et écritures acceptées sans effet.
   if (DEMO) {
@@ -823,23 +942,31 @@ $THEME = <<<'CSS'
           --muted:#8aa2c8; --accent:#4dc3ff; --accent2:#2ea8e8; --green:#43d68b; --red:#ff5f6b; --blue:#62b8ff;
           --gold:#ff9b3d; }
   body { font-family:'Segoe UI',system-ui,sans-serif; color:var(--text); min-height:100vh;
-         background:radial-gradient(1100px 520px at 82% -12%, #14305c66, transparent 60%),
+         background:radial-gradient(1.4px 1.4px at 12% 18%, rgba(231,241,255,.30), transparent 55%),
+                    radial-gradient(1.2px 1.2px at 38% 64%, rgba(231,241,255,.22), transparent 55%),
+                    radial-gradient(1.6px 1.6px at 63% 28%, rgba(231,241,255,.26), transparent 55%),
+                    radial-gradient(1.2px 1.2px at 86% 70%, rgba(231,241,255,.18), transparent 55%),
+                    radial-gradient(1.4px 1.4px at 74% 6%, rgba(231,241,255,.24), transparent 55%),
+                    radial-gradient(1.2px 1.2px at 22% 86%, rgba(231,241,255,.18), transparent 55%),
+                    radial-gradient(1100px 520px at 82% -12%, #14305c66, transparent 60%),
                     radial-gradient(900px 460px at 8% 112%, #0e3a5e44, transparent 60%),
                     linear-gradient(180deg, #0a1122 0%, #0b142a 100%);
-         background-attachment:fixed; }
+         background-attachment:fixed;
+         background-color:var(--bg); }
   a { color:inherit; text-decoration:none; }
   button { background:var(--panel2); color:var(--text); border:1px solid var(--border); border-radius:8px;
-           padding:9px 16px; font-size:13.5px; cursor:pointer; font-family:inherit; }
-  button:hover { filter:brightness(1.15); }
+           padding:9px 16px; font-size:13.5px; cursor:pointer; font-family:inherit; transition:filter .12s, box-shadow .15s, border-color .15s; }
+  button:hover { filter:brightness(1.15); border-color:#2a4a78; }
   button.accent { background:linear-gradient(135deg, #39b6f5, #1f8fe0); border-color:#57c8ff; color:#04121f;
                   font-weight:700; box-shadow:0 0 14px rgba(77,195,255,.35); }
   input, select, textarea { background:#0b1526; border:1px solid var(--border); color:var(--text);
            border-radius:9px; padding:11px 13px; font-size:13.5px; width:100%; font-family:inherit; }
   input:focus, select:focus, textarea:focus { outline:none; border-color:var(--accent);
            box-shadow:0 0 0 2px rgba(77,195,255,.18); }
-  /* ---- barre du haut ---- */
-  .nav { display:flex; align-items:center; gap:26px; padding:0 26px; height:64px; background:var(--bg2);
-         border-bottom:1px solid var(--border); position:sticky; top:0; z-index:20; }
+  /* ---- barre du haut (fenêtre système translucide) ---- */
+  .nav { display:flex; align-items:center; gap:26px; padding:0 26px; height:64px; background:rgba(7,13,26,.88);
+         backdrop-filter:blur(10px); border-bottom:1px solid var(--border); position:sticky; top:0; z-index:20;
+         box-shadow:0 6px 24px rgba(3,10,25,.35); }
   .nav .brand { display:flex; align-items:center; gap:10px; font-weight:800; font-size:19px; letter-spacing:.06em; color:var(--accent); text-shadow:0 0 14px rgba(77,195,255,.45); }
   .nav .brand .lg { font-size:24px; }
   .nav .links { display:flex; gap:22px; font-size:13px; font-weight:700; letter-spacing:.06em; }
@@ -848,7 +975,13 @@ $THEME = <<<'CSS'
   .nav .supportbtn { border:1.5px solid var(--accent); color:var(--accent); background:transparent; border-radius:22px;
                      padding:9px 22px; font-weight:700; letter-spacing:.05em; font-size:12.5px; }
   .nav .me { display:flex; align-items:center; gap:9px; font-weight:600; font-size:14px; }
-  .nav .me img { width:36px; height:36px; border-radius:50%; border:2px solid var(--border); }
+  .nav .me img { width:36px; height:36px; border-radius:50%; border:2px solid var(--accent); box-shadow:0 0 10px rgba(77,195,255,.35); }
+  /* Barre de vie sous le pseudo — clin d'œil SAO. */
+  .nav .me .meinfo { display:flex; flex-direction:column; gap:3px; align-items:flex-start; }
+  .nav .me .hpbar { width:104px; height:5px; background:#20344f; border-radius:3px; overflow:hidden; }
+  .nav .me .hpbar i { display:block; height:100%; width:86%; border-radius:3px;
+                      background:linear-gradient(90deg,#43d68b,#2fbf76); box-shadow:0 0 6px rgba(67,214,139,.7); }
+  .sub { color:var(--muted); font-size:13.5px; margin-bottom:14px; }
   /* ---- interrupteurs façon DraftBot ---- */
   .switch { position:relative; width:46px; height:25px; flex-shrink:0; display:inline-block; }
   .switch input { opacity:0; width:0; height:0; }
@@ -864,21 +997,30 @@ $THEME = <<<'CSS'
                background:var(--panel2); display:flex; align-items:center; justify-content:center; font-size:19px; overflow:hidden; }
   .rail .ric img { width:100%; height:100%; object-fit:cover; }
   .rail .ric:hover { border-color:var(--muted); border-radius:16px; }
-  .rail .ric.on { border-color:var(--accent); }
+  .rail .ric.on { border-color:var(--accent); box-shadow:0 0 12px rgba(77,195,255,.45); }
   .side { width:250px; background:var(--panel); border-right:1px solid var(--border); flex-shrink:0; }
-  .side .head { padding:20px 16px; text-align:center; border-bottom:1px solid var(--border); }
-  .side .head img, .side .head .noicon { width:76px; height:76px; border-radius:50%; margin-bottom:9px; }
+  .side .head { padding:20px 16px; text-align:center; border-bottom:1px solid var(--border);
+                background:linear-gradient(180deg, rgba(77,195,255,.06), transparent); }
+  .side .head img, .side .head .noicon { width:76px; height:76px; border-radius:50%; margin-bottom:9px;
+                border:2px solid var(--border); box-shadow:0 0 18px rgba(77,195,255,.15); }
   .side .head .noicon { background:var(--panel2); display:inline-flex; align-items:center; justify-content:center; font-size:30px; }
   .side .head .nm { font-family:'Georgia',serif; font-weight:700; font-size:16px; }
   .side .item { display:flex; align-items:center; gap:10px; padding:11px 16px; font-size:13.5px; color:var(--muted);
-                cursor:pointer; border-left:3px solid transparent; }
+                cursor:pointer; border-left:3px solid transparent; transition:background .12s, color .12s; }
   .side .item:hover { background:var(--panel2); color:var(--text); }
-  .side .item.on { background:var(--panel2); color:var(--text); border-left-color:var(--accent); font-weight:600; }
+  .side .item.on { background:linear-gradient(90deg, rgba(77,195,255,.14), transparent); color:var(--accent);
+                   border-left-color:var(--accent); font-weight:700; text-shadow:0 0 12px rgba(77,195,255,.35); }
   .main { flex:1; padding:34px 42px; min-width:0; max-width:1150px; }
-  h1.pagetitle { font-size:26px; font-weight:700; margin-bottom:26px; }
-  .sec { margin-bottom:34px; }
+  h1.pagetitle { font-size:25px; font-weight:800; margin-bottom:26px; letter-spacing:.02em; position:relative; padding-bottom:12px; }
+  h1.pagetitle::after { content:''; position:absolute; left:0; bottom:0; width:64px; height:3px; border-radius:2px;
+                        background:linear-gradient(90deg, var(--accent), transparent); box-shadow:0 0 10px rgba(77,195,255,.5); }
+  /* Chaque section est une « fenêtre système » translucide. */
+  .sec { margin-bottom:26px; background:rgba(16,26,48,.55); border:1px solid var(--border); border-radius:14px;
+         padding:20px 22px; box-shadow:inset 0 1px 0 rgba(191,227,255,.07), 0 8px 26px rgba(3,10,25,.25); }
   .sechead { display:flex; align-items:flex-start; gap:14px; margin-bottom:8px; }
-  .sechead .t { font-size:17px; font-weight:700; }
+  .sechead .t { font-size:16.5px; font-weight:700; }
+  .sechead .t::before { content:'◆'; color:var(--accent); margin-right:8px; font-size:11px; vertical-align:2px;
+                        text-shadow:0 0 8px rgba(77,195,255,.8); }
   .sechead .d { color:var(--muted); font-size:13px; margin-top:3px; }
   .sechead .sw { margin-left:auto; }
   .flabel { font-size:11px; letter-spacing:.08em; font-weight:800; color:#a9c2e8; text-transform:uppercase; margin:16px 0 7px; }
@@ -902,20 +1044,38 @@ $THEME = <<<'CSS'
   .dprev .mention { background:rgba(88,101,242,.3); color:#c9cdfb; border-radius:3px; padding:0 3px; }
   /* ---- tuiles / lignes ---- */
   .tiles { display:grid; grid-template-columns:repeat(auto-fill,minmax(170px,1fr)); gap:13px; margin:18px 0; }
-  .tile { background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:16px; }
-  .tile .tv { font-size:23px; font-weight:800; color:var(--accent); }
+  .tile { background:linear-gradient(160deg, #121f3a, #0e1830); border:1px solid var(--border); border-radius:12px;
+          padding:16px; transition:.15s; }
+  .tile:hover { border-color:#2a4a78; transform:translateY(-2px); }
+  .tile .tv { font-size:24px; font-weight:800; color:var(--accent); text-shadow:0 0 14px rgba(77,195,255,.45); }
   .tile .tl { color:var(--muted); font-size:12px; margin-top:4px; }
   .row { background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:11px 15px;
-         margin-bottom:8px; display:flex; align-items:center; gap:10px; flex-wrap:wrap; font-size:13.5px; }
+         margin-bottom:8px; display:flex; align-items:center; gap:10px; flex-wrap:wrap; font-size:13.5px;
+         transition:border-color .15s; }
+  .row:hover { border-color:#2a4a78; }
   .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:15px; }
-  .scard { background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:19px;
-           display:flex; align-items:center; gap:14px; cursor:pointer; transition:.15s; }
-  .scard:hover { border-color:var(--accent); transform:translateY(-2px); }
+  /* Cartes serveur façon carte de quête. */
+  .scard { background:linear-gradient(160deg, #121f3a, #0d1730); border:1px solid var(--border); border-radius:14px;
+           padding:19px; display:flex; align-items:center; gap:14px; cursor:pointer; transition:.18s;
+           position:relative; overflow:hidden; }
+  .scard::before { content:''; position:absolute; left:0; top:0; bottom:0; width:3px;
+                   background:linear-gradient(180deg, var(--accent), transparent); opacity:0; transition:.18s; }
+  .scard:hover { border-color:var(--accent); transform:translateY(-3px);
+                 box-shadow:0 12px 30px rgba(3,10,25,.5), 0 0 18px rgba(77,195,255,.12); }
+  .scard:hover::before { opacity:1; }
   .scard img, .scard .noicon { width:54px; height:54px; border-radius:50%; }
   .scard .noicon { background:var(--panel2); display:flex; align-items:center; justify-content:center; font-size:22px; }
-  .toast { position:fixed; bottom:24px; right:24px; background:var(--panel2); border:1px solid var(--accent);
-           border-radius:10px; padding:13px 18px; font-size:13.5px; opacity:0; transform:translateY(10px);
-           transition:opacity .22s, transform .22s; z-index:60; box-shadow:0 10px 30px rgba(0,0,0,.35); pointer-events:none; }
+  /* Pastille « accès créateur » + têtes de section par bot (espace créateur). */
+  .ownchip { background:rgba(255,155,61,.12); border:1px solid rgba(255,155,61,.5); color:#ffb066; font-size:10.5px;
+             border-radius:10px; padding:1px 8px; font-weight:700; letter-spacing:.04em; white-space:nowrap; }
+  .botsec { display:flex; align-items:center; gap:10px; margin:26px 0 14px; }
+  .botsec .bt { font-size:17px; font-weight:800; color:var(--accent); text-shadow:0 0 12px rgba(77,195,255,.35); }
+  .botsec .bn2 { color:var(--muted); font-size:12.5px; }
+  .botsec::after { content:''; flex:1; height:1px; background:linear-gradient(90deg, var(--border), transparent); }
+  .toast { position:fixed; bottom:24px; right:24px; background:rgba(22,35,63,.92); backdrop-filter:blur(8px);
+           border:1px solid var(--accent); border-radius:10px; padding:13px 18px; font-size:13.5px; opacity:0;
+           transform:translateY(10px); transition:opacity .22s, transform .22s; z-index:60;
+           box-shadow:0 10px 30px rgba(0,0,0,.35); pointer-events:none; }
   .toast.on { opacity:1; transform:translateY(0); }
   .toast.ok { border-color:var(--green); }
   .toast.err { border-color:var(--red); }
@@ -923,17 +1083,21 @@ $THEME = <<<'CSS'
   .wrap { max-width:1100px; margin:0 auto; padding:30px 20px; }
   /* ---- onglets (espace staff) ---- */
   .tabbar { display:flex; gap:4px; border-bottom:1px solid var(--border); margin:16px 0 22px; flex-wrap:wrap; }
-  .tab { padding:10px 18px; font-size:13.5px; color:var(--muted); cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-1px; }
-  .tab:hover { color:var(--text); }
-  .tab.on { color:var(--accent); border-bottom-color:var(--accent); font-weight:600; }
+  .tab { padding:10px 18px; font-size:13.5px; color:var(--muted); cursor:pointer; border-bottom:2px solid transparent;
+         margin-bottom:-1px; border-radius:8px 8px 0 0; transition:background .12s, color .12s; }
+  .tab:hover { color:var(--text); background:rgba(77,195,255,.05); }
+  .tab.on { color:var(--accent); border-bottom-color:var(--accent); font-weight:700; text-shadow:0 0 10px rgba(77,195,255,.4); }
   .chip { background:#0b1526; border:1px solid var(--border); border-radius:14px; padding:4px 11px; font-size:12.5px;
           display:inline-flex; gap:6px; align-items:center; }
   .chip button { padding:0 5px; font-size:11px; background:transparent; border:0; color:var(--muted); }
   /* ---- bouton flottant Créateur (en bas à gauche) ---- */
-  .cfab { position:fixed; bottom:22px; left:22px; width:52px; height:52px; border-radius:50%; background:var(--accent);
-          color:#fff; font-size:24px; display:flex; align-items:center; justify-content:center; cursor:pointer;
-          box-shadow:0 8px 26px rgba(0,0,0,.4); z-index:40; transition:transform .15s; }
+  .cfab { position:fixed; bottom:22px; left:22px; width:52px; height:52px; border-radius:50%;
+          background:linear-gradient(135deg,#39b6f5,#1f8fe0); color:#04121f; font-size:24px; display:flex;
+          align-items:center; justify-content:center; cursor:pointer; z-index:40; transition:transform .15s;
+          animation:cpulse 2.6s ease-in-out infinite; }
   .cfab:hover { transform:scale(1.08); }
+  @keyframes cpulse { 0%,100% { box-shadow:0 8px 26px rgba(0,0,0,.4), 0 0 10px rgba(77,195,255,.25); }
+                      50% { box-shadow:0 8px 26px rgba(0,0,0,.4), 0 0 26px rgba(77,195,255,.6); } }
   /* ---- barre de défilement raffinée ---- */
   ::-webkit-scrollbar { width:10px; height:10px; }
   ::-webkit-scrollbar-track { background:transparent; }
@@ -997,71 +1161,246 @@ $NOM_HTML = htmlspecialchars($NOM_BOT);
 if (empty($_SESSION['user'])) {
   header('Content-Type: text/html; charset=utf-8');
   // Aide à la connexion : l'URL de redirection exacte à enregistrer côté
-  // Discord est affichée sur la page (auto-détectée), avec bouton copier.
+  // Discord est affichée sur la page (auto-détectée), avec bouton copier,
+  // ainsi que le Client ID utilisé (avec plusieurs bots = plusieurs
+  // applications Discord, l'URL doit être enregistrée dans LA BONNE).
   $oauthUri = htmlspecialchars(oauth_redirect_uri());
+  $cidHtml = htmlspecialchars(defined('DASH_CLIENT_ID') ? DASH_CLIENT_ID : '');
+  // La page d'accueil est COMPOSÉE par le créateur (Espace Créateur → Page
+  // d'accueil) : nom, couleur, accroche et messages défilants (cache 60 s).
+  $dashCfg = dash_config_cached();
+  $cut = fn($s, $n) => function_exists('mb_substr') ? mb_substr($s, 0, $n) : substr($s, 0, $n);
+  $nomLanding = trim((string) ($dashCfg['nom'] ?? '')) !== '' ? $dashCfg['nom'] : $NOM_BOT;
+  $NOMD = htmlspecialchars($nomLanding);
+  $ACCENT_CSS = preg_match('/^#[0-9a-fA-F]{6}$/', (string) ($dashCfg['accent'] ?? '')) ? $dashCfg['accent'] : '#4dc3ff';
+  $accroche = trim((string) ($dashCfg['accroche'] ?? ''));
+  $taglineHtml = $accroche !== '' ? '<div class="tagline">Un bot pour <b>' . htmlspecialchars($accroche) . '</b></div>' : '';
+  // Messages défilants de la page d'accueil (max 8, composés par le créateur).
+  $annonces = [];
+  foreach (($dashCfg['annonces'] ?? []) as $an) {
+    if (!is_array($an)) continue;
+    $ti = trim((string) ($an['titre'] ?? ''));
+    $tx = trim((string) ($an['texte'] ?? ''));
+    if ($ti === '' && $tx === '') continue;
+    $annonces[] = ['titre' => $cut($ti, 80), 'texte' => $cut($tx, 400)];
+    if (count($annonces) >= 8) break;
+  }
+  $annJson = json_encode($annonces, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE) ?: '[]';
+  $annHtml = $annonces ? '<div class="annwin"><div class="anhead">A N N O N C E S</div>'
+    . '<button class="anv" id="anprev" aria-label="Message précédent">‹</button>'
+    . '<div class="anbody" id="anbody"><div class="antitre" id="antitre"></div><div class="antexte" id="antexte"></div></div>'
+    . '<button class="anv" id="annext" aria-label="Message suivant">›</button>'
+    . '<div class="andots" id="andots"></div></div>' : '';
+  // Choix du bot à inviter : chaque bot de l'agent a sa propre application
+  // Discord (CLIENT_ID) — l'utilisateur choisit exactement lequel il ajoute.
+  $botsCat = array_values(array_filter(bots_catalog(), fn($b) => !empty($b['invite'])));
+  $botBtns = '';
+  foreach ($botsCat as $b) {
+    $nsrv = (int) ($b['serveurs'] ?? 0);
+    $botBtns .= '<a href="index.php?p=inviter&bot=' . htmlspecialchars(rawurlencode($b['name'])) . '">'
+      . '<button class="addbtn">🤖 Inviter <b>' . htmlspecialchars(bot_label($b['name'])) . '</b>'
+      . ($nsrv > 0 ? '<span class="bcount">' . $nsrv . ' serveur' . ($nsrv > 1 ? 's' : '') . '</span>' : '')
+      . '</button></a>';
+  }
+  $botPick = $botBtns === ''
+    ? '<a href="index.php?p=inviter"><button class="addbtn">🎮 Inviter le bot sur un serveur</button></a>'
+    : (count($botsCat) > 1 ? '<div class="bphead">🎮 CHOISISSEZ VOTRE BOT</div>' : '') . $botBtns;
   $err = $_GET['erreur'] ?? '';
   $errHtml = '';
   if ($err === 'oauth') {
-    $errHtml = '<div class="errbn">⚠️ Discord a refusé la connexion. Vérifiez le <b>Client Secret</b> dans config.php '
-      . 'et que l\'URL ci-dessous est bien enregistrée dans <b>OAuth2 → Redirects</b> (puis Save Changes).</div>';
+    $errHtml = '<div class="saowarn"><div class="wt">⚠ SYSTEM ALERT</div>Discord a refusé la connexion.<br>'
+      . '1️⃣ Vérifiez le <b>Client Secret</b> dans config.php (application <b>' . $cidHtml . '</b>).<br>'
+      . '2️⃣ Vérifiez que l\'URL affichée plus bas est dans <b>OAuth2 → Redirects</b> de CETTE application (puis Save Changes).</div>';
   } elseif ($err !== '') {
-    $errHtml = '<div class="errbn">⚠️ La connexion Discord a échoué — réessayez dans un instant.</div>';
+    $errHtml = '<div class="saowarn"><div class="wt">⚠ SYSTEM ALERT</div>La connexion Discord a échoué — réessayez dans un instant.</div>';
   }
   echo <<<HTML
 <!DOCTYPE html>
 <html lang="fr">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>$NOM_HTML — Dashboard</title>
+<title>$NOMD — Aincrad</title>
 <style>$THEME
+  :root { --accent:$ACCENT_CSS; }
+  /* ================== 🗡️ ENTRÉE DANS L'AINCRAD ================== */
   .hero { position:relative; min-height:calc(100vh - 64px); display:flex; flex-direction:column; align-items:center;
-          justify-content:center; text-align:center; padding:20px 20px 150px; overflow:hidden; }
+          justify-content:center; text-align:center; padding:20px 20px 170px; overflow:hidden; }
   .star { position:absolute; background:#fff; border-radius:50%; opacity:.5; animation:tw 3s infinite; }
-  @keyframes tw { 0%,100% { opacity:.15; } 50% { opacity:.7; } }
-  .biglogo { font-size:96px; margin-bottom:18px; filter:drop-shadow(0 0 26px rgba(77,195,255,.55)); }
-  .hero .pre { color:var(--muted); font-size:21px; }
-  .hero .word { color:var(--accent); font-size:32px; font-weight:700; min-height:44px; margin-bottom:26px; transition:opacity .3s; }
-  .addbtn { background:linear-gradient(135deg,#39b6f5,#1f8fe0); border:0; color:#04121f; font-size:15.5px; font-weight:700; padding:14px 28px; border-radius:9px; box-shadow:0 0 18px rgba(77,195,255,.4); }
-  .connectbtn { margin-top:14px; background:transparent; border:1.5px solid var(--border); color:var(--muted); border-radius:9px; }
-  .wave { position:absolute; bottom:-4px; left:0; right:0; pointer-events:none; }
-  .errbn { background:#ff9b3d1e; border:1px solid #ff9b3d66; color:#ffc18a; border-radius:10px; padding:11px 16px;
-           font-size:13.5px; max-width:560px; margin-bottom:20px; line-height:1.5; position:relative; z-index:2; }
+  @keyframes tw { 0%,100% { opacity:.12; } 50% { opacity:.75; } }
+  .shoot { position:absolute; width:120px; height:2px; border-radius:2px; pointer-events:none;
+           background:linear-gradient(90deg, rgba(191,227,255,.9), transparent); opacity:0; animation:shoot 1.4s linear forwards; }
+  @keyframes shoot { 0% { opacity:0; transform:translate(0,0) rotate(24deg); } 8% { opacity:.9; }
+                     100% { opacity:0; transform:translate(-340px,150px) rotate(24deg); } }
+  /* --- château d'Aincrad flottant --- */
+  .aincrad { position:absolute; left:50%; top:44%; transform:translate(-50%,-50%); width:min(560px,86vw);
+             opacity:.5; pointer-events:none; animation:hover 9s ease-in-out infinite; z-index:0; }
+  @keyframes hover { 0%,100% { transform:translate(-50%,-50%); } 50% { transform:translate(-50%,calc(-50% - 16px)); } }
+  .cloud { position:absolute; border-radius:50%; background:#9fc4ff; filter:blur(26px); opacity:.09; pointer-events:none; }
+  .c1 { width:420px; height:90px; top:26%; animation:drift 65s linear infinite; }
+  .c2 { width:300px; height:70px; top:58%; animation:drift 45s linear infinite; animation-delay:-20s; }
+  .c3 { width:520px; height:110px; top:74%; animation:drift 85s linear infinite; animation-delay:-48s; }
+  @keyframes drift { from { left:-40%; } to { left:110%; } }
+  /* --- titre --- */
+  .fg { position:relative; z-index:2; display:flex; flex-direction:column; align-items:center; }
+  .gametitle { font-size:clamp(34px,7vw,64px); font-weight:900; letter-spacing:.14em; line-height:1.1;
+               background:linear-gradient(180deg,#eaf7ff 20%,#69ccff 70%,#2ea8e8); -webkit-background-clip:text;
+               background-clip:text; color:transparent; filter:drop-shadow(0 0 22px rgba(77,195,255,.35)); animation:fadeup 1s ease .1s both; }
+  .subtitle { color:var(--muted); letter-spacing:.55em; font-size:12px; font-weight:700; margin:10px 0 4px; text-transform:uppercase; animation:fadeup 1s ease .3s both; }
+  .floor { color:#bfe3ff; font-size:13.5px; margin-bottom:14px; animation:fadeup 1s ease .45s both; }
+  .floor b { color:var(--accent); }
+  .quote { color:var(--muted); font-style:italic; font-size:14px; max-width:520px; min-height:42px; line-height:1.5;
+           transition:opacity .4s; margin-bottom:24px; animation:fadeup 1s ease .6s both; }
+  @keyframes fadeup { from { opacity:0; transform:translateY(14px); } to { opacity:1; transform:none; } }
+  /* --- fenêtre système SAO --- */
+  .syswin { position:relative; z-index:2; background:rgba(16,26,48,.72); border:1px solid #2a4a78; border-radius:14px;
+            padding:22px 26px 20px; min-width:min(430px,92vw); backdrop-filter:blur(8px); animation:fadeup 1s ease .75s both;
+            box-shadow:0 18px 60px rgba(3,10,25,.55), inset 0 1px 0 rgba(191,227,255,.12); }
+  .syswin .swhead { display:flex; align-items:center; gap:8px; justify-content:center; margin-bottom:14px;
+                    color:#9fc9ef; font-size:10.5px; letter-spacing:.35em; font-weight:800; }
+  .syswin .swhead i { width:7px; height:7px; border-radius:50%; background:#4dc3ff; box-shadow:0 0 8px rgba(77,195,255,.9); display:inline-block; }
+  .linkstart { display:block; width:100%; background:linear-gradient(135deg,#39b6f5,#1f8fe0); border:0; color:#04121f;
+               font-size:19px; font-weight:900; letter-spacing:.22em; padding:16px 30px; border-radius:10px;
+               box-shadow:0 0 24px rgba(77,195,255,.45); animation:pulse 2.2s ease-in-out infinite; cursor:pointer; }
+  .linkstart:hover { filter:brightness(1.12); }
+  @keyframes pulse { 0%,100% { box-shadow:0 0 16px rgba(77,195,255,.35); } 50% { box-shadow:0 0 34px rgba(77,195,255,.75); } }
+  .linksub { color:var(--muted); font-size:11.5px; margin-top:8px; }
+  .addbtn { margin-top:14px; background:transparent; border:1.5px solid #2a4a78; color:#bfe3ff; font-size:13px;
+            font-weight:600; padding:11px 22px; border-radius:9px; width:100%; }
+  /* --- alerte système (façon annonce du jeu) --- */
+  .saowarn { position:relative; z-index:2; background:rgba(60,26,6,.66); border:1.5px solid #ff9b3d; border-radius:12px;
+             padding:14px 18px; font-size:13.5px; color:#ffd9b0; max-width:560px; margin-bottom:22px; line-height:1.65;
+             backdrop-filter:blur(6px); box-shadow:0 0 26px rgba(255,155,61,.25); text-align:left; }
+  .saowarn .wt { color:#ff9b3d; font-weight:900; letter-spacing:.3em; font-size:12px; margin-bottom:6px; text-align:center; }
+  /* --- encart URL de redirection --- */
   .cbx { margin-top:26px; background:#0b152699; border:1px solid var(--border); border-radius:10px; padding:12px 16px;
-         font-size:12.5px; color:var(--muted); max-width:560px; line-height:1.6; position:relative; z-index:2; }
+         font-size:12.5px; color:var(--muted); max-width:600px; line-height:1.6; position:relative; z-index:2; backdrop-filter:blur(6px); }
   .cbx code { background:#050b18; border:1px solid #1c2f4e; border-radius:5px; padding:2px 7px; font-size:12px;
               word-break:break-all; display:inline-block; margin:4px 0; color:#bfe3ff; }
   .cbx button { padding:4px 10px; font-size:11.5px; border-radius:6px; margin-left:4px; }
+  .wave { position:absolute; bottom:-4px; left:0; right:0; pointer-events:none; }
+  .lore { position:absolute; bottom:12px; left:0; right:0; text-align:center; color:#5a7ba8; font-size:11.5px; letter-spacing:.08em; z-index:2; }
+  /* --- accroche + choix du bot + annonces défilantes --- */
+  .tagline { color:#bfe3ff; font-size:15px; margin-bottom:12px; animation:fadeup 1s ease .5s both; }
+  .tagline b { color:var(--accent); }
+  .bphead { color:#9fc9ef; font-size:10.5px; letter-spacing:.3em; font-weight:800; margin:16px 0 2px; }
+  .addbtn b { color:var(--accent); }
+  .bcount { color:var(--muted); font-weight:400; font-size:11px; margin-left:7px; }
+  .annwin { position:relative; z-index:2; margin-top:26px; background:rgba(16,26,48,.72); border:1px solid #2a4a78;
+            border-radius:14px; padding:18px 14px 20px; width:min(560px,92vw); backdrop-filter:blur(8px);
+            box-shadow:0 18px 60px rgba(3,10,25,.45), inset 0 1px 0 rgba(191,227,255,.12);
+            display:flex; align-items:center; gap:8px; animation:fadeup 1s ease .9s both; }
+  .annwin .anhead { position:absolute; top:-9px; left:50%; transform:translateX(-50%); background:#101a30;
+                    border:1px solid #2a4a78; border-radius:12px; color:#9fc9ef; font-size:9.5px; letter-spacing:.25em;
+                    font-weight:800; padding:2px 12px; white-space:nowrap; }
+  .annwin .anbody { flex:1; min-width:0; min-height:56px; transition:opacity .3s; text-align:left; }
+  .annwin .antitre { font-weight:800; font-size:14.5px; color:var(--accent); margin-bottom:4px; }
+  .annwin .antexte { color:var(--text); font-size:13px; line-height:1.55; white-space:pre-wrap; }
+  .annwin .anv { background:transparent; border:0; color:#8aa2c8; font-size:24px; cursor:pointer; padding:0 8px; flex-shrink:0; line-height:1; }
+  .annwin .anv:hover { color:var(--accent); }
+  .andots { position:absolute; bottom:-7px; left:50%; transform:translateX(-50%); display:flex; gap:6px; }
+  .andots i { width:8px; height:8px; border-radius:50%; background:#253a5c; cursor:pointer; border:1px solid #2a4a78; }
+  .andots i.on { background:var(--accent); box-shadow:0 0 7px rgba(77,195,255,.8); }
+  /* ================== ⚡ SÉQUENCE « LINK START » ================== */
+  #ls { position:fixed; inset:0; background:#000; z-index:100; display:flex; align-items:center; justify-content:center;
+        overflow:hidden; cursor:pointer; transition:opacity .5s; }
+  #ls .lstxt { color:#fff; font-size:clamp(30px,7vw,58px); font-weight:900; letter-spacing:.3em; opacity:0;
+               animation:lstxt 1.1s ease .15s forwards; text-shadow:0 0 30px rgba(255,255,255,.6); }
+  @keyframes lstxt { 0% { opacity:0; transform:scale(.92); } 25% { opacity:1; transform:scale(1); }
+                     85% { opacity:1; } 100% { opacity:0; transform:scale(1.06); } }
+  #ls .ray { position:absolute; left:50%; top:50%; width:3px; height:3px; border-radius:3px; opacity:0; }
+  @keyframes ray { 0% { opacity:0; transform:rotate(var(--a)) translateY(0) scaleY(.2); }
+                   20% { opacity:1; } 100% { opacity:0; transform:rotate(var(--a)) translateY(-130vmax) scaleY(60); } }
+  @media (prefers-reduced-motion: reduce) { #ls { display:none; } .aincrad, .linkstart { animation:none; } }
 </style>
 </head>
 <body>
+<div id="ls"><div class="lstxt">LINK&nbsp;START</div></div>
 <div class="nav">
-  <span class="brand"><span class="lg">⚔️</span>$NOM_HTML</span>
+  <span class="brand"><span class="lg">⚔️</span>$NOMD</span>
   $navLinks
   <span class="spacer"></span>
   $navSupport
   <a href="index.php?p=login"><button class="accent">Se connecter</button></a>
 </div>
 <div class="hero" id="hero">
-  $errHtml
-  <div class="biglogo">⚔️</div>
-  <div class="pre">Un bot pour</div>
-  <div class="word" id="word">Le Roleplay</div>
-  <a href="index.php?p=inviter"><button class="addbtn">🎮 Ajouter à Discord</button></a>
-  <a href="index.php?p=login"><button class="connectbtn">🔗 Se connecter avec Discord pour gérer vos serveurs</button></a>
-  <div class="cbx">🔗 <b style="color:var(--accent)">Première connexion ?</b> Enregistrez cette URL dans
-    <b>Portail développeur Discord → OAuth2 → Redirects</b> (une seule fois) :<br>
-    <code id="cburi">$oauthUri</code>
-    <button onclick="navigator.clipboard.writeText(document.getElementById('cburi').textContent).then(()=>{this.textContent='✅ Copiée'})">📋 Copier</button>
+  <div class="cloud c1"></div><div class="cloud c2"></div><div class="cloud c3"></div>
+  <svg class="aincrad" viewBox="0 0 560 380" aria-hidden="true">
+    <defs><linearGradient id="ac" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3f6ea8"/><stop offset="1" stop-color="#101a30"/></linearGradient></defs>
+    <g fill="url(#ac)" stroke="#7fb7e8" stroke-opacity=".35" stroke-width="1.5">
+      <polygon points="280,4 292,44 268,44"/>
+      <rect x="262" y="44" width="36" height="22" rx="3"/>
+      <polygon points="215,66 345,66 355,92 205,92"/>
+      <polygon points="185,96 375,96 390,126 170,126"/>
+      <polygon points="150,130 410,130 430,166 130,166"/>
+      <polygon points="110,170 450,170 475,212 85,212"/>
+      <polygon points="65,216 495,216 520,264 40,264"/>
+      <polygon points="40,268 520,268 445,330 280,376 115,330"/>
+    </g>
+    <g fill="#ffe9a8" opacity=".8">
+      <circle cx="240" cy="240" r="2.2"/><circle cx="330" cy="238" r="2.2"/><circle cx="180" cy="190" r="2"/>
+      <circle cx="390" cy="192" r="2"/><circle cx="285" cy="150" r="2"/><circle cx="140" cy="242" r="2"/>
+      <circle cx="425" cy="244" r="2"/><circle cx="300" cy="110" r="1.8"/><circle cx="255" cy="80" r="1.6"/>
+    </g>
+    <ellipse cx="280" cy="372" rx="150" ry="9" fill="#4dc3ff" opacity=".28"/>
+  </svg>
+  <div class="fg">
+    $errHtml
+    <div class="gametitle">$NOMD</div>
+    <div class="subtitle">— Aincrad Online —</div>
+    <div class="floor">🗡️ <b>Étage 1</b> · Ville des Débuts</div>
+    $taglineHtml
+    <div class="quote" id="quote">« Ceci est peut-être un jeu, mais ce n'est pas quelque chose à quoi on joue. »</div>
+    <div class="syswin">
+      <div class="swhead"><i></i><i></i><i></i>&nbsp;&nbsp;S Y S T È M E&nbsp;&nbsp;<i></i><i></i><i></i></div>
+      <a href="index.php?p=login"><button class="linkstart">▶ LINK START</button></a>
+      <div class="linksub">Connexion avec votre compte Discord — gérez vos serveurs</div>
+      $botPick
+    </div>
+    $annHtml
+    <div class="cbx">🔗 <b style="color:var(--accent)">Première connexion ?</b> Enregistrez cette URL dans
+      <b>Portail développeur Discord → OAuth2 → Redirects</b> puis <b>Save Changes</b> (une seule fois) :<br>
+      <code id="cburi">$oauthUri</code>
+      <button onclick="navigator.clipboard.writeText(document.getElementById('cburi').textContent).then(()=>{this.textContent='✅ Copiée'})">📋 Copier</button><br>
+      ⚠️ Plusieurs bots = plusieurs applications Discord : faites-le dans l'application <b style="color:#bfe3ff">$cidHtml</b>
+      (celle du Client ID de config.php), pas une autre.
+    </div>
+    <a href="index.php?p=diag" style="margin-top:16px;color:var(--muted);font-size:12.5px">🔧 Vérifier ma configuration</a>
   </div>
-  <a href="index.php?p=diag" style="margin-top:16px;color:var(--muted);font-size:12.5px;position:relative;z-index:2">🔧 Vérifier ma configuration</a>
   <svg class="wave" viewBox="0 0 1440 180" preserveAspectRatio="none" height="150">
-    <path fill="#1f8fe0" d="M0,96 C240,150 480,40 720,80 C960,120 1200,150 1440,90 L1440,180 L0,180 Z" opacity=".55"/>
+    <path fill="#1f8fe0" d="M0,96 C240,150 480,40 720,80 C960,120 1200,150 1440,90 L1440,180 L0,180 Z" opacity=".45"/>
     <path fill="#101a30" d="M0,130 C260,170 520,80 760,110 C1000,140 1240,170 1440,120 L1440,180 L0,180 Z"/>
   </svg>
+  <div class="lore">⚔️ Château flottant d'Aincrad · 100 étages · « Vaincre le boss de l'étage pour accéder au suivant »</div>
 </div>
 <script>
+// ---- Séquence LINK START (une fois par session, clic pour passer) ----
+var ls = document.getElementById('ls');
+function endLS(){ if (!ls) return; ls.style.opacity = 0; setTimeout(function(){ if (ls && ls.parentNode) ls.parentNode.removeChild(ls); ls = null; }, 500); }
+try {
+  if (sessionStorage.getItem('ls_done')) { endLS(); }
+  else {
+    sessionStorage.setItem('ls_done', '1');
+    var hues = [0, 30, 55, 120, 180, 210, 260, 300];
+    setTimeout(function(){
+      if (!ls) return;
+      for (var r = 0; r < 90; r++) {
+        var d = document.createElement('div');
+        d.className = 'ray';
+        var hue = hues[Math.floor(Math.random() * hues.length)];
+        d.style.background = 'hsl(' + hue + ', 90%, 65%)';
+        d.style.setProperty('--a', (Math.random() * 360) + 'deg');
+        d.style.animation = 'ray ' + (0.7 + Math.random() * 0.6) + 's linear ' + (Math.random() * 0.35) + 's forwards';
+        ls.appendChild(d);
+      }
+    }, 1000);
+    setTimeout(endLS, 2350);
+    ls.addEventListener('click', endLS);
+  }
+} catch (e) { endLS(); }
+// ---- Ciel : étoiles + étoiles filantes ----
 var hero = document.getElementById('hero');
-for (var i = 0; i < 90; i++) {
+for (var i = 0; i < 110; i++) {
   var s = document.createElement('div');
   s.className = 'star';
   var size = Math.random() * 2.4 + 1;
@@ -1070,12 +1409,66 @@ for (var i = 0; i < 90; i++) {
   s.style.animationDelay = (Math.random() * 3) + 's';
   hero.appendChild(s);
 }
-var mots = ['Le Roleplay', 'La Modération', 'Les Niveaux', 'Les Tickets', 'La Communauté'];
-var wi = 0, w = document.getElementById('word');
 setInterval(function(){
-  w.style.opacity = 0;
-  setTimeout(function(){ wi = (wi + 1) % mots.length; w.textContent = mots[wi]; w.style.opacity = 1; }, 300);
-}, 2600);
+  var f = document.createElement('div');
+  f.className = 'shoot';
+  f.style.left = (30 + Math.random() * 65) + '%';
+  f.style.top = (Math.random() * 40) + '%';
+  hero.appendChild(f);
+  setTimeout(function(){ if (f.parentNode) f.parentNode.removeChild(f); }, 1600);
+}, 3400);
+// ---- Parallaxe légère du château à la souris ----
+var castle = document.querySelector('.aincrad');
+document.addEventListener('mousemove', function(e){
+  if (!castle) return;
+  var dx = (e.clientX / window.innerWidth - 0.5) * 14;
+  var dy = (e.clientY / window.innerHeight - 0.5) * 8;
+  castle.style.marginLeft = dx + 'px';
+  castle.style.marginTop = dy + 'px';
+});
+// ---- Citations de la série (rotation) ----
+var quotes = [
+  '« Ceci est peut-être un jeu, mais ce n’est pas quelque chose à quoi on joue. » — Kayaba',
+  '« Le monde a beau être virtuel, ce que l’on y ressent est bien réel. »',
+  '« La seule façon de sortir du jeu : atteindre le sommet de l’Aincrad. »',
+  '« Je préfère rester moi-même jusqu’au bout plutôt que de survivre en trichant. »',
+  '« Un jour, forger sa propre épée… et protéger les siens. »'
+];
+var qi = 0, q = document.getElementById('quote');
+setInterval(function(){
+  q.style.opacity = 0;
+  setTimeout(function(){ qi = (qi + 1) % quotes.length; q.textContent = quotes[qi]; q.style.opacity = 1; }, 400);
+}, 5200);
+// ---- Annonces défilantes composées par le créateur ----
+var ANN = $annJson;
+var ai = 0, annT = null;
+function annShow(k){
+  var t = document.getElementById('antitre'), x = document.getElementById('antexte'), b = document.getElementById('anbody');
+  if (!t || !ANN.length) return;
+  ai = ((k % ANN.length) + ANN.length) % ANN.length;
+  if (b) b.style.opacity = 0;
+  setTimeout(function(){
+    t.textContent = ANN[ai].titre || '';
+    x.textContent = ANN[ai].texte || '';
+    var dots = document.querySelectorAll('#andots i');
+    for (var d = 0; d < dots.length; d++) dots[d].className = d === ai ? 'on' : '';
+    if (b) b.style.opacity = 1;
+  }, 220);
+}
+function annArm(){ clearInterval(annT); if (ANN.length > 1) annT = setInterval(function(){ annShow(ai + 1); }, 6000); }
+if (ANN.length){
+  var dz = document.getElementById('andots');
+  if (dz) for (var an2 = 0; an2 < ANN.length; an2++) (function(n){
+    var dd = document.createElement('i');
+    dd.onclick = function(){ annShow(n); annArm(); };
+    dz.appendChild(dd);
+  })(an2);
+  annShow(0); annArm();
+  var apv = document.getElementById('anprev'), anx = document.getElementById('annext');
+  if (apv) apv.onclick = function(){ annShow(ai - 1); annArm(); };
+  if (anx) anx.onclick = function(){ annShow(ai + 1); annArm(); };
+  if (ANN.length < 2){ if (apv) apv.style.display = 'none'; if (anx) anx.style.display = 'none'; }
+}
 </script>
 </body>
 </html>
@@ -1098,7 +1491,7 @@ echo <<<HTML
   $navLinks
   <span class="spacer"></span>
   $navSupport
-  <span class="me"><img id="h_avatar" style="display:none"><span id="h_name"></span></span>
+  <span class="me"><img id="h_avatar" style="display:none"><span class="meinfo"><span id="h_name"></span><span class="hpbar" title="PV — clin d'œil SAO"><i></i></span></span></span>
   <a href="index.php?p=logout"><button>Déconnexion</button></a>
 </div>
 <div id="content"><div class="loadbox"><div class="spin"></div>Chargement…</div></div>
@@ -1138,20 +1531,42 @@ var ROLE = { creator: false, staff: false, perms: [] };
 var DASH = { nom: 'Mon Bot', accent: '#4dc3ff', modules: {} };
 var TK = null; // paramètres tickets (raisons, profils) pour la prévisualisation
 function canPerm(p){ return ROLE.creator || (ROLE.perms || []).indexOf(p) >= 0; }
+// Nom d'affichage d'un bot : « Shadow_community » → « Shadow Community ».
+function botLabel(n){
+  return String(n || '').split(/[_-]+/).map(function(w){
+    return w.toLowerCase() === 'rp' ? 'RP' : (w.charAt(0).toUpperCase() + w.slice(1));
+  }).join(' ');
+}
+// Carte serveur (accueil + sections créateur par bot).
+function scardHtml(s){
+  return '<div class="scard" data-g="' + s.id + '">' +
+    (s.icon ? '<img src="' + s.icon + '">' : '<div class="noicon">🌐</div>') +
+    '<div style="min-width:0"><div style="font-weight:700">' + esc(s.name) +
+    (s.creatorOnly ? ' <span class="ownchip">👑 accès créateur</span>' : '') + '</div>' +
+    '<div style="color:var(--muted);font-size:12px">' + (s.membres ? s.membres + ' membres · ' : '') + '🤖 ' + esc(botLabel(s.bot)) + '</div></div></div>';
+}
 
 // ----- Accueil : grille des serveurs -----
 function renderHome(){
   gid = null;
+  var own = moi.servers.filter(function(s){ return !s.creatorOnly; });
   var h = '<div class="wrap"><h1 class="pagetitle">Mes serveurs</h1>';
-  if (!moi.servers.length) h += '<div class="empty">Aucun serveur — invitez le bot sur votre serveur (bouton « Ajouter à Discord » de la page d\'accueil), puis rechargez.</div>';
+  if (!own.length) h += '<div class="empty">Aucun serveur — invitez le bot sur votre serveur (bouton « Ajouter à Discord » de la page d\'accueil), puis rechargez.</div>';
   h += '<div class="grid">';
-  moi.servers.forEach(function(s){
-    h += '<div class="scard" data-g="' + s.id + '">' +
-      (s.icon ? '<img src="' + s.icon + '">' : '<div class="noicon">🌐</div>') +
-      '<div><div style="font-weight:700">' + esc(s.name) + '</div>' +
-      '<div style="color:var(--muted);font-size:12px">' + (s.membres ? s.membres + ' membres · ' : '') + '🤖 ' + esc(s.bot) + '</div></div></div>';
-  });
+  own.forEach(function(s){ h += scardHtml(s); });
   h += '</div>';
+  // ⚙️ Créateur : une section PAR BOT avec TOUS ses serveurs (même ceux où le
+  // créateur n'est pas membre — pastille « accès créateur »).
+  if (moi.parBot && moi.parBot.length){
+    h += '<h1 class="pagetitle" style="margin-top:38px">🗺️ Tous les serveurs, bot par bot</h1>';
+    moi.parBot.forEach(function(gb){
+      var n = (gb.servers || []).length;
+      h += '<div class="botsec"><span class="bt">🤖 ' + esc(gb.label || botLabel(gb.bot)) + '</span><span class="bn2">' + n + ' serveur' + (n > 1 ? 's' : '') + '</span></div>';
+      h += '<div class="grid">';
+      (gb.servers || []).forEach(function(s){ h += scardHtml(s); });
+      h += '</div>';
+    });
+  }
   // Accès Staff / Créateur (réservés à l'équipe du bot)
   if (ROLE.staff || ROLE.creator){
     h += '<h1 class="pagetitle" style="margin-top:34px">Espace équipe du bot</h1><div class="grid">';
@@ -1285,7 +1700,7 @@ function loadPage(srv){
     api('GET', su('apercu')).then(function(d){
       if (d.error) { m.innerHTML = errScreen('Impossible de charger ce serveur : ' + d.error, true); if ($('retrybtn')) $('retrybtn').onclick = function(){ loadPage(srv); }; return; }
       var h = '<div class="fade"><h1 class="pagetitle">' + esc(d.serveur.name) + '</h1>' +
-        '<p style="color:var(--muted);margin:-18px 0 8px">' + d.serveur.membres + ' membres · géré par 🤖 ' + esc(srv ? srv.bot : '') + '</p>';
+        '<p style="color:var(--muted);margin:-18px 0 8px">' + d.serveur.membres + ' membres · géré par 🤖 ' + esc(botLabel(srv ? srv.bot : '')) + '</p>';
       var labels = { cartes: "🪪 Cartes d'identité", permis: '🚗 Permis', entreprises: '🏢 Entreprises', ticketsOuverts: '🎫 Tickets ouverts', whitelist: '📋 Whitelist métiers', vehicules: '🛡️ Véhicules assurés' };
       h += '<div class="tiles">';
       Object.keys(labels).forEach(function(k){ h += '<div class="tile"><div class="tv">' + (d.stats[k] || 0) + '</div><div class="tl">' + labels[k] + '</div></div>'; });
@@ -1758,6 +2173,10 @@ function renderCreateur(){
       '<div class="flabel" style="margin-top:12px">Accroche (page d\'accueil : « Un bot pour … »)</div><input id="cr_accroche" value="' + esc(cfg.accroche || '') + '">' +
       '<div class="flabel" style="margin-top:12px">Couleur d\'accent</div><input id="cr_accent" type="color" value="' + esc(cfg.accent || '#4dc3ff') + '" style="width:70px;height:38px;padding:3px">' +
       '</div>', '');
+    // 🏠 Builder de la page d'accueil : messages défilants (max 8).
+    h += sec('🏠 Page d\'accueil — messages défilants',
+      'Composez votre page d\'accueil : ces messages défilent dans un panneau « ANNONCES » sous le bouton LINK START (événements, règlement, nouveautés…). Réordonnez avec ▲▼.',
+      '<div id="an_list"></div><button id="an_add" style="margin-top:4px">➕ Ajouter un message</button>', '');
     // Modules
     var mi = '';
     Object.keys(mods).forEach(function(k){
@@ -1792,6 +2211,34 @@ function renderCreateur(){
 
     $('content').innerHTML = h;
     if ($('cr-home')) $('cr-home').onclick = renderHome;
+    // ----- Messages défilants de la page d'accueil (builder) -----
+    var AN = (cfg.annonces || []).map(function(a){ return { titre: (a && a.titre) || '', texte: (a && a.texte) || '' }; }).slice(0, 8);
+    var drawAnn = function(){
+      var box = $('an_list'); if (!box) return;
+      var ht = '';
+      if (!AN.length) ht = '<div class="row" style="color:var(--muted)"><i>Aucun message — la page d\'accueil affiche uniquement les citations par défaut.</i></div>';
+      AN.forEach(function(a, i){
+        ht += '<div class="row" style="align-items:flex-start;gap:9px">' +
+          '<div style="display:flex;flex-direction:column;gap:3px">' +
+          '<button class="an-up" data-i="' + i + '" style="padding:2px 8px;font-size:11px"' + (i === 0 ? ' disabled' : '') + '>▲</button>' +
+          '<button class="an-dn" data-i="' + i + '" style="padding:2px 8px;font-size:11px"' + (i === AN.length - 1 ? ' disabled' : '') + '>▼</button></div>' +
+          '<div style="flex:1;min-width:220px">' +
+          '<input class="an-ti" data-i="' + i + '" placeholder="Titre (ex : 🎉 Événement samedi)" maxlength="80" value="' + esc(a.titre) + '">' +
+          '<textarea class="an-tx" data-i="' + i + '" rows="2" placeholder="Texte du message…" maxlength="400" style="margin-top:6px">' + esc(a.texte) + '</textarea></div>' +
+          '<button class="an-del" data-i="' + i + '" style="padding:4px 11px;font-size:12px">🗑</button></div>';
+      });
+      box.innerHTML = ht;
+      Array.prototype.forEach.call(box.querySelectorAll('.an-ti'), function(el){ el.oninput = function(){ AN[+el.getAttribute('data-i')].titre = el.value; }; });
+      Array.prototype.forEach.call(box.querySelectorAll('.an-tx'), function(el){ el.oninput = function(){ AN[+el.getAttribute('data-i')].texte = el.value; }; });
+      Array.prototype.forEach.call(box.querySelectorAll('.an-del'), function(el){ el.onclick = function(){ AN.splice(+el.getAttribute('data-i'), 1); drawAnn(); }; });
+      Array.prototype.forEach.call(box.querySelectorAll('.an-up'), function(el){ el.onclick = function(){ var i2 = +el.getAttribute('data-i'); var t2 = AN[i2 - 1]; AN[i2 - 1] = AN[i2]; AN[i2] = t2; drawAnn(); }; });
+      Array.prototype.forEach.call(box.querySelectorAll('.an-dn'), function(el){ el.onclick = function(){ var i2 = +el.getAttribute('data-i'); var t2 = AN[i2 + 1]; AN[i2 + 1] = AN[i2]; AN[i2] = t2; drawAnn(); }; });
+    };
+    drawAnn();
+    if ($('an_add')) $('an_add').onclick = function(){
+      if (AN.length >= 8){ toast('⚠️ 8 messages maximum.', 'err'); return; }
+      AN.push({ titre: '', texte: '' }); drawAnn();
+    };
     // ----- Mises à jour -----
     var loadMaj = function(){
       var box = $('maj_box'); if (!box) return;
@@ -1833,9 +2280,11 @@ function renderCreateur(){
     $('cr_save').onclick = function(){
       var modules = {};
       Object.keys(mods).forEach(function(k){ if (k === 'apercu') { modules[k] = true; return; } modules[k] = $('crm_' + k) ? $('crm_' + k).checked : true; });
-      var newCfg = { nom: $('cr_nom').value.trim() || 'Mon Bot', accroche: $('cr_accroche').value.trim() || 'Le Roleplay', accent: $('cr_accent').value, modules: modules };
+      var annonces = AN.map(function(a){ return { titre: (a.titre || '').trim().slice(0, 80), texte: (a.texte || '').trim().slice(0, 400) }; })
+        .filter(function(a){ return a.titre || a.texte; });
+      var newCfg = { nom: $('cr_nom').value.trim() || 'Mon Bot', accroche: $('cr_accroche').value.trim() || 'Le Roleplay', accent: $('cr_accent').value, modules: modules, annonces: annonces };
       api('POST', gu('dashconfig-save'), { config: newCfg }).then(function(j){
-        if (j && !j.error){ toast('✅ Configuration enregistrée', 'ok'); DASH = newCfg; applyBrand(); }
+        if (j && !j.error){ toast('✅ Configuration enregistrée — la page d\'accueil est à jour', 'ok'); DASH = newCfg; applyBrand(); }
       });
     };
     // Statut : affiche le champ URL uniquement pour « streaming », charge l'existant.
@@ -1868,12 +2317,21 @@ function renderCreateur(){
 // Applique la marque (nom + couleur d'accent) définie par le créateur.
 function applyBrand(){
   if (DASH.accent) document.documentElement.style.setProperty('--accent', DASH.accent);
-  if (DASH.nom){ var b = document.querySelector('.nav .brand'); if (b) b.innerHTML = '<span class="lg">🎛️</span>' + esc(DASH.nom); document.title = DASH.nom + ' — Dashboard'; }
+  if (DASH.nom){ var b = document.querySelector('.nav .brand'); if (b) b.innerHTML = '<span class="lg">⚔️</span>' + esc(DASH.nom); document.title = DASH.nom + ' — Dashboard'; }
 }
 
 api('GET', 'index.php?p=api-moi').then(function(j){
   if (!j || j.error) { location.href = 'index.php'; return; }
   moi = j;
+  // Créateur : les serveurs où il n'est pas membre (sections par bot) sont
+  // ajoutés à sa liste pour que le rail et la vue serveur fonctionnent aussi.
+  if (j.parBot){
+    var have = {};
+    moi.servers.forEach(function(s){ have[s.id] = true; });
+    j.parBot.forEach(function(gb){
+      (gb.servers || []).forEach(function(s){ if (!have[s.id]){ have[s.id] = true; moi.servers.push(s); } });
+    });
+  }
   ROLE = j.role || ROLE;
   DASH = j.dash || DASH;
   applyBrand();

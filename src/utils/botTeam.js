@@ -72,13 +72,22 @@ async function isImmune(client, userId) {
 }
 
 // ----- Créateur du bot -----
+// L'application est mise en cache 10 min : isCreator est appelé à chaque
+// vérification de permission et ne doit pas coûter un aller-retour API
+// (sinon les interactions dépassent les 3 s et Discord affiche
+// « l'application ne répond pas »).
+let appCache = null;
+let appCacheAt = 0;
 async function isCreator(client, userId) {
   if (process.env.OWNER_ID?.trim() === userId) return true;
   try {
-    const app = await client.application.fetch();
-    if (app.owner) {
-      if (app.owner.members) return app.owner.members.has(userId);
-      return app.owner.id === userId;
+    if (!appCache || Date.now() - appCacheAt > 10 * 60 * 1000) {
+      appCache = await client.application.fetch();
+      appCacheAt = Date.now();
+    }
+    if (appCache.owner) {
+      if (appCache.owner.members) return appCache.owner.members.has(userId);
+      return appCache.owner.id === userId;
     }
   } catch {}
   return false;

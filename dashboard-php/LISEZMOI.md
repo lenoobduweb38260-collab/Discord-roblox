@@ -18,6 +18,18 @@ sur les serveurs qu'il **administre** (et uniquement ceux-là) : vue d'ensemble,
 
 Les boutons **Staff** et **Créateur** n'apparaissent qu'aux personnes concernées ; tout le reste est ouvert à chaque administrateur de serveur.
 
+### 🏠 Page d'accueil « Aincrad » personnalisable
+
+- **Messages défilants** : dans l'espace **⚙️ Créateur → « Page d'accueil — messages
+  défilants »**, composez jusqu'à 8 annonces (titre + texte) qui défilent dans le
+  panneau « ANNONCES » de la page d'accueil publique (réordonnables avec ▲▼).
+- **Choix du bot à inviter** : la page d'accueil affiche un bouton « Inviter » par
+  bot de votre agent (chaque bot a sa propre application Discord) — le visiteur
+  ajoute exactement le bot qu'il veut sur son serveur.
+- **Sections créateur par bot** : sur « Mes serveurs », le créateur voit en plus une
+  section par bot listant **tous** ses serveurs — même ceux où il n'est pas membre
+  (pastille « 👑 accès créateur ») — et peut les configurer à distance.
+
 ## 🧪 Tester en local d'abord (sans Discord ni agent)
 
 Pour voir l'interface fonctionner immédiatement sur votre PC :
