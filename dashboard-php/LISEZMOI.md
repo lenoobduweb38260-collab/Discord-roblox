@@ -28,23 +28,26 @@ Pour voir l'interface fonctionner immédiatement sur votre PC :
    fictifs et pouvez cliquer partout (les modifications sont simulées, non enregistrées)
 4. Une fois satisfait, remettez **`const DASH_DEMO = false;`** et suivez l'installation ci-dessous.
 
-## 1️⃣ Créer la connexion Discord (2 minutes)
+## 1️⃣ Installer dans public_html (ou `www`)
 
-1. [Portail développeur Discord](https://discord.com/developers/applications) → votre application (celle d'un de vos bots convient)
-2. Onglet **OAuth2** :
-   - copiez le **Client ID** → `DASH_CLIENT_ID` dans `config.php`
-   - **Reset Secret** → copiez le **Client Secret** → `DASH_CLIENT_SECRET`
-   - Dans **Redirects**, ajoutez EXACTEMENT : `VOTRE_URL/index.php?p=callback`
-     (ex : `https://monsite.fr/index.php?p=callback` — même valeur que `DASH_URL` + `/index.php?p=callback`)
-
-## 2️⃣ Installer dans public_html
-
-1. Envoyez **`index.php`** et **`config.php`** dans `public_html` (ou un sous-dossier, ex : `public_html/dashboard`)
+1. Envoyez **`index.php`** et **`config.php`** dans `public_html`/`www` (ou un sous-dossier, ex : `www/dashboard`)
 2. Remplissez `config.php` :
-   - les 2 clés OAuth2
-   - `DASH_URL` : l'URL publique du dossier, **sans / final** (ex : `https://monsite.fr` ou `https://monsite.fr/dashboard`)
-   - `AGENT_URL` (ex : `http://191.44.119.37:9999`) et `AGENT_KEY` — les mêmes que dans votre panel
-3. C'est tout — ouvrez `DASH_URL` dans votre navigateur : la page « Se connecter avec Discord » apparaît
+   - `DASH_CLIENT_ID` et `DASH_CLIENT_SECRET` — [Portail développeur Discord](https://discord.com/developers/applications) → votre application → **OAuth2** (Client ID + « Reset Secret »)
+   - `AGENT_URL` (ex : `http://IP:43600`) et `AGENT_KEY` — les mêmes que dans votre panel
+   - `DASH_URL` : **laissez vide** — l'URL est détectée automatiquement 🎉
+
+## 2️⃣ Enregistrer l'URL de redirection (1 minute, une seule fois)
+
+1. Ouvrez votre site dans le navigateur : la page d'accueil affiche un encart
+   **« Première connexion ? »** avec **l'URL de redirection exacte** et un bouton **📋 Copier**
+   (elle est aussi sur `index.php?p=diag`)
+2. Portail développeur Discord → **OAuth2** → **Redirects** → **Add Redirect** → collez-la → **Save Changes**
+3. C'est tout — cliquez « Se connecter avec Discord »
+
+> 💡 L'URL de redirection est **construite depuis la page que vous visitez**
+> (https/http, avec ou sans www, sous-dossier…) : elle correspond donc toujours,
+> y compris derrière un proxy type Cloudflare. Plus d'erreur « redirect_uri non valide »
+> à cause d'une URL recopiée à la main.
 
 ## 3️⃣ Vérifier que tout est branché (page de diagnostic)
 

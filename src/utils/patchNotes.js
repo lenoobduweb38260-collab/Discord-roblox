@@ -217,6 +217,19 @@ const RELEASES = [
     fix: [],
     retrait: [],
   },
+  {
+    id: 'dashboard-sao-2026-08a',
+    title: 'Dashboard web : thème Aincrad & connexion simplifiée',
+    ajout: [
+      '⚔️ Le **dashboard web** fait peau neuve avec un **thème Sword Art Online / Aincrad** (ciel nocturne, panneaux d\'acier bleuté, lueurs cyan)',
+    ],
+    amelioration: [
+      '🔗 **Connexion Discord fiabilisée** : l\'URL de redirection est **détectée automatiquement** (https/www/sous-dossier/proxy) — fini les erreurs « redirect_uri non valide »',
+      '📋 L\'URL exacte à enregistrer côté Discord s\'affiche sur la page d\'accueil et le diagnostic du dashboard, avec un **bouton Copier**',
+    ],
+    fix: [],
+    retrait: [],
+  },
 ];
 
 // Découpe une catégorie en champs d'embed (max 1024 caractères par champ).

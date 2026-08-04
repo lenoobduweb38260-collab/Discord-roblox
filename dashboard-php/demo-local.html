@@ -2,15 +2,15 @@
 <html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Zetku — Dashboard (DÉMO locale)</title>
 <style>  * { box-sizing: border-box; margin: 0; padding: 0; }
-  :root { --bg:#1e2126; --bg2:#17191d; --panel:#24272d; --panel2:#2b2f36; --border:#33373f; --text:#e8e9ed;
-          --muted:#8f919b; --accent:#d8734f; --accent2:#c05f3d; --green:#43b581; --red:#f04747; --blue:#4d9de0; }
+  :root { --bg:#0a1122; --bg2:#070d1a; --panel:#101a30; --panel2:#16233f; --border:#24395e; --text:#e7f1ff;
+          --muted:#8aa2c8; --accent:#4dc3ff; --accent2:#2ea8e8; --green:#43d68b; --red:#ff5f6b; --blue:#62b8ff; --gold:#ff9b3d; }
   body { font-family:'Segoe UI',system-ui,sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
   a { color:inherit; text-decoration:none; }
   button { background:var(--panel2); color:var(--text); border:1px solid var(--border); border-radius:8px;
            padding:9px 16px; font-size:13.5px; cursor:pointer; font-family:inherit; }
   button:hover { filter:brightness(1.12); }
-  button.accent { background:var(--accent); border-color:var(--accent); color:#fff; font-weight:600; }
-  input, select, textarea { background:#191b1f; border:1px solid var(--border); color:var(--text);
+  button.accent { background:linear-gradient(135deg, #39b6f5, #1f8fe0); border-color:#57c8ff; color:#04121f; font-weight:700; box-shadow:0 0 14px rgba(77,195,255,.35); }
+  input, select, textarea { background:#0b1526; border:1px solid var(--border); color:var(--text);
            border-radius:9px; padding:11px 13px; font-size:13.5px; width:100%; font-family:inherit; }
   input:focus, select:focus, textarea:focus { outline:none; border-color:var(--accent); }
   /* ---- barre du haut ---- */
@@ -28,7 +28,7 @@
   /* ---- interrupteurs façon DraftBot ---- */
   .switch { position:relative; width:46px; height:25px; flex-shrink:0; display:inline-block; }
   .switch input { opacity:0; width:0; height:0; }
-  .switch .sl { position:absolute; inset:0; background:#3a3e47; border-radius:25px; transition:.18s; cursor:pointer; }
+  .switch .sl { position:absolute; inset:0; background:#253a5c; border-radius:25px; transition:.18s; cursor:pointer; }
   .switch .sl:before { content:''; position:absolute; width:19px; height:19px; border-radius:50%; background:#fff; top:3px; left:3px; transition:.18s; }
   .switch input:checked + .sl { background:var(--accent); }
   .switch input:checked + .sl:before { transform:translateX(21px); }
@@ -57,7 +57,7 @@
   .sechead .t { font-size:17px; font-weight:700; }
   .sechead .d { color:var(--muted); font-size:13px; margin-top:3px; }
   .sechead .sw { margin-left:auto; }
-  .flabel { font-size:11px; letter-spacing:.08em; font-weight:800; color:#b9bac3; text-transform:uppercase; margin:16px 0 7px; }
+  .flabel { font-size:11px; letter-spacing:.08em; font-weight:800; color:#a9c2e8; text-transform:uppercase; margin:16px 0 7px; }
   .fields { max-width:640px; }
   .cols { display:flex; gap:34px; flex-wrap:wrap; }
   .cols > div { flex:1; min-width:320px; }
@@ -102,7 +102,7 @@
   .tab { padding:10px 18px; font-size:13.5px; color:var(--muted); cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-1px; }
   .tab:hover { color:var(--text); }
   .tab.on { color:var(--accent); border-bottom-color:var(--accent); font-weight:600; }
-  .chip { background:#101114; border:1px solid var(--border); border-radius:14px; padding:4px 11px; font-size:12.5px;
+  .chip { background:#0b1526; border:1px solid var(--border); border-radius:14px; padding:4px 11px; font-size:12.5px;
           display:inline-flex; gap:6px; align-items:center; }
   .chip button { padding:0 5px; font-size:11px; background:transparent; border:0; color:var(--muted); }
   /* ---- bouton flottant Créateur (en bas à gauche) ---- */
@@ -113,9 +113,9 @@
   /* ---- barre de défilement raffinée ---- */
   ::-webkit-scrollbar { width:10px; height:10px; }
   ::-webkit-scrollbar-track { background:transparent; }
-  ::-webkit-scrollbar-thumb { background:#3a3e47; border-radius:6px; border:2px solid var(--bg); }
-  ::-webkit-scrollbar-thumb:hover { background:#4a4f59; }
-  * { scrollbar-width:thin; scrollbar-color:#3a3e47 transparent; }
+  ::-webkit-scrollbar-thumb { background:#28405f; border-radius:6px; border:2px solid var(--bg); }
+  ::-webkit-scrollbar-thumb:hover { background:#33507a; }
+  * { scrollbar-width:thin; scrollbar-color:#28405f transparent; }
   :focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
   /* ---- chargement (spinner) ---- */
   .spin { width:34px; height:34px; border:3px solid var(--border); border-top-color:var(--accent);
@@ -124,7 +124,7 @@
   .loadbox { display:flex; flex-direction:column; align-items:center; gap:12px; padding:40px; color:var(--muted); font-size:13.5px; }
   /* ---- pastille de statut (bot en ligne) ---- */
   .dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; display:inline-block; }
-  .dot.up { background:var(--green); box-shadow:0 0 7px rgba(67,181,129,.8); }
+  .dot.up { background:var(--green); box-shadow:0 0 7px rgba(67,214,139,.8); }
   .dot.down { background:var(--red); }
   .rail .ric { position:relative; }
   .rail .ric .st { position:absolute; bottom:-1px; right:-1px; width:13px; height:13px; border-radius:50%; border:2.5px solid var(--bg2); }
@@ -161,7 +161,7 @@
   }</style>
 </head>
 <body>
-<div style="background:#d8734f;color:#fff;text-align:center;padding:7px 14px;font-size:13px;font-weight:600">🧪 DÉMO LOCALE — données fictives, aucune connexion. Toutes les sections (Staff, Créateur, Tickets, Base de données) sont explorables.</div>
+<div style="background:#4dc3ff;color:#04121f;text-align:center;padding:7px 14px;font-size:13px;font-weight:600">🧪 DÉMO LOCALE — données fictives, aucune connexion. Toutes les sections (Staff, Créateur, Tickets, Base de données) sont explorables.</div>
 <div class="nav">
   <span class="brand" style="cursor:pointer" onclick="renderHome()"><span class="lg">🎛️</span>Zetku</span>
   <span class="links"><a href="#" onclick="return false">DOCUMENTATION</a></span>
@@ -190,7 +190,7 @@ function errScreen(msg, retry){
 var DB = {
   moi: { user:{ id:'0', username:'Vous (démo)', avatar:null },
     role:{ creator:true, staff:true, rank:'Créateur', perms:['blacklist','tickets','staff'] },
-    dash:{ nom:'Zetku', accent:'#d8734f', accroche:'Le Roleplay',
+    dash:{ nom:'Zetku', accent:'#4dc3ff', accroche:'Le Roleplay',
       modules:{ apercu:true, module:true, membres:true, roles:true, salons:true, niveaux:true, whitelist:false, tickets:true } },
     servers:[
       { id:'900000000000000001', name:'Colmar RP', icon:null, membres:842, bot:'Colmar_rp', enligne:true },
@@ -320,7 +320,7 @@ function tog(id, checked){
 }
 
 var ROLE = { creator: false, staff: false, perms: [] };
-var DASH = { nom: 'Mon Bot', accent: '#d8734f', modules: {} };
+var DASH = { nom: 'Mon Bot', accent: '#4dc3ff', modules: {} };
 var TK = null; // paramètres tickets (raisons, profils) pour la prévisualisation
 function canPerm(p){ return ROLE.creator || (ROLE.perms || []).indexOf(p) >= 0; }
 
@@ -567,7 +567,7 @@ function loadPage(srv){
         '<div class="flabel">Titre</div><input id="tp_titre" value="Ouvrir un ticket">' +
         '<div class="flabel" style="margin-top:10px">Description</div><textarea id="tp_desc" rows="3">Choisissez une raison pour contacter le staff.</textarea>' +
         '<div style="display:flex;gap:9px;flex-wrap:wrap;margin-top:10px">' +
-        '<div><div class="flabel">Couleur</div><input id="tp_col" type="color" value="#d8734f" style="width:64px;height:36px;padding:2px"></div>' +
+        '<div><div class="flabel">Couleur</div><input id="tp_col" type="color" value="#4dc3ff" style="width:64px;height:36px;padding:2px"></div>' +
         '<div style="flex:1;min-width:180px"><div class="flabel">Auteur (haut de l\'embed)</div><input id="tp_auteur"></div></div>' +
         '<div class="flabel" style="margin-top:10px">Grande image (URL)</div><input id="tp_img">' +
         '<div class="flabel" style="margin-top:10px">Miniature (URL)</div><input id="tp_thumb">' +
@@ -941,7 +941,7 @@ function renderCreateur(){
       '<div class="fields">' +
       '<div class="flabel">Nom affiché</div><input id="cr_nom" value="' + esc(cfg.nom || '') + '">' +
       '<div class="flabel" style="margin-top:12px">Accroche (page d\'accueil : « Un bot pour … »)</div><input id="cr_accroche" value="' + esc(cfg.accroche || '') + '">' +
-      '<div class="flabel" style="margin-top:12px">Couleur d\'accent</div><input id="cr_accent" type="color" value="' + esc(cfg.accent || '#d8734f') + '" style="width:70px;height:38px;padding:3px">' +
+      '<div class="flabel" style="margin-top:12px">Couleur d\'accent</div><input id="cr_accent" type="color" value="' + esc(cfg.accent || '#4dc3ff') + '" style="width:70px;height:38px;padding:3px">' +
       '</div>', '');
     // Modules
     var mi = '';
@@ -982,7 +982,7 @@ function renderCreateur(){
       var box = $('maj_box'); if (!box) return;
       api('GET', gu('dash-version')).then(function(j){
         box = $('maj_box'); if (!box) return;
-        if (!j || j.error){ box.innerHTML = '<span style="color:#ec8a67">Vérification impossible : ' + esc((j && j.error) || 'réseau') + '</span>'; return; }
+        if (!j || j.error){ box.innerHTML = '<span style="color:#ffb066">Vérification impossible : ' + esc((j && j.error) || 'réseau') + '</span>'; return; }
         var cur = j.current || 'inconnue (dev)', lat = j.latest || '?';
         var html = '<div>Version installée : <b>' + esc(cur) + '</b> · Dernière version publiée : <b>' + esc(lat) + '</b></div>';
         // Interrupteur mise à jour automatique
@@ -990,7 +990,7 @@ function renderCreateur(){
           '<span style="color:var(--muted);font-size:12px;margin-left:8px">le dashboard s\'actualise seul (vérif. toutes les 6 h)</span>' +
           '<span class="sw" style="margin-left:auto">' + tog('maj_auto', j.auto !== false) + '</span></div>';
         if (!j.writable){
-          html += '<div style="color:#ec8a67;font-size:12.5px;margin-top:6px">⚠️ Ici, PHP ne peut pas réécrire index.php : la mise à jour automatique est en pause. Donnez les droits d\'écriture au fichier (chmod 644) ou ré-uploadez-le à la main.</div>';
+          html += '<div style="color:#ffb066;font-size:12.5px;margin-top:6px">⚠️ Ici, PHP ne peut pas réécrire index.php : la mise à jour automatique est en pause. Donnez les droits d\'écriture au fichier (chmod 644) ou ré-uploadez-le à la main.</div>';
         } else if (j.updateAvailable){
           html += '<div style="margin-top:10px;color:#4bd07f;font-size:12.5px">⬇️ Nouvelle version disponible — elle s\'installera automatiquement. Vous pouvez aussi l\'appliquer tout de suite :</div>' +
             '<div style="margin-top:8px"><button id="maj_go" class="accent">Mettre à jour vers ' + esc(lat) + ' maintenant</button></div>';

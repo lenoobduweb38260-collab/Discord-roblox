@@ -16,11 +16,11 @@ const DASH_CLIENT_ID = '';
 //  - Client Secret (bouton « Reset Secret » si besoin)
 const DASH_CLIENT_SECRET = '';
 
-// URL PUBLIQUE du dossier où se trouve index.php, SANS / final
-// (ex : https://monsite.fr  ou  https://monsite.fr/dashboard)
-// ➜ Ajoutez dans Portail développeur > OAuth2 > Redirects EXACTEMENT :
-//    CETTE URL + « /index.php?p=callback »
-//    (ex : https://monsite.fr/index.php?p=callback)
+// FACULTATIF — URL publique du dossier, SANS / final (ex : https://monsite.fr).
+// ✅ Laissez VIDE dans la plupart des cas : l'URL est détectée automatiquement
+// depuis la page visitée, et l'URL de redirection OAuth2 exacte à enregistrer
+// (Portail développeur > OAuth2 > Redirects) est affichée sur la page d'accueil
+// et sur index.php?p=diag, avec un bouton Copier.
 const DASH_URL = '';
 
 // ================== LIEN AVEC VOS BOTS ==================

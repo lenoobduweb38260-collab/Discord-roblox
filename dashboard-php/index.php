@@ -30,7 +30,8 @@ const DASH_BUILD = 'dev';
 // pour aider à finaliser l'installation.
 if (!DEMO && ($_GET['p'] ?? '') !== 'diag') {
   $manquants = [];
-  foreach (['DASH_CLIENT_ID', 'DASH_CLIENT_SECRET', 'DASH_URL', 'AGENT_URL', 'AGENT_KEY'] as $c) {
+  // DASH_URL n'est plus obligatoire : l'URL est auto-détectée depuis la requête.
+  foreach (['DASH_CLIENT_ID', 'DASH_CLIENT_SECRET', 'AGENT_URL', 'AGENT_KEY'] as $c) {
     if (!defined($c) || constant($c) === '') $manquants[] = $c;
   }
   if ($manquants) {
@@ -39,29 +40,66 @@ if (!DEMO && ($_GET['p'] ?? '') !== 'diag') {
       . ' (Astuce : ouvrez index.php?p=diag pour un diagnostic guidé, ou mettez DASH_DEMO = true pour tester l\'interface en local.)');
   }
 }
-$DASH_URL = defined('DASH_URL') && DASH_URL !== '' ? DASH_URL : '';
+$DASH_URL = defined('DASH_URL') && DASH_URL !== '' ? rtrim(DASH_URL, '/') : '';
 
 // Personnalisation optionnelle (constantes facultatives de config.php).
 $NOM_BOT = defined('DASH_NOM') && DASH_NOM !== '' ? DASH_NOM : 'Mon Bot';
 $URL_SUPPORT = defined('DASH_SUPPORT_URL') ? DASH_SUPPORT_URL : '';
 $URL_DOCS = defined('DASH_DOCS_URL') && DASH_DOCS_URL !== '' ? DASH_DOCS_URL : 'https://github.com/lenoobduweb38260-collab/Discord-roblox#readme';
 
+// ----- URL réelle de la page (auto-détection) -----
+// L'URL de redirection OAuth2 est construite depuis la requête RÉELLE du
+// navigateur (schéma, hôte, dossier — y compris derrière un proxy) : elle
+// correspond donc TOUJOURS à l'adresse visitée. Fini les erreurs
+// « redirect_uri non valide » dues à un DASH_URL mal recopié : DASH_URL
+// devient un simple réglage facultatif.
+function request_scheme(): string {
+  $fw = strtolower(trim(explode(',', $_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '')[0]));
+  if ($fw === 'https' || $fw === 'http') return $fw;
+  $https = $_SERVER['HTTPS'] ?? '';
+  if ($https !== '' && strtolower($https) !== 'off') return 'https';
+  if ((int) ($_SERVER['SERVER_PORT'] ?? 0) === 443) return 'https';
+  return 'http';
+}
+function request_host(): string {
+  $fw = trim(explode(',', $_SERVER['HTTP_X_FORWARDED_HOST'] ?? '')[0]);
+  return $fw !== '' ? $fw : ($_SERVER['HTTP_HOST'] ?? 'localhost');
+}
+// Chemin du script tel que servi (ex : /index.php ou /dashboard/index.php).
+function request_script(): string {
+  $path = strtok($_SERVER['SCRIPT_NAME'] ?? ($_SERVER['PHP_SELF'] ?? '/index.php'), '?');
+  return '/' . ltrim($path, '/');
+}
+// URL de redirection OAuth2. UNE SEULE source de vérité :
+//  • DASH_URL renseignée → valeur ÉPINGLÉE (comme avant : les installations
+//    existantes et les montages proxy/tunnel qui ne transmettent pas les
+//    en-têtes X-Forwarded-* continuent de fonctionner à l'identique) ;
+//  • DASH_URL vide (recommandé) → auto-détection depuis la page réelle.
+function oauth_redirect_uri(): string {
+  global $DASH_URL;
+  if ($DASH_URL !== '') return $DASH_URL . '/index.php?p=callback';
+  return request_scheme() . '://' . request_host() . request_script() . '?p=callback';
+}
+// Base d'URL pour les redirections internes — MÊME source de vérité que le
+// redirect_uri (sinon la session se pose sur un hôte et l'utilisateur est
+// renvoyé sur un autre → déconnecté juste après une connexion réussie).
+function base_url(): string {
+  global $DASH_URL;
+  if ($DASH_URL !== '') return $DASH_URL;
+  return request_scheme() . '://' . request_host() . rtrim(dirname(request_script()), '/');
+}
+
 session_set_cookie_params([
   'lifetime' => 604800,
   'path' => '/',
   'httponly' => true,
   'samesite' => 'Lax',
-  'secure' => str_starts_with($DASH_URL, 'https://'),
+  // Cookie « secure » si la connexion réelle est en https OU si DASH_URL
+  // l'impose (frontal TLS qui ne transmet pas X-Forwarded-Proto) — jamais
+  // moins protégé qu'avant.
+  'secure' => request_scheme() === 'https' || str_starts_with($DASH_URL, 'https://'),
 ]);
 session_start();
-
-// Base d'URL pour les redirections (en démo : l'hôte courant).
-function base_url(): string {
-  global $DASH_URL;
-  if ($DASH_URL !== '') return $DASH_URL;
-  $scheme = (($_SERVER['HTTPS'] ?? '') === 'on') ? 'https' : 'http';
-  return $scheme . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost');
-}
 
 // ----- Données fictives du mode démo -----
 function demo_servers(): array {
@@ -402,13 +440,13 @@ const DASH_MODULES = [
 function dash_defaults(): array {
   return [
     'nom' => defined('DASH_NOM') && DASH_NOM !== '' ? DASH_NOM : 'Mon Bot',
-    'accent' => '#d8734f',
+    'accent' => '#4dc3ff',
     'accroche' => 'Le Roleplay',
     'modules' => array_fill_keys(array_keys(DASH_MODULES), true),
   ];
 }
 function dash_config_get(): array {
-  if (DEMO) $cfg = ['nom' => 'Zetku', 'accent' => '#d8734f', 'accroche' => 'Le Roleplay', 'modules' => ['apercu' => true, 'module' => true, 'membres' => true, 'roles' => true, 'salons' => true, 'niveaux' => true, 'whitelist' => false, 'tickets' => true]];
+  if (DEMO) $cfg = ['nom' => 'Zetku', 'accent' => '#4dc3ff', 'accroche' => 'Le Roleplay', 'modules' => ['apercu' => true, 'module' => true, 'membres' => true, 'roles' => true, 'salons' => true, 'niveaux' => true, 'whitelist' => false, 'tickets' => true]];
   else { [$st, $d] = first_bot_api('/dashboard-config'); $cfg = ($st === 200 && !empty($d['config'])) ? $d['config'] : []; }
   return array_replace_recursive(dash_defaults(), is_array($cfg) ? $cfg : []);
 }
@@ -445,9 +483,14 @@ if ($p === 'login') {
   if (DEMO) { header('Location: ' . base_url() . '/index.php'); exit; }
   $state = bin2hex(random_bytes(16));
   $_SESSION['oauth_state'] = $state;
+  // Le redirect_uri est auto-détecté depuis la page réelle, et mémorisé pour
+  // renvoyer EXACTEMENT la même valeur lors de l'échange de code (exigence
+  // Discord) — quel que soit le réglage de DASH_URL.
+  $redirect = oauth_redirect_uri();
+  $_SESSION['oauth_redirect'] = $redirect;
   header('Location: https://discord.com/oauth2/authorize?response_type=code'
     . '&client_id=' . DASH_CLIENT_ID
-    . '&redirect_uri=' . rawurlencode(DASH_URL . '/index.php?p=callback')
+    . '&redirect_uri=' . rawurlencode($redirect)
     . '&scope=identify%20guilds'
     . '&state=' . $state);
   exit;
@@ -461,23 +504,25 @@ if ($p === 'callback') {
     exit;
   }
   unset($_SESSION['oauth_state']);
+  $redirect = $_SESSION['oauth_redirect'] ?? oauth_redirect_uri();
+  unset($_SESSION['oauth_redirect']);
   [$st, $token, $raw] = http_req('https://discord.com/api/oauth2/token', 'POST', [
     'client_id' => DASH_CLIENT_ID,
     'client_secret' => DASH_CLIENT_SECRET,
     'grant_type' => 'authorization_code',
     'code' => $code,
-    'redirect_uri' => DASH_URL . '/index.php?p=callback',
+    'redirect_uri' => $redirect,
   ], [], true);
   if ($st !== 200 || empty($token['access_token'])) {
-    error_log("Dashboard : échange OAuth2 refusé (HTTP $st) — vérifiez DASH_CLIENT_SECRET et l'URL de redirection. $raw");
-    header('Location: ' . DASH_URL . '/index.php?erreur=oauth');
+    error_log("Dashboard : échange OAuth2 refusé (HTTP $st) — vérifiez DASH_CLIENT_SECRET et que « $redirect » est bien dans OAuth2 → Redirects. $raw");
+    header('Location: ' . base_url() . '/index.php?erreur=oauth');
     exit;
   }
   $auth = ['Authorization: Bearer ' . $token['access_token']];
   [, $user] = http_req('https://discord.com/api/users/@me', 'GET', null, $auth);
   [, $guilds] = http_req('https://discord.com/api/users/@me/guilds', 'GET', null, $auth);
   if (empty($user['id']) || !is_array($guilds)) {
-    header('Location: ' . DASH_URL . '/index.php?erreur=discord');
+    header('Location: ' . base_url() . '/index.php?erreur=discord');
     exit;
   }
   session_regenerate_id(true);
@@ -513,10 +558,9 @@ if ($p === 'diag') {
   $checks[] = ['Mode démo ' . ($demoOn ? 'ACTIVÉ' : 'désactivé'), !$demoOn, 'Passez DASH_DEMO à false dans config.php pour la mise en ligne (sinon tout le monde entre sans Discord).'];
   $cid = defined('DASH_CLIENT_ID') ? DASH_CLIENT_ID : '';
   $csec = defined('DASH_CLIENT_SECRET') ? DASH_CLIENT_SECRET : '';
-  $durl = defined('DASH_URL') ? DASH_URL : '';
   $checks[] = ['Client ID Discord renseigné', $cid !== '', 'Portail développeur Discord → votre application → OAuth2 → Client ID.'];
   $checks[] = ['Client Secret Discord renseigné', $csec !== '', 'Portail développeur Discord → OAuth2 → « Reset Secret ».'];
-  $checks[] = ['URL publique (DASH_URL) renseignée', $durl !== '', 'Ex : https://monsite.fr (l\'adresse où se trouve ce dashboard).'];
+  $checks[] = ['URL du dashboard détectée automatiquement : ' . request_scheme() . '://' . request_host() . request_script(), true, ''];
   $aurl = defined('AGENT_URL') ? AGENT_URL : '';
   $akey = defined('AGENT_KEY') ? AGENT_KEY : '';
   $checks[] = ['Adresse de l\'agent (AGENT_URL) renseignée', $aurl !== '', 'Ex : http://IP-de-votre-serveur:9999 (le pack hébergeur qui fait tourner les bots).'];
@@ -540,7 +584,7 @@ if ($p === 'diag') {
     ? '<div class="box" style="border-color:#3ba55d">🔄 <b style="color:#4bd07f">Mise à jour automatique disponible</b> : le créateur peut mettre le dashboard à jour en un clic depuis l\'espace Créateur.</div>'
     : '<div class="box">🔄 <b>Mise à jour automatique indisponible</b> : PHP ne peut pas réécrire index.php ici. Donnez les droits d\'écriture (chmod 644) pour l\'activer, sinon ré-uploadez le fichier à la main lors des mises à jour.</div>';
 
-  $redirect = htmlspecialchars(($durl !== '' ? $durl : rtrim(base_url(), '/')) . '/index.php?p=callback');
+  $redirect = htmlspecialchars(oauth_redirect_uri());
   $rows = '';
   $allOk = true;
   foreach ($checks as $c) {
@@ -554,21 +598,23 @@ if ($p === 'diag') {
   echo <<<HTML
 <!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Diagnostic — Dashboard</title><style>
-*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Segoe UI',system-ui,sans-serif;background:#1e2126;color:#e8e9ed;padding:32px 18px;line-height:1.5}
-.card{max-width:680px;margin:0 auto;background:#24272d;border:1px solid #33373f;border-radius:14px;padding:26px}
-h1{font-size:22px;margin-bottom:4px}.sub{color:#8f919b;font-size:13.5px;margin-bottom:18px}
+*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Segoe UI',system-ui,sans-serif;background:radial-gradient(900px 420px at 80% -10%,#14305c55,transparent 60%),#0a1122;color:#e7f1ff;padding:32px 18px;line-height:1.5;min-height:100vh}
+.card{max-width:680px;margin:0 auto;background:#101a30;border:1px solid #24395e;border-radius:14px;padding:26px;box-shadow:0 12px 40px rgba(3,10,25,.5)}
+h1{font-size:22px;margin-bottom:4px}.sub{color:#8aa2c8;font-size:13.5px;margin-bottom:18px}
 .bn{border-radius:10px;padding:12px 15px;font-weight:600;font-size:14px;margin-bottom:18px}
-.bn.ok{background:#3ba55d22;color:#4bd07f}.bn.ko{background:#d8734f22;color:#ec8a67}
-.row{display:flex;gap:11px;align-items:flex-start;padding:11px 0;border-top:1px solid #33373f}
-.ic{font-size:16px;line-height:1.4}.lbl{font-size:14px;font-weight:500}.hint{color:#8f919b;font-size:12.5px;margin-top:2px}
-.box{background:#191b1f;border:1px solid #33373f;border-radius:9px;padding:12px 14px;margin-top:18px}
-.box b{color:#d8734f}code{background:#000;padding:2px 7px;border-radius:5px;font-size:13px;word-break:break-all;display:inline-block;margin-top:5px}
-a.btn{display:inline-block;margin-top:20px;background:#d8734f;color:#fff;text-decoration:none;padding:11px 20px;border-radius:9px;font-weight:600;font-size:14px}
+.bn.ok{background:#43d68b22;color:#5fe3a1}.bn.ko{background:#ff9b3d22;color:#ffb066}
+.row{display:flex;gap:11px;align-items:flex-start;padding:11px 0;border-top:1px solid #24395e}
+.ic{font-size:16px;line-height:1.4}.lbl{font-size:14px;font-weight:500}.hint{color:#8aa2c8;font-size:12.5px;margin-top:2px}
+.box{background:#0b1526;border:1px solid #24395e;border-radius:9px;padding:12px 14px;margin-top:18px}
+.box b{color:#4dc3ff}code{background:#050b18;padding:2px 7px;border-radius:5px;font-size:13px;word-break:break-all;display:inline-block;margin-top:5px;border:1px solid #1c2f4e}
+.copy{margin-top:8px;background:#16233f;border:1px solid #2a4a78;color:#bfe3ff;border-radius:7px;padding:6px 12px;font-size:12.5px;cursor:pointer;font-family:inherit}
+a.btn{display:inline-block;margin-top:20px;background:linear-gradient(135deg,#39b6f5,#1f8fe0);color:#04121f;text-decoration:none;padding:11px 20px;border-radius:9px;font-weight:700;font-size:14px;box-shadow:0 0 14px rgba(77,195,255,.3)}
 </style></head><body><div class="card">
 <h1>🔧 Diagnostic du dashboard</h1><div class="sub">Vérification de la configuration (config.php) et de la liaison au bot.</div>
 $banner
 $rows
-<div class="box">🔗 <b>URL de redirection à coller</b> dans Portail développeur Discord → OAuth2 → Redirects :<br><code>$redirect</code></div>
+<div class="box">🔗 <b>URL de redirection à coller</b> dans Portail développeur Discord → OAuth2 → Redirects (auto-détectée depuis CETTE page — copiez-la telle quelle) :<br><code id="cburi">$redirect</code><br>
+<button class="copy" onclick="navigator.clipboard.writeText(document.getElementById('cburi').textContent).then(()=>{this.textContent='✅ Copiée !'})">📋 Copier l'URL</button></div>
 $majNote
 <a class="btn" href="index.php">← Retour au dashboard</a>
 </div></body></html>
@@ -770,22 +816,31 @@ if ($p === 'api-moi' || $p === 'api-serveur' || $p === 'api-global') {
 // ============================ INTERFACE ============================
 
 $THEME = <<<'CSS'
+  /* ⚔️ Thème « Aincrad » (Sword Art Online) : ciel nocturne du château
+     flottant, panneaux d'acier bleuté et lueurs cyan des fenêtres système. */
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  :root { --bg:#1e2126; --bg2:#17191d; --panel:#24272d; --panel2:#2b2f36; --border:#33373f; --text:#e8e9ed;
-          --muted:#8f919b; --accent:#d8734f; --accent2:#c05f3d; --green:#43b581; --red:#f04747; --blue:#4d9de0; }
-  body { font-family:'Segoe UI',system-ui,sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
+  :root { --bg:#0a1122; --bg2:#070d1a; --panel:#101a30; --panel2:#16233f; --border:#24395e; --text:#e7f1ff;
+          --muted:#8aa2c8; --accent:#4dc3ff; --accent2:#2ea8e8; --green:#43d68b; --red:#ff5f6b; --blue:#62b8ff;
+          --gold:#ff9b3d; }
+  body { font-family:'Segoe UI',system-ui,sans-serif; color:var(--text); min-height:100vh;
+         background:radial-gradient(1100px 520px at 82% -12%, #14305c66, transparent 60%),
+                    radial-gradient(900px 460px at 8% 112%, #0e3a5e44, transparent 60%),
+                    linear-gradient(180deg, #0a1122 0%, #0b142a 100%);
+         background-attachment:fixed; }
   a { color:inherit; text-decoration:none; }
   button { background:var(--panel2); color:var(--text); border:1px solid var(--border); border-radius:8px;
            padding:9px 16px; font-size:13.5px; cursor:pointer; font-family:inherit; }
-  button:hover { filter:brightness(1.12); }
-  button.accent { background:var(--accent); border-color:var(--accent); color:#fff; font-weight:600; }
-  input, select, textarea { background:#191b1f; border:1px solid var(--border); color:var(--text);
+  button:hover { filter:brightness(1.15); }
+  button.accent { background:linear-gradient(135deg, #39b6f5, #1f8fe0); border-color:#57c8ff; color:#04121f;
+                  font-weight:700; box-shadow:0 0 14px rgba(77,195,255,.35); }
+  input, select, textarea { background:#0b1526; border:1px solid var(--border); color:var(--text);
            border-radius:9px; padding:11px 13px; font-size:13.5px; width:100%; font-family:inherit; }
-  input:focus, select:focus, textarea:focus { outline:none; border-color:var(--accent); }
+  input:focus, select:focus, textarea:focus { outline:none; border-color:var(--accent);
+           box-shadow:0 0 0 2px rgba(77,195,255,.18); }
   /* ---- barre du haut ---- */
   .nav { display:flex; align-items:center; gap:26px; padding:0 26px; height:64px; background:var(--bg2);
          border-bottom:1px solid var(--border); position:sticky; top:0; z-index:20; }
-  .nav .brand { display:flex; align-items:center; gap:10px; font-weight:800; font-size:19px; letter-spacing:.02em; color:var(--accent); }
+  .nav .brand { display:flex; align-items:center; gap:10px; font-weight:800; font-size:19px; letter-spacing:.06em; color:var(--accent); text-shadow:0 0 14px rgba(77,195,255,.45); }
   .nav .brand .lg { font-size:24px; }
   .nav .links { display:flex; gap:22px; font-size:13px; font-weight:700; letter-spacing:.06em; }
   .nav .links a { color:var(--text); opacity:.85; } .nav .links a:hover { color:var(--accent); opacity:1; }
@@ -797,7 +852,7 @@ $THEME = <<<'CSS'
   /* ---- interrupteurs façon DraftBot ---- */
   .switch { position:relative; width:46px; height:25px; flex-shrink:0; display:inline-block; }
   .switch input { opacity:0; width:0; height:0; }
-  .switch .sl { position:absolute; inset:0; background:#3a3e47; border-radius:25px; transition:.18s; cursor:pointer; }
+  .switch .sl { position:absolute; inset:0; background:#253a5c; border-radius:25px; transition:.18s; cursor:pointer; }
   .switch .sl:before { content:''; position:absolute; width:19px; height:19px; border-radius:50%; background:#fff; top:3px; left:3px; transition:.18s; }
   .switch input:checked + .sl { background:var(--accent); }
   .switch input:checked + .sl:before { transform:translateX(21px); }
@@ -826,7 +881,7 @@ $THEME = <<<'CSS'
   .sechead .t { font-size:17px; font-weight:700; }
   .sechead .d { color:var(--muted); font-size:13px; margin-top:3px; }
   .sechead .sw { margin-left:auto; }
-  .flabel { font-size:11px; letter-spacing:.08em; font-weight:800; color:#b9bac3; text-transform:uppercase; margin:16px 0 7px; }
+  .flabel { font-size:11px; letter-spacing:.08em; font-weight:800; color:#a9c2e8; text-transform:uppercase; margin:16px 0 7px; }
   .fields { max-width:640px; }
   .cols { display:flex; gap:34px; flex-wrap:wrap; }
   .cols > div { flex:1; min-width:320px; }
@@ -871,7 +926,7 @@ $THEME = <<<'CSS'
   .tab { padding:10px 18px; font-size:13.5px; color:var(--muted); cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-1px; }
   .tab:hover { color:var(--text); }
   .tab.on { color:var(--accent); border-bottom-color:var(--accent); font-weight:600; }
-  .chip { background:#101114; border:1px solid var(--border); border-radius:14px; padding:4px 11px; font-size:12.5px;
+  .chip { background:#0b1526; border:1px solid var(--border); border-radius:14px; padding:4px 11px; font-size:12.5px;
           display:inline-flex; gap:6px; align-items:center; }
   .chip button { padding:0 5px; font-size:11px; background:transparent; border:0; color:var(--muted); }
   /* ---- bouton flottant Créateur (en bas à gauche) ---- */
@@ -882,9 +937,9 @@ $THEME = <<<'CSS'
   /* ---- barre de défilement raffinée ---- */
   ::-webkit-scrollbar { width:10px; height:10px; }
   ::-webkit-scrollbar-track { background:transparent; }
-  ::-webkit-scrollbar-thumb { background:#3a3e47; border-radius:6px; border:2px solid var(--bg); }
-  ::-webkit-scrollbar-thumb:hover { background:#4a4f59; }
-  * { scrollbar-width:thin; scrollbar-color:#3a3e47 transparent; }
+  ::-webkit-scrollbar-thumb { background:#28405f; border-radius:6px; border:2px solid var(--bg); }
+  ::-webkit-scrollbar-thumb:hover { background:#33507a; }
+  * { scrollbar-width:thin; scrollbar-color:#28405f transparent; }
   :focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
   /* ---- chargement (spinner) ---- */
   .spin { width:34px; height:34px; border:3px solid var(--border); border-top-color:var(--accent);
@@ -893,7 +948,7 @@ $THEME = <<<'CSS'
   .loadbox { display:flex; flex-direction:column; align-items:center; gap:12px; padding:40px; color:var(--muted); font-size:13.5px; }
   /* ---- pastille de statut (bot en ligne) ---- */
   .dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; display:inline-block; }
-  .dot.up { background:var(--green); box-shadow:0 0 7px rgba(67,181,129,.8); }
+  .dot.up { background:var(--green); box-shadow:0 0 7px rgba(67,214,139,.8); }
   .dot.down { background:var(--red); }
   .rail .ric { position:relative; }
   .rail .ric .st { position:absolute; bottom:-1px; right:-1px; width:13px; height:13px; border-radius:50%; border:2.5px solid var(--bg2); }
@@ -941,6 +996,17 @@ $NOM_HTML = htmlspecialchars($NOM_BOT);
 
 if (empty($_SESSION['user'])) {
   header('Content-Type: text/html; charset=utf-8');
+  // Aide à la connexion : l'URL de redirection exacte à enregistrer côté
+  // Discord est affichée sur la page (auto-détectée), avec bouton copier.
+  $oauthUri = htmlspecialchars(oauth_redirect_uri());
+  $err = $_GET['erreur'] ?? '';
+  $errHtml = '';
+  if ($err === 'oauth') {
+    $errHtml = '<div class="errbn">⚠️ Discord a refusé la connexion. Vérifiez le <b>Client Secret</b> dans config.php '
+      . 'et que l\'URL ci-dessous est bien enregistrée dans <b>OAuth2 → Redirects</b> (puis Save Changes).</div>';
+  } elseif ($err !== '') {
+    $errHtml = '<div class="errbn">⚠️ La connexion Discord a échoué — réessayez dans un instant.</div>';
+  }
   echo <<<HTML
 <!DOCTYPE html>
 <html lang="fr">
@@ -949,35 +1015,48 @@ if (empty($_SESSION['user'])) {
 <title>$NOM_HTML — Dashboard</title>
 <style>$THEME
   .hero { position:relative; min-height:calc(100vh - 64px); display:flex; flex-direction:column; align-items:center;
-          justify-content:center; text-align:center; padding:20px 20px 150px; overflow:hidden; background:var(--bg); }
+          justify-content:center; text-align:center; padding:20px 20px 150px; overflow:hidden; }
   .star { position:absolute; background:#fff; border-radius:50%; opacity:.5; animation:tw 3s infinite; }
   @keyframes tw { 0%,100% { opacity:.15; } 50% { opacity:.7; } }
-  .biglogo { font-size:96px; margin-bottom:18px; filter:drop-shadow(0 6px 24px rgba(216,115,79,.35)); }
+  .biglogo { font-size:96px; margin-bottom:18px; filter:drop-shadow(0 0 26px rgba(77,195,255,.55)); }
   .hero .pre { color:var(--muted); font-size:21px; }
   .hero .word { color:var(--accent); font-size:32px; font-weight:700; min-height:44px; margin-bottom:26px; transition:opacity .3s; }
-  .addbtn { background:var(--accent); border:0; color:#fff; font-size:15.5px; font-weight:600; padding:14px 28px; border-radius:9px; }
+  .addbtn { background:linear-gradient(135deg,#39b6f5,#1f8fe0); border:0; color:#04121f; font-size:15.5px; font-weight:700; padding:14px 28px; border-radius:9px; box-shadow:0 0 18px rgba(77,195,255,.4); }
   .connectbtn { margin-top:14px; background:transparent; border:1.5px solid var(--border); color:var(--muted); border-radius:9px; }
   .wave { position:absolute; bottom:-4px; left:0; right:0; pointer-events:none; }
+  .errbn { background:#ff9b3d1e; border:1px solid #ff9b3d66; color:#ffc18a; border-radius:10px; padding:11px 16px;
+           font-size:13.5px; max-width:560px; margin-bottom:20px; line-height:1.5; position:relative; z-index:2; }
+  .cbx { margin-top:26px; background:#0b152699; border:1px solid var(--border); border-radius:10px; padding:12px 16px;
+         font-size:12.5px; color:var(--muted); max-width:560px; line-height:1.6; position:relative; z-index:2; }
+  .cbx code { background:#050b18; border:1px solid #1c2f4e; border-radius:5px; padding:2px 7px; font-size:12px;
+              word-break:break-all; display:inline-block; margin:4px 0; color:#bfe3ff; }
+  .cbx button { padding:4px 10px; font-size:11.5px; border-radius:6px; margin-left:4px; }
 </style>
 </head>
 <body>
 <div class="nav">
-  <span class="brand"><span class="lg">🎛️</span>$NOM_HTML</span>
+  <span class="brand"><span class="lg">⚔️</span>$NOM_HTML</span>
   $navLinks
   <span class="spacer"></span>
   $navSupport
   <a href="index.php?p=login"><button class="accent">Se connecter</button></a>
 </div>
 <div class="hero" id="hero">
-  <div class="biglogo">🎛️</div>
+  $errHtml
+  <div class="biglogo">⚔️</div>
   <div class="pre">Un bot pour</div>
   <div class="word" id="word">Le Roleplay</div>
   <a href="index.php?p=inviter"><button class="addbtn">🎮 Ajouter à Discord</button></a>
   <a href="index.php?p=login"><button class="connectbtn">🔗 Se connecter avec Discord pour gérer vos serveurs</button></a>
-  <a href="index.php?p=diag" style="margin-top:16px;color:var(--muted);font-size:12.5px">🔧 Vérifier ma configuration</a>
+  <div class="cbx">🔗 <b style="color:var(--accent)">Première connexion ?</b> Enregistrez cette URL dans
+    <b>Portail développeur Discord → OAuth2 → Redirects</b> (une seule fois) :<br>
+    <code id="cburi">$oauthUri</code>
+    <button onclick="navigator.clipboard.writeText(document.getElementById('cburi').textContent).then(()=>{this.textContent='✅ Copiée'})">📋 Copier</button>
+  </div>
+  <a href="index.php?p=diag" style="margin-top:16px;color:var(--muted);font-size:12.5px;position:relative;z-index:2">🔧 Vérifier ma configuration</a>
   <svg class="wave" viewBox="0 0 1440 180" preserveAspectRatio="none" height="150">
-    <path fill="#d8734f" d="M0,96 C240,150 480,40 720,80 C960,120 1200,150 1440,90 L1440,180 L0,180 Z" opacity=".9"/>
-    <path fill="#2b2f36" d="M0,130 C260,170 520,80 760,110 C1000,140 1240,170 1440,120 L1440,180 L0,180 Z"/>
+    <path fill="#1f8fe0" d="M0,96 C240,150 480,40 720,80 C960,120 1200,150 1440,90 L1440,180 L0,180 Z" opacity=".55"/>
+    <path fill="#101a30" d="M0,130 C260,170 520,80 760,110 C1000,140 1240,170 1440,120 L1440,180 L0,180 Z"/>
   </svg>
 </div>
 <script>
@@ -1015,7 +1094,7 @@ echo <<<HTML
 </head>
 <body>
 <div class="nav">
-  <span class="brand" style="cursor:pointer" onclick="renderHome()"><span class="lg">🎛️</span>$NOM_HTML</span>
+  <span class="brand" style="cursor:pointer" onclick="renderHome()"><span class="lg">⚔️</span>$NOM_HTML</span>
   $navLinks
   <span class="spacer"></span>
   $navSupport
@@ -1056,7 +1135,7 @@ function tog(id, checked){
 }
 
 var ROLE = { creator: false, staff: false, perms: [] };
-var DASH = { nom: 'Mon Bot', accent: '#d8734f', modules: {} };
+var DASH = { nom: 'Mon Bot', accent: '#4dc3ff', modules: {} };
 var TK = null; // paramètres tickets (raisons, profils) pour la prévisualisation
 function canPerm(p){ return ROLE.creator || (ROLE.perms || []).indexOf(p) >= 0; }
 
@@ -1303,7 +1382,7 @@ function loadPage(srv){
         '<div class="flabel">Titre</div><input id="tp_titre" value="Ouvrir un ticket">' +
         '<div class="flabel" style="margin-top:10px">Description</div><textarea id="tp_desc" rows="3">Choisissez une raison pour contacter le staff.</textarea>' +
         '<div style="display:flex;gap:9px;flex-wrap:wrap;margin-top:10px">' +
-        '<div><div class="flabel">Couleur</div><input id="tp_col" type="color" value="#d8734f" style="width:64px;height:36px;padding:2px"></div>' +
+        '<div><div class="flabel">Couleur</div><input id="tp_col" type="color" value="#4dc3ff" style="width:64px;height:36px;padding:2px"></div>' +
         '<div style="flex:1;min-width:180px"><div class="flabel">Auteur (haut de l\'embed)</div><input id="tp_auteur"></div></div>' +
         '<div class="flabel" style="margin-top:10px">Grande image (URL)</div><input id="tp_img">' +
         '<div class="flabel" style="margin-top:10px">Miniature (URL)</div><input id="tp_thumb">' +
@@ -1677,7 +1756,7 @@ function renderCreateur(){
       '<div class="fields">' +
       '<div class="flabel">Nom affiché</div><input id="cr_nom" value="' + esc(cfg.nom || '') + '">' +
       '<div class="flabel" style="margin-top:12px">Accroche (page d\'accueil : « Un bot pour … »)</div><input id="cr_accroche" value="' + esc(cfg.accroche || '') + '">' +
-      '<div class="flabel" style="margin-top:12px">Couleur d\'accent</div><input id="cr_accent" type="color" value="' + esc(cfg.accent || '#d8734f') + '" style="width:70px;height:38px;padding:3px">' +
+      '<div class="flabel" style="margin-top:12px">Couleur d\'accent</div><input id="cr_accent" type="color" value="' + esc(cfg.accent || '#4dc3ff') + '" style="width:70px;height:38px;padding:3px">' +
       '</div>', '');
     // Modules
     var mi = '';
@@ -1718,7 +1797,7 @@ function renderCreateur(){
       var box = $('maj_box'); if (!box) return;
       api('GET', gu('dash-version')).then(function(j){
         box = $('maj_box'); if (!box) return;
-        if (!j || j.error){ box.innerHTML = '<span style="color:#ec8a67">Vérification impossible : ' + esc((j && j.error) || 'réseau') + '</span>'; return; }
+        if (!j || j.error){ box.innerHTML = '<span style="color:#ffb066">Vérification impossible : ' + esc((j && j.error) || 'réseau') + '</span>'; return; }
         var cur = j.current || 'inconnue (dev)', lat = j.latest || '?';
         var html = '<div>Version installée : <b>' + esc(cur) + '</b> · Dernière version publiée : <b>' + esc(lat) + '</b></div>';
         // Interrupteur mise à jour automatique
@@ -1726,7 +1805,7 @@ function renderCreateur(){
           '<span style="color:var(--muted);font-size:12px;margin-left:8px">le dashboard s\'actualise seul (vérif. toutes les 6 h)</span>' +
           '<span class="sw" style="margin-left:auto">' + tog('maj_auto', j.auto !== false) + '</span></div>';
         if (!j.writable){
-          html += '<div style="color:#ec8a67;font-size:12.5px;margin-top:6px">⚠️ Ici, PHP ne peut pas réécrire index.php : la mise à jour automatique est en pause. Donnez les droits d\'écriture au fichier (chmod 644) ou ré-uploadez-le à la main.</div>';
+          html += '<div style="color:#ffb066;font-size:12.5px;margin-top:6px">⚠️ Ici, PHP ne peut pas réécrire index.php : la mise à jour automatique est en pause. Donnez les droits d\'écriture au fichier (chmod 644) ou ré-uploadez-le à la main.</div>';
         } else if (j.updateAvailable){
           html += '<div style="margin-top:10px;color:#4bd07f;font-size:12.5px">⬇️ Nouvelle version disponible — elle s\'installera automatiquement. Vous pouvez aussi l\'appliquer tout de suite :</div>' +
             '<div style="margin-top:8px"><button id="maj_go" class="accent">Mettre à jour vers ' + esc(lat) + ' maintenant</button></div>';
