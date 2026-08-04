@@ -247,6 +247,18 @@ const RELEASES = [
     ],
     retrait: [],
   },
+  {
+    id: 'dashboard-nexus-2026-08c',
+    title: 'Dashboard : interface « NEXUS » 💠',
+    ajout: [],
+    amelioration: [
+      '💠 **Nouveau design complet du dashboard** façon interface système SAO : fond quadrillé, panneaux à coins coupés, typographies Orbitron/Exo 2, lueurs cyan, balayage lumineux et particules',
+      '🤖 Le choix du bot sur la page d\'accueil devient de **grandes cartes de sélection** (une couleur par bot) avec « Inviter sur mon serveur → »',
+      '🔧 Page de diagnostic assortie au nouveau style',
+    ],
+    fix: [],
+    retrait: [],
+  },
 ];
 
 // Découpe une catégorie en champs d'embed (max 1024 caractères par champ).
