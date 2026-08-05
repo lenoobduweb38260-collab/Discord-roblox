@@ -1,25 +1,51 @@
 AINCRAD CONTROL PANEL — INSTALLATION RAPIDE
 
-1. Vérifiez que PHP 8.0 ou plus récent est installé.
-2. Ouvrez un terminal dans le dossier du projet.
-3. Lancez : php -S localhost:8000
-4. Ouvrez : http://localhost:8000
+1. Déposez ce dossier chez votre hébergeur PHP (version 8.0 ou plus récente).
+2. Ouvrez l'adresse de votre site dans le navigateur.
+   (Pour essayer sur votre PC : ouvrez un terminal dans ce dossier,
+    lancez « php -S localhost:8000 » puis allez sur http://localhost:8000)
 
-DOSSIERS À RENDRE MODIFIABLES PAR PHP :
-- data/
+DOSSIERS À RENDRE MODIFIABLES PAR PHP (chmod 775) :
+- data/                  (données du site + connexion à votre agent)
 - uploads/proofs/
 - uploads/backgrounds/   (images de fond téléversées depuis le Site builder)
 
-RELIER VOS BOTS (facultatif) :
-Ouvrez config.php et renseignez SITE_AGENT_URL et SITE_AGENT_KEY (les mêmes
-que votre dashboard). Puis, dans le site : Créateur > Mes bots > ajoutez
-autant de bots que voulu (nom + « nom chez l'agent ») > Synchroniser.
-Sans agent configuré, le site tourne avec des données de démonstration.
+RELIER VOS BOTS — TOUT SE FAIT DANS LE SITE, AUCUN FICHIER À MODIFIER :
+  Créateur (⚙️) > Mes bots (🤖) > encadré « 🔗 Connexion à votre agent »
+    • Adresse de l'agent : http://IP-de-votre-serveur:PORT
+      (la même valeur que AGENT_URL dans votre dashboard ;
+       ce n'est NI le Client ID du bot, NI l'adresse de votre site)
+    • Clé de l'agent : la valeur AGENT_KEY du config.env de votre agent
+    • Cliquez sur « 🔌 Tester et enregistrer »
+
+  Le site appelle vraiment votre agent :
+    ✅ il répond        -> c'est enregistré, et vos bots apparaissent
+                           aussitôt dans la liste « Nom chez l'agent »
+    ❌ il ne répond pas -> RIEN n'est enregistré, et le site vous dit
+                           précisément pourquoi (clé refusée, port fermé,
+                           adresse d'un autre service…)
+
+  Ensuite : choisissez le bot dans « Nom chez l'agent »,
+  cliquez sur « 💾 Enregistrer les bots » puis « 🔄 Synchroniser ».
+
+  À noter : si votre dashboard est installé dans un sous-dossier
+  « dashboard », le site reprend automatiquement ses réglages —
+  vous n'avez alors rien à saisir.
+
+  Sans agent joignable, le site tourne avec des données de démonstration.
+
+METTRE UN MOT DE PASSE (fortement conseillé en ligne) :
+Ouvrez config.php et renseignez SITE_ADMIN_PASSWORD. La lecture du site
+reste publique, mais toute modification demandera ce mot de passe
+(cadenas 🔒 en haut à droite). Sans mot de passe, n'importe qui trouvant
+l'adresse de votre site peut tout modifier.
 
 PERSONNALISER LE SITE :
 Ouvrez l'onglet « Site builder » dans le menu : couleur, police, style des
 boutons, arrondi, fond (votre image/GIF ou un fond animé), navigation,
 effets et CSS libre. Tout se prévisualise en direct, puis « Enregistrer ».
 
-L’interface et la persistance locale fonctionnent directement.
-Pour gérer de vrais serveurs Discord, reliez ensuite votre OAuth2 Discord et l’API de vos bots.
+EN CAS DE PROBLÈME :
+Ouvrez votre-site/api.php?action=selftest — cette page liste en clair ce
+qui va et ce qui bloque (droits d'écriture, version de PHP, agent joignable
+ou non, mot de passe configuré ou non).
