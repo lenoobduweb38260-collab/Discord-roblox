@@ -12,3 +12,7 @@ data.sqlite-wal
 data.sqlite-shm
 site-php/data/agent.php
 site-php/data/discord.php
+site-php/data/version.txt
+site-php/data/maj.php
+site-php/data/maj.lock
+site-php/data/maj-tmp/

@@ -31,6 +31,7 @@ const PROOF_DIR = __DIR__ . '/uploads/proofs';
 // Configuration facultative (liaison à l'agent hébergeur).
 if (is_file(__DIR__ . '/config.php')) require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/lib_discord.php';
+require_once __DIR__ . '/lib_maj.php';
 
 // ----- 🔒 Protection de l'administration -----
 // Deux façons d'être administrateur :
@@ -44,7 +45,11 @@ function admin_password(): string {
 }
 // Une protection est en place dès qu'il y a un mot de passe OU au moins un
 // compte Discord autorisé.
-function admin_requis(): bool { return admin_password() !== '' || discord_admins() !== []; }
+// Une protection est en place dès qu'il y a un propriétaire épinglé, un
+// membre d'équipe déclaré, un compte administrateur, ou un mot de passe.
+function admin_requis(): bool {
+  return admin_password() !== '' || owner_id() !== '' || discord_admins() !== [] || discord_staff() !== [];
+}
 function admin_connecte(): bool {
   if (!admin_requis()) return true;
   if (discord_est_admin()) return true;
@@ -243,6 +248,39 @@ function taille_lisible(int $octets): string {
   if ($octets >= 1024 * 1024 * 1024) return round($octets / 1073741824, 1) . ' Go';
   if ($octets >= 1024 * 1024) return round($octets / 1048576, 1) . ' Mo';
   return round($octets / 1024) . ' Ko';
+}
+
+// Appel POST vers l'agent (démarrage, arrêt, mise à jour d'un bot).
+function agent_post(string $path, int $timeout = 30): array {
+  $base = agent_url();
+  if ($base === '') return [0, []];
+  $url = $base . $path;
+  $headers = ['x-cle: ' . agent_key(), 'Content-Length: 0'];
+  if (function_exists('curl_init')) {
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+      CURLOPT_RETURNTRANSFER => true,
+      CURLOPT_POST => true,
+      CURLOPT_POSTFIELDS => '',
+      CURLOPT_HTTPHEADER => $headers,
+      CURLOPT_TIMEOUT => $timeout,
+    ]);
+    $raw = curl_exec($ch);
+    $code = (int) (curl_getinfo($ch, CURLINFO_RESPONSE_CODE) ?: 0);
+    curl_close($ch);
+  } else {
+    $ctx = stream_context_create(['http' => [
+      'method' => 'POST', 'header' => implode("\r\n", $headers), 'content' => '',
+      'timeout' => $timeout, 'ignore_errors' => true,
+    ]]);
+    $raw = @file_get_contents($url, false, $ctx);
+    $code = 0;
+    foreach ($http_response_header ?? [] as $h) {
+      if (preg_match('#^HTTP/\S+\s+(\d{3})#', $h, $m)) $code = (int) $m[1];
+    }
+  }
+  $data = $raw === false ? null : json_decode((string) $raw, true);
+  return [$code, is_array($data) ? $data : []];
 }
 
 // Petit identifiant stable à partir d'un nom (« Colmar RP » → « colmar-rp »).
@@ -557,6 +595,32 @@ if ($action === 'discord.config') {
     respond(['ok' => true, 'clientId' => $clientId, 'redirect' => oauth_redirect_uri(), 'admins' => discord_admins()]);
 }
 
+// 🎭 L'équipe : quel identifiant Discord a quel grade.
+if ($action === 'discord.staff') {
+    exiger_admin();
+    $in = body();
+    if (!empty($in['lire'])) {
+        respond(['ok' => true, 'staff' => discord_staff(), 'owner' => owner_id(),
+                 'ownerEpingle' => owner_id() !== '', 'moi' => moi_id()]);
+    }
+    $equipe = is_array($in['staff'] ?? null) ? $in['staff'] : [];
+    $owner = owner_id();
+    // On ne se retire pas soi-même : ce serait se fermer la porte.
+    $moi = moi_id();
+    if ($moi !== '' && $moi !== $owner && !isset($equipe[$moi])) {
+        respond(['ok' => false, 'error' => "Vous alliez retirer VOTRE propre compte de l'équipe : vous perdriez l'accès immédiatement."], 422);
+    }
+    // Sans propriétaire épinglé dans config.php, il doit rester quelqu'un.
+    if ($owner === '' && !$equipe && admin_password() === '') {
+        respond(['ok' => false, 'error' => "Impossible de vider l'équipe : plus personne ne pourrait administrer le site. "
+            . "Renseignez d'abord votre identifiant dans SITE_OWNER_ID (config.php)."], 422);
+    }
+    if (!discord_staff_save($equipe)) {
+        respond(['ok' => false, 'error' => "Impossible d'écrire dans data/ — donnez les droits d'écriture au dossier data (chmod 775)."], 500);
+    }
+    respond(['ok' => true, 'staff' => discord_staff()]);
+}
+
 // 👑 Comptes Discord autorisés à administrer le site.
 if ($action === 'discord.admins') {
     exiger_admin();
@@ -585,6 +649,78 @@ if ($action === 'discord.admins') {
         respond(['ok' => false, 'error' => "Impossible d'écrire dans data/ — donnez les droits d'écriture au dossier data (chmod 775)."], 500);
     }
     respond(['ok' => true, 'admins' => discord_admins()]);
+}
+
+// ══════════════════════════════════════════════════════════════════
+// 🔄 MISES À JOUR — le site et tous ses bots, ensemble
+// ══════════════════════════════════════════════════════════════════
+
+// Demande à l'agent de mettre à jour chaque bot déclaré, puis de le relancer.
+function maj_tous_les_bots(array $state): array {
+    $rapport = [];
+    foreach ($state['bots'] ?? [] as $bot) {
+        $nom = trim((string) ($bot['agentName'] ?? ''));
+        $affiche = (string) ($bot['name'] ?? $nom);
+        if ($nom === '') {
+            $rapport[] = ['bot' => $affiche, 'ok' => false, 'message' => "Aucun « nom chez l'agent » : impossible de le mettre à jour."];
+            continue;
+        }
+        [$code] = agent_post('/agent/bots/' . rawurlencode($nom) . '/maj', 60);
+        $rapport[] = $code === 200
+            ? ['bot' => $affiche, 'ok' => true, 'message' => "Mis à jour et relancé."]
+            : ['bot' => $affiche, 'ok' => false, 'message' => $code === 0
+                ? "Agent injoignable — vérifiez « 🔗 Connexion à votre agent »."
+                : ($code === 401 || $code === 403 ? "L'agent refuse la clé (HTTP $code)." : "L'agent a répondu HTTP $code.")];
+    }
+    return $rapport;
+}
+
+if ($action === 'maj.etat') {
+    exiger_admin();
+    $etat = maj_etat();
+    [$derniere, $lien, $err] = maj_derniere_version();
+    $installee = maj_version_installee();
+    respond(['ok' => true, 'maj' => [
+        'installee' => $installee,
+        'derniere' => $derniere,
+        'disponible' => $err === '' && maj_plus_recente($derniere, $installee),
+        'erreur' => $err ?: null,
+        'auto' => !empty($etat['auto']),
+        'derniereMaj' => $etat['derniereMaj'] ?? 0,
+        'message' => $etat['message'] ?? '',
+        'zipDispo' => class_exists('ZipArchive'),
+        'siteModifiable' => is_writable(__DIR__),
+    ]]);
+}
+
+// Active ou coupe la mise à jour automatique.
+if ($action === 'maj.auto') {
+    exiger_admin();
+    $etat = maj_etat();
+    $etat['auto'] = !empty(body()['auto']);
+    maj_etat_save($etat);
+    respond(['ok' => true, 'auto' => $etat['auto']]);
+}
+
+// Lance la mise à jour : le site, puis TOUS les bots.
+if ($action === 'maj.lancer') {
+    exiger_admin();
+    $in = body();
+    $faireSite = !isset($in['site']) || !empty($in['site']);
+    $faireBots = !isset($in['bots']) || !empty($in['bots']);
+    $sortie = ['ok' => true, 'site' => null, 'bots' => []];
+    if ($faireSite) {
+        $r = maj_site();
+        $sortie['site'] = $r;
+        $etat = maj_etat();
+        $etat['derniereMaj'] = time();
+        $etat['message'] = $r['message'];
+        maj_etat_save($etat);
+    }
+    if ($faireBots) {
+        $sortie['bots'] = maj_tous_les_bots(loadState());
+    }
+    respond($sortie);
 }
 
 // 🤖 Liste des bots déclarés chez l'agent (pour remplir « Nom chez l'agent »).
@@ -625,13 +761,60 @@ function moi_discord(): ?array {
     ];
 }
 
+// 🔄 Mise à jour automatique : un hébergeur PHP mutualisé n'a pas de tâche
+// planifiée, alors on profite des visites. Le contrôle est limité à une fois
+// toutes les 6 h, et une seule requête à la fois grâce au verrou.
+function maj_auto_si_besoin(): void {
+    $etat = maj_etat();
+    if (empty($etat['auto'])) return;
+    if (time() - (int) ($etat['dernierTest'] ?? 0) < 6 * 3600) return;
+    $etat['dernierTest'] = time();
+    maj_etat_save($etat);                        // écrit AVANT : pas de rafale
+    [$derniere, $lien, $err] = maj_derniere_version();
+    if ($err !== '' || !maj_plus_recente($derniere, maj_version_installee())) {
+        $etat['disponible'] = $err === '' ? '' : $derniere;
+        maj_etat_save($etat);
+        return;
+    }
+    $r = maj_site($derniere, $lien);
+    $etat['derniereMaj'] = time();
+    $etat['message'] = ($r['ok'] ? '✅ ' : '❌ ') . $r['message'];
+    $etat['disponible'] = $r['ok'] ? '' : $derniere;
+    maj_etat_save($etat);
+    if ($r['ok']) {
+        // Le site vient de changer de version : on aligne les bots.
+        maj_tous_les_bots(loadState());
+    }
+}
+
+// 🌐 Le site public n'a pas à divulguer les tickets et la blacklist :
+// seul le staff (identifiants Discord autorisés) reçoit tout.
+function state_public(array $state): array {
+    return [
+        'bots' => $state['bots'] ?? [],
+        'siteConfig' => $state['siteConfig'] ?? [],
+        'servers' => [],
+        'blacklist' => [],
+        'tickets' => [],
+        'archives' => [],
+        'activity' => [],
+        'serverSettings' => new stdClass(),
+    ];
+}
+
 if ($method === 'GET' && $action === 'state') {
     $moi = moi_discord();
     unset($_SESSION['discord_premier']);   // le bandeau ne s'affiche qu'une fois
+    maj_auto_si_besoin();
+    $complet = loadState();
+    $staff = est_staff() || admin_connecte();
     respond([
-        'ok' => true, 'state' => loadState(),
+        'ok' => true,
+        'state' => $staff ? $complet : state_public($complet),
         'authRequired' => admin_requis(), 'authOk' => admin_connecte(),
         'moi' => $moi,
+        'staff' => $staff,
+        'grade' => mon_grade(),
         'discordPret' => discord_app()['clientId'] !== '' && discord_app()['clientSecret'] !== '',
         // Sert à prévenir AVANT l'envoi qu'une vidéo est trop lourde.
         'limiteEnvoi' => ['octets' => limite_envoi(), 'lisible' => taille_lisible(limite_envoi())],

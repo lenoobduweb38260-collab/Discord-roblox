@@ -100,7 +100,10 @@ jobs:
       - name: Créer le pack site personnalisable (Site builder)
         run: |
           cd site-php
-          zip -r ../dist/pack-site-builder.zip . -x '*.git*' 'data/agent.php' 'data/discord.php'
+          # Version installée, pour que la mise à jour automatique sache où
+          # elle en est dès la première visite (sinon elle se retéléchargerait).
+          echo "v1.0.${{ github.run_number }}" > data/version.txt
+          zip -r ../dist/pack-site-builder.zip . -x '*.git*' 'data/agent.php' 'data/discord.php' 'data/maj.php' 'data/maj.lock'
 
       - uses: softprops/action-gh-release@v2
         with:

@@ -40,6 +40,7 @@
     agentErreur: null,
     agentReglages: null, // adresse retenue + origine (la clé n'arrive jamais ici)
     discord: null,       // réglages de la connexion Discord (null = pas encore lus)
+    maj: null,           // état des mises à jour (null = pas encore lu)
     bandeauVu: false,    // bandeau Discord (erreur / bienvenue) déjà refermé
     ticketTab: "open",   // tickets en cours / archives
     selectedArchiveId: null,
@@ -1015,13 +1016,14 @@
 
   // ── Espace créateur : bots + page + apparence + écosystème ──────────
   function creatorView() {
-    const valid = ["ecosystem", "page", "builder", "bots", "perms", "discord"];
+    const valid = ["ecosystem", "page", "builder", "bots", "perms", "discord", "maj"];
     const tab = valid.includes(ui.creatorTab) ? ui.creatorTab : "page";
     const tabs = [
       ["page", "🧱 Constructeur de page", "Blocs de la page d'accueil"],
       ["bots", "🤖 Mes bots", "Ajoutez autant de bots que voulu"],
       ["perms", "🔐 Fonctions & grades", "Qui voit quoi, avec aperçu"],
-      ["discord", "🔑 Connexion Discord", "Se connecter avec son compte"],
+      ["discord", "🔑 Connexion & équipe", "Qui entre, avec quel grade"],
+      ["maj", "🔄 Mises à jour", "Le site et tous les bots"],
       ["builder", "🎨 Apparence du site", "Thème, fond, navigation, CSS"],
       ["ecosystem", "🌍 Écosystème", "Serveurs et indicateurs"],
     ];
@@ -1030,7 +1032,8 @@
       bots: pageHead("Créateur / Bots", "Mes bots", "Déclarez ici tous vos bots — il n'y a aucune limite. Reliez-les à votre agent pour récupérer leurs vrais serveurs."),
       perms: pageHead("Créateur / Permissions", "Fonctions & grades", "Toutes les fonctions du bot et toutes les pages du site : choisissez qui y a accès, et prévisualisez le site avec les yeux d'un grade."),
       builder: pageHead("Créateur / Site builder", "Apparence du site", "Identité, thème, fond animé ou image, navigation, effets et CSS libre — appliqués en direct."),
-      discord: pageHead("Créateur / Connexion", "Connexion Discord", "Vos membres se connectent au site avec leur compte Discord. Vous choisissez qui a le droit d'administrer."),
+      discord: pageHead("Créateur / Connexion", "Connexion & équipe", "Vos membres se connectent avec leur compte Discord. Seuls les identifiants que vous listez entrent dans l'espace de gestion."),
+      maj: pageHead("Créateur / Maintenance", "Mises à jour", "Le site se met à jour tout seul depuis GitHub et aligne tous les bots qu'il pilote sur la même version."),
       ecosystem: pageHead("Créateur / Écosystème", "Vue globale", "Consultez l'ensemble des bots, des serveurs et des indicateurs de déploiement.", button("Exporter les données", "export-state", "primary")),
     };
     const tabBar = `<div class="subtabs">${tabs.map(t => `
@@ -1042,6 +1045,7 @@
       : tab === "bots" ? botsBuilderBody()
       : tab === "perms" ? permissionsBody()
       : tab === "discord" ? discordBody()
+      : tab === "maj" ? majBody()
       : creatorEcosystem();
     return `<div class="content-view">${heads[tab]}${tabBar}${body}</div>`;
   }
@@ -1334,19 +1338,124 @@
         </div>
         <div id="discord-report" style="margin-top:12px"></div>
       </div></section>
+      ${equipeSection(d)}`;
+  }
+
+  // 3️⃣ L'équipe : un identifiant Discord = un grade. Personne d'autre
+  // n'entre dans l'espace de gestion.
+  function equipeSection(d) {
+    const equipe = d.staff || {};
+    const ids = Object.keys(equipe);
+    const owner = d.owner || "";
+    const bandeauOwner = d.ownerEpingle
+      ? `<div class="row" style="border-color:rgba(47,227,139,.45)">👑 <b>Propriétaire épinglé</b><span style="color:var(--muted)">
+           <code>${esc(owner)}</code> est propriétaire via <code>SITE_OWNER_ID</code> dans <code>config.php</code>.
+           Personne ne peut lui retirer ce grade depuis le site, et aucun inconnu ne peut s'emparer du site.</span></div>`
+      : `<div class="row" style="border-color:rgba(243,200,106,.45);flex-direction:column;align-items:flex-start;gap:6px">
+           <b>⚠️ Aucun propriétaire épinglé</b>
+           <span style="color:var(--muted)">Ouvrez <code>config.php</code> et collez votre identifiant Discord dans <code>SITE_OWNER_ID</code> :
+             vous serez alors le <b>seul et unique</b> propriétaire, définitivement.
+             ${MOI ? `Le vôtre : <code style="user-select:all">${esc(MOI.id)}</code>` : "Connectez-vous pour voir le vôtre."}</span></div>`;
+    const lignes = ids.length ? ids.map(id => {
+      const g = gradeById(equipe[id]);
+      const fixe = id === owner && d.ownerEpingle;
+      return `<div class="row" data-staff-id="${esc(id)}">
+        <span style="min-width:190px">${fixe ? "👑" : "🎭"} <code>${esc(id)}</code>${MOI && MOI.id === id ? " <b>(vous)</b>" : ""}</span>
+        <select class="select" data-staff-grade="${esc(id)}" style="max-width:230px" ${fixe ? "disabled" : ""}>
+          ${GRADES.map(x => `<option value="${x.id}"${equipe[id] === x.id ? " selected" : ""}>${esc(x.label)} — ${esc(x.family)}</option>`).join("")}
+        </select>
+        <span style="color:${g.color};font-size:12px">${esc(g.desc)}</span>
+        ${fixe ? `<span style="margin-left:auto;color:var(--muted-2);font-size:12px">verrouillé par config.php</span>`
+               : `<button type="button" class="btn danger small" data-action="staff-remove" data-id="${esc(id)}" style="margin-left:auto">Retirer</button>`}
+      </div>`;
+    }).join("")
+      : `<div class="row" style="border-color:rgba(255,92,116,.45);flex-direction:column;align-items:flex-start;gap:5px">
+           <b>Personne dans l'équipe</b>
+           <span style="color:var(--muted)">Tant que la liste est vide, <b>aucun visiteur</b> n'accède à l'espace de gestion (serveurs, blacklist, tickets, créateur).</span></div>`;
+    return `
       <section class="panel mt-16"><div class="panel-inner">
-        <div class="panel-head"><div><h3>3️⃣ Qui peut administrer le site</h3>
-          <p>Seuls ces comptes Discord peuvent modifier la page, les bots et les permissions.</p></div>
-          <div class="page-actions">${button("➕ Ajouter un compte", "admin-add", "primary")}</div></div>
-        ${lignes}
-        <span class="field-note" style="display:block;margin-top:10px">L'identifiant Discord d'un membre s'obtient en activant le <b>mode développeur</b> (Discord → Paramètres → Avancés), puis clic droit sur la personne → <b>Copier l'identifiant</b>.</span>
+        <div class="panel-head"><div><h3>3️⃣ Qui fait partie de l'équipe</h3>
+          <p>Seuls ces identifiants Discord entrent dans l'espace de gestion — chacun avec son grade.</p></div>
+          <div class="page-actions">${button("➕ Ajouter un membre", "staff-add", "primary")}${button("💾 Enregistrer l'équipe", "staff-save", "success")}</div></div>
+        ${bandeauOwner}
+        <div style="margin-top:12px">${lignes}</div>
+        <span class="field-note" style="display:block;margin-top:10px">
+          Un visiteur non listé voit uniquement la <b>page d'accueil publique</b> : ni les tickets, ni la blacklist, ni les serveurs — le serveur ne les lui envoie même pas.
+          Pour obtenir l'identifiant de quelqu'un : Discord → Paramètres → Avancés → <b>Mode développeur</b>, puis clic droit sur la personne → <b>Copier l'identifiant</b>.
+        </span>
       </div></section>`;
   }
+
+  // ── 🔄 Mises à jour du site et des bots ─────────────────────────────
+  function majBody() {
+    const m = ui.maj;
+    if (!m) { chargerMaj(); return `<div class="row">⏳ Recherche de la dernière version…</div>`; }
+    const dispo = m.disponible;
+    const etat = m.erreur
+      ? `<div class="row" style="border-color:rgba(255,92,116,.45);flex-direction:column;align-items:flex-start;gap:6px">
+           <b>❌ Impossible de vérifier les mises à jour</b><span style="color:var(--muted)">${esc(m.erreur)}</span></div>`
+      : dispo
+        ? `<div class="row" style="border-color:rgba(243,200,106,.45);flex-direction:column;align-items:flex-start;gap:6px">
+             <b>🎉 Une nouvelle version est disponible : ${esc(m.derniere)}</b>
+             <span style="color:var(--muted)">Vous êtes en <b>${esc(m.installee)}</b>. La mise à jour remplace les fichiers du site et relance tous vos bots à la même version.</span></div>`
+        : `<div class="row" style="border-color:rgba(47,227,139,.45)">✅ <b>Tout est à jour</b><span style="color:var(--muted)">Version ${esc(m.installee)} — la plus récente publiée.</span></div>`;
+    const obstacles = [];
+    if (!m.zipDispo) obstacles.push("L'extension PHP <b>zip</b> manque chez votre hébergeur : le site ne peut pas se remplacer tout seul (les bots, eux, se mettent quand même à jour).");
+    if (!m.siteModifiable) obstacles.push("Le dossier du site n'est pas modifiable par PHP : donnez-lui les droits d'écriture, sinon la mise à jour du site échouera.");
+    return `
+      <div class="builder-hint">🔄 Le site va chercher la dernière version publiée sur GitHub, se met à jour <b>lui-même</b>, puis demande à l'agent de mettre à jour <b>tous les bots</b> qu'il pilote — d'un seul coup.</div>
+      ${etat}
+      ${obstacles.map(o => `<div class="row mt-16" style="border-color:rgba(243,200,106,.45)">⚠️ <span style="color:var(--muted)">${o}</span></div>`).join("")}
+      <section class="panel mt-16"><div class="panel-inner">
+        <div class="panel-head"><div><h3>⚡ Mise à jour automatique</h3>
+          <p>Activée, le site se met à jour tout seul dès qu'une version sort — et aligne vos bots dans la foulée.</p></div></div>
+        <div class="row">
+          <button type="button" class="toggle ${m.auto ? "on" : ""}" data-action="maj-auto" aria-label="Mise à jour automatique"></button>
+          <span style="color:var(--muted)">${m.auto
+            ? "✅ <b>Activée</b> — la vérification a lieu au plus une fois toutes les 6 heures, lors d'une visite du site (un hébergeur mutualisé n'a pas de tâche planifiée)."
+            : "⚪ Désactivée — vous mettez à jour à la main avec le bouton ci-dessous."}</span>
+        </div>
+        ${m.derniereMaj ? `<div class="row mt-16"><span style="color:var(--muted)">Dernier passage : ${esc(new Date(m.derniereMaj * 1000).toLocaleString("fr-FR"))}${m.message ? ` — ${esc(m.message)}` : ""}</span></div>` : ""}
+      </div></section>
+      <section class="panel mt-16"><div class="panel-inner">
+        <div class="panel-head"><div><h3>▶️ Mettre à jour maintenant</h3>
+          <p>Le site puis tous les bots déclarés, dans cet ordre.</p></div>
+          <div class="page-actions">
+            ${button("🤖 Les bots seulement", "maj-bots", "ghost")}
+            ${button("🔄 Tout mettre à jour", "maj-tout", "success")}
+          </div></div>
+        <div class="row" style="flex-direction:column;align-items:flex-start;gap:5px">
+          <span style="color:var(--muted)">Vos données sont préservées : <code>data/</code>, <code>uploads/</code> et <code>config.php</code> ne sont jamais écrasés.</span>
+          <span style="color:var(--muted)">Chaque bot est arrêté, mis à jour, puis relancé par l'agent — quelques secondes d'interruption.</span>
+        </div>
+        <div id="maj-rapport" style="margin-top:12px"></div>
+      </div></section>`;
+  }
+
+  async function chargerMaj() {
+    try {
+      const r = await api("maj.etat");
+      ui.maj = r.maj;
+    } catch (e) {
+      ui.maj = { installee: "inconnue", derniere: "", erreur: e.message, zipDispo: true, siteModifiable: true };
+    }
+    if (ui.creatorTab === "maj") render();
+  }
+
+  async function chargerDiscordStaff() {
+    try {
+      const r = await api("discord.staff", { lire: true });
+      if (ui.discord) Object.assign(ui.discord, { staff: r.staff, owner: r.owner, ownerEpingle: r.ownerEpingle });
+    } catch (_) { /* la section affichera l'état par défaut */ }
+  }
+
+  // ── 🔐 Permissions par grade + aperçu ───────────────────────────────
 
   async function chargerDiscord() {
     try {
       const r = await api("discord.config", { lire: true });
       ui.discord = r.discord;
+      await chargerDiscordStaff();
     } catch (e) {
       ui.discord = { clientId: "", admins: [], redirect: DISCORD.redirect || "", erreur: e.message };
     }
@@ -1947,6 +2056,7 @@
           // proposer directement les bons noms dans la liste déroulante.
           if (ui.creatorTab === "bots" && ui.agentBots === null) chargerBotsAgent();
           if (ui.creatorTab === "discord" && ui.discord === null) chargerDiscord();
+          if (ui.creatorTab === "maj" && ui.maj === null) chargerMaj();
           break;
         case "auth-open":
           openLoginModal();
@@ -2121,6 +2231,79 @@
           await api("discord.config", { clientId: "" });
           await chargerDiscord();
           toast("IDENTIFIANTS EFFACÉS", "Le site reprendra ceux du dashboard voisin, s'il y en a.");
+          break;
+        }
+        // ── 🎭 L'équipe : identifiant Discord → grade ────────────────
+        case "staff-add": {
+          const saisi = prompt("Identifiant Discord du membre à ajouter (17 à 20 chiffres) :");
+          if (!saisi) break;
+          const id = saisi.replace(/\D+/g, "");
+          if (id.length < 15) { toast("IDENTIFIANT INVALIDE", "Attendu : 17 à 20 chiffres (mode développeur → Copier l'identifiant).", "error"); break; }
+          const equipe = { ...(ui.discord?.staff || {}) };
+          if (equipe[id]) { toast("DÉJÀ DANS L'ÉQUIPE", "Ce compte y figure — changez simplement son grade."); break; }
+          equipe[id] = "staff";                 // grade de départ, modifiable juste après
+          await api("discord.staff", { staff: equipe });
+          await chargerDiscord();
+          toast("MEMBRE AJOUTÉ", "Choisissez son grade, puis « Enregistrer l'équipe ».");
+          break;
+        }
+        case "staff-remove": {
+          const id = target.dataset.id;
+          if (!confirm(`Retirer ${id} de l'équipe ? Ce compte n'aura plus accès à l'espace de gestion.`)) break;
+          const equipe = { ...(ui.discord?.staff || {}) };
+          delete equipe[id];
+          await api("discord.staff", { staff: equipe });
+          await chargerDiscord();
+          toast("MEMBRE RETIRÉ", `${id} n'a plus accès à l'espace de gestion.`);
+          break;
+        }
+        case "staff-save": {
+          const equipe = {};
+          document.querySelectorAll("[data-staff-grade]").forEach(sel => { equipe[sel.dataset.staffGrade] = sel.value; });
+          await api("discord.staff", { staff: equipe });
+          await chargerDiscord();
+          toast("ÉQUIPE ENREGISTRÉE", `${Object.keys(equipe).length} membre(s) — chacun avec son grade.`);
+          break;
+        }
+        // ── 🔄 Mises à jour ─────────────────────────────────────────
+        case "maj-auto": {
+          const actif = !target.classList.contains("on");
+          await api("maj.auto", { auto: actif });
+          if (ui.maj) ui.maj.auto = actif;
+          render();
+          toast(actif ? "AUTOMATIQUE ACTIVÉE" : "AUTOMATIQUE COUPÉE",
+            actif ? "Le site se mettra à jour tout seul, ainsi que vos bots." : "Vous garderez la main sur chaque mise à jour.");
+          break;
+        }
+        case "maj-bots":
+        case "maj-tout": {
+          const toutFaire = target.dataset.action === "maj-tout";
+          if (toutFaire && !confirm("Mettre à jour le site ET tous les bots ?\n\nLes bots seront arrêtés puis relancés (quelques secondes d'interruption). Vos données et vos réglages sont conservés.")) break;
+          const libelle = target.textContent;
+          target.textContent = "⏳ Mise à jour…";
+          target.disabled = true;
+          try {
+            const r = await api("maj.lancer", { site: toutFaire, bots: true });
+            const box = document.querySelector("#maj-rapport");
+            const lignes = [];
+            if (r.site) {
+              lignes.push(`<div class="row" style="border-color:${r.site.ok ? "rgba(47,227,139,.4)" : "rgba(255,92,116,.45)"}">
+                ${r.site.ok ? "✅" : "❌"} <b>Site</b><span style="color:var(--muted)">${esc(r.site.message)}</span></div>`);
+            }
+            (r.bots || []).forEach(l => lignes.push(`<div class="row" style="border-color:${l.ok ? "rgba(47,227,139,.4)" : "rgba(255,92,116,.45)"}">
+              ${l.ok ? "✅" : "❌"} <b>${esc(l.bot)}</b><span style="color:var(--muted)">${esc(l.message)}</span></div>`));
+            if (!lignes.length) lignes.push(`<div class="row">Aucun bot déclaré à mettre à jour.</div>`);
+            if (box) box.innerHTML = lignes.join("");
+            const echecs = (r.bots || []).filter(l => !l.ok).length + (r.site && !r.site.ok ? 1 : 0);
+            toast(echecs ? "MISE À JOUR PARTIELLE" : "MISE À JOUR TERMINÉE",
+              echecs ? `${echecs} élément(s) en échec — voir le détail.` : "Le site et vos bots sont à la même version.",
+              echecs ? "error" : "success");
+            if (r.site?.ok) setTimeout(() => window.location.reload(), 2500);
+          } catch (e) {
+            toast("ÉCHEC", e.message, "error");
+          } finally {
+            if (target.isConnected) { target.textContent = libelle; target.disabled = false; }
+          }
           break;
         }
         case "admin-add": {

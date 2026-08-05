@@ -41,7 +41,7 @@ function oauth_redirect_uri(): string {
 // écriture le rafraîchisse immédiatement dans la même requête.
 function discord_store(): array {
   if (isset($GLOBALS['__discord_store'])) return $GLOBALS['__discord_store'];
-  $c = ['clientId' => '', 'clientSecret' => '', 'admins' => []];
+  $c = ['clientId' => '', 'clientSecret' => '', 'admins' => [], 'staff' => []];
   $brut = @file_get_contents(DISCORD_STORE);
   if ($brut !== false && strpos($brut, DISCORD_PREFIX) === 0) {
     $d = json_decode(substr($brut, strlen(DISCORD_PREFIX)), true);
@@ -49,6 +49,7 @@ function discord_store(): array {
       $c['clientId'] = (string) ($d['clientId'] ?? '');
       $c['clientSecret'] = (string) ($d['clientSecret'] ?? '');
       $c['admins'] = array_values(array_filter(array_map('strval', (array) ($d['admins'] ?? []))));
+      $c['staff'] = is_array($d['staff'] ?? null) ? $d['staff'] : [];
     }
   }
   $GLOBALS['__discord_store'] = $c;
@@ -61,6 +62,7 @@ function discord_store_save(array $valeurs): bool {
     'clientId' => (string) ($valeurs['clientId'] ?? $actuel['clientId']),
     'clientSecret' => (string) ($valeurs['clientSecret'] ?? $actuel['clientSecret']),
     'admins' => array_values(array_unique(array_map('strval', (array) ($valeurs['admins'] ?? $actuel['admins'])))),
+    'staff' => (array) ($valeurs['staff'] ?? $actuel['staff']),
   ];
   $ok = @file_put_contents(DISCORD_STORE, DISCORD_PREFIX . json_encode($nouveau)) !== false;
   if ($ok) {
@@ -110,9 +112,72 @@ function dashboard_discord(): array {
   return $cache;
 }
 
+// ----- 👑 LE propriétaire, défini dans config.php -----
+// Renseigné, il l'emporte sur tout : impossible de le retirer depuis le site,
+// et le site est protégé DÈS L'INSTALLATION (aucun inconnu ne peut s'en
+// emparer en se connectant le premier).
+function owner_id(): string {
+  if (!defined('SITE_OWNER_ID')) return '';
+  $id = preg_replace('/\D+/', '', (string) SITE_OWNER_ID);
+  return ($id !== null && strlen($id) >= 15 && strlen($id) <= 25) ? $id : '';
+}
+function moi_id(): string { return (string) ($_SESSION['discord']['id'] ?? ''); }
+function est_owner(): bool {
+  $moi = moi_id();
+  if ($moi === '') return false;
+  $owner = owner_id();
+  if ($owner !== '') return $moi === $owner;
+  // Sans propriétaire épinglé, le premier compte enregistré fait office.
+  $admins = discord_admins();
+  return $admins && $moi === $admins[0];
+}
+
+// ----- 🎭 L'équipe : qui a droit à quoi, par identifiant Discord -----
+// { "identifiant" : "grade" } — les grades sont ceux du site
+// (membre, police, staff, admin, bot-tickets, bot-blacklist, bot-staff, createur).
+function discord_staff(): array {
+  $s = discord_store();
+  $equipe = is_array($s['staff'] ?? null) ? $s['staff'] : [];
+  // Le propriétaire est TOUJOURS créateur, quoi qu'il y ait dans le fichier.
+  $owner = owner_id();
+  if ($owner !== '') $equipe[$owner] = 'createur';
+  return $equipe;
+}
+function discord_staff_save(array $equipe): bool {
+  $propre = [];
+  foreach ($equipe as $id => $grade) {
+    $id = preg_replace('/\D+/', '', (string) $id);
+    $grade = preg_replace('/[^a-z\-]/', '', strtolower((string) $grade));
+    if ($id !== null && strlen($id) >= 15 && strlen($id) <= 25 && $grade !== '') $propre[$id] = $grade;
+  }
+  $owner = owner_id();
+  if ($owner !== '') $propre[$owner] = 'createur';
+  return discord_store_save(['staff' => $propre]);
+}
+// Le grade du visiteur connecté. null = simple visiteur, sans accès à
+// l'espace de gestion.
+function mon_grade(): ?string {
+  if (est_owner()) return 'createur';
+  $moi = moi_id();
+  if ($moi === '') return null;
+  $equipe = discord_staff();
+  if (isset($equipe[$moi])) return $equipe[$moi];
+  // Compatibilité : les comptes de l'ancienne liste « admins » sont créateurs.
+  return in_array($moi, discord_admins(), true) ? 'createur' : null;
+}
+// A-t-il le droit d'entrer dans l'espace de gestion (tickets, blacklist…) ?
+function est_staff(): bool { return mon_grade() !== null; }
+
 // ----- 👑 Comptes Discord autorisés à administrer le site -----
 function discord_admins(): array {
-  return discord_store()['admins'];
+  $admins = discord_store()['admins'];
+  $owner = owner_id();
+  // Le propriétaire figure toujours en tête et ne peut pas disparaître.
+  if ($owner !== '') {
+    $admins = array_values(array_diff($admins, [$owner]));
+    array_unshift($admins, $owner);
+  }
+  return $admins;
 }
 function discord_admins_save(array $ids): bool {
   $propres = [];
@@ -124,8 +189,11 @@ function discord_admins_save(array $ids): bool {
 }
 // Le visiteur connecté est-il l'un des comptes autorisés ?
 function discord_est_admin(): bool {
-  $id = (string) ($_SESSION['discord']['id'] ?? '');
+  if (est_owner()) return true;
+  $id = moi_id();
   if ($id === '') return false;
+  // Le grade « createur » donne les pleins pouvoirs sur le site.
+  if (mon_grade() === 'createur') return true;
   $admins = discord_admins();
   return $admins ? in_array($id, $admins, true) : false;
 }

@@ -346,6 +346,24 @@ const RELEASES = [
     ],
     retrait: [],
   },
+  {
+    id: 'site-equipe-maj-2026-08i',
+    title: 'Site : équipe par identifiant, propriétaire épinglé & mises à jour auto 🔄',
+    ajout: [
+      '👑 **`SITE_OWNER_ID` dans `config.php`** : collez votre identifiant Discord et vous êtes le **seul et unique propriétaire**, définitivement — personne ne peut vous retirer ce grade depuis le site',
+      '🔒 **Site verrouillé dès l\'installation** dès que cette ligne est remplie : aucun inconnu ne peut s\'en emparer en se connectant avant vous',
+      '🎭 **L\'équipe se compose identifiant par identifiant**, chacun avec son grade : seuls les comptes listés entrent dans l\'espace de gestion',
+      '🔄 **Mise à jour automatique** : le site va chercher la dernière version publiée, se remplace lui-même, puis **met à jour tous les bots qu\'il pilote** dans la foulée',
+      '▶️ Bouton **« Tout mettre à jour »** pour déclencher la même chose à la demande, avec un rapport ligne par ligne',
+    ],
+    amelioration: [
+      '🛡️ **Les tickets, la blacklist et les serveurs ne sont plus envoyés aux visiteurs** qui ne font pas partie de l\'équipe — le serveur ne les transmet même pas à la page',
+      '💾 Une mise à jour n\'écrase jamais `data/`, `uploads/` ni `config.php` : réglages, images et données restent intacts',
+      '🧯 Verrou anti-collision pendant la mise à jour, et annulation si l\'archive téléchargée n\'est pas celle du site',
+    ],
+    fix: [],
+    retrait: [],
+  },
 ];
 
 // Découpe une catégorie en champs d'embed (max 1024 caractères par champ).

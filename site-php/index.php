@@ -17,7 +17,9 @@ require_once __DIR__ . '/lib_discord.php';
 if (session_status() !== PHP_SESSION_ACTIVE) session_start();
 
 $motDePasse = defined('SITE_ADMIN_PASSWORD') ? (string) SITE_ADMIN_PASSWORD : '';
-$authRequired = $motDePasse !== '' || discord_admins() !== [];
+// Le site est protégé dès qu'un propriétaire est épinglé, qu'un compte est
+// autorisé, ou qu'un mot de passe de secours existe.
+$authRequired = $motDePasse !== '' || owner_id() !== '' || discord_admins() !== [] || discord_staff() !== [];
 $authOk = !$authRequired || discord_est_admin() || !empty($_SESSION['site_admin']);
 
 // Profil Discord de la session (jamais de secret ici).
@@ -30,6 +32,9 @@ if (!empty($_SESSION['discord']['id'])) {
         'pseudo' => (string) ($u['pseudo'] ?? ''),
         'avatar' => (string) ($u['avatar'] ?? ''),
         'admin' => discord_est_admin(),
+        'owner' => est_owner(),
+        'grade' => mon_grade(),
+        'staff' => est_staff(),
         'serveurs' => count($_SESSION['discord_guilds'] ?? []),
         'premier' => !empty($_SESSION['discord_premier']),
     ];
@@ -37,6 +42,17 @@ if (!empty($_SESSION['discord']['id'])) {
 }
 $app = discord_app();
 $discordPret = $app['clientId'] !== '' && $app['clientSecret'] !== '';
+
+// 🌐 Un visiteur qui n'est pas du staff ne doit PAS recevoir les tickets ni
+// la blacklist : la page publique n'embarque que ce qu'elle affiche.
+if (!est_staff() && !$authOk) {
+    $bootState = [
+        'bots' => $bootState['bots'] ?? [],
+        'siteConfig' => $bootState['siteConfig'] ?? [],
+        'servers' => [], 'blacklist' => [], 'tickets' => [],
+        'archives' => [], 'activity' => [], 'serverSettings' => new stdClass(),
+    ];
+}
 // Message d'erreur éventuel du retour OAuth2, traduit en clair.
 $oauthErreurs = [
     'discord_non_configure' => "La connexion Discord n'est pas encore configurée sur ce site (⚙️ Créateur → 🔑 Connexion Discord).",
