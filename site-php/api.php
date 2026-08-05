@@ -286,7 +286,17 @@ if ($action === 'selftest') {
     $dataOk = is_file(DATA_FILE) && is_writable(DATA_FILE);
     $bgDir = __DIR__ . '/uploads/backgrounds';
     $probleme = agent_url_probleme();
-    $agent = ['adresseUtilisee' => agent_url(), 'probleme' => $probleme, 'joignable' => false, 'bots' => []];
+    $repris = dashboard_agent();
+    $urlPropre = defined('SITE_AGENT_URL') && adresse_plausible((string) SITE_AGENT_URL);
+    $agent = [
+        'adresseUtilisee' => agent_url(),
+        // D'où viennent réellement l'adresse et la clé employées.
+        'origine' => $urlPropre ? 'config.php du site' : ($repris['source'] ? 'repris du ' . $repris['source'] : 'aucune'),
+        'cleFournie' => agent_key() !== '' ? 'oui' : 'non',
+        'probleme' => $probleme,
+        'joignable' => false,
+        'bots' => [],
+    ];
     if ($probleme === null) {
         [$code, $etat] = agent_get('/agent/etat', 8);
         $agent['httpAgent'] = $code;
