@@ -1,8 +1,29 @@
 <?php
 declare(strict_types=1);
 
+// Aucune notice, aucun avertissement PHP ne doit se mélanger au JSON :
+// sinon le site affiche « Réponse serveur invalide ».
+error_reporting(E_ALL & ~E_DEPRECATED & ~E_NOTICE & ~E_WARNING);
+ini_set('display_errors', '0');
+ob_start();
+
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store, no-cache, must-revalidate');
+
+// Une erreur fatale renvoie quand même du JSON exploitable.
+register_shutdown_function(static function () {
+    $fatal = error_get_last();
+    if ($fatal && in_array($fatal['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR], true)) {
+        if (ob_get_length() !== false) ob_end_clean();
+        http_response_code(500);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode([
+            'ok' => false,
+            'error' => 'Erreur PHP : ' . $fatal['message'] . ' (' . basename($fatal['file']) . ' ligne ' . $fatal['line'] . ')',
+            'php' => PHP_VERSION,
+        ]);
+    }
+});
 
 const DATA_FILE = __DIR__ . '/data/app.json';
 const PROOF_DIR = __DIR__ . '/uploads/proofs';
@@ -53,9 +74,11 @@ function slugify(string $value, string $fallback = 'bot'): string {
   return $value !== '' ? substr($value, 0, 40) : $fallback;
 }
 
-function respond(array $payload, int $status = 200): never
+function respond(array $payload, int $status = 200)
 {
+    if (ob_get_length() !== false) ob_end_clean();   // jette toute sortie parasite
     http_response_code($status);
+    header('Content-Type: application/json; charset=utf-8');
     echo json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
     exit;
 }
@@ -111,16 +134,31 @@ function saveState(array $state): void
 
 function body(): array
 {
+    // Voie de secours : certains hébergeurs mutualisés (pare-feu applicatif)
+    // rejettent les POST au format JSON. Le site renvoie alors les mêmes
+    // données dans un champ de formulaire « payload ».
+    if (isset($_POST['payload'])) {
+        $decoded = json_decode((string) $_POST['payload'], true);
+        if (is_array($decoded)) return $decoded;
+    }
+
     $contentType = $_SERVER['CONTENT_TYPE'] ?? '';
-    if (str_contains($contentType, 'application/json')) {
+    if (strpos($contentType, 'application/json') !== false) {
         $decoded = json_decode((string) file_get_contents('php://input'), true);
         return is_array($decoded) ? $decoded : [];
+    }
+
+    // Dernier recours : le corps est du JSON mais sans en-tête correct.
+    $raw = (string) file_get_contents('php://input');
+    if ($raw !== '' && ($raw[0] === '{' || $raw[0] === '[')) {
+        $decoded = json_decode($raw, true);
+        if (is_array($decoded)) return $decoded;
     }
 
     return $_POST;
 }
 
-function cleanString(mixed $value, int $max = 500): string
+function cleanString($value, int $max = 500): string
 {
     $value = trim((string) $value);
     return function_exists('mb_substr') ? mb_substr($value, 0, $max) : substr($value, 0, $max);
@@ -149,6 +187,28 @@ function findIndexById(array $items, string $id): int
 
 $action = $_GET['action'] ?? $_POST['action'] ?? 'state';
 $method = strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET');
+
+// 🩺 Diagnostic : ouvrez api.php?action=selftest dans le navigateur pour
+// savoir immédiatement ce qui bloque chez votre hébergeur.
+if ($action === 'selftest') {
+    $dataOk = is_file(DATA_FILE) && is_writable(DATA_FILE);
+    $bgDir = __DIR__ . '/uploads/backgrounds';
+    respond([
+        'ok' => true,
+        'php' => PHP_VERSION,
+        'phpSuffisant' => version_compare(PHP_VERSION, '7.4', '>='),
+        'donneesLisibles' => is_file(DATA_FILE),
+        'donneesModifiables' => $dataOk,
+        'dossierPreuves' => is_dir(PROOF_DIR) ? is_writable(PROOF_DIR) : 'absent',
+        'dossierFonds' => is_dir($bgDir) ? is_writable($bgDir) : 'absent',
+        'curl' => function_exists('curl_init'),
+        'allow_url_fopen' => (bool) ini_get('allow_url_fopen'),
+        'agentConfigure' => agent_url() !== '',
+        'conseil' => $dataOk
+            ? 'Tout est bon : les enregistrements doivent fonctionner.'
+            : 'Donnez les droits d\'écriture à data/app.json (chmod 664) et au dossier data/ (chmod 775).',
+    ]);
+}
 
 if ($method === 'GET' && $action === 'state') {
     respond(['ok' => true, 'state' => loadState()]);

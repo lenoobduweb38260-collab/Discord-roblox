@@ -159,17 +159,45 @@
   }
 
   async function api(action, payload = {}, options = {}) {
-    const config = options.formData
-      ? { method: "POST", body: options.formData }
-      : {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action, ...payload }),
-        };
+    const url = `${window.AINCRAD_API}?action=${encodeURIComponent(action)}`;
 
-    const response = await fetch(`${window.AINCRAD_API}?action=${encodeURIComponent(action)}`, config);
-    const data = await response.json().catch(() => ({ ok: false, error: "Réponse serveur invalide." }));
-    if (!response.ok || !data.ok) throw new Error(data.error || "Une erreur est survenue.");
+    // Envoie la requête et essaie de lire du JSON. En cas de réponse
+    // illisible, on renvoie le texte brut pour pouvoir diagnostiquer.
+    async function envoyer(config) {
+      const response = await fetch(url, config);
+      const texte = await response.text();
+      try {
+        return { data: JSON.parse(texte), response };
+      } catch (_) {
+        return { data: null, texte, response };
+      }
+    }
+
+    let tentative;
+    if (options.formData) {
+      tentative = await envoyer({ method: "POST", body: options.formData });
+    } else {
+      const corps = JSON.stringify({ action, ...payload });
+      tentative = await envoyer({ method: "POST", headers: { "Content-Type": "application/json" }, body: corps });
+      // Plan B : certains hébergeurs mutualisés bloquent les POST JSON.
+      // On rejoue la même requête en formulaire classique.
+      if (!tentative.data) {
+        const form = new URLSearchParams();
+        form.set("action", action);
+        form.set("payload", corps);
+        tentative = await envoyer({ method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: form.toString() });
+      }
+    }
+
+    const { data, texte, response } = tentative;
+    if (!data) {
+      // Message précis plutôt qu'un « réponse invalide » sans info.
+      const extrait = String(texte || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 160);
+      throw new Error(`Le serveur n'a pas renvoyé de JSON (HTTP ${response.status}). ` +
+        (extrait ? `Réponse : « ${extrait} »` : "Réponse vide.") +
+        " — ouvrez api.php?action=selftest pour un diagnostic.");
+    }
+    if (!response.ok || !data.ok) throw new Error(data.error || `Une erreur est survenue (HTTP ${response.status}).`);
     if (data.state) state = data.state;
     return data;
   }
