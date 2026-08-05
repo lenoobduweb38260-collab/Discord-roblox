@@ -3,6 +3,34 @@
 Panneau de gestion Discord complet en PHP, JavaScript natif et CSS, **entièrement
 personnalisable depuis le site lui-même** (onglet ⚙️ **Site builder**).
 
+## 🤖 Vos bots — autant que vous voulez
+
+Dans **⚙️ Créateur → 🤖 Mes bots**, ajoutez **autant de bots que nécessaire**
+(bouton « ➕ Ajouter un bot », aucune limite). Pour chacun :
+
+| Champ | À quoi ça sert |
+|-------|----------------|
+| **Nom affiché** | Le nom montré sur le site (ex : `Colmar RP`) |
+| **Étiquette** | Petit texte sous le nom (ex : `BOT RP`) |
+| **Couleur** | Teinte de la carte du bot |
+| **Description** | Une phrase de présentation |
+| **Nom chez l'agent** | Le nom EXACT du bot dans votre panel (dossier `bots/<nom>`) — c'est ce qui **relie** le site au bot |
+| **Client ID Discord** | Sert au lien « inviter ce bot » (rempli automatiquement à la synchronisation) |
+
+Ensuite **🔄 Synchroniser avec l'agent** : le site interroge chaque bot et
+récupère ses **vrais serveurs**, ses compteurs et son Client ID. Un rapport
+ligne par ligne indique ✅ ou ❌ **avec la raison** (bot arrêté, nom inconnu,
+bot qui ne répond pas…).
+
+Pour que la liaison fonctionne, remplissez une seule fois dans **`config.php`** :
+
+```php
+const SITE_AGENT_URL = 'http://IP-de-votre-serveur:PORT';  // votre agent
+const SITE_AGENT_KEY = 'votre-cle-agent';                  // la même que le dashboard
+```
+
+Laissés vides, le site tourne avec des données de démonstration.
+
 ## 🎨 Site builder — construisez votre site sans toucher au code
 
 Tout se règle dans l’onglet **Site builder**, avec **aperçu en direct** (chaque
@@ -18,6 +46,13 @@ qui l’applique pour tous les visiteurs :
 | ✨ **Effets** | Animations, particules flottantes, balayage lumineux, aura du curseur, écran de démarrage, mode compact, maintenance, statut public |
 | 🧪 **CSS personnalisé** | Votre CSS injecté tel quel sur tout le site (20 000 caractères) — pouvoir total sur le style |
 
+Et dans **🧱 Constructeur de page**, la page d'accueil se compose **bloc par
+bloc** : bannière, sélection des bots, chiffres clés, cartes de
+fonctionnalités, texte libre, galerie d'images, FAQ, annonces défilantes,
+appel à l'action et pied de page. Chaque bloc s'ajoute, se duplique, se
+déplace (▲▼), s'édite et se supprime. Le **logo en haut à gauche** ramène à
+cette page d'accueil **sans se déconnecter**.
+
 Le bouton 👁 de la barre du haut affiche la **page d’accueil** telle que la
 verront vos visiteurs.
 
@@ -27,7 +62,7 @@ aucun script ne peut y être exécuté). Tous les réglages sont enregistrés da
 
 ## Fonctionnalités incluses
 
-- Sélection entre deux bots : **Kirito** et **Asuna**.
+- Sélection entre **autant de bots que vous déclarez** (⚙️ Créateur → 🤖 Mes bots).
 - Tableau de bord global avec statistiques, activité et état des connexions.
 - Liste des serveurs associés à chaque bot.
 - Configuration complète d’un serveur à travers huit modules :
@@ -52,7 +87,7 @@ aucun script ne peut y être exécuté). Tous les réglages sont enregistrés da
 
 - PHP 8.0 ou supérieur.
 - Extension PHP `fileinfo` recommandée pour contrôler les preuves envoyées.
-- Droits d’écriture sur les dossiers `data/` et `uploads/proofs/`.
+- Droits d’écriture sur `data/`, `uploads/proofs/` et `uploads/backgrounds/`.
 - Un serveur Apache, Nginx ou le serveur de développement intégré à PHP.
 
 ## Lancement rapide
@@ -80,7 +115,7 @@ http://localhost:8000
 Exemple de permissions Linux :
 
 ```bash
-chmod -R 775 data uploads/proofs
+chmod -R 775 data uploads/proofs uploads/backgrounds
 ```
 
 ## Structure
@@ -88,6 +123,7 @@ chmod -R 775 data uploads/proofs
 ```text
 Aincrad_Discord_Bot_PHP/
 ├── index.php                 Interface principale
+├── config.php                Liaison à votre agent (SEUL fichier à éditer)
 ├── api.php                   API PHP et actions d’écriture
 ├── assets/
 │   ├── css/style.css         Direction artistique complète
@@ -96,7 +132,8 @@ Aincrad_Discord_Bot_PHP/
 ├── data/
 │   ├── app.json              Données utilisées par le site
 │   └── app.default.json      Sauvegarde des données initiales
-└── uploads/proofs/           Preuves envoyées par le staff
+├── uploads/proofs/           Preuves envoyées par le staff
+└── uploads/backgrounds/      Fonds téléversés depuis le Site builder
 ```
 
 ## Données et API
@@ -112,12 +149,18 @@ Actions disponibles dans `api.php` :
 - `ticket.status`
 - `server.module.save`
 - `site.config.save`
+- `site.background.upload`  (image / GIF de fond)
+- `bots.save`               (liste des bots, sans limite)
+- `agent.sync`              (récupère les vrais serveurs depuis l'agent)
 
 Pour une grande communauté, remplacez la persistance JSON par MySQL ou PostgreSQL en conservant les mêmes réponses JSON côté API.
 
 ## Connexion réelle à Discord
 
-Le panneau livré est entièrement fonctionnel pour l’interface, la configuration, les tickets, la blacklist et la persistance locale. Les serveurs et utilisateurs fournis sont des données de démonstration.
+Le panneau est entièrement fonctionnel. Les serveurs et bots livrés sont des
+données de démonstration **jusqu’à ce que vous remplissiez `config.php`** :
+renseignez alors vos bots dans ⚙️ Créateur → 🤖 Mes bots puis cliquez sur
+**Synchroniser** pour récupérer vos vrais serveurs.
 
 Pour une utilisation réelle, reliez :
 

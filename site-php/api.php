@@ -7,6 +7,52 @@ header('Cache-Control: no-store, no-cache, must-revalidate');
 const DATA_FILE = __DIR__ . '/data/app.json';
 const PROOF_DIR = __DIR__ . '/uploads/proofs';
 
+// Configuration facultative (liaison à l'agent hébergeur).
+if (is_file(__DIR__ . '/config.php')) require_once __DIR__ . '/config.php';
+function agent_url(): string { return defined('SITE_AGENT_URL') ? rtrim(SITE_AGENT_URL, '/') : ''; }
+function agent_key(): string { return defined('SITE_AGENT_KEY') ? SITE_AGENT_KEY : ''; }
+
+// Appel HTTP vers l'agent : renvoie [code, données].
+function agent_get(string $path, int $timeout = 20): array {
+  $base = agent_url();
+  if ($base === '') return [0, []];
+  $url = $base . $path;
+  $headers = ['x-cle: ' . agent_key()];
+  if (function_exists('curl_init')) {
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+      CURLOPT_RETURNTRANSFER => true,
+      CURLOPT_HTTPHEADER => $headers,
+      CURLOPT_TIMEOUT => $timeout,
+      CURLOPT_FOLLOWLOCATION => true,
+    ]);
+    $raw = curl_exec($ch);
+    $code = curl_getinfo($ch, CURLINFO_RESPONSE_CODE) ?: 0;
+    curl_close($ch);
+  } else {
+    $ctx = stream_context_create(['http' => ['method' => 'GET', 'header' => implode("\r\n", $headers), 'timeout' => $timeout, 'ignore_errors' => true]]);
+    $raw = @file_get_contents($url, false, $ctx);
+    $code = 0;
+    foreach ($http_response_header ?? [] as $h) {
+      if (preg_match('#^HTTP/\S+\s+(\d{3})#', $h, $m)) $code = (int) $m[1];
+    }
+  }
+  $data = $raw === false ? null : json_decode((string) $raw, true);
+  return [$code, is_array($data) ? $data : []];
+}
+
+// Petit identifiant stable à partir d'un nom (« Colmar RP » → « colmar-rp »).
+function slugify(string $value, string $fallback = 'bot'): string {
+  $value = strtolower(trim($value));
+  if (function_exists('iconv')) {
+    $converted = @iconv('UTF-8', 'ASCII//TRANSLIT', $value);
+    if ($converted !== false) $value = $converted;
+  }
+  $value = preg_replace('/[^a-z0-9]+/', '-', $value) ?? '';
+  $value = trim((string) $value, '-');
+  return $value !== '' ? substr($value, 0, 40) : $fallback;
+}
+
 function respond(array $payload, int $status = 200): never
 {
     http_response_code($status);
@@ -262,6 +308,115 @@ switch ($action) {
         appendActivity($state, 'config', 'Configuration du site enregistrée', 'Site builder');
         saveState($state);
         respond(['ok' => true, 'state' => $state]);
+
+    // ── 🤖 Bots : enregistrement de la liste (autant que vous voulez) ──
+    case 'bots.save': {
+        $incoming = $input['bots'] ?? null;
+        if (!is_array($incoming)) {
+            respond(['ok' => false, 'error' => 'Liste de bots invalide.'], 422);
+        }
+        $accents = ['cyan', 'rose', 'gold', 'green', 'violet'];
+        $bots = [];
+        $used = [];
+        foreach ($incoming as $raw) {
+            if (!is_array($raw)) continue;
+            $name = cleanString($raw['name'] ?? '', 60);
+            if ($name === '') continue;
+            $id = slugify((string) ($raw['id'] ?? $name), 'bot');
+            while (in_array($id, $used, true)) $id .= '-2';
+            $used[] = $id;
+            $accent = cleanString($raw['accent'] ?? 'cyan', 12);
+            $bots[] = [
+                'id' => $id,
+                'name' => $name,
+                'tag' => cleanString($raw['tag'] ?? 'BOT', 30),
+                'status' => 'online',
+                'description' => cleanString($raw['description'] ?? '', 300),
+                'accent' => in_array($accent, $accents, true) ? $accent : 'cyan',
+                // Liaison technique : nom du bot chez l'agent + Client ID Discord.
+                'agentName' => cleanString($raw['agentName'] ?? '', 40),
+                'clientId' => preg_replace('/\D+/', '', (string) ($raw['clientId'] ?? '')),
+                'servers' => (int) ($raw['servers'] ?? 0),
+                'users' => (int) ($raw['users'] ?? 0),
+                'latency' => (int) ($raw['latency'] ?? 0),
+            ];
+        }
+        $state['bots'] = $bots;
+        // Les serveurs qui référencent un bot supprimé sont nettoyés.
+        $ids = array_column($bots, 'id');
+        foreach ($state['servers'] as $index => $server) {
+            $state['servers'][$index]['botIds'] = array_values(array_intersect($server['botIds'] ?? [], $ids));
+        }
+        appendActivity($state, 'config', 'Liste des bots enregistrée', count($bots) . ' bot(s)');
+        saveState($state);
+        respond(['ok' => true, 'state' => $state]);
+    }
+
+    // ── 🔄 Synchronisation avec l'agent : vrais serveurs de chaque bot ──
+    case 'agent.sync': {
+        if (agent_url() === '') {
+            respond(['ok' => false, 'error' => "Aucun agent configuré : renseignez SITE_AGENT_URL et SITE_AGENT_KEY dans config.php."], 422);
+        }
+        [$code, $etat] = agent_get('/agent/etat');
+        if ($code !== 200) {
+            respond(['ok' => false, 'error' => $code === 0
+                ? "Agent injoignable (adresse/port bloqués, ou agent éteint)."
+                : "L'agent a répondu HTTP $code — vérifiez SITE_AGENT_KEY."], 502);
+        }
+        $enLigne = [];
+        foreach ($etat['bots'] ?? [] as $bot) {
+            if (($bot['status'] ?? '') === 'demarre') $enLigne[] = (string) ($bot['name'] ?? '');
+        }
+        $servers = [];
+        $rapport = [];
+        foreach ($state['bots'] as $index => $bot) {
+            $agentName = (string) ($bot['agentName'] ?? '');
+            if ($agentName === '') { $rapport[] = ['bot' => $bot['name'], 'ok' => false, 'message' => 'Aucun « nom chez l\'agent » renseigné.']; continue; }
+            if (!in_array($agentName, $enLigne, true)) { $rapport[] = ['bot' => $bot['name'], 'ok' => false, 'message' => "« $agentName » n'est pas démarré chez l'agent."]; continue; }
+            [$c2, $infos] = agent_get('/agent/bots/' . rawurlencode($agentName) . '/proxy/infos');
+            if ($c2 !== 200) {
+                $rapport[] = ['bot' => $bot['name'], 'ok' => false, 'message' => $c2 === 0
+                    ? "Le bot ne répond pas (API interne arrêtée ou délai dépassé)."
+                    : "Réponse HTTP $c2 du bot (version trop ancienne ?)."];
+                continue;
+            }
+            $guilds = $infos['guilds'] ?? [];
+            $membres = 0;
+            foreach ($guilds as $g) {
+                $gid = (string) ($g['id'] ?? '');
+                if ($gid === '') continue;
+                $membres += (int) ($g['memberCount'] ?? 0);
+                if (!isset($servers[$gid])) {
+                    $nom = (string) ($g['name'] ?? $gid);
+                    $servers[$gid] = [
+                        'id' => $gid,
+                        'name' => $nom,
+                        'short' => strtoupper(substr(preg_replace('/[^A-Za-z0-9]/', '', $nom) ?: 'SV', 0, 2)),
+                        'members' => (int) ($g['memberCount'] ?? 0),
+                        'online' => 0,
+                        'region' => 'Discord',
+                        'verified' => true,
+                        'botIds' => [],
+                        'role' => 'Administrateur',
+                        'level' => 100,
+                        'activity' => 75,
+                        'icon' => $g['icon'] ?? null,
+                    ];
+                }
+                $servers[$gid]['botIds'][] = $bot['id'];
+            }
+            $state['bots'][$index]['servers'] = count($guilds);
+            $state['bots'][$index]['users'] = $membres;
+            if (!empty($infos['bot']['clientId']) && empty($bot['clientId'])) {
+                $state['bots'][$index]['clientId'] = preg_replace('/\D+/', '', (string) $infos['bot']['clientId']);
+            }
+            $rapport[] = ['bot' => $bot['name'], 'ok' => true, 'message' => count($guilds) . ' serveur(s) récupéré(s).'];
+        }
+        if ($servers) $state['servers'] = array_values($servers);
+        appendActivity($state, 'config', 'Synchronisation avec l\'agent', count($servers) . ' serveur(s)');
+        saveState($state);
+        respond(['ok' => true, 'rapport' => $rapport, 'state' => $state]);
+    }
 
     case 'site.background.upload':
         // Fond personnalisé du site : image téléversée par le créateur.

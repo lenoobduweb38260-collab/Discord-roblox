@@ -1168,3 +1168,24 @@ body.compact .content-view { max-width: 1320px; }
 .brand-home { display: flex; align-items: center; gap: 13px; min-width: 0; cursor: pointer; border-radius: 14px; padding: 5px 9px 5px 5px; transition: background .18s; }
 .brand-home:hover { background: rgba(var(--accent-rgb), .08); }
 .brand-home:hover .brand-mark { box-shadow: 0 0 24px rgba(var(--accent-rgb), .4); }
+
+/* ── Gestion des bots (espace créateur) ──────────────────────────── */
+.botcfg {
+  padding: 16px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: rgba(255,255,255,.025);
+  margin-bottom: 12px;
+  animation: slideUp .28s ease both;
+  transition: border-color .2s;
+}
+.botcfg:hover { border-color: var(--line-strong); }
+.botcfg-head { display: flex; align-items: center; gap: 11px; margin-bottom: 14px; flex-wrap: wrap; }
+.botcfg-head strong { font-size: 15px; }
+.botcfg-head .bot-avatar { width: 40px; height: 40px; font-size: 16px; border-radius: 13px; }
+.botcfg-move { display: flex; gap: 5px; margin-left: auto; flex-wrap: wrap; }
+.bot-avatar.violet { color: #a970ff; background: rgba(169,112,255,.12); border-color: rgba(169,112,255,.4); }
+.bot-avatar.cyan { color: var(--cyan); background: rgba(79,217,255,.12); border-color: rgba(79,217,255,.4); }
+.bot-avatar.gold { color: var(--gold); background: rgba(243,200,106,.12); border-color: rgba(243,200,106,.4); }
+.bot-avatar.green { color: var(--green); background: rgba(47,227,139,.12); border-color: rgba(47,227,139,.4); }
+code { background: rgba(0,0,0,.35); border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px; font-size: 12px; }

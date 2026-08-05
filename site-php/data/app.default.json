@@ -9,7 +9,9 @@
       "accent": "cyan",
       "servers": 6,
       "users": 14237,
-      "latency": 28
+      "latency": 28,
+      "agentName": "",
+      "clientId": ""
     },
     {
       "id": "asuna",
@@ -20,7 +22,9 @@
       "accent": "rose",
       "servers": 5,
       "users": 9816,
-      "latency": 34
+      "latency": 34,
+      "agentName": "",
+      "clientId": ""
     }
   ],
   "servers": [

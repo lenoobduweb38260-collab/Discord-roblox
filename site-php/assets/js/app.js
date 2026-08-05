@@ -827,17 +827,19 @@
     }
   }
 
-  // ── Espace créateur : écosystème + Site builder intégré ─────────────
+  // ── Espace créateur : bots + page + apparence + écosystème ──────────
   function creatorView() {
-    const valid = ["ecosystem", "page", "builder"];
+    const valid = ["ecosystem", "page", "builder", "bots"];
     const tab = valid.includes(ui.creatorTab) ? ui.creatorTab : "page";
     const tabs = [
       ["page", "🧱 Constructeur de page", "Blocs de la page d'accueil"],
+      ["bots", "🤖 Mes bots", "Ajoutez autant de bots que voulu"],
       ["builder", "🎨 Apparence du site", "Thème, fond, navigation, CSS"],
-      ["ecosystem", "🌍 Écosystème", "Bots, serveurs et indicateurs"],
+      ["ecosystem", "🌍 Écosystème", "Serveurs et indicateurs"],
     ];
     const heads = {
       page: pageHead("Créateur / Site builder", "Construisez votre page", "Ajoutez, réordonnez et modifiez les blocs de votre page d'accueil : bannière, cartes, chiffres, galerie, FAQ, annonces…"),
+      bots: pageHead("Créateur / Bots", "Mes bots", "Déclarez ici tous vos bots — il n'y a aucune limite. Reliez-les à votre agent pour récupérer leurs vrais serveurs."),
       builder: pageHead("Créateur / Site builder", "Apparence du site", "Identité, thème, fond animé ou image, navigation, effets et CSS libre — appliqués en direct."),
       ecosystem: pageHead("Créateur / Écosystème", "Vue globale", "Consultez l'ensemble des bots, des serveurs et des indicateurs de déploiement.", button("Exporter les données", "export-state", "primary")),
     };
@@ -845,8 +847,71 @@
       <button class="subtab ${tab === t[0] ? "active" : ""}" data-action="creator-tab" data-tab="${t[0]}">
         <strong>${t[1]}</strong><span>${t[2]}</span>
       </button>`).join("")}</div>`;
-    const body = tab === "builder" ? siteBuilderBody() : tab === "page" ? pageBuilderBody() : creatorEcosystem();
+    const body = tab === "builder" ? siteBuilderBody()
+      : tab === "page" ? pageBuilderBody()
+      : tab === "bots" ? botsBuilderBody()
+      : creatorEcosystem();
     return `<div class="content-view">${heads[tab]}${tabBar}${body}</div>`;
+  }
+
+  // ── 🤖 Gestion des bots : autant de bots que souhaité ───────────────
+  const ACCENTS = [
+    { value: "cyan", label: "Bleu" }, { value: "violet", label: "Violet" },
+    { value: "rose", label: "Rose" }, { value: "gold", label: "Or" }, { value: "green", label: "Vert" },
+  ];
+  function botsBuilderBody() {
+    const bots = state.bots || [];
+    const rows = bots.map((bot, index) => `
+      <div class="botcfg" data-bot-index="${index}">
+        <div class="botcfg-head">
+          <span class="bot-avatar ${esc(bot.accent || "cyan")}">${esc((bot.name || "B").slice(0, 1))}</span>
+          <strong>${esc(bot.name || "Bot")}</strong>
+          <span class="chip">${bot.servers || 0} serveur(s)</span>
+          <div class="botcfg-move">
+            <button type="button" class="btn ghost small" data-action="bot-move" data-dir="-1" ${index === 0 ? "disabled" : ""}>▲</button>
+            <button type="button" class="btn ghost small" data-action="bot-move" data-dir="1" ${index === bots.length - 1 ? "disabled" : ""}>▼</button>
+            <button type="button" class="btn small" data-action="bot-test">🔌 Tester</button>
+            <button type="button" class="btn danger small" data-action="bot-remove">🗑</button>
+          </div>
+        </div>
+        <div class="form-grid">
+          <div class="field"><label>Nom affiché</label><input class="input" data-f="name" value="${esc(bot.name || "")}" placeholder="Colmar RP"></div>
+          <div class="field"><label>Étiquette</label><input class="input" data-f="tag" value="${esc(bot.tag || "")}" placeholder="BOT RP"></div>
+          <div class="field"><label>Couleur</label><select class="select" data-f="accent">${ACCENTS.map(a => `<option value="${a.value}"${(bot.accent || "cyan") === a.value ? " selected" : ""}>${a.label}</option>`).join("")}</select></div>
+          <div class="field full"><label>Description</label><input class="input" data-f="description" value="${esc(bot.description || "")}" placeholder="Ce que fait ce bot"></div>
+          <div class="field"><label>Nom chez l'agent</label><input class="input" data-f="agentName" value="${esc(bot.agentName || "")}" placeholder="Colmar_rp">
+            <span class="field-note">Le nom EXACT du bot dans votre panel / dossier bots/.</span></div>
+          <div class="field"><label>Client ID Discord</label><input class="input" data-f="clientId" value="${esc(bot.clientId || "")}" placeholder="123456789012345678">
+            <span class="field-note">Sert au lien « Inviter ce bot ».</span></div>
+        </div>
+      </div>`).join("");
+    return `
+      <div class="builder-hint">🤖 Ajoutez <b>autant de bots que vous voulez</b>. Renseignez le « nom chez l'agent » puis cliquez sur <b>Synchroniser</b> : le site récupère les vrais serveurs de chaque bot.</div>
+      <section class="panel"><div class="panel-inner">
+        <div class="panel-head"><div><h3>Mes bots</h3><p>${bots.length} bot(s) déclaré(s) — aucune limite.</p></div>
+          <div class="page-actions">${button("🔄 Synchroniser avec l'agent", "bots-sync", "ghost")}${button("💾 Enregistrer les bots", "bots-save", "success")}</div></div>
+        <div id="bots-list">${rows || emptyBlock("Aucun bot", "Ajoutez votre premier bot ci-dessous.")}</div>
+        <div style="margin-top:12px">${button("➕ Ajouter un bot", "bot-add", "primary")}</div>
+      </div></section>
+      <section class="panel mt-16"><div class="panel-inner">
+        <div class="panel-head"><div><h3>🔗 Liaison à vos bots</h3><p>Renseignée une seule fois dans <code>config.php</code>, à côté de index.php.</p></div></div>
+        <div class="row" style="flex-direction:column;align-items:flex-start;gap:6px">
+          <span><b>SITE_AGENT_URL</b> — l'adresse de votre agent, ex. <code>http://123.45.67.89:9999</code></span>
+          <span><b>SITE_AGENT_KEY</b> — la même clé que dans votre dashboard</span>
+          <span style="color:var(--muted)">Sans ces deux valeurs, le site fonctionne avec des données de démonstration.</span>
+        </div>
+        <div id="sync-report" style="margin-top:12px"></div>
+      </div></section>`;
+  }
+
+  // Lit la liste des bots depuis les champs affichés.
+  function collectBots() {
+    return Array.from(document.querySelectorAll(".botcfg")).map(card => {
+      const get = f => card.querySelector(`[data-f="${f}"]`)?.value.trim() || "";
+      const index = Number(card.dataset.botIndex);
+      const existing = (state.bots || [])[index] || {};
+      return { ...existing, name: get("name"), tag: get("tag"), accent: get("accent"), description: get("description"), agentName: get("agentName"), clientId: get("clientId") };
+    }).filter(bot => bot.name);
   }
 
   // ── Constructeur de page : liste des blocs + ajout ──────────────────
@@ -1266,6 +1331,64 @@
           ui.creatorTab = target.dataset.tab;
           render();
           break;
+        // ── Gestion des bots ────────────────────────────────────────
+        case "bot-add": {
+          const bots = collectBots();
+          bots.push({ id: "", name: "Nouveau bot", tag: "BOT", accent: ACCENTS[bots.length % ACCENTS.length].value, description: "", agentName: "", clientId: "", servers: 0, users: 0 });
+          state.bots = bots;
+          render();
+          toast("BOT AJOUTÉ", "Renseignez son nom et son « nom chez l'agent », puis Enregistrer.");
+          break;
+        }
+        case "bot-remove": {
+          const card = target.closest(".botcfg");
+          if (!card || !confirm("Retirer ce bot du site ?")) break;
+          const bots = collectBots();
+          bots.splice(Number(card.dataset.botIndex), 1);
+          state.bots = bots;
+          render();
+          break;
+        }
+        case "bot-move": {
+          const card = target.closest(".botcfg");
+          const bots = collectBots();
+          const index = Number(card?.dataset.botIndex);
+          const next = index + Number(target.dataset.dir);
+          if (next < 0 || next >= bots.length) break;
+          [bots[index], bots[next]] = [bots[next], bots[index]];
+          state.bots = bots;
+          render();
+          break;
+        }
+        case "bots-save":
+          await api("bots.save", { bots: collectBots() });
+          render();
+          toast("BOTS ENREGISTRÉS", `${(state.bots || []).length} bot(s) sur votre site.`);
+          break;
+        case "bots-sync": {
+          target.textContent = "⏳ Synchronisation…";
+          await api("bots.save", { bots: collectBots() });
+          const result = await api("agent.sync");
+          render();
+          const box = document.querySelector("#sync-report");
+          if (box && result.rapport) {
+            box.innerHTML = result.rapport.map(line => `<div class="row" style="border-color:${line.ok ? "rgba(47,227,139,.4)" : "rgba(255,92,116,.45)"}">
+              ${line.ok ? "✅" : "❌"} <b>${esc(line.bot)}</b><span style="color:var(--muted)">${esc(line.message)}</span></div>`).join("");
+          }
+          toast("SYNCHRONISÉ", "Serveurs et compteurs mis à jour depuis l'agent.");
+          break;
+        }
+        case "bot-test": {
+          const card = target.closest(".botcfg");
+          const name = card?.querySelector('[data-f="agentName"]')?.value.trim();
+          if (!name) { toast("TEST", "Renseignez d'abord le « nom chez l'agent ».", "error"); break; }
+          await api("bots.save", { bots: collectBots() });
+          const result = await api("agent.sync");
+          const line = (result.rapport || []).find(item => item.bot === card.querySelector('[data-f="name"]').value.trim());
+          toast(line && line.ok ? "LIAISON OK" : "LIAISON KO", line ? line.message : "Bot introuvable dans le rapport.", line && line.ok ? "success" : "error");
+          render();
+          break;
+        }
         // ── Constructeur de page ────────────────────────────────────
         case "block-add": {
           const type = target.dataset.type;

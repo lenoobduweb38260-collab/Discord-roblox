@@ -10,6 +10,12 @@ DOSSIERS À RENDRE MODIFIABLES PAR PHP :
 - uploads/proofs/
 - uploads/backgrounds/   (images de fond téléversées depuis le Site builder)
 
+RELIER VOS BOTS (facultatif) :
+Ouvrez config.php et renseignez SITE_AGENT_URL et SITE_AGENT_KEY (les mêmes
+que votre dashboard). Puis, dans le site : Créateur > Mes bots > ajoutez
+autant de bots que voulu (nom + « nom chez l'agent ») > Synchroniser.
+Sans agent configuré, le site tourne avec des données de démonstration.
+
 PERSONNALISER LE SITE :
 Ouvrez l'onglet « Site builder » dans le menu : couleur, police, style des
 boutons, arrondi, fond (votre image/GIF ou un fond animé), navigation,
