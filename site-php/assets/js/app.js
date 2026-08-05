@@ -1910,40 +1910,60 @@
   // Applique TOUTE la configuration du builder (accent, police, boutons,
   // rayon, fond, effets, CSS personnalisé). Accepte une config temporaire
   // pour l'aperçu en direct pendant l'édition.
+  // ⚡ Écriture « seulement si ça change ».
+  // Poser une variable CSS sur :root invalide le style de TOUTE la page
+  // (mesuré à ~35 ms sur un téléphone d'entrée de gamme). Comme l'aperçu en
+  // direct réécrit ces valeurs à chaque frappe, on compare d'abord : taper
+  // dans « Nom du site » ne touche aucune couleur et ne coûte donc plus rien.
+  const _css = new Map();
+  function setVar(root, nom, valeur) {
+    if (_css.get(nom) === valeur) return;
+    _css.set(nom, valeur);
+    root.style.setProperty(nom, valeur);
+  }
+  function setData(el, cle, valeur) {
+    if (el.dataset[cle] !== valeur) el.dataset[cle] = valeur;
+  }
+
   function applySitePreferences(cfg = siteConfig()) {
     const root = document.documentElement;
     const accent = accentHex(cfg);
-    root.style.setProperty("--accent", accent);
-    root.style.setProperty("--accent-rgb", hexToRgb(accent));
+    setVar(root, "--accent", accent);
+    setVar(root, "--accent-rgb", hexToRgb(accent));
     const radius = Math.min(30, Math.max(0, Number(cfg.radius ?? 18)));
-    root.style.setProperty("--radius", `${radius}px`);
-    document.body.dataset.font = ["exo", "inter", "poppins", "orbitron"].includes(cfg.font) ? cfg.font : "exo";
-    document.body.dataset.btnstyle = ["pill", "rounded", "square", "cut"].includes(cfg.buttonStyle) ? cfg.buttonStyle : "pill";
+    setVar(root, "--radius", `${radius}px`);
+    setData(document.body, "font", ["exo", "inter", "poppins", "orbitron"].includes(cfg.font) ? cfg.font : "exo");
+    setData(document.body, "btnstyle", ["pill", "rounded", "square", "cut"].includes(cfg.buttonStyle) ? cfg.buttonStyle : "pill");
 
     // Fond du site : image téléversée / URL, vidéo MP4, ou fond animé.
     const bgType = BG_TYPES.includes(cfg.bgType) ? cfg.bgType : "image";
-    document.body.dataset.bg = bgType;
+    setData(document.body, "bg", bgType);
     // L'assombrissement et le flou servent à l'image ET à la vidéo.
-    root.style.setProperty("--bg-overlay", String(Math.min(92, Math.max(0, Number(cfg.bgOverlay ?? 62))) / 100));
-    root.style.setProperty("--bg-blur", `${Math.min(24, Math.max(0, Number(cfg.bgBlur ?? 0)))}px`);
+    setVar(root, "--bg-overlay", String(Math.min(92, Math.max(0, Number(cfg.bgOverlay ?? 62))) / 100));
+    const flou = Math.min(24, Math.max(0, Number(cfg.bgBlur ?? 0)));
+    setVar(root, "--bg-blur", `${flou}px`);
+    // Marqueur lu par le CSS : sans flou, aucun filtre n'est appliqué.
+    setData(document.body, "blur", flou === 0 ? "0" : "1");
     if (bgType === "image") {
       // URL absolue : dans une variable CSS, une URL relative serait résolue
       // depuis le fichier .css (assets/css/) et non depuis la page.
       let image = String(cfg.bgImage || "assets/images/aincrad-bg.jpg");
       try { image = new URL(image, document.baseURI).href; } catch (_) {}
       image = image.replaceAll('"', "%22");
-      root.style.setProperty("--bg-image", `url("${image}")`);
+      setVar(root, "--bg-image", `url("${image}")`);
     }
     appliquerVideoDeFond(bgType === "video" ? cfg : null);
 
     // Effets activables un par un.
     document.body.classList.toggle("reduce-effects", cfg.animations === false);
     document.body.classList.toggle("compact", cfg.compactMode === true);
-    const particleField = document.querySelector("#particle-field");
-    if (particleField) particleField.style.display = cfg.particles === false ? "none" : "block";
-    const scan = document.querySelector(".scanline");
-    if (scan) scan.style.display = cfg.scanline === false ? "none" : "block";
-    if (cursorAura) cursorAura.style.display = cfg.cursorAura === false ? "none" : "block";
+    const affiche = (el, visible) => {
+      const v = visible ? "block" : "none";
+      if (el && el.style.display !== v) el.style.display = v;
+    };
+    affiche(document.querySelector("#particle-field"), cfg.particles !== false);
+    affiche(document.querySelector(".scanline"), cfg.scanline !== false);
+    affiche(cursorAura, cfg.cursorAura !== false);
 
     // CSS personnalisé du créateur (pouvoir total sur le style).
     let customTag = document.querySelector("#site-custom-css");
@@ -1952,8 +1972,12 @@
       customTag.id = "site-custom-css";
       document.head.appendChild(customTag);
     }
-    customTag.textContent = String(cfg.customCss || "").slice(0, 20000);
-    document.title = cfg.siteName || "Aincrad Control Panel";
+    // Réécrire ce <style> refait analyser la feuille par le navigateur :
+    // on ne le touche que si le CSS a réellement changé.
+    const css = String(cfg.customCss || "").slice(0, 20000);
+    if (customTag.textContent !== css) customTag.textContent = css;
+    const titre = cfg.siteName || "Aincrad Control Panel";
+    if (document.title !== titre) document.title = titre;
 
     // Écran de chargement : textes, logo et anneau modifiables en direct.
     if (boot) {
@@ -2736,10 +2760,19 @@
 
   // Aperçu en direct : chaque frappe/glissement du builder est appliqué
   // immédiatement au site (sans enregistrer).
+  // ⚡ L'aperçu est regroupé sur la prochaine image du navigateur : taper
+  // « Aincrad » déclenchait 7 relectures du formulaire et 7 recalculs de
+  // style. Il n'y en a plus qu'un, quel que soit le nombre de frappes.
+  let _apercuPrevu = false;
   function livePreview() {
-    const form = document.querySelector("#site-builder-form");
-    if (!form) return;
-    applySitePreferences({ ...siteConfig(), ...collectSiteConfig(form) });
+    if (_apercuPrevu) return;
+    _apercuPrevu = true;
+    requestAnimationFrame(() => {
+      _apercuPrevu = false;
+      const form = document.querySelector("#site-builder-form");
+      if (!form) return;
+      applySitePreferences({ ...siteConfig(), ...collectSiteConfig(form) });
+    });
   }
   document.addEventListener("input", event => {
     if (event.target.closest("#site-builder-form")) livePreview();
@@ -2899,7 +2932,12 @@
   function createParticles() {
     const field = document.querySelector("#particle-field");
     if (!field) return;
-    field.innerHTML = Array.from({ length: 22 }, (_, index) => {
+    // Chaque particule est un élément animé en continu : sur téléphone, on en
+    // met deux fois moins, et aucune si le visiteur demande moins d'animations.
+    const petit = window.matchMedia("(max-width: 720px)").matches;
+    const reduit = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const nombre = reduit ? 0 : (petit ? 9 : 22);
+    field.innerHTML = Array.from({ length: nombre }, (_, index) => {
       const left = (index * 37 + 11) % 100;
       const size = 3 + (index % 4) * 2;
       const duration = 12 + (index % 7) * 2.3;
@@ -2908,16 +2946,30 @@
     }).join("");
   }
 
+  // ⚡ La souris émet jusqu'à 120 événements par seconde. On se contente de
+  // retenir sa position et de n'écrire dans le style qu'une fois par image :
+  // sinon l'aura et la parallaxe déclenchaient trois écritures par événement,
+  // en concurrence directe avec la frappe au clavier.
+  let _souris = null;
+  let _sourisPrevue = false;
   window.addEventListener("mousemove", event => {
-    if (cursorAura) {
-      cursorAura.style.left = `${event.clientX}px`;
-      cursorAura.style.top = `${event.clientY}px`;
-    }
-    // Parallaxe du fond (désactivable dans le builder).
-    if (!sky || siteConfig().parallax === false) return;
-    const x = (event.clientX / innerWidth - .5) * 8;
-    const y = (event.clientY / innerHeight - .5) * 5;
-    sky.style.transform = `scale(1.04) translate(${x}px, ${y}px)`;
+    _souris = { x: event.clientX, y: event.clientY };
+    if (_sourisPrevue) return;
+    _sourisPrevue = true;
+    requestAnimationFrame(() => {
+      _sourisPrevue = false;
+      const p = _souris;
+      if (!p) return;
+      if (cursorAura) {
+        cursorAura.style.left = `${p.x}px`;
+        cursorAura.style.top = `${p.y}px`;
+      }
+      // Parallaxe du fond (désactivable dans le builder).
+      if (!sky || siteConfig().parallax === false) return;
+      const x = (p.x / innerWidth - .5) * 8;
+      const y = (p.y / innerHeight - .5) * 5;
+      sky.style.transform = `scale(1.04) translate(${x}px, ${y}px)`;
+    });
   }, { passive: true });
 
   window.addEventListener("load", () => {

@@ -403,6 +403,21 @@ const RELEASES = [
       '🗑️ Les boutons isolés du bandeau (horloge, œil, éclair, losange) : ils sont désormais dans le menu du profil',
     ],
   },
+  {
+    id: 'site-perfs-2026-08l',
+    title: 'Site : interface nettement plus fluide ⚡',
+    amelioration: [
+      '⚡ **Frappe 15 fois plus légère** dans le Site builder : l\'aperçu était recalculé à chaque caractère, il ne l\'est plus qu\'une fois par image affichée',
+      '🖼️ **Fin des à-coups au défilement sur téléphone** : sans flou demandé, le fond n\'est plus placé sur une couche graphique séparée qui se repeignait en permanence',
+      '📱 Sur téléphone : moitié moins de particules, plus d\'aura de curseur (inutile sans souris), plus de ligne de scan, et le flou d\'arrière-plan des barres remplacé par un fond opaque',
+      '🖱️ Le suivi de la souris n\'écrit plus dans le style à chaque mouvement, mais une fois par image',
+      '♿ Le réglage système « réduire les animations » est respecté : plus aucune animation ni particule',
+      '🎨 Les réglages d\'apparence ne sont réécrits que s\'ils ont réellement changé (la feuille de style personnalisée n\'est plus réanalysée pour rien)',
+    ],
+    ajout: [],
+    fix: [],
+    retrait: [],
+  },
 ];
 
 // Découpe une catégorie en champs d'embed (max 1024 caractères par champ).

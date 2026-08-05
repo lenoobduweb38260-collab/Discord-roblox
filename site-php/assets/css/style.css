@@ -87,6 +87,12 @@ body[data-bg="image"] .sky-layer {
   background-repeat: no-repeat;
   filter: blur(var(--bg-blur)) saturate(.95);
 }
+/* ⚡ Sans flou demandé, on retire le filtre au lieu d'appliquer blur(0px) :
+   un filtre, même nul, force le fond sur sa propre couche graphique et le
+   fait repeindre à chaque défilement — c'est LA cause des à-coups sur
+   téléphone, avec un fond en plein écran. */
+body[data-blur="0"] .sky-layer,
+body[data-blur="0"] .sky-video { filter: none; }
 /* Vidéo de fond (MP4 / WEBM), sous l'assombrissement et le flou */
 .sky-video {
   position: fixed;
@@ -1184,6 +1190,31 @@ body.compact .content-view { max-width: 1320px; }
   .toast-root { left: 12px; right: 12px; bottom: 12px; }
   .toast { width: auto; }
 }
+/* ⚡ Téléphone : allègement du rendu.
+   Le flou d'arrière-plan (backdrop-filter) est repeint à chaque défilement et
+   coûte cher sur un GPU de téléphone : on le remplace par un fond opaque, qui
+   donne le même résultat visuel pour une fraction du prix. */
+@media (max-width: 720px) {
+  /* Pas de souris sur un téléphone : l'aura ne suit rien et coûte une couche
+     graphique. La ligne de scan animée en continu part avec elle. */
+  #cursor-aura, .scanline { display: none !important; }
+  .topbar { backdrop-filter: none; background: rgba(11, 9, 14, .96); }
+  .sidebar { backdrop-filter: none; background: rgba(13, 11, 17, .98); }
+  .profile-menu { backdrop-filter: none; background: rgba(17, 14, 22, .99); }
+  .modal { backdrop-filter: none; }
+  /* Les entrées en fondu se rejouaient à chaque reconstruction de la page :
+     on les raccourcit fortement plutôt que d'animer des dizaines de blocs. */
+  .panel, .row, .botcfg, .permrow, .blk-row { animation-duration: .12s; }
+}
+/* Le visiteur qui demande moins d'animations n'en a plus aucune. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}
+
 /* Très petits écrans : on abrège encore. */
 @media (max-width: 420px) {
   .brand h1 { font-size: 12px; }
