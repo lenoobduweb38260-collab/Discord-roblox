@@ -16,6 +16,28 @@ if (is_file(__DIR__ . '/config.php')) require_once __DIR__ . '/config.php';
 if (session_status() !== PHP_SESSION_ACTIVE) session_start();
 $authRequired = defined('SITE_ADMIN_PASSWORD') && SITE_ADMIN_PASSWORD !== '';
 $authOk = !$authRequired || !empty($_SESSION['site_admin']);
+
+// Taille maximale d'un envoi, telle que la impose l'hébergeur (la plus petite
+// des deux limites PHP). Affichée sous le champ de téléversement.
+function taille_envoi_lisible(): string
+{
+    $lire = static function (string $v): int {
+        $v = trim($v);
+        if ($v === '') return 0;
+        $u = strtolower(substr($v, -1));
+        $n = (int) $v;
+        if ($u === 'g') return $n * 1073741824;
+        if ($u === 'm') return $n * 1048576;
+        if ($u === 'k') return $n * 1024;
+        return $n;
+    };
+    $limites = array_filter([$lire((string) ini_get('upload_max_filesize')), $lire((string) ini_get('post_max_size'))]);
+    if (!$limites) return '';
+    $octets = min($limites);
+    if ($octets >= 1073741824) return round($octets / 1073741824, 1) . ' Go';
+    if ($octets >= 1048576) return round($octets / 1048576, 1) . ' Mo';
+    return round($octets / 1024) . ' Ko';
+}
 ?>
 <!doctype html>
 <html lang="fr">
@@ -63,6 +85,9 @@ $authOk = !$authRequired || !empty($_SESSION['site_admin']);
         window.AINCRAD_BOOT_STATE = <?= json_encode($bootState, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
         window.AINCRAD_API = 'api.php';
         window.AINCRAD_AUTH = <?= json_encode(['required' => $authRequired, 'ok' => $authOk]) ?>;
+        // Limite d'envoi de l'hébergeur : sert à prévenir avant de téléverser
+        // une vidéo trop lourde.
+        window.AINCRAD_UPLOAD_MAX = <?= json_encode(taille_envoi_lisible(), JSON_UNESCAPED_UNICODE) ?>;
     </script>
     <script src="assets/js/app.js?v=2.0.0" defer></script>
 </body>

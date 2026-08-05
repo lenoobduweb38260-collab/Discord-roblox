@@ -87,6 +87,45 @@ body[data-bg="image"] .sky-layer {
   background-repeat: no-repeat;
   filter: blur(var(--bg-blur)) saturate(.95);
 }
+/* Vidéo de fond (MP4 / WEBM), sous l'assombrissement et le flou */
+.sky-video {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: -6;                       /* sous .sky-layer, qui porte le voile */
+  pointer-events: none;
+  filter: blur(var(--bg-blur)) saturate(.95);
+}
+/* En mode vidéo, la couche du ciel ne sert plus qu'à assombrir l'image */
+body[data-bg="video"] .sky-layer {
+  background-color: transparent;
+  background-image: linear-gradient(
+    180deg,
+    rgba(8, 5, 12, calc(var(--bg-overlay) * .8)),
+    rgba(8, 5, 12, var(--bg-overlay)) 70%,
+    rgba(8, 5, 12, calc(var(--bg-overlay) * .92)) 100%);
+}
+/* Réglages réservés au fond vidéo : masqués pour les autres fonds.
+   Le sélecteur passe par l'#id : sans lui, le « display:flex » de .field et
+   .row (même spécificité, déclarés plus bas) l'emporterait sur le masquage. */
+#site-builder-form .bg-only-video { display: none; }
+#site-builder-form[data-bgtype="video"] .bg-only-video { display: flex; }
+#site-builder-form[data-bgtype="video"] .field.bg-only-video { flex-direction: column; }
+/* Pastille ▶ sur la vignette « Vidéo MP4 » */
+.thumb-badge {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 20px;
+  color: #fff;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, .8);
+  background: rgba(8, 5, 12, .35);
+}
+.bg-choice .thumb { position: relative; overflow: hidden; }
+
 /* Dégradé animé « aurora » */
 body[data-bg="aurora"] .sky-layer {
   background:

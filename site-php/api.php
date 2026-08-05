@@ -205,6 +205,32 @@ function agent_get(string $path, int $timeout = 20): array {
   return [$code, is_array($data) ? $data : []];
 }
 
+// ----- 📏 Limites d'envoi de l'hébergeur -----
+// « 8M », « 512K », « 1G » → nombre d'octets.
+function taille_octets(string $valeur): int {
+  $valeur = trim($valeur);
+  if ($valeur === '') return 0;
+  $unite = strtolower(substr($valeur, -1));
+  $nombre = (int) $valeur;
+  if ($unite === 'g') return $nombre * 1024 * 1024 * 1024;
+  if ($unite === 'm') return $nombre * 1024 * 1024;
+  if ($unite === 'k') return $nombre * 1024;
+  return $nombre;
+}
+// Ce que l'hébergeur accepte réellement : la plus petite des deux limites.
+function limite_envoi(): int {
+  $u = taille_octets((string) ini_get('upload_max_filesize'));
+  $p = taille_octets((string) ini_get('post_max_size'));
+  $valeurs = array_filter([$u, $p]);
+  return $valeurs ? (int) min($valeurs) : 0;
+}
+function taille_lisible(int $octets): string {
+  if ($octets <= 0) return 'inconnue';
+  if ($octets >= 1024 * 1024 * 1024) return round($octets / 1073741824, 1) . ' Go';
+  if ($octets >= 1024 * 1024) return round($octets / 1048576, 1) . ' Mo';
+  return round($octets / 1024) . ' Ko';
+}
+
 // Petit identifiant stable à partir d'un nom (« Colmar RP » → « colmar-rp »).
 function slugify(string $value, string $fallback = 'bot'): string {
   $value = strtolower(trim($value));
@@ -375,6 +401,7 @@ if ($action === 'selftest') {
         'donneesModifiables' => $dataOk,
         'dossierPreuves' => is_dir(PROOF_DIR) ? is_writable(PROOF_DIR) : 'absent',
         'dossierFonds' => is_dir($bgDir) ? is_writable($bgDir) : 'absent',
+        'tailleEnvoiMax' => taille_lisible(limite_envoi()) . ' (upload_max_filesize=' . ini_get('upload_max_filesize') . ', post_max_size=' . ini_get('post_max_size') . ')',
         'curl' => function_exists('curl_init'),
         'allow_url_fopen' => (bool) ini_get('allow_url_fopen'),
         'agent' => $agent,
@@ -477,7 +504,12 @@ if ($action === 'agent.bots') {
 }
 
 if ($method === 'GET' && $action === 'state') {
-    respond(['ok' => true, 'state' => loadState(), 'authRequired' => admin_requis(), 'authOk' => admin_connecte()]);
+    respond([
+        'ok' => true, 'state' => loadState(),
+        'authRequired' => admin_requis(), 'authOk' => admin_connecte(),
+        // Sert à prévenir AVANT l'envoi qu'une vidéo est trop lourde.
+        'limiteEnvoi' => ['octets' => limite_envoi(), 'lisible' => taille_lisible(limite_envoi())],
+    ]);
 }
 
 if ($method !== 'POST') {
@@ -836,38 +868,77 @@ switch ($action) {
         respond(['ok' => true, 'rapport' => $rapport, 'state' => $state]);
     }
 
-    case 'site.background.upload':
-        // Fond personnalisé du site : image téléversée par le créateur.
-        if (!isset($_FILES['background']) || $_FILES['background']['error'] !== UPLOAD_ERR_OK) {
-            respond(['ok' => false, 'error' => 'Aucune image valide reçue.'], 422);
+    case 'site.background.upload': {
+        // Fond personnalisé du site : image, GIF animé ou VIDÉO MP4.
+        // Un envoi plus lourd que post_max_size arrive VIDE chez PHP : sans
+        // ce test, on afficherait « aucun fichier reçu » alors que le vrai
+        // problème est la limite de l'hébergeur.
+        $envoi = (int) ($_SERVER['CONTENT_LENGTH'] ?? 0);
+        if (!$_FILES && $envoi > 0 && $envoi > taille_octets((string) ini_get('post_max_size'))) {
+            respond(['ok' => false, 'error' => "Fichier trop lourd pour votre hébergeur : "
+                . taille_lisible($envoi) . " envoyés, mais PHP n'accepte que "
+                . taille_lisible(limite_envoi()) . " (post_max_size / upload_max_filesize). "
+                . "Compressez la vidéo, ou hébergez-la ailleurs et collez son URL dans « Adresse de la vidéo »."], 413);
+        }
+        if (!isset($_FILES['background']) || !is_array($_FILES['background'])) {
+            respond(['ok' => false, 'error' => 'Aucun fichier reçu.'], 422);
         }
         $file = $_FILES['background'];
-        if ((int) $file['size'] > 10 * 1024 * 1024) {
-            respond(['ok' => false, 'error' => "L'image dépasse 10 Mo."], 422);
+        $err = (int) ($file['error'] ?? UPLOAD_ERR_NO_FILE);
+        if ($err === UPLOAD_ERR_INI_SIZE || $err === UPLOAD_ERR_FORM_SIZE) {
+            respond(['ok' => false, 'error' => "Fichier trop lourd pour votre hébergeur : la limite de PHP est "
+                . taille_lisible(limite_envoi()) . " (upload_max_filesize). "
+                . "Compressez la vidéo, ou hébergez-la ailleurs et collez son URL dans « Adresse de la vidéo »."], 413);
         }
-        $allowed = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
+        if ($err === UPLOAD_ERR_PARTIAL) {
+            respond(['ok' => false, 'error' => "L'envoi a été interrompu avant la fin. Réessayez ; si le fichier est gros, préférez une URL."], 422);
+        }
+        if ($err !== UPLOAD_ERR_OK) {
+            respond(['ok' => false, 'error' => "Aucun fichier valide reçu (code PHP $err)."], 422);
+        }
+
+        // Type reconnu par l'extension ET par le contenu réel du fichier.
+        $extension = strtolower(pathinfo((string) $file['name'], PATHINFO_EXTENSION));
         $mime = function_exists('mime_content_type') ? (mime_content_type((string) $file['tmp_name']) ?: '') : cleanString($file['type'] ?? '', 100);
-        if (!in_array($mime, $allowed, true)) {
-            respond(['ok' => false, 'error' => 'Formats acceptés : PNG, JPG, WEBP ou GIF (animé accepté).'], 422);
+        $imagesOk = ['png' => 'image/png', 'jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'webp' => 'image/webp', 'gif' => 'image/gif'];
+        // Certains serveurs annoncent application/octet-stream pour un MP4 :
+        // l'extension fait alors foi, à condition que le contenu ne soit pas
+        // reconnu comme autre chose (une image ou du texte, par exemple).
+        $videosOk = ['mp4' => 'video/mp4', 'webm' => 'video/webm'];
+        $estVideo = isset($videosOk[$extension]) && (strpos($mime, 'video/') === 0 || $mime === '' || $mime === 'application/octet-stream');
+        $estImage = isset($imagesOk[$extension]) && $imagesOk[$extension] === $mime;
+        if (!$estVideo && !$estImage) {
+            respond(['ok' => false, 'error' => "Format non accepté (« $extension », détecté « $mime »). "
+                . "Acceptés : PNG, JPG, WEBP, GIF animé, et vidéo MP4 ou WEBM."], 422);
         }
+
+        $maxi = $estVideo ? 60 * 1024 * 1024 : 10 * 1024 * 1024;
+        if ((int) $file['size'] > $maxi) {
+            respond(['ok' => false, 'error' => ($estVideo ? 'La vidéo' : "L'image") . ' dépasse '
+                . taille_lisible($maxi) . ' (' . taille_lisible((int) $file['size']) . ' envoyés).'
+                . ($estVideo ? " Une vidéo de fond gagne à rester courte et compressée : elle est téléchargée par CHAQUE visiteur." : '')], 422);
+        }
+
         $bgDir = __DIR__ . '/uploads/backgrounds';
         if (!is_dir($bgDir) && !mkdir($bgDir, 0775, true) && !is_dir($bgDir)) {
             respond(['ok' => false, 'error' => 'Impossible de créer le dossier des fonds.'], 500);
         }
-        $extension = strtolower(pathinfo((string) $file['name'], PATHINFO_EXTENSION));
-        if (!in_array($extension, ['png', 'jpg', 'jpeg', 'webp', 'gif'], true)) {
-            $extension = ['image/png' => 'png', 'image/jpeg' => 'jpg', 'image/webp' => 'webp', 'image/gif' => 'gif'][$mime] ?? 'png';
-        }
         $safeName = 'bg_' . date('Ymd_His') . '_' . bin2hex(random_bytes(3)) . '.' . $extension;
         if (!move_uploaded_file((string) $file['tmp_name'], $bgDir . '/' . $safeName)) {
-            respond(['ok' => false, 'error' => "Impossible d'enregistrer l'image."], 500);
+            respond(['ok' => false, 'error' => "Impossible d'enregistrer le fichier — vérifiez les droits d'écriture sur uploads/backgrounds (chmod 775)."], 500);
         }
         $path = 'uploads/backgrounds/' . $safeName;
-        $state['siteConfig']['bgImage'] = $path;
-        $state['siteConfig']['bgType'] = 'image';
-        appendActivity($state, 'config', 'Fond du site remplacé', $safeName);
+        if ($estVideo) {
+            $state['siteConfig']['bgVideo'] = $path;
+            $state['siteConfig']['bgType'] = 'video';
+        } else {
+            $state['siteConfig']['bgImage'] = $path;
+            $state['siteConfig']['bgType'] = 'image';
+        }
+        appendActivity($state, 'config', $estVideo ? 'Vidéo de fond remplacée' : 'Fond du site remplacé', $safeName);
         saveState($state);
-        respond(['ok' => true, 'path' => $path, 'state' => $state]);
+        respond(['ok' => true, 'path' => $path, 'video' => $estVideo, 'state' => $state]);
+    }
 
     default:
         respond(['ok' => false, 'error' => 'Action inconnue.'], 404);

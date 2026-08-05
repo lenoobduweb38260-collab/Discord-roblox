@@ -141,6 +141,8 @@
   // Accents nommés hérités de l'ancienne version + conversion hexadécimale.
   const ACCENT_PRESETS = { cyan: "#4fd9ff", rose: "#ff7ca5", gold: "#f3c86a" };
   const SWATCHES = ["#a970ff", "#4fd9ff", "#ff7ca5", "#2fe38b", "#f3c86a", "#ff5c74", "#6a8bff", "#ff9d5c"];
+  // Fonds proposés dans le Site builder (l'ordre est celui des vignettes).
+  const BG_TYPES = ["image", "video", "aurora", "stars", "grid", "none"];
   function accentHex(cfg = siteConfig()) {
     const value = cfg.accentColor || ACCENT_PRESETS[cfg.accent] || "#a970ff";
     return /^#[0-9a-fA-F]{6}$/.test(value) ? value : "#a970ff";
@@ -1386,10 +1388,10 @@
   function siteBuilderBody() {
     const s = siteConfig();
     const accent = accentHex(s);
-    const bgType = ["image", "aurora", "stars", "grid", "none"].includes(s.bgType) ? s.bgType : "image";
-    const bgChoice = (id, label, note, thumbStyle) => `
+    const bgType = BG_TYPES.includes(s.bgType) ? s.bgType : "image";
+    const bgChoice = (id, label, note, thumbStyle, badge = "") => `
       <div class="bg-choice ${bgType === id ? "on" : ""}" data-action="pick-bg" data-bg="${id}">
-        <div class="thumb" style="${thumbStyle}"></div>
+        <div class="thumb" style="${thumbStyle}">${badge ? `<span class="thumb-badge">${badge}</span>` : ""}</div>
         <strong>${label}</strong><span>${note}</span>
       </div>`;
     const identity = `<section class="panel"><div class="panel-inner"><div class="panel-head"><div><h3>🪪 Identité</h3><p>Nom, logo, sous-titre et pied de page — visibles partout.</p></div></div><div class="form-grid">
@@ -1418,9 +1420,12 @@
         ${inputField("radius", "Arrondi des cartes", s.radius ?? 18, "range", "", 'min="0" max="30" step="1"')}
       </div>
     </div></section>`;
-    const background = `<section class="panel"><div class="panel-inner"><div class="panel-head"><div><h3>🌌 Fond du site</h3><p>Une image (ou un GIF animé) à vous, ou un fond animé généré.</p></div></div>
+    // Vignette « vidéo » : on affiche l'image de secours en fond, avec un ▶.
+    const videoThumb = `background-image:url('${esc(String(s.bgImage || "assets/images/aincrad-bg.jpg").replaceAll("'", "%27"))}');background-size:cover;background-position:center`;
+    const background = `<section class="panel"><div class="panel-inner"><div class="panel-head"><div><h3>🌌 Fond du site</h3><p>Une image, un GIF, <b>votre vidéo MP4</b>, ou un fond animé généré.</p></div></div>
       <div class="bg-choices">
         ${bgChoice("image", "Image / GIF", "votre visuel", `background-image:url('${esc(String(s.bgImage || "assets/images/aincrad-bg.jpg").replaceAll("'", "%27"))}')`)}
+        ${bgChoice("video", "Vidéo MP4", "votre vidéo en boucle", videoThumb, "▶")}
         ${bgChoice("aurora", "Aurora", "dégradé animé", "background:radial-gradient(60% 80% at 25% 20%, rgba(169,112,255,.6), transparent 60%), radial-gradient(50% 70% at 80% 60%, rgba(79,140,255,.45), transparent 60%), #0b090e")}
         ${bgChoice("stars", "Étoiles", "ciel dérivant", "background:radial-gradient(2px 2px at 25% 30%, #fff, transparent 55%), radial-gradient(1.5px 1.5px at 60% 65%, rgba(255,255,255,.8), transparent 55%), radial-gradient(1.5px 1.5px at 80% 25%, rgba(255,255,255,.7), transparent 55%), #0b090e")}
         ${bgChoice("grid", "Grille", "trame discrète", "background:linear-gradient(rgba(169,112,255,.25) 1px, transparent 1px), linear-gradient(90deg, rgba(169,112,255,.25) 1px, transparent 1px), #0b090e; background-size:11px 11px")}
@@ -1428,18 +1433,32 @@
       </div>
       <input type="hidden" name="bgType" value="${esc(bgType)}">
       <div class="form-grid mt-22">
-        ${inputField("bgImage", "URL de l'image de fond", s.bgImage || "assets/images/aincrad-bg.jpg", "text", "Collez une URL (PNG, JPG, WEBP, GIF animé) — ou téléversez ci-dessous.")}
-        ${inputField("bgOverlay", "Assombrissement du fond", s.bgOverlay ?? 62, "range", "0 = image pure, 92 = presque noir.", 'min="0" max="92" step="1"')}
+        <div class="field full bg-only-video">
+          <label>Adresse de la vidéo (MP4 / WEBM)</label>
+          <input class="input" name="bgVideo" value="${esc(s.bgVideo || "")}" placeholder="uploads/backgrounds/ma-video.mp4">
+          <span class="field-note">Téléversez un fichier juste en dessous (le champ se remplit tout seul), ou collez une adresse se terminant par <code>.mp4</code>. La vidéo tourne <b>en boucle et sans son</b>.</span>
+        </div>
+        ${inputField("bgImage", "Image de fond", s.bgImage || "assets/images/aincrad-bg.jpg", "text", "Fond « Image / GIF » — et, en mode vidéo, l'image affichée le temps que la vidéo se charge.")}
+        ${inputField("bgOverlay", "Assombrissement du fond", s.bgOverlay ?? 62, "range", "0 = fond pur, 92 = presque noir. Indispensable pour garder le texte lisible sur une vidéo.", 'min="0" max="92" step="1"')}
         ${inputField("bgBlur", "Flou du fond", s.bgBlur ?? 0, "range", "0 à 24 pixels.", 'min="0" max="24" step="1"')}
+      </div>
+      <div class="row mt-16 bg-only-video" style="flex-direction:column;align-items:flex-start;gap:5px">
+        <span><b>ℹ️ Bon à savoir sur une vidéo de fond</b></span>
+        <span style="color:var(--muted)">Elle est <b>toujours muette</b> et en boucle : aucun navigateur ne lance tout seul une vidéo avec du son.</span>
+        <span style="color:var(--muted)">Elle est téléchargée par <b>chaque visiteur</b> — visez <b>court et compressé</b> (quelques Mo), sous peine de ralentir votre site.</span>
+        <span style="color:var(--muted)">Si le visiteur a coupé les animations (section ✨ Effets), la vidéo reste figée sur sa première image.</span>
       </div>
     </div></section>`;
     // Le téléversement est un formulaire séparé (un <form> ne peut pas en
     // contenir un autre) — affiché juste sous la section « Fond du site ».
-    const uploadSection = `<section class="panel mt-16"><div class="panel-inner"><div class="panel-head"><div><h3>📤 Téléverser un fond</h3><p>Depuis votre PC — PNG, JPG, WEBP ou GIF animé (10 Mo max). Il devient immédiatement le fond du site.</p></div></div>
+    const limite = window.AINCRAD_UPLOAD_MAX || "";
+    const uploadSection = `<section class="panel mt-16"><div class="panel-inner"><div class="panel-head"><div><h3>📤 Téléverser un fond</h3><p>Depuis votre PC — image (10 Mo max) ou <b>vidéo MP4 / WEBM</b> (60 Mo max). Appliqué immédiatement.</p></div></div>
       <form data-form="bg-upload" enctype="multipart/form-data" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
-        <input class="input" type="file" name="background" accept="image/png,image/jpeg,image/webp,image/gif" required style="max-width:340px">
+        <input class="input" type="file" name="background" accept="image/png,image/jpeg,image/webp,image/gif,video/mp4,video/webm" required style="max-width:340px">
         <button class="btn primary" type="submit">Téléverser et appliquer</button>
       </form>
+      <span class="field-note" style="display:block;margin-top:8px">Un MP4 devient automatiquement le fond vidéo ; une image devient le fond image.${
+        limite ? ` Votre hébergeur limite chaque envoi à <b>${esc(limite)}</b> — au-delà, hébergez la vidéo ailleurs et collez son adresse.` : ""}</span>
     </div></section>`;
     const navigation = `<section class="panel"><div class="panel-inner"><div class="panel-head"><div><h3>🧭 Navigation</h3><p>Renommez, masquez et réordonnez les onglets du menu. Le Site builder reste toujours accessible.</p></div></div>
       <div id="nav-builder">
@@ -1481,7 +1500,7 @@
       ${textAreaField("customCss", "Votre CSS", s.customCss || "", "Exemple : .panel { border-width: 2px; }  ·  body { letter-spacing: .02em; }")}
     </div></section>`;
     return `<div class="builder-hint">💡 Chaque réglage se prévisualise <b>en direct</b> pendant que vous le modifiez. « Enregistrer » l'applique pour tout le monde.</div>
-      <form data-form="site-config" id="site-builder-form">${identity}<div class="mt-16">${theme}</div><div class="mt-16">${background}</div><div class="mt-16">${boot}</div><div class="mt-16">${navigation}</div><div class="mt-16">${effects}</div><div class="mt-16">${advanced}</div>
+      <form data-form="site-config" id="site-builder-form" data-bgtype="${esc(bgType)}">${identity}<div class="mt-16">${theme}</div><div class="mt-16">${background}</div><div class="mt-16">${boot}</div><div class="mt-16">${navigation}</div><div class="mt-16">${effects}</div><div class="mt-16">${advanced}</div>
       <div class="form-actions"><button class="btn ghost" type="button" data-action="reset-site-config">Annuler les modifications</button><button class="btn success" type="submit">💾 Enregistrer le site</button></div></form>
       ${uploadSection}`;
   }
@@ -1533,9 +1552,12 @@
     document.body.dataset.font = ["exo", "inter", "poppins", "orbitron"].includes(cfg.font) ? cfg.font : "exo";
     document.body.dataset.btnstyle = ["pill", "rounded", "square", "cut"].includes(cfg.buttonStyle) ? cfg.buttonStyle : "pill";
 
-    // Fond du site : image téléversée / URL, ou fond animé.
-    const bgType = ["image", "aurora", "stars", "grid", "none"].includes(cfg.bgType) ? cfg.bgType : "image";
+    // Fond du site : image téléversée / URL, vidéo MP4, ou fond animé.
+    const bgType = BG_TYPES.includes(cfg.bgType) ? cfg.bgType : "image";
     document.body.dataset.bg = bgType;
+    // L'assombrissement et le flou servent à l'image ET à la vidéo.
+    root.style.setProperty("--bg-overlay", String(Math.min(92, Math.max(0, Number(cfg.bgOverlay ?? 62))) / 100));
+    root.style.setProperty("--bg-blur", `${Math.min(24, Math.max(0, Number(cfg.bgBlur ?? 0)))}px`);
     if (bgType === "image") {
       // URL absolue : dans une variable CSS, une URL relative serait résolue
       // depuis le fichier .css (assets/css/) et non depuis la page.
@@ -1543,9 +1565,8 @@
       try { image = new URL(image, document.baseURI).href; } catch (_) {}
       image = image.replaceAll('"', "%22");
       root.style.setProperty("--bg-image", `url("${image}")`);
-      root.style.setProperty("--bg-overlay", String(Math.min(92, Math.max(0, Number(cfg.bgOverlay ?? 62))) / 100));
-      root.style.setProperty("--bg-blur", `${Math.min(24, Math.max(0, Number(cfg.bgBlur ?? 0)))}px`);
     }
+    appliquerVideoDeFond(bgType === "video" ? cfg : null);
 
     // Effets activables un par un.
     document.body.classList.toggle("reduce-effects", cfg.animations === false);
@@ -1581,6 +1602,53 @@
       }
       if (ring) ring.style.display = cfg.bootRing === false ? "none" : "";
     }
+  }
+
+  // ── 🎬 Vidéo de fond (MP4 / WEBM) ───────────────────────────────────
+  // Passer `null` retire la vidéo. La balise est créée une seule fois et sa
+  // source n'est réécrite que si elle change : sans cela, la lecture
+  // repartirait de zéro à chaque frappe pendant l'aperçu en direct.
+  function appliquerVideoDeFond(cfg) {
+    let video = document.querySelector("#bg-video");
+    if (!cfg) {
+      if (video) { video.pause(); video.remove(); }
+      return;
+    }
+    const source = String(cfg.bgVideo || "").trim();
+    if (!source) {           // type « vidéo » choisi mais aucun fichier
+      if (video) { video.pause(); video.remove(); }
+      return;
+    }
+    let url = source;
+    try { url = new URL(source, document.baseURI).href; } catch (_) {}
+    if (!video) {
+      video = document.createElement("video");
+      video.id = "bg-video";
+      video.className = "sky-video";
+      // muted + playsinline : sans eux, les navigateurs refusent la lecture
+      // automatique. loop : le fond ne doit jamais s'arrêter sur une image fixe.
+      video.muted = true;
+      video.defaultMuted = true;
+      video.loop = true;
+      video.autoplay = true;
+      video.playsInline = true;
+      video.setAttribute("muted", "");
+      video.setAttribute("playsinline", "");
+      video.setAttribute("aria-hidden", "true");
+      video.preload = "auto";
+      document.body.insertBefore(video, document.body.firstChild);
+    }
+    // Image affichée le temps que la vidéo se charge (et si elle échoue).
+    const poster = String(cfg.bgImage || "");
+    if (poster) { try { video.poster = new URL(poster, document.baseURI).href; } catch (_) {} }
+    if (video.dataset.src !== url) {
+      video.dataset.src = url;
+      video.src = url;
+      video.load();
+    }
+    // « Animations » coupées : on fige la vidéo au lieu de la faire tourner.
+    if (cfg.animations === false) video.pause();
+    else { const p = video.play(); if (p && p.catch) p.catch(() => {}); }
   }
 
   function startClock() {
@@ -1705,8 +1773,13 @@
           break;
         }
         case "pick-bg": {
-          const hidden = document.querySelector('#site-builder-form input[name="bgType"]');
+          const formBg = document.querySelector("#site-builder-form");
+          const hidden = formBg?.querySelector('input[name="bgType"]');
           if (hidden) hidden.value = target.dataset.bg;
+          // Fait apparaître (ou disparaître) les réglages propres à la vidéo,
+          // sans reconstruire la page : les autres champs en cours d'édition
+          // ne sont pas perdus.
+          if (formBg) formBg.dataset.bgtype = target.dataset.bg;
           document.querySelectorAll(".bg-choice").forEach(el => el.classList.toggle("on", el === target));
           livePreview();
           break;
@@ -2172,9 +2245,18 @@
         case "bg-upload": {
           const data = new FormData(form);
           data.append("action", "site.background.upload");
-          await api("site.background.upload", {}, { formData: data });
-          render();
-          toast("FOND APPLIQUÉ", "Votre image est désormais le fond du site.");
+          const bouton = form.querySelector('button[type="submit"]');
+          const libelle = bouton?.textContent;
+          // Une vidéo peut mettre du temps à monter : on le montre.
+          if (bouton) { bouton.textContent = "⏳ Envoi en cours…"; bouton.disabled = true; }
+          try {
+            const r = await api("site.background.upload", {}, { formData: data });
+            render();
+            toast(r.video ? "VIDÉO APPLIQUÉE" : "FOND APPLIQUÉ",
+              r.video ? "Votre vidéo tourne désormais en fond du site." : "Votre image est désormais le fond du site.");
+          } finally {
+            if (bouton && bouton.isConnected) { bouton.textContent = libelle; bouton.disabled = false; }
+          }
           break;
         }
         case "auth-login": {
