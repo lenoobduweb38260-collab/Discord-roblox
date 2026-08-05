@@ -33,6 +33,8 @@
     blacklistQuery: "",
     serverQuery: "",
     mobileOpen: false,
+    creatorTab: "page",
+    blocks: null, // blocs en cours d'édition dans le constructeur de page
   };
 
   const icons = {
@@ -229,44 +231,47 @@
       </div>`;
   }
 
+  // Page d'accueil publique : rendue depuis les BLOCS composés par le
+  // créateur dans « Constructeur de page ».
   function renderGate() {
-    const totalServers = state.servers?.length || 0;
-    const totalUsers = (state.servers || []).reduce((sum, server) => sum + Number(server.members || 0), 0);
-    const cfg = siteConfig();
-    const rawName = String(cfg.siteName || "Aincrad Control");
-    const words = rawName.trim().split(/\s+/);
-    const lastWord = words.length > 1 ? words.pop() : "";
-    const titleHtml = lastWord
-      ? `${esc(words.join(" "))}<br><span>${esc(lastWord)}</span>`
-      : `<span>${esc(rawName)}</span>`;
+    const blocks = pageBlocks();
     app.innerHTML = `
-      <section class="gate">
-        <div class="gate-copy">
-          <div class="eyebrow">${esc(cfg.logo || "⚔️")} ${esc(cfg.subtitle || "Cardinal System connecté")}</div>
-          <h1>${titleHtml}</h1>
-          <p>Une interface de gestion Discord complète : administration des serveurs, modules RP, sécurité, blacklist, preuves et tickets avec chat en temps réel.</p>
-          <div class="gate-metrics">
-            <div class="gate-metric"><strong>${formatNumber(totalServers)}</strong><span>serveurs liés</span></div>
-            <div class="gate-metric"><strong>${formatNumber(totalUsers)}</strong><span>utilisateurs</span></div>
-            <div class="gate-metric"><strong>8</strong><span>modules serveur</span></div>
-          </div>
-        </div>
-        <div class="bot-select">
-          <div class="bot-select-title">Sélectionnez l'interface du bot</div>
-          ${(state.bots || []).map(bot => `
-            <button class="bot-card" data-action="select-bot" data-bot-id="${esc(bot.id)}">
-              <span class="bot-avatar ${bot.accent === "rose" ? "rose" : ""}">${esc(bot.name.slice(0, 1))}</span>
-              <span>
-                <span style="display:flex;align-items:center;gap:8px"><h2>${esc(bot.name)}</h2><i class="status-dot"></i></span>
-                <p>${esc(bot.description)}</p>
-                <small>${esc(bot.tag)} · ${formatNumber(bot.servers)} SERVEURS · ${formatNumber(bot.latency)} MS</small>
-              </span>
-              <span class="arrow">›</span>
-            </button>`).join("")}
-          ${siteConfig().footer ? `<div class="bot-select-title" style="margin-top:8px">${esc(siteConfig().footer)}</div>` : ""}
-        </div>
-      </section>
+      <div class="page-public">
+        ${blocks.map((block, index) => renderBlock(block, index)).join("")}
+      </div>
       ${ui.activeBotId ? `<button class="btn primary gate-back" data-action="navigate" data-route="dashboard">← Retour à l'administration</button>` : ""}`;
+    startAnnouncements();
+  }
+
+  // Fait défiler les blocs « Annonces » présents sur la page.
+  function startAnnouncements() {
+    document.querySelectorAll(".annwin[data-ann]").forEach(box => {
+      let items = [];
+      try { items = JSON.parse(box.dataset.ann); } catch (_) { return; }
+      if (!items.length) return;
+      const titre = box.querySelector(".antitre");
+      const texte = box.querySelector(".antexte");
+      const dots = box.querySelector(".andots");
+      let index = 0;
+      dots.innerHTML = items.map((_, i) => `<i data-i="${i}"></i>`).join("");
+      const show = next => {
+        index = ((next % items.length) + items.length) % items.length;
+        const body = box.querySelector(".anbody");
+        body.style.opacity = 0;
+        setTimeout(() => {
+          titre.textContent = items[index].titre || "";
+          texte.textContent = items[index].texte || "";
+          dots.querySelectorAll("i").forEach((dot, i) => dot.className = i === index ? "on" : "");
+          body.style.opacity = 1;
+        }, 200);
+      };
+      let timer = setInterval(() => show(index + 1), 6000);
+      const rearm = () => { clearInterval(timer); timer = setInterval(() => show(index + 1), 6000); };
+      box.querySelector('[data-action="ann-prev"]').onclick = () => { show(index - 1); rearm(); };
+      box.querySelector('[data-action="ann-next"]').onclick = () => { show(index + 1); rearm(); };
+      dots.querySelectorAll("i").forEach(dot => { dot.onclick = () => { show(Number(dot.dataset.i)); rearm(); }; });
+      show(0);
+    });
   }
 
   function sidebarNavButton(route, label, icon, badge = "") {
@@ -295,8 +300,11 @@
         <header class="topbar">
           <div class="brand">
             <button class="icon-btn mobile-menu" data-action="toggle-sidebar" aria-label="Ouvrir le menu">☰</button>
-            <div class="brand-mark">${brandMark()}</div>
-            <div><h1>${esc(siteConfig().siteName || "AINCRAD CONTROL PANEL")}</h1><p>${esc(siteConfig().subtitle || "Sword Art Online Discord Management")}</p></div>
+            <!-- Logo + nom : retour à la page d'accueil du site, SANS se déconnecter. -->
+            <div class="brand-home" data-action="go-home" title="Retour à l'accueil du site">
+              <div class="brand-mark">${brandMark()}</div>
+              <div><h1>${esc(siteConfig().siteName || "AINCRAD CONTROL PANEL")}</h1><p>${esc(siteConfig().subtitle || "Sword Art Online Discord Management")}</p></div>
+            </div>
           </div>
           <div class="top-actions">
             <div class="clock" id="live-clock">--:--:--</div>
@@ -637,20 +645,295 @@
     </div>`;
   }
 
+  // ══════════════════════════════════════════════════════════════════
+  // CONSTRUCTEUR DE PAGE — blocs empilables composés par le créateur
+  // ══════════════════════════════════════════════════════════════════
+  // Chaque bloc a un type, des champs décrits ici (l'éditeur est généré
+  // automatiquement) et s'affiche sur la page d'accueil publique.
+  const BLOCK_TYPES = {
+    hero: {
+      label: "🏔️ Bannière (hero)", desc: "Grand titre, texte et boutons d'appel",
+      fields: [
+        { k: "eyebrow", l: "Sur-titre", t: "text" },
+        { k: "title", l: "Titre", t: "text" },
+        { k: "highlight", l: "Mot mis en couleur", t: "text", note: "Affiché dans votre couleur d'accent, sous le titre." },
+        { k: "text", l: "Texte de présentation", t: "textarea" },
+        { k: "btn1", l: "Bouton principal — texte", t: "text" },
+        { k: "btn1url", l: "Bouton principal — lien", t: "text", note: "URL, ou une page du site : #servers, #tickets…" },
+        { k: "btn2", l: "Bouton secondaire — texte", t: "text" },
+        { k: "btn2url", l: "Bouton secondaire — lien", t: "text" },
+      ],
+      def: { eyebrow: "Cardinal System connecté", title: "Aincrad", highlight: "Control", text: "Une interface de gestion Discord complète.", btn1: "Ouvrir le panneau", btn1url: "#dashboard", btn2: "", btn2url: "" },
+    },
+    bots: {
+      label: "🤖 Sélection des bots", desc: "Les cartes pour choisir/inviter un bot",
+      fields: [{ k: "title", l: "Titre de la section", t: "text" }],
+      def: { title: "Sélectionnez l'interface du bot" },
+    },
+    stats: {
+      label: "📊 Chiffres clés", desc: "Une rangée de statistiques",
+      fields: [{ k: "items", l: "Chiffres", t: "list", item: [{ k: "value", l: "Valeur" }, { k: "label", l: "Libellé" }] }],
+      def: { items: [{ value: "auto:servers", label: "serveurs liés" }, { value: "auto:users", label: "utilisateurs" }, { value: "8", label: "modules" }] },
+      hint: "Astuce : écrivez auto:servers, auto:users ou auto:bots pour un chiffre calculé automatiquement.",
+    },
+    features: {
+      label: "✨ Cartes / fonctionnalités", desc: "Une grille de cartes illustrées",
+      fields: [{ k: "title", l: "Titre de la section", t: "text" },
+        { k: "items", l: "Cartes", t: "list", item: [{ k: "icon", l: "Emoji" }, { k: "title", l: "Titre" }, { k: "text", l: "Texte" }] }],
+      def: { title: "Ce que fait le bot", items: [
+        { icon: "⚔️", title: "Module RP", text: "Personnages, économie et progression." },
+        { icon: "🛡️", title: "Sécurité", text: "Anti-raid, anti-spam et journaux complets." },
+        { icon: "🎫", title: "Tickets", text: "Support intégré avec transcriptions." },
+      ] },
+    },
+    text: {
+      label: "📝 Texte libre", desc: "Un titre et un paragraphe",
+      fields: [{ k: "title", l: "Titre", t: "text" }, { k: "body", l: "Texte", t: "textarea" }],
+      def: { title: "À propos", body: "Écrivez ici la présentation de votre communauté." },
+    },
+    gallery: {
+      label: "🖼️ Galerie d'images", desc: "Vos captures ou visuels",
+      fields: [{ k: "title", l: "Titre", t: "text" },
+        { k: "items", l: "Images", t: "list", item: [{ k: "url", l: "URL de l'image" }, { k: "caption", l: "Légende" }] }],
+      def: { title: "Galerie", items: [{ url: "assets/images/aincrad-bg.jpg", caption: "Aincrad" }] },
+    },
+    faq: {
+      label: "❓ FAQ", desc: "Questions/réponses dépliables",
+      fields: [{ k: "title", l: "Titre", t: "text" },
+        { k: "items", l: "Questions", t: "list", item: [{ k: "q", l: "Question" }, { k: "a", l: "Réponse" }] }],
+      def: { title: "Questions fréquentes", items: [{ q: "Comment inviter le bot ?", a: "Cliquez sur la carte du bot puis autorisez-le sur votre serveur." }] },
+    },
+    announcements: {
+      label: "📣 Annonces défilantes", desc: "Messages qui défilent automatiquement",
+      fields: [{ k: "items", l: "Messages", t: "list", item: [{ k: "titre", l: "Titre" }, { k: "texte", l: "Texte" }] }],
+      def: { items: [{ titre: "🎉 Nouveauté", texte: "Décrivez ici votre annonce." }] },
+    },
+    cta: {
+      label: "🚀 Appel à l'action", desc: "Un bandeau avec un gros bouton",
+      fields: [{ k: "title", l: "Titre", t: "text" }, { k: "text", l: "Texte", t: "text" },
+        { k: "btn", l: "Bouton — texte", t: "text" }, { k: "btnurl", l: "Bouton — lien", t: "text" }],
+      def: { title: "Rejoignez l'aventure", text: "Ajoutez le bot à votre serveur en un clic.", btn: "Ajouter le bot", btnurl: "#dashboard" },
+    },
+    footer: {
+      label: "🔻 Pied de page", desc: "Mentions de bas de page",
+      fields: [{ k: "text", l: "Texte", t: "text" }],
+      def: { text: "© 2026 — Tous droits réservés" },
+    },
+  };
+
+  // Blocs en cours d'édition (non encore enregistrés) puis blocs enregistrés.
+  function stageBlocks(blocks) {
+    ui.blocks = blocks;
+  }
+  function pageBlocks() {
+    if (Array.isArray(ui.blocks)) return ui.blocks;
+    const blocks = siteConfig().blocks;
+    if (Array.isArray(blocks) && blocks.length) return blocks;
+    // Page par défaut (équivalent de l'accueil d'origine).
+    return [
+      { id: "b1", type: "hero", props: { ...BLOCK_TYPES.hero.def } },
+      { id: "b2", type: "stats", props: { ...BLOCK_TYPES.stats.def } },
+      { id: "b3", type: "bots", props: { ...BLOCK_TYPES.bots.def } },
+    ];
+  }
+
+  function autoValue(raw) {
+    const text = String(raw ?? "");
+    if (text === "auto:servers") return formatNumber(state.servers?.length || 0);
+    if (text === "auto:users") return formatNumber((state.servers || []).reduce((sum, s) => sum + Number(s.members || 0), 0));
+    if (text === "auto:bots") return formatNumber(state.bots?.length || 0);
+    return text;
+  }
+
+  // Rendu public d'un bloc sur la page d'accueil.
+  function renderBlock(block, index) {
+    const p = block.props || {};
+    const anim = `style="animation-delay:${.06 * index}s"`;
+    const list = key => Array.isArray(p[key]) ? p[key] : [];
+    switch (block.type) {
+      case "hero":
+        return `<section class="blk blk-hero" ${anim}>
+          ${p.eyebrow ? `<div class="eyebrow">${esc(p.eyebrow)}</div>` : ""}
+          <h1>${esc(p.title || "")}${p.highlight ? `<br><span>${esc(p.highlight)}</span>` : ""}</h1>
+          ${p.text ? `<p>${esc(p.text)}</p>` : ""}
+          <div class="blk-btns">
+            ${p.btn1 ? `<button class="btn primary" data-action="block-link" data-url="${esc(p.btn1url || "")}">${esc(p.btn1)}</button>` : ""}
+            ${p.btn2 ? `<button class="btn" data-action="block-link" data-url="${esc(p.btn2url || "")}">${esc(p.btn2)}</button>` : ""}
+          </div>
+        </section>`;
+      case "bots":
+        return `<section class="blk" ${anim}>
+          ${p.title ? `<div class="bot-select-title">${esc(p.title)}</div>` : ""}
+          <div class="bot-select">${(state.bots || []).map(bot => `
+            <button class="bot-card" data-action="select-bot" data-bot-id="${esc(bot.id)}">
+              <span class="bot-avatar ${bot.accent === "rose" ? "rose" : ""}">${esc(bot.name.slice(0, 1))}</span>
+              <span>
+                <span style="display:flex;align-items:center;gap:8px"><h2>${esc(bot.name)}</h2><i class="status-dot"></i></span>
+                <p>${esc(bot.description)}</p>
+                <small>${esc(bot.tag)} · ${formatNumber(bot.servers)} SERVEURS</small>
+              </span>
+              <span class="arrow">›</span>
+            </button>`).join("")}</div>
+        </section>`;
+      case "stats":
+        return `<section class="blk" ${anim}><div class="gate-metrics">${list("items").map(item => `
+          <div class="gate-metric"><strong>${esc(autoValue(item.value))}</strong><span>${esc(item.label || "")}</span></div>`).join("")}
+        </div></section>`;
+      case "features":
+        return `<section class="blk" ${anim}>
+          ${p.title ? `<h3 class="blk-title">${esc(p.title)}</h3>` : ""}
+          <div class="feature-grid">${list("items").map(item => `
+            <div class="feature-card"><span class="feature-icon">${esc(item.icon || "◆")}</span>
+              <strong>${esc(item.title || "")}</strong><p>${esc(item.text || "")}</p></div>`).join("")}</div>
+        </section>`;
+      case "text":
+        return `<section class="blk blk-text" ${anim}>
+          ${p.title ? `<h3 class="blk-title">${esc(p.title)}</h3>` : ""}
+          <p>${esc(p.body || "")}</p>
+        </section>`;
+      case "gallery":
+        return `<section class="blk" ${anim}>
+          ${p.title ? `<h3 class="blk-title">${esc(p.title)}</h3>` : ""}
+          <div class="gallery-grid">${list("items").map(item => `
+            <figure class="gallery-item"><img src="${esc(item.url || "")}" alt="${esc(item.caption || "")}" loading="lazy">
+            ${item.caption ? `<figcaption>${esc(item.caption)}</figcaption>` : ""}</figure>`).join("")}</div>
+        </section>`;
+      case "faq":
+        return `<section class="blk" ${anim}>
+          ${p.title ? `<h3 class="blk-title">${esc(p.title)}</h3>` : ""}
+          <div class="faq-list">${list("items").map(item => `
+            <details class="faq-item"><summary>${esc(item.q || "")}</summary><p>${esc(item.a || "")}</p></details>`).join("")}</div>
+        </section>`;
+      case "announcements": {
+        const items = list("items");
+        if (!items.length) return "";
+        return `<section class="blk" ${anim}><div class="annwin" data-ann='${esc(JSON.stringify(items))}'>
+          <div class="anhead">A N N O N C E S</div>
+          <button class="anv" data-action="ann-prev">‹</button>
+          <div class="anbody"><div class="antitre"></div><div class="antexte"></div></div>
+          <button class="anv" data-action="ann-next">›</button>
+          <div class="andots"></div>
+        </div></section>`;
+      }
+      case "cta":
+        return `<section class="blk" ${anim}><div class="cta-band">
+          <div><strong>${esc(p.title || "")}</strong><span>${esc(p.text || "")}</span></div>
+          ${p.btn ? `<button class="btn primary" data-action="block-link" data-url="${esc(p.btnurl || "")}">${esc(p.btn)}</button>` : ""}
+        </div></section>`;
+      case "footer":
+        return `<section class="blk blk-footer" ${anim}>${esc(p.text || "")}</section>`;
+      default:
+        return "";
+    }
+  }
+
+  // ── Espace créateur : écosystème + Site builder intégré ─────────────
   function creatorView() {
+    const valid = ["ecosystem", "page", "builder"];
+    const tab = valid.includes(ui.creatorTab) ? ui.creatorTab : "page";
+    const tabs = [
+      ["page", "🧱 Constructeur de page", "Blocs de la page d'accueil"],
+      ["builder", "🎨 Apparence du site", "Thème, fond, navigation, CSS"],
+      ["ecosystem", "🌍 Écosystème", "Bots, serveurs et indicateurs"],
+    ];
+    const heads = {
+      page: pageHead("Créateur / Site builder", "Construisez votre page", "Ajoutez, réordonnez et modifiez les blocs de votre page d'accueil : bannière, cartes, chiffres, galerie, FAQ, annonces…"),
+      builder: pageHead("Créateur / Site builder", "Apparence du site", "Identité, thème, fond animé ou image, navigation, effets et CSS libre — appliqués en direct."),
+      ecosystem: pageHead("Créateur / Écosystème", "Vue globale", "Consultez l'ensemble des bots, des serveurs et des indicateurs de déploiement.", button("Exporter les données", "export-state", "primary")),
+    };
+    const tabBar = `<div class="subtabs">${tabs.map(t => `
+      <button class="subtab ${tab === t[0] ? "active" : ""}" data-action="creator-tab" data-tab="${t[0]}">
+        <strong>${t[1]}</strong><span>${t[2]}</span>
+      </button>`).join("")}</div>`;
+    const body = tab === "builder" ? siteBuilderBody() : tab === "page" ? pageBuilderBody() : creatorEcosystem();
+    return `<div class="content-view">${heads[tab]}${tabBar}${body}</div>`;
+  }
+
+  // ── Constructeur de page : liste des blocs + ajout ──────────────────
+  function pageBuilderBody() {
+    const blocks = pageBlocks();
+    const rows = blocks.map((block, index) => {
+      const type = BLOCK_TYPES[block.type];
+      if (!type) return "";
+      const count = Object.values(block.props || {}).filter(Array.isArray)[0]?.length;
+      return `<div class="blk-row" data-block-id="${esc(block.id)}">
+        <span class="blk-index">${String(index + 1).padStart(2, "0")}</span>
+        <div class="blk-info"><strong>${type.label}</strong><span>${esc(block.props?.title || block.props?.text || type.desc)}${count != null ? ` · ${count} élément(s)` : ""}</span></div>
+        <div class="blk-actions">
+          <button class="btn ghost small" data-action="block-move" data-dir="-1" ${index === 0 ? "disabled" : ""}>▲</button>
+          <button class="btn ghost small" data-action="block-move" data-dir="1" ${index === blocks.length - 1 ? "disabled" : ""}>▼</button>
+          <button class="btn small" data-action="block-edit">✏️ Modifier</button>
+          <button class="btn small" data-action="block-duplicate">⧉</button>
+          <button class="btn danger small" data-action="block-delete">🗑</button>
+        </div>
+      </div>`;
+    }).join("");
+    const addButtons = Object.entries(BLOCK_TYPES).map(([id, type]) => `
+      <button class="addblk" data-action="block-add" data-type="${id}">
+        <strong>${type.label}</strong><span>${esc(type.desc)}</span>
+      </button>`).join("");
+    return `
+      <div class="builder-hint">🧱 Composez votre page d'accueil bloc par bloc. Le bouton 👁 de la barre du haut affiche le rendu public.</div>
+      <section class="panel"><div class="panel-inner">
+        <div class="panel-head"><div><h3>Blocs de la page</h3><p>${blocks.length} bloc(s) — glissez-les avec ▲▼, modifiez leur contenu, dupliquez ou supprimez.</p></div>
+          <div class="page-actions">${button("👁 Voir le rendu", "preview-gate", "ghost")}${button("💾 Enregistrer la page", "save-blocks", "success")}</div></div>
+        <div id="block-list">${rows || emptyBlock("Page vide", "Ajoutez votre premier bloc ci-dessous.")}</div>
+      </div></section>
+      <section class="panel mt-16"><div class="panel-inner">
+        <div class="panel-head"><div><h3>➕ Ajouter un bloc</h3><p>Cliquez pour l'ajouter à la fin de la page.</p></div></div>
+        <div class="addblk-grid">${addButtons}</div>
+      </div></section>`;
+  }
+
+  // Éditeur d'un bloc (modale générée depuis la description des champs).
+  function openBlockEditor(blockId) {
+    const blocks = pageBlocks();
+    const block = blocks.find(item => item.id === blockId);
+    if (!block) return;
+    const type = BLOCK_TYPES[block.type];
+    const p = block.props || {};
+    const body = type.fields.map(field => {
+      if (field.t === "textarea") return textAreaField(field.k, field.l, p[field.k] || "", field.note || "");
+      if (field.t === "list") {
+        const items = Array.isArray(p[field.k]) ? p[field.k] : [];
+        return `<div class="field full"><label>${esc(field.l)}</label>
+          <div class="blk-items" data-list="${esc(field.k)}">
+            ${items.map(item => blockItemRow(field, item)).join("")}
+          </div>
+          <button type="button" class="btn small" data-action="item-add" data-list="${esc(field.k)}">➕ Ajouter</button>
+          ${type.hint ? `<span class="field-note">${esc(type.hint)}</span>` : ""}
+        </div>`;
+      }
+      return inputField(field.k, field.l, p[field.k] ?? "", "text", field.note || "");
+    }).join("");
+    openModal(`Modifier · ${type.label}`, `
+      <form data-form="block-edit" data-block-id="${esc(blockId)}">
+        <div class="form-grid">${body}</div>
+        <div class="form-actions"><button class="btn ghost" type="button" data-action="close-modal">Annuler</button><button class="btn success" type="submit">Appliquer</button></div>
+      </form>`, true);
+  }
+
+  function blockItemRow(field, item = {}) {
+    return `<div class="blk-item">
+      ${field.item.map(sub => `<input class="input" data-sub="${esc(sub.k)}" placeholder="${esc(sub.l)}" value="${esc(item[sub.k] ?? "")}">`).join("")}
+      <button type="button" class="btn danger small" data-action="item-remove">✕</button>
+    </div>`;
+  }
+
+  function creatorEcosystem() {
     const totalMembers = (state.servers || []).reduce((s,x)=>s+x.members,0);
-    return `<div class="content-view">
-      ${pageHead("Administration / Créateur", "Vue globale de l'écosystème", "Consultez l'ensemble des bots, des serveurs et des indicateurs de déploiement.", button("Exporter les données", "export-state", "primary"))}
+    return `
       <div class="grid-2">${(state.bots || []).map(bot => {
         const servers = botServers(bot.id);
         return `<section class="panel"><div class="panel-inner"><div class="panel-head"><div style="display:flex;gap:13px;align-items:center"><span class="bot-avatar ${bot.accent === "rose" ? "rose" : ""}">${esc(bot.name.slice(0,1))}</span><div><h3>${esc(bot.name)}</h3><p>${esc(bot.description)}</p></div></div><span class="chip green">EN LIGNE</span></div><div class="grid-3"><div class="stat-card"><span>Serveurs</span><strong>${servers.length}</strong><em>déploiements</em></div><div class="stat-card"><span>Utilisateurs</span><strong>${formatNumber(servers.reduce((s,x)=>s+x.members,0))}</strong><em>portée</em></div><div class="stat-card"><span>Latence</span><strong>${bot.latency}</strong><em>millisecondes</em></div></div></div></section>`;
       }).join("")}</div>
       <section class="panel mt-16"><div class="panel-inner"><div class="panel-head"><div><h3>Tous les serveurs</h3><p>${state.servers?.length || 0} déploiements · ${formatNumber(totalMembers)} membres cumulés.</p></div></div><div class="table-wrap"><table class="data-table"><thead><tr><th>Serveur</th><th>Région</th><th>Membres</th><th>En ligne</th><th>Bots installés</th><th>Accès</th></tr></thead><tbody>${(state.servers || []).map(server => `<tr><td><strong>${esc(server.name)}</strong><br><span>${esc(server.id)}</span></td><td>${esc(server.region)}</td><td>${formatNumber(server.members)}</td><td>${formatNumber(server.online)}</td><td>${server.botIds.map(id => `<span class="chip">${esc(state.bots.find(bot=>bot.id===id)?.name || id)}</span>`).join(" ")}</td><td>${button("Configurer", "open-server", "small", `data-server-id="${esc(server.id)}"`)}</td></tr>`).join("")}</tbody></table></div></div></section>
-      <div class="grid-3 mt-16"><div class="stat-card"><span>Disponibilité</span><strong>99.98%</strong><em>30 derniers jours</em></div><div class="stat-card"><span>Commandes exécutées</span><strong>1.24 M</strong><em>total historique</em></div><div class="stat-card"><span>Événements traités</span><strong>8.7 M</strong><em>Cardinal System</em></div></div>
-    </div>`;
+      <div class="grid-3 mt-16"><div class="stat-card"><span>Disponibilité</span><strong>99.98%</strong><em>30 derniers jours</em></div><div class="stat-card"><span>Commandes exécutées</span><strong>1.24 M</strong><em>total historique</em></div><div class="stat-card"><span>Événements traités</span><strong>8.7 M</strong><em>Cardinal System</em></div></div>`;
   }
 
-  function siteConfigView() {
+  // Corps du Site builder (réutilisé par l'onglet dédié ET par l'espace
+  // Créateur, pour que le créateur construise son site sans changer de page).
+  function siteBuilderBody() {
     const s = siteConfig();
     const accent = accentHex(s);
     const bgType = ["image", "aurora", "stars", "grid", "none"].includes(s.bgType) ? s.bgType : "image";
@@ -737,11 +1020,16 @@
     const advanced = `<section class="panel"><div class="panel-inner"><div class="panel-head"><div><h3>🧪 CSS personnalisé</h3><p>Pouvoir total : ce CSS est injecté tel quel sur tout le site (20 000 caractères max).</p></div></div>
       ${textAreaField("customCss", "Votre CSS", s.customCss || "", "Exemple : .panel { border-width: 2px; }  ·  body { letter-spacing: .02em; }")}
     </div></section>`;
-    return `<div class="content-view">${pageHead("Administration / Site builder", "Construisez votre site", "Composez le site de A à Z : identité, thème, fond animé ou image, navigation, effets et CSS libre. Tout s'applique en direct — enregistrez pour le rendre permanent.")}
-      <div class="builder-hint">💡 Chaque réglage se prévisualise <b>en direct</b> pendant que vous le modifiez. « Enregistrer » l'applique pour tout le monde.</div>
+    return `<div class="builder-hint">💡 Chaque réglage se prévisualise <b>en direct</b> pendant que vous le modifiez. « Enregistrer » l'applique pour tout le monde.</div>
       <form data-form="site-config" id="site-builder-form">${identity}<div class="mt-16">${theme}</div><div class="mt-16">${background}</div><div class="mt-16">${navigation}</div><div class="mt-16">${effects}</div><div class="mt-16">${advanced}</div>
       <div class="form-actions"><button class="btn ghost" type="button" data-action="reset-site-config">Annuler les modifications</button><button class="btn success" type="submit">💾 Enregistrer le site</button></div></form>
-      ${uploadSection}
+      ${uploadSection}`;
+  }
+
+  // Page « Site builder » autonome (onglet dédié du menu).
+  function siteConfigView() {
+    return `<div class="content-view">${pageHead("Administration / Site builder", "Construisez votre site", "Composez le site de A à Z : identité, thème, fond animé ou image, navigation, effets et CSS libre. Tout s'applique en direct — enregistrez pour le rendre permanent.")}
+      ${siteBuilderBody()}
     </div>`;
   }
 
@@ -789,7 +1077,11 @@
     const bgType = ["image", "aurora", "stars", "grid", "none"].includes(cfg.bgType) ? cfg.bgType : "image";
     document.body.dataset.bg = bgType;
     if (bgType === "image") {
-      const image = String(cfg.bgImage || "assets/images/aincrad-bg.jpg").replaceAll('"', "%22");
+      // URL absolue : dans une variable CSS, une URL relative serait résolue
+      // depuis le fichier .css (assets/css/) et non depuis la page.
+      let image = String(cfg.bgImage || "assets/images/aincrad-bg.jpg");
+      try { image = new URL(image, document.baseURI).href; } catch (_) {}
+      image = image.replaceAll('"', "%22");
       root.style.setProperty("--bg-image", `url("${image}")`);
       root.style.setProperty("--bg-overlay", String(Math.min(92, Math.max(0, Number(cfg.bgOverlay ?? 62))) / 100));
       root.style.setProperty("--bg-blur", `${Math.min(24, Math.max(0, Number(cfg.bgBlur ?? 0)))}px`);
@@ -963,11 +1255,94 @@
           break;
         }
         case "preview-gate":
+        case "go-home":
+          // Page d'accueil du site en restant CONNECTÉ (le bot actif est
+          // conservé) — le bouton « Retour à l'administration » ramène ici.
           ui.route = "gate";
-          renderGate();
-          applySitePreferences();
-          toast("APERÇU", "Page d'accueil — cliquez sur « Retour à l'administration ».");
+          render();
+          window.scrollTo({ top: 0, behavior: "smooth" });
           break;
+        case "creator-tab":
+          ui.creatorTab = target.dataset.tab;
+          render();
+          break;
+        // ── Constructeur de page ────────────────────────────────────
+        case "block-add": {
+          const type = target.dataset.type;
+          if (!BLOCK_TYPES[type]) break;
+          ui.blocks = pageBlocks().concat([{
+            id: `b${Date.now().toString(36)}${Math.floor(Math.random() * 1e4).toString(36)}`,
+            type,
+            props: JSON.parse(JSON.stringify(BLOCK_TYPES[type].def || {})),
+          }]);
+          stageBlocks(ui.blocks);
+          render();
+          toast("BLOC AJOUTÉ", `${BLOCK_TYPES[type].label} — n'oubliez pas d'enregistrer.`);
+          break;
+        }
+        case "block-move": {
+          const row = target.closest(".blk-row");
+          const blocks = pageBlocks().slice();
+          const index = blocks.findIndex(item => item.id === row?.dataset.blockId);
+          const next = index + Number(target.dataset.dir);
+          if (index < 0 || next < 0 || next >= blocks.length) break;
+          [blocks[index], blocks[next]] = [blocks[next], blocks[index]];
+          stageBlocks(blocks);
+          render();
+          break;
+        }
+        case "block-duplicate": {
+          const row = target.closest(".blk-row");
+          const blocks = pageBlocks().slice();
+          const index = blocks.findIndex(item => item.id === row?.dataset.blockId);
+          if (index < 0) break;
+          const copy = JSON.parse(JSON.stringify(blocks[index]));
+          copy.id = `b${Date.now().toString(36)}${Math.floor(Math.random() * 1e4).toString(36)}`;
+          blocks.splice(index + 1, 0, copy);
+          stageBlocks(blocks);
+          render();
+          toast("BLOC DUPLIQUÉ", "Une copie a été insérée juste après.");
+          break;
+        }
+        case "block-delete": {
+          const row = target.closest(".blk-row");
+          if (!row || !confirm("Supprimer ce bloc de la page ?")) break;
+          stageBlocks(pageBlocks().filter(item => item.id !== row.dataset.blockId));
+          render();
+          break;
+        }
+        case "block-edit":
+          openBlockEditor(target.closest(".blk-row")?.dataset.blockId);
+          break;
+        case "item-add": {
+          const wrap = document.querySelector(`.blk-items[data-list="${target.dataset.list}"]`);
+          const form = target.closest("form");
+          const block = pageBlocks().find(item => item.id === form?.dataset.blockId);
+          const field = BLOCK_TYPES[block?.type]?.fields.find(f => f.k === target.dataset.list);
+          if (wrap && field) wrap.insertAdjacentHTML("beforeend", blockItemRow(field));
+          break;
+        }
+        case "item-remove":
+          target.closest(".blk-item")?.remove();
+          break;
+        case "save-blocks":
+          await api("site.config.save", { config: { ...siteConfig(), blocks: pageBlocks() } });
+          ui.blocks = null;
+          render();
+          toast("PAGE ENREGISTRÉE", "Votre page d'accueil est en ligne.");
+          break;
+        case "block-link": {
+          const url = target.dataset.url || "";
+          if (/^https?:\/\//.test(url)) window.open(url, "_blank");
+          else if (url.startsWith("#")) {
+            if (!ui.activeBotId && state.bots?.[0]) {
+              ui.activeBotId = state.bots[0].id;
+              storage.setItem("aincrad.activeBot", ui.activeBotId);
+            }
+            navigate(url.slice(1) || "dashboard");
+          }
+          break;
+        }
         case "server-search":
           ui.serverQuery = document.querySelector("#server-search")?.value || "";
           render();
@@ -1116,6 +1491,31 @@
           await api("site.background.upload", {}, { formData: data });
           render();
           toast("FOND APPLIQUÉ", "Votre image est désormais le fond du site.");
+          break;
+        }
+        case "block-edit": {
+          const blocks = pageBlocks().slice();
+          const index = blocks.findIndex(item => item.id === form.dataset.blockId);
+          if (index < 0) break;
+          const type = BLOCK_TYPES[blocks[index].type];
+          const props = {};
+          type.fields.forEach(field => {
+            if (field.t === "list") {
+              const wrap = form.querySelector(`.blk-items[data-list="${field.k}"]`);
+              props[field.k] = Array.from(wrap?.querySelectorAll(".blk-item") || []).map(row => {
+                const item = {};
+                field.item.forEach(sub => { item[sub.k] = row.querySelector(`[data-sub="${sub.k}"]`)?.value.trim() || ""; });
+                return item;
+              }).filter(item => Object.values(item).some(Boolean));
+            } else {
+              props[field.k] = form.querySelector(`[name="${field.k}"]`)?.value ?? "";
+            }
+          });
+          blocks[index] = { ...blocks[index], props };
+          stageBlocks(blocks);
+          closeModal();
+          render();
+          toast("BLOC MIS À JOUR", "Enregistrez la page pour publier vos changements.");
           break;
         }
       }

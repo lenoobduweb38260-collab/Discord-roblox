@@ -273,6 +273,23 @@ const RELEASES = [
     fix: [],
     retrait: [],
   },
+  {
+    id: 'page-builder-2026-08e',
+    title: 'Constructeur de page & diagnostic des bots 🧱',
+    ajout: [
+      '🧱 **Constructeur de page** dans l\'espace Créateur : composez votre page d\'accueil **bloc par bloc** (bannière, cartes, chiffres, galerie, FAQ, annonces défilantes, appel à l\'action, texte, pied de page) — ajout, duplication, réordonnancement et édition de chaque bloc',
+      '🏠 **Vraie page d\'accueil** : le logo/nom en haut à gauche y ramène **en restant connecté**',
+      '🤖 **État des bots** (⚙️ Créateur et page de diagnostic) : dit précisément **quel bot** est injoignable et **pourquoi**',
+    ],
+    amelioration: [
+      '🔁 **Bascule automatique entre bots** : si plusieurs bots sont sur un serveur et que l\'un ne répond pas, le dashboard utilise l\'autre au lieu d\'échouer',
+    ],
+    fix: [
+      '🩹 Fini le message « Bot injoignable » sans explication : la cause exacte est affichée (bot arrêté, API interne muette, version trop ancienne, délai dépassé)',
+      '⏱️ Délai des appels aux bots porté à 25 s — les bots présents sur beaucoup de serveurs ne sont plus considérés à tort comme injoignables',
+    ],
+    retrait: [],
+  },
 ];
 
 // Découpe une catégorie en champs d'embed (max 1024 caractères par champ).

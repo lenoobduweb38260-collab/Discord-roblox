@@ -198,7 +198,7 @@ function demo_preuves(): array {
 }
 
 // ----- Requêtes HTTP sortantes (cURL, sinon flux natifs) -----
-function http_req(string $url, string $method = 'GET', $body = null, array $headers = [], bool $form = false): array {
+function http_req(string $url, string $method = 'GET', $body = null, array $headers = [], bool $form = false, int $timeout = 10): array {
   $payload = $body === null ? null : ($form ? http_build_query($body) : json_encode($body));
   if ($payload !== null) $headers[] = 'Content-Type: ' . ($form ? 'application/x-www-form-urlencoded' : 'application/json');
   if (function_exists('curl_init')) {
@@ -207,7 +207,7 @@ function http_req(string $url, string $method = 'GET', $body = null, array $head
       CURLOPT_RETURNTRANSFER => true,
       CURLOPT_CUSTOMREQUEST => $method,
       CURLOPT_HTTPHEADER => $headers,
-      CURLOPT_TIMEOUT => 10,
+      CURLOPT_TIMEOUT => $timeout,
       CURLOPT_FOLLOWLOCATION => true,
     ]);
     if ($payload !== null) curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
@@ -219,7 +219,7 @@ function http_req(string $url, string $method = 'GET', $body = null, array $head
       'method' => $method,
       'header' => implode("\r\n", $headers),
       'content' => $payload ?? '',
-      'timeout' => 10,
+      'timeout' => $timeout,
       'ignore_errors' => true,
     ]]);
     $raw = @file_get_contents($url, false, $ctx);
@@ -233,7 +233,9 @@ function http_req(string $url, string $method = 'GET', $body = null, array $head
 }
 
 function agent_call(string $path, string $method = 'GET', $body = null): array {
-  [$status, $data] = http_req(AGENT_URL . $path, $method, $body, ['x-cle: ' . AGENT_KEY]);
+  // 25 s : un bot présent sur beaucoup de serveurs met plusieurs secondes à
+  // répondre à /dashboard ; 10 s provoquaient de faux « Bot injoignable ».
+  [$status, $data] = http_req(AGENT_URL . $path, $method, $body, ['x-cle: ' . AGENT_KEY], false, 25);
   return [$status, $data];
 }
 
@@ -247,31 +249,58 @@ function cache_read(): ?array {
   $data = json_decode(substr($raw, strlen(CACHE_PREFIX)), true);
   return is_array($data) ? $data : null;
 }
+// Renvoie [$map, $infos, $meta] :
+//  • $map   : serveur → PREMIER bot qui l'héberge (compatibilité)
+//  • $infos : nom / nombre de membres / icône du serveur
+//  • $meta  : ['all' => serveur → TOUS les bots qui l'hébergent,
+//              'bots' => bots démarrés, 'errors' => bot → raison de l'échec]
+// Garder TOUS les bots par serveur permet de basculer sur un autre bot quand
+// l'un d'eux ne répond pas, et de dire précisément CE QUI a échoué.
 function guild_map(): array {
   $cache = cache_read();
   if ($cache !== null && isset($cache['at']) && time() - $cache['at'] < 30) {
-    return [$cache['map'] ?? [], $cache['infos'] ?? []];
+    return [$cache['map'] ?? [], $cache['infos'] ?? [], $cache['meta'] ?? ['all' => [], 'bots' => [], 'errors' => []]];
   }
   $map = [];
   $infos = [];
+  $meta = ['all' => [], 'bots' => [], 'errors' => []];
   [$st, $etat] = agent_call('/agent/etat');
   if ($st === 200) {
     foreach ($etat['bots'] ?? [] as $bot) {
-      if (($bot['status'] ?? '') !== 'demarre') continue;
-      [$st2, $data] = agent_call('/agent/bots/' . rawurlencode($bot['name']) . '/proxy/infos');
-      if ($st2 !== 200) continue;
-      foreach ($data['guilds'] ?? [] as $g) {
-        if (!isset($map[$g['id']])) {
-          $map[$g['id']] = $bot['name'];
-          $infos[$g['id']] = ['name' => $g['name'], 'memberCount' => $g['memberCount'] ?? null, 'icon' => $g['icon'] ?? null];
+      $name = (string) ($bot['name'] ?? '');
+      if ($name === '') continue;
+      if (($bot['status'] ?? '') !== 'demarre') {
+        $meta['errors'][$name] = 'Bot arrêté chez l\'agent — démarrez-le (▶) dans votre panel.';
+        continue;
+      }
+      $meta['bots'][] = $name;
+      [$st2, $data] = agent_call('/agent/bots/' . rawurlencode($name) . '/proxy/infos');
+      if ($st2 !== 200 || empty($data['guilds'])) {
+        $meta['errors'][$name] = $st2 === 0
+          ? 'Le bot ne répond pas à l\'agent (délai dépassé ou API interne non démarrée).'
+          : "Réponse HTTP $st2 du bot — il tourne peut-être une version trop ancienne, ou vient de démarrer.";
+        continue;
+      }
+      foreach ($data['guilds'] as $g) {
+        $gid = (string) ($g['id'] ?? '');
+        if ($gid === '') continue;
+        $meta['all'][$gid][] = $name;
+        if (!isset($map[$gid])) {
+          $map[$gid] = $name;
+          $infos[$gid] = ['name' => $g['name'], 'memberCount' => $g['memberCount'] ?? null, 'icon' => $g['icon'] ?? null];
         }
       }
     }
-    @file_put_contents(__DIR__ . '/cache-serveurs.php', CACHE_PREFIX . json_encode(['at' => time(), 'map' => $map, 'infos' => $infos]));
+    @file_put_contents(__DIR__ . '/cache-serveurs.php', CACHE_PREFIX . json_encode(['at' => time(), 'map' => $map, 'infos' => $infos, 'meta' => $meta]));
   } elseif ($cache !== null) {
-    return [$cache['map'] ?? [], $cache['infos'] ?? []]; // agent injoignable : on garde l'ancien cache
+    // Agent injoignable : on garde l'ancien cache pour ne pas vider le dashboard.
+    return [$cache['map'] ?? [], $cache['infos'] ?? [], $cache['meta'] ?? ['all' => [], 'bots' => [], 'errors' => []]];
+  } else {
+    $meta['errors']['agent'] = $st === 0
+      ? 'Agent injoignable (AGENT_URL/port bloqués, ou agent éteint).'
+      : "L'agent a répondu HTTP $st — vérifiez AGENT_KEY.";
   }
-  return [$map, $infos];
+  return [$map, $infos, $meta];
 }
 
 // ----- 🔄 Mise à jour automatique du dashboard (créateur) -----
@@ -393,11 +422,64 @@ function manages_guild(string $guildId): bool {
   return false;
 }
 
+// Appel vers le bot d'un serveur. Si PLUSIEURS bots sont sur ce serveur et que
+// le premier ne répond pas, on bascule automatiquement sur les suivants ; en
+// cas d'échec total, l'erreur dit QUEL bot a échoué et POURQUOI (au lieu du
+// « Bot injoignable » générique qui n'aidait personne).
 function bot_api(string $guildId, string $path, string $method = 'GET', $body = null): array {
-  [$map] = guild_map();
-  $botName = $map[$guildId] ?? null;
-  if (!$botName) return [404, ['error' => 'Aucun bot en ligne sur ce serveur.']];
-  return agent_call('/agent/bots/' . rawurlencode($botName) . '/proxy' . $path, $method, $body);
+  [$map, , $meta] = guild_map();
+  $candidats = $meta['all'][$guildId] ?? [];
+  if (!$candidats && isset($map[$guildId])) $candidats = [$map[$guildId]];
+  if (!$candidats) {
+    $raisons = [];
+    foreach ($meta['errors'] ?? [] as $bot => $why) $raisons[] = "$bot : $why";
+    return [404, ['error' => 'Aucun bot en ligne sur ce serveur.' . ($raisons ? ' — ' . implode(' · ', $raisons) : '')]];
+  }
+  $dernier = null;
+  foreach ($candidats as $botName) {
+    [$st, $data] = agent_call('/agent/bots/' . rawurlencode($botName) . '/proxy' . $path, $method, $body);
+    if ($st >= 200 && $st < 300 && $data) return [$st, $data];
+    $dernier = [$botName, $st, $data['error'] ?? null];
+  }
+  [$botName, $st, $err] = $dernier;
+  $detail = $err ?: ($st === 0
+    ? "le bot n'a pas répondu à temps (API interne arrêtée, bot en cours de redémarrage, ou serveur surchargé)"
+    : "réponse HTTP $st de l'agent (bot arrêté, nom de bot inconnu chez l'agent, ou version du bot trop ancienne)");
+  return [$st ?: 502, ['error' => "🤖 Bot « $botName » injoignable : $detail. Ouvrez ⚙️ Créateur → État des bots pour le détail."]];
+}
+
+// État détaillé de chaque bot (créateur) : joignabilité de l'agent, de l'API du
+// bot, nombre de serveurs et message d'erreur exact.
+function bots_diagnostic(): array {
+  [$map, , $meta] = guild_map();
+  $counts = [];
+  foreach ($map as $bot) $counts[$bot] = ($counts[$bot] ?? 0) + 1;
+  [$st, $etat] = agent_call('/agent/etat');
+  $sortie = ['agentOk' => $st === 200, 'agentErreur' => $st === 200 ? null : ($st === 0 ? 'Agent injoignable (adresse/port bloqués ou agent éteint).' : "L'agent a répondu HTTP $st — vérifiez AGENT_KEY."), 'bots' => []];
+  foreach ($etat['bots'] ?? [] as $bot) {
+    $name = (string) ($bot['name'] ?? '');
+    if ($name === '') continue;
+    $demarre = ($bot['status'] ?? '') === 'demarre';
+    $ligne = ['nom' => $name, 'demarre' => $demarre, 'serveurs' => $counts[$name] ?? 0, 'ok' => false, 'erreur' => null];
+    if (!$demarre) {
+      $ligne['erreur'] = 'Bot arrêté chez l\'agent — démarrez-le (▶) depuis votre panel.';
+    } else {
+      [$st2, $data] = agent_call('/agent/bots/' . rawurlencode($name) . '/proxy/infos');
+      if ($st2 >= 200 && $st2 < 300 && !empty($data['guilds'])) {
+        $ligne['ok'] = true;
+        $ligne['serveurs'] = count($data['guilds']);
+        $ligne['tag'] = $data['bot']['tag'] ?? null;
+      } elseif ($st2 >= 200 && $st2 < 300) {
+        $ligne['erreur'] = 'Le bot répond mais n\'est sur AUCUN serveur — invitez-le d\'abord.';
+      } elseif ($st2 === 0) {
+        $ligne['erreur'] = 'Pas de réponse : API interne du bot arrêtée, bot en cours de démarrage, ou délai dépassé.';
+      } else {
+        $ligne['erreur'] = "Réponse HTTP $st2 : nom de bot inconnu chez l'agent, ou version du bot trop ancienne (mettez-le à jour).";
+      }
+    }
+    $sortie['bots'][] = $ligne;
+  }
+  return $sortie;
 }
 
 // Appel « global » (blacklist, staff du bot, config du dashboard) : ces
@@ -651,6 +733,17 @@ if ($p === 'diag') {
     }
   }
   $checks[] = ['Liaison au bot via l\'agent' . ($agentOk ? " — $botCount bot(s) démarré(s), $srvCount serveur(s)" : ''), $agentOk, $agentMsg ?: 'Renseignez d\'abord AGENT_URL et AGENT_KEY.'];
+  // Une ligne PAR BOT : dit lequel ne répond pas et pourquoi (cause n°1 des
+  // messages « Bot injoignable » sur les serveurs d'un bot précis).
+  if ($agentOk) {
+    foreach (bots_diagnostic()['bots'] as $b) {
+      $checks[] = [
+        'Bot « ' . $b['nom'] . ' »' . ($b['ok'] ? ' — ' . $b['serveurs'] . ' serveur(s)' . (!empty($b['tag']) ? ' · ' . $b['tag'] : '') : ''),
+        $b['ok'],
+        $b['erreur'] ?? '',
+      ];
+    }
+  }
 
   $selfWritable = is_writable(__DIR__ . '/index.php');
   $majNote = $selfWritable
@@ -832,6 +925,15 @@ if ($p === 'api-moi' || $p === 'api-serveur' || $p === 'api-global') {
       if (DEMO) send_json(200, demo_preuves());
       [$st, $d] = first_bot_api('/preuves' . ($q !== '' ? '?q=' . rawurlencode($q) : ''));
       send_json($st ?: 502, $d ?: ['error' => 'Bot injoignable.']);
+    }
+    // 🤖 État détaillé de chaque bot (créateur) : pourquoi un bot est injoignable.
+    if ($a === 'bots-etat' && $_SERVER['REQUEST_METHOD'] === 'GET') {
+      if (empty($role['creator'])) send_json(403, ['error' => 'Réservé au créateur du bot.']);
+      if (DEMO) send_json(200, ['agentOk' => true, 'agentErreur' => null, 'bots' => [
+        ['nom' => 'Shadow_community', 'demarre' => true, 'ok' => true, 'serveurs' => 1, 'erreur' => null, 'tag' => 'Shadow#0001'],
+        ['nom' => 'Colmar_rp', 'demarre' => true, 'ok' => false, 'serveurs' => 2, 'erreur' => 'Pas de réponse : API interne du bot arrêtée, bot en cours de démarrage, ou délai dépassé.'],
+      ]]);
+      send_json(200, bots_diagnostic());
     }
     // 🔄 Version installée vs dernière release (créateur).
     if ($a === 'dash-version' && $_SERVER['REQUEST_METHOD'] === 'GET') {
@@ -2255,6 +2357,9 @@ function renderCreateur(){
       '<div class="flabel" id="st_urlL" style="margin-top:12px;display:none">URL Twitch (pour « En live »)</div><input id="st_url" placeholder="https://twitch.tv/…" style="display:none">' +
       '<div style="margin-top:12px;display:flex;gap:9px"><button id="st_save" class="accent">💾 Appliquer le statut</button><button id="st_clear">🧹 Retirer le statut</button></div></div>';
     h += sec('🟢 Statut personnalisé par bot', 'Définissez l\'activité et la présence Discord affichées par un bot précis.', stat, '');
+    // 🤖 État des bots : dit précisément pourquoi un bot est injoignable.
+    h += sec('🤖 État des bots', 'Si un serveur affiche « Bot injoignable », la raison exacte est ici, bot par bot.',
+      '<div id="bots_box" style="color:var(--muted)">Vérification…</div>', '');
     // Mises à jour du dashboard (auto-update depuis GitHub, comme le bot)
     h += sec('🔄 Mises à jour du dashboard', 'Le dashboard se met à jour tout seul depuis GitHub, comme le bot. Le fichier config.php et vos réglages sont conservés (une sauvegarde index.php.bak est créée).',
       '<div id="maj_box" style="color:var(--muted)">Vérification…</div>', '');
@@ -2262,6 +2367,30 @@ function renderCreateur(){
 
     $('content').innerHTML = h;
     if ($('cr-home')) $('cr-home').onclick = renderHome;
+    // ----- 🤖 État des bots -----
+    var loadBots = function(){
+      var box = $('bots_box'); if (!box) return;
+      api('GET', gu('bots-etat')).then(function(j){
+        box = $('bots_box'); if (!box) return;
+        if (!j || j.error){ box.innerHTML = '<span style="color:#f0a500">Vérification impossible : ' + esc((j && j.error) || 'réseau') + '</span>'; return; }
+        var html = '';
+        if (!j.agentOk) html += '<div class="row" style="border-color:rgba(255,48,96,.5)">❌ <b>Agent</b> — ' + esc(j.agentErreur || 'injoignable') + '</div>';
+        (j.bots || []).forEach(function(b){
+          var ok = b.ok;
+          html += '<div class="row" style="align-items:flex-start;border-color:' + (ok ? 'rgba(0,255,136,.35)' : 'rgba(255,48,96,.45)') + '">' +
+            '<span style="font-size:15px">' + (ok ? '✅' : '❌') + '</span>' +
+            '<div style="flex:1;min-width:180px"><b>' + esc(b.nom) + '</b>' + (b.tag ? ' <span style="color:var(--muted)">' + esc(b.tag) + '</span>' : '') +
+            '<div style="color:var(--muted);font-size:12px">' + (ok ? (b.serveurs + ' serveur(s) · tout fonctionne') : esc(b.erreur || 'injoignable')) + '</div></div>' +
+            '</div>';
+        });
+        if (!(j.bots || []).length) html += '<div class="row" style="color:var(--muted)"><i>Aucun bot déclaré chez l\'agent.</i></div>';
+        html += '<div style="color:var(--muted);font-size:12px;margin-top:8px">💡 Un bot « démarré » qui ne répond pas : redémarrez-le (⏹ puis ▶) depuis votre panel, puis mettez-le à jour (⬇) — sa version doit être aussi récente que celle du dashboard.</div>';
+        html += '<div style="margin-top:10px"><button id="bots_refresh">↻ Revérifier</button></div>';
+        box.innerHTML = html;
+        if ($('bots_refresh')) $('bots_refresh').onclick = function(){ box.innerHTML = 'Vérification…'; loadBots(); };
+      });
+    };
+    loadBots();
     // ----- Messages défilants de la page d'accueil (builder) -----
     var AN = (cfg.annonces || []).map(function(a){ return { titre: (a && a.titre) || '', texte: (a && a.texte) || '' }; }).slice(0, 8);
     var drawAnn = function(){
