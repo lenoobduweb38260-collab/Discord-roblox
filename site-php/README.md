@@ -312,3 +312,41 @@ jour les bots sans toucher au site.
 Si l'extension PHP `zip` manque chez votre hébergeur, ou si le dossier du site
 n'est pas modifiable par PHP, le site vous le dit et **seuls les bots** sont
 mis à jour.
+
+## 🗄️ Base de données (MySQL / MariaDB ou SQLite)
+
+Par défaut le site enregistre tout dans `data/app.json` — suffisant pour
+démarrer. Dès que vous branchez une base, elle devient la **source de vérité**.
+
+**⚙️ Créateur → 🗄️ Base de données** : type, hôte, port, nom de la base,
+utilisateur, mot de passe, puis **🔌 Tester et enregistrer**. Le site se
+connecte réellement, **crée les tables** et **importe vos données existantes**
+si la base est vierge — rien n'est écrasé si elle contient déjà quelque chose.
+
+| Table | Contenu |
+|---|---|
+| `blacklist` | Une ligne par sanction (pseudo, ID Discord, motif, gravité, serveur, auteur, date) |
+| `preuves` | Une ligne par fichier joint, rattachée à sa sanction |
+| `tickets` | Tickets en cours **et** archivés (colonne `archive`) |
+| `ticket_messages` | Chaque message d'un ticket, dans l'ordre |
+| `activite` | Journal des actions du site |
+| `kv` | Thème, page d'accueil, bots, serveurs, permissions |
+
+> Les **fichiers** de preuve restent dans `uploads/proofs/` : la base ne stocke
+> que leur nom. Sauvegardez ce dossier en même temps que la base.
+
+**Si la base tombe** : le site reste consultable (il relit `data/app.json`),
+mais **toute modification est refusée** avec un message explicite — plutôt que
+d'être perdue en silence.
+
+Les identifiants sont rangés dans `data/db.php`, illisible depuis le web, et le
+mot de passe n'est jamais renvoyé au navigateur. Sans serveur MySQL, choisissez
+**SQLite** : la base tient dans un fichier de `data/`.
+
+## 📂 Fiche d'une sanction
+
+Dans **Blacklist & preuves**, cliquez sur une ligne : la fiche s'ouvre avec le
+motif, la gravité, le serveur, l'auteur, la date et **toutes les preuves**. Les
+images s'affichent en vignettes (clic pour agrandir), les PDF et journaux
+s'ouvrent dans un nouvel onglet. Un fichier manquant sur le serveur est signalé
+au lieu d'afficher une image cassée.

@@ -527,6 +527,54 @@ input[type="file"].input { padding: 9px 12px; }
 /* Photo de profil Discord : elle remplit la pastille ronde */
 .profile-avatar img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; display: block; }
 
+/* ── 📂 Fiche de sanction : toutes les preuves ───────────────────── */
+tr.cliquable { cursor: pointer; transition: background .15s; }
+tr.cliquable:hover { background: rgba(var(--accent-rgb), .07); }
+/* Les boutons de la dernière colonne ne doivent pas ouvrir la fiche. */
+tr.cliquable .page-actions { cursor: default; }
+.preuve-grille {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+  gap: 10px;
+}
+.preuve {
+  margin: 0; display: flex; flex-direction: column; gap: 6px;
+  padding: 8px; border-radius: 12px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, .03);
+  cursor: pointer; text-decoration: none; color: var(--text);
+  transition: border-color .18s, transform .18s;
+}
+.preuve:hover { border-color: rgba(var(--accent-rgb), .5); transform: translateY(-2px); }
+.preuve img {
+  width: 100%; height: 92px; object-fit: cover;
+  border-radius: 8px; background: rgba(0, 0, 0, .3); display: block;
+}
+.preuve figcaption {
+  font-size: 11px; color: var(--muted);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.preuve-ico {
+  height: 92px; display: flex; align-items: center; justify-content: center;
+  font-size: 30px; border-radius: 8px; background: rgba(0, 0, 0, .3);
+}
+/* Fichier introuvable sur le serveur : on le dit au lieu d'une image cassée. */
+.preuve.absente img { display: none; }
+.preuve.absente::before {
+  content: "⚠️ fichier introuvable";
+  height: 92px; display: flex; align-items: center; justify-content: center;
+  text-align: center; font-size: 11px; color: var(--gold);
+  border-radius: 8px; background: rgba(243, 200, 106, .1);
+}
+.preuve-zoom {
+  position: fixed; inset: 0; z-index: 300;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px;
+  padding: 24px; background: rgba(6, 4, 10, .92); cursor: zoom-out;
+  animation: fadeIn .16s ease both;
+}
+.preuve-zoom img { max-width: 100%; max-height: 82vh; border-radius: 12px; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
 /* ── 📂 Menu déroulant du profil ─────────────────────────────────── */
 .profile[data-action], .profile.on { cursor: pointer; }
 .profile.on { border-color: rgba(var(--accent-rgb), .5); background: rgba(var(--accent-rgb), .1); }

@@ -41,6 +41,7 @@
     agentReglages: null, // adresse retenue + origine (la clé n'arrive jamais ici)
     discord: null,       // réglages de la connexion Discord (null = pas encore lus)
     maj: null,           // état des mises à jour (null = pas encore lu)
+    db: null,            // configuration de la base (null = pas encore lue)
     bandeauVu: false,    // bandeau Discord (erreur / bienvenue) déjà refermé
     menuProfil: false,   // menu déroulant du profil ouvert ?
     ticketTab: "open",   // tickets en cours / archives
@@ -887,13 +888,13 @@
       <section class="panel"><div class="panel-inner">
         <div class="panel-head"><div><h3>Base de sanctions</h3><p>${entries.length} résultat(s) sur ${state.blacklist?.length || 0} entrées.</p></div><div class="searchbar"><input class="input" id="blacklist-search" value="${esc(ui.blacklistQuery)}" placeholder="Nom, ID Discord, serveur ou motif…"><button class="btn" data-action="blacklist-search">Rechercher</button></div></div>
         <div class="table-wrap"><table class="data-table"><thead><tr><th>Utilisateur</th><th>Motif</th><th>Sévérité</th><th>Serveur</th><th>Preuves</th><th>Actions</th></tr></thead><tbody>
-        ${entries.map(entry => `<tr>
+        ${entries.map(entry => `<tr class="cliquable" data-action="open-sanction" data-id="${esc(entry.id)}" title="Ouvrir la fiche et voir toutes les preuves">
           <td><strong>${esc(entry.username)}</strong><br><span>${esc(entry.discordId)}</span><br><span>${esc(entry.id)} · ${esc(entry.date)}</span></td>
           <td>${esc(entry.reason)}</td>
           <td><span class="severity ${esc(entry.severity)}">${esc(entry.severity)}</span></td>
           <td>${esc(entry.server)}<br><span>par ${esc(entry.author)}</span></td>
           <td><div class="proof-list">${entry.proofs?.length ? entry.proofs.map(proof => `<span class="proof-pill">${esc(proof)}</span>`).join("") : `<span class="field-note">Aucune preuve</span>`}</div></td>
-          <td><div class="page-actions">${button("Preuve", "open-proof-modal", "small", `data-id="${esc(entry.id)}"`)}${button("Retirer", "delete-blacklist", "danger small", `data-id="${esc(entry.id)}"`)}</div></td>
+          <td><div class="page-actions">${button("📂 Fiche", "open-sanction", "small", `data-id="${esc(entry.id)}"`)}${button("Preuve", "open-proof-modal", "small", `data-id="${esc(entry.id)}"`)}${button("Retirer", "delete-blacklist", "danger small", `data-id="${esc(entry.id)}"`)}</div></td>
         </tr>`).join("") || `<tr><td colspan="6">${emptyBlock("Aucun résultat", "Aucune entrée ne correspond à cette recherche.")}</td></tr>`}
         </tbody></table></div>
       </div></section>
@@ -903,6 +904,55 @@
         <div class="stat-card"><span>Serveurs concernés</span><strong>${new Set((state.blacklist || []).map(x=>x.server)).size}</strong><em>base mutualisée</em></div>
       </div>
     </div>`;
+  }
+
+  // ── 📂 Fiche complète d'une sanction, avec TOUTES ses preuves ───────
+  // Les images s'affichent directement ; les autres fichiers (PDF, logs)
+  // sont proposés en ouverture. Un clic sur une image l'agrandit.
+  function openSanctionModal(id) {
+    const e = (state.blacklist || []).find(x => x.id === id);
+    if (!e) { toast("INTROUVABLE", "Cette sanction n'existe plus.", "error"); return; }
+    const preuves = e.proofs || [];
+    const estImage = f => /\.(png|jpe?g|webp|gif|avif)$/i.test(String(f));
+    const url = f => {
+      const s = String(f);
+      // Les preuves téléversées sont dans uploads/proofs/ ; les anciennes
+      // entrées ne contiennent qu'un nom de fichier.
+      if (/^(https?:\/\/|uploads\/)/.test(s)) return s;
+      return "uploads/proofs/" + s;
+    };
+    const vignettes = preuves.length
+      ? `<div class="preuve-grille">${preuves.map((f, i) => estImage(f)
+          ? `<figure class="preuve" data-action="preuve-zoom" data-src="${esc(url(f))}" title="Agrandir">
+               <img src="${esc(url(f))}" alt="" loading="lazy"
+                    onerror="this.closest('figure').classList.add('absente')">
+               <figcaption>${esc(String(f).split('/').pop())}</figcaption>
+             </figure>`
+          : `<a class="preuve fichier" href="${esc(url(f))}" target="_blank" rel="noopener">
+               <span class="preuve-ico">${/\.pdf$/i.test(f) ? "📕" : "📄"}</span>
+               <figcaption>${esc(String(f).split('/').pop())}</figcaption>
+             </a>`).join("")}</div>`
+      : emptyBlock("Aucune preuve", "Utilisez « Ajouter une preuve » pour joindre une capture, un PDF ou un journal.");
+    const g = { critique: "#ff5c74", élevée: "#f3c86a", moyenne: "#4fd9ff", faible: "#948aa3" }[e.severity] || "var(--accent)";
+    openModal(`📂 Sanction ${esc(e.id)}`, `
+      <div class="acc-head">
+        <div class="acc-avatar" style="background:linear-gradient(135deg, ${g}, ${g}99)">${esc(String(e.username || "?").slice(0, 2).toUpperCase())}</div>
+        <div>
+          <strong>${esc(e.username)}</strong>
+          <span>${esc(e.discordId)}</span>
+        </div>
+        <span class="acc-grade" style="--gc:${g};margin-left:auto">${esc(e.severity)}</span>
+      </div>
+      <div class="acc-row"><span>Motif</span><div><b>${esc(e.reason)}</b></div></div>
+      <div class="acc-row"><span>Serveur</span><div><b>${esc(e.server || "—")}</b><i>sanction prononcée par ${esc(e.author || "inconnu")}</i></div></div>
+      <div class="acc-row"><span>Date</span><div><b>${esc(e.date || "—")}</b></div></div>
+      <div class="acc-row"><span>Preuves</span><div><b>${preuves.length} fichier(s)</b></div></div>
+      <div style="margin-top:14px">${vignettes}</div>
+      <div class="form-actions" style="flex-wrap:wrap">
+        <button class="btn ghost" type="button" data-action="open-proof-modal" data-id="${esc(e.id)}">📎 Ajouter une preuve</button>
+        <button class="btn danger" type="button" data-action="delete-blacklist" data-id="${esc(e.id)}">Retirer la sanction</button>
+        <button class="btn success" type="button" data-action="close-modal">Fermer</button>
+      </div>`, true);
   }
 
   function ticketsView() {
@@ -1146,13 +1196,14 @@
 
   // ── Espace créateur : bots + page + apparence + écosystème ──────────
   function creatorView() {
-    const valid = ["ecosystem", "page", "builder", "bots", "perms", "discord", "maj"];
+    const valid = ["ecosystem", "page", "builder", "bots", "perms", "discord", "db", "maj"];
     const tab = valid.includes(ui.creatorTab) ? ui.creatorTab : "page";
     const tabs = [
       ["page", "🧱 Constructeur de page", "Blocs de la page d'accueil"],
       ["bots", "🤖 Mes bots", "Ajoutez autant de bots que voulu"],
       ["perms", "🔐 Fonctions & grades", "Qui voit quoi, avec aperçu"],
       ["discord", "🔑 Connexion & équipe", "Qui entre, avec quel grade"],
+      ["db", "🗄️ Base de données", "Tout sauvegarder en base"],
       ["maj", "🔄 Mises à jour", "Le site et tous les bots"],
       ["builder", "🎨 Apparence du site", "Thème, fond, navigation, CSS"],
       ["ecosystem", "🌍 Écosystème", "Serveurs et indicateurs"],
@@ -1163,6 +1214,7 @@
       perms: pageHead("Créateur / Permissions", "Fonctions & grades", "Toutes les fonctions du bot et toutes les pages du site : choisissez qui y a accès, et prévisualisez le site avec les yeux d'un grade."),
       builder: pageHead("Créateur / Site builder", "Apparence du site", "Identité, thème, fond animé ou image, navigation, effets et CSS libre — appliqués en direct."),
       discord: pageHead("Créateur / Connexion", "Connexion & équipe", "Vos membres se connectent avec leur compte Discord. Seuls les identifiants que vous listez entrent dans l'espace de gestion."),
+      db: pageHead("Créateur / Données", "Base de données", "Rangez sanctions, preuves, tickets et réglages dans une vraie base — MySQL chez votre hébergeur, ou un simple fichier SQLite."),
       maj: pageHead("Créateur / Maintenance", "Mises à jour", "Le site se met à jour tout seul depuis GitHub et aligne tous les bots qu'il pilote sur la même version."),
       ecosystem: pageHead("Créateur / Écosystème", "Vue globale", "Consultez l'ensemble des bots, des serveurs et des indicateurs de déploiement.", button("Exporter les données", "export-state", "primary")),
     };
@@ -1175,6 +1227,7 @@
       : tab === "bots" ? botsBuilderBody()
       : tab === "perms" ? permissionsBody()
       : tab === "discord" ? discordBody()
+      : tab === "db" ? dbBody()
       : tab === "maj" ? majBody()
       : creatorEcosystem();
     return `<div class="content-view">${heads[tab]}${tabBar}${body}</div>`;
@@ -1514,6 +1567,91 @@
           Pour obtenir l'identifiant de quelqu'un : Discord → Paramètres → Avancés → <b>Mode développeur</b>, puis clic droit sur la personne → <b>Copier l'identifiant</b>.
         </span>
       </div></section>`;
+  }
+
+  // ── 🗄️ Base de données ──────────────────────────────────────────────
+  function dbBody() {
+    const d = ui.db;
+    if (!d) { chargerDb(); return `<div class="row">⏳ Lecture de la configuration…</div>`; }
+    const sqlite = d.type === "sqlite";
+    const etat = d.active
+      ? `<div class="row" style="border-color:rgba(47,227,139,.45);flex-direction:column;align-items:flex-start;gap:6px">
+           <b>✅ Base connectée — vos données y sont enregistrées</b>
+           <span style="color:var(--muted)">${d.stats ? `${d.stats.blacklist} sanction(s) · ${d.stats.preuves} preuve(s) · ${d.stats.tickets} ticket(s) · ${d.stats.ticket_messages} message(s) · ${d.stats.activite} ligne(s) de journal` : ""}</span></div>`
+      : d.configuree
+        ? `<div class="row" style="border-color:rgba(255,92,116,.45);flex-direction:column;align-items:flex-start;gap:6px">
+             <b>❌ Base configurée mais injoignable</b>
+             <span style="color:var(--muted)">${esc(d.erreur || "")}</span>
+             <span style="color:var(--muted);font-size:12px">Le site continue de lire <code>data/app.json</code> en attendant, mais <b>toute modification sera refusée</b>.</span></div>`
+        : `<div class="row" style="border-color:rgba(243,200,106,.45);flex-direction:column;align-items:flex-start;gap:6px">
+             <b>💾 Aucune base configurée</b>
+             <span style="color:var(--muted)">Le site fonctionne sur le fichier <code>data/app.json</code>. C'est suffisant pour démarrer, mais une base encaisse bien mieux la montée en charge et se sauvegarde plus facilement.</span></div>`;
+    const manque = !d.pilotes.mysql
+      ? `<div class="row mt-16" style="border-color:rgba(243,200,106,.45)">⚠️ <span style="color:var(--muted)">Votre hébergeur n'a pas l'extension PHP <code>pdo_mysql</code> : MySQL est indisponible. ${d.pilotes.sqlite ? "SQLite reste possible." : ""}</span></div>`
+      : "";
+    return `
+      <div class="builder-hint">🗄️ Tout ce que le site enregistre — sanctions, preuves, tickets, messages, archives, journal, thème et page d'accueil — part dans votre base. <b>L'import de vos données actuelles est automatique</b> à la première connexion.</div>
+      ${etat}
+      ${manque}
+      ${d.modifiable === false ? `<div class="row mt-16" style="border-color:rgba(255,92,116,.45)">🚫 <b>Dossier <code>data/</code> non inscriptible</b><span style="color:var(--muted)">chmod 775 sur le dossier <code>data</code>.</span></div>` : ""}
+      <section class="panel mt-16"><div class="panel-inner">
+        <div class="panel-head"><div><h3>Connexion</h3><p>Les valeurs viennent du panel de votre hébergeur, section « Bases de données ».</p></div></div>
+        <div class="form-grid">
+          <div class="field full"><label>Type de base</label>
+            <select class="select" id="db-type" data-bascule="db">
+              <option value="mysql"${!sqlite ? " selected" : ""}${!d.pilotes.mysql ? " disabled" : ""}>MySQL / MariaDB (recommandé)</option>
+              <option value="sqlite"${sqlite ? " selected" : ""}${!d.pilotes.sqlite ? " disabled" : ""}>SQLite (un simple fichier, sans serveur)</option>
+            </select>
+            <span class="field-note">MySQL si votre hébergeur vous en fournit une. SQLite si vous n'avez pas de serveur de base : tout tient dans un fichier de <code>data/</code>.</span></div>
+        </div>
+        <div class="form-grid db-mysql" style="${sqlite ? "display:none" : ""}">
+          <div class="field"><label>Hôte</label>
+            <input class="input" id="db-hote" value="${esc(d.hote || "")}" placeholder="game1.exemple.fr" spellcheck="false" autocomplete="off">
+            <span class="field-note">Vous pouvez coller <code>serveur:port</code> d'un bloc : le port sera séparé tout seul.</span></div>
+          <div class="field"><label>Port</label>
+            <input class="input" id="db-port" value="${esc(String(d.port || 3306))}" inputmode="numeric">
+            <span class="field-note">3306 pour MySQL, sauf indication contraire.</span></div>
+          <div class="field"><label>Nom de la base</label>
+            <input class="input" id="db-base" value="${esc(d.base || "")}" placeholder="nom_de_votre_base" spellcheck="false" autocomplete="off"></div>
+          <div class="field"><label>Nom d'utilisateur</label>
+            <input class="input" id="db-user" value="${esc(d.utilisateur || "")}" placeholder="utilisateur_de_la_base" spellcheck="false" autocomplete="off"></div>
+          <div class="field full"><label>Mot de passe</label>
+            <input class="input" id="db-mdp" type="password" value="" placeholder="${d.motDePasseEnregistre ? "•••••••• (déjà enregistré — laissez vide pour le garder)" : "mot de passe de la base"}" autocomplete="new-password">
+            <span class="field-note">Stocké hors d'atteinte du web et jamais réaffiché. ⚠️ Ne le partagez avec personne.</span></div>
+        </div>
+        <div class="form-grid db-sqlite" style="${sqlite ? "" : "display:none"}">
+          <div class="field full"><label>Fichier de la base</label>
+            <input class="input" id="db-fichier" value="${esc(d.fichier || "")}" placeholder="data/site.sqlite" spellcheck="false">
+            <span class="field-note">Laissez tel quel si vous ne savez pas : le fichier sera créé dans <code>data/</code>.</span></div>
+        </div>
+        <div class="form-actions">
+          ${d.configuree ? button("🧹 Revenir au fichier JSON", "db-forget", "ghost") : ""}
+          ${button("🔌 Tester et enregistrer", "db-save", "success")}
+        </div>
+        <div id="db-rapport" style="margin-top:12px"></div>
+      </div></section>
+      <section class="panel mt-16"><div class="panel-inner">
+        <div class="panel-head"><div><h3>❓ Ce qui est enregistré, et où</h3></div></div>
+        <div class="table-wrap"><table class="data-table"><thead><tr><th>Table</th><th>Contenu</th></tr></thead><tbody>
+          <tr><td><code>blacklist</code></td><td>Une ligne par sanction (pseudo, identifiant Discord, motif, gravité, serveur, auteur, date)</td></tr>
+          <tr><td><code>preuves</code></td><td>Une ligne par fichier joint, rattachée à sa sanction</td></tr>
+          <tr><td><code>tickets</code></td><td>Tickets en cours <b>et</b> archivés (colonne <code>archive</code>)</td></tr>
+          <tr><td><code>ticket_messages</code></td><td>Chaque message d'un ticket, dans l'ordre</td></tr>
+          <tr><td><code>activite</code></td><td>Journal des actions du site</td></tr>
+          <tr><td><code>kv</code></td><td>Thème, page d'accueil, bots, serveurs, permissions</td></tr>
+        </tbody></table></div>
+        <span class="field-note" style="display:block;margin-top:10px">Les <b>fichiers</b> de preuve restent dans <code>uploads/proofs/</code> : la base ne stocke que leur nom. Pensez à les sauvegarder aussi.</span>
+      </div></section>`;
+  }
+
+  async function chargerDb() {
+    try {
+      const r = await api("db.config", { lire: true });
+      ui.db = r.db;
+    } catch (e) {
+      ui.db = { type: "mysql", pilotes: { mysql: true, sqlite: true }, erreur: e.message, configuree: false, active: false };
+    }
+    if (ui.creatorTab === "db") render();
   }
 
   // ── 🔄 Mises à jour du site et des bots ─────────────────────────────
@@ -2212,6 +2350,7 @@
           if (ui.creatorTab === "bots" && ui.agentBots === null) chargerBotsAgent();
           if (ui.creatorTab === "discord" && ui.discord === null) chargerDiscord();
           if (ui.creatorTab === "maj" && ui.maj === null) chargerMaj();
+          if (ui.creatorTab === "db" && ui.db === null) chargerDb();
           break;
         case "auth-open":
           ui.menuProfil = false;
@@ -2469,6 +2608,51 @@
           toast("ÉQUIPE ENREGISTRÉE", `${Object.keys(equipe).length} membre(s) — chacun avec son grade.`);
           break;
         }
+        // ── 🗄️ Base de données ──────────────────────────────────────
+        case "db-save": {
+          const type = document.querySelector("#db-type")?.value || "mysql";
+          const charge = type === "sqlite"
+            ? { type, fichier: document.querySelector("#db-fichier")?.value.trim() || "" }
+            : {
+                type,
+                hote: document.querySelector("#db-hote")?.value.trim() || "",
+                port: document.querySelector("#db-port")?.value.trim() || "3306",
+                base: document.querySelector("#db-base")?.value.trim() || "",
+                utilisateur: document.querySelector("#db-user")?.value.trim() || "",
+                motdepasse: document.querySelector("#db-mdp")?.value || "",
+              };
+          const libelle = target.textContent;
+          target.textContent = "⏳ Connexion…";
+          target.disabled = true;
+          try {
+            const r = await api("db.config", charge);
+            await chargerDb();
+            const box = document.querySelector("#db-rapport");
+            if (box) {
+              box.innerHTML = `<div class="row" style="border-color:rgba(47,227,139,.45);flex-direction:column;align-items:flex-start;gap:6px">
+                <b>✅ ${esc(r.note)}</b>
+                <span style="color:var(--muted)">Toutes les modifications du site partent désormais dans cette base.</span></div>`;
+            }
+            toast("BASE CONNECTÉE", r.note);
+          } catch (e) {
+            const box = document.querySelector("#db-rapport");
+            if (box) {
+              box.innerHTML = `<div class="row" style="border-color:rgba(255,92,116,.45);flex-direction:column;align-items:flex-start;gap:6px">
+                <b>❌ Rien n'a été enregistré</b><span style="color:var(--muted)">${esc(e.message)}</span></div>`;
+            }
+            toast("ÉCHEC", e.message, "error");
+            target.textContent = libelle;
+            target.disabled = false;
+          }
+          break;
+        }
+        case "db-forget": {
+          if (!confirm("Revenir au fichier data/app.json ?\n\nVos tables ne seront PAS supprimées, mais le site cessera de les utiliser — les données saisies depuis la connexion ne s'afficheront plus.")) break;
+          await api("db.config", { effacer: true });
+          await chargerDb();
+          toast("RETOUR AU FICHIER", "Le site utilise de nouveau data/app.json.");
+          break;
+        }
         // ── 🔄 Mises à jour ─────────────────────────────────────────
         case "maj-auto": {
           const actif = !target.classList.contains("on");
@@ -2664,6 +2848,20 @@
         case "open-blacklist-modal":
           openBlacklistModal();
           break;
+        case "open-sanction":
+          openSanctionModal(target.dataset.id);
+          break;
+        case "preuve-zoom": {
+          // Agrandissement plein écran d'une preuve image.
+          const src = target.closest("[data-src]")?.dataset.src;
+          if (!src) break;
+          const vue = document.createElement("div");
+          vue.className = "preuve-zoom";
+          vue.innerHTML = `<img src="${esc(src)}" alt=""><button class="btn" type="button">Fermer</button>`;
+          vue.addEventListener("click", () => vue.remove());
+          document.body.appendChild(vue);
+          break;
+        }
         case "open-proof-modal":
           openProofModal(target.dataset.id);
           break;
@@ -2780,6 +2978,13 @@
 
   document.addEventListener("change", async event => {
     const target = event.target;
+    // 🗄️ Type de base : on montre le bon jeu de champs, sans reconstruire la
+    // page (ce qui effacerait ce qui est déjà saisi).
+    if (target.dataset && target.dataset.bascule === "db") {
+      const sqlite = target.value === "sqlite";
+      document.querySelectorAll(".db-mysql").forEach(e => { e.style.display = sqlite ? "none" : ""; });
+      document.querySelectorAll(".db-sqlite").forEach(e => { e.style.display = sqlite ? "" : "none"; });
+    }
     if (target.closest("#site-builder-form")) livePreview();
     if (target.matches('[data-action="ticket-status"]')) {
       try {

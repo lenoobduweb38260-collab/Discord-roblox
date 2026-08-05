@@ -32,6 +32,7 @@ const PROOF_DIR = __DIR__ . '/uploads/proofs';
 if (is_file(__DIR__ . '/config.php')) require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/lib_discord.php';
 require_once __DIR__ . '/lib_maj.php';
+require_once __DIR__ . '/lib_db.php';
 
 // ----- 🔒 Protection de l'administration -----
 // Deux façons d'être administrateur :
@@ -306,6 +307,18 @@ function respond(array $payload, int $status = 200)
 
 function loadState(): array
 {
+    // 🗄️ Base de données configurée : elle est la source de vérité.
+    // En cas de panne, on retombe sur le fichier JSON plutôt que d'afficher
+    // un site vide — les données restent lisibles, seules les écritures
+    // signaleront le problème.
+    if (db_configuree()) {
+        try {
+            $pdo = db();
+            if ($pdo !== null) { db_init($pdo); return db_charger($pdo); }
+        } catch (Throwable $e) {
+            error_log('Site : base injoignable, repli sur app.json — ' . $e->getMessage());
+        }
+    }
     if (!is_file(DATA_FILE)) {
         respond(['ok' => false, 'error' => 'Le fichier de données est introuvable.'], 500);
     }
@@ -330,6 +343,17 @@ function loadState(): array
 
 function saveState(array $state): void
 {
+    // 🗄️ Vers la base si elle est configurée. Une écriture qui échoue doit se
+    // voir : mieux vaut un message clair qu'une modification perdue en
+    // silence.
+    if (db_configuree()) {
+        try {
+            $pdo = db();
+            if ($pdo !== null) { db_init($pdo); db_sauver($pdo, $state); return; }
+        } catch (Throwable $e) {
+            respond(['ok' => false, 'error' => "Enregistrement impossible : la base de données a refusé l'écriture (" . $e->getMessage() . "). Vérifiez ⚙️ Créateur → 🗄️ Base de données."], 500);
+        }
+    }
     $json = json_encode($state, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
     if ($json === false) {
         respond(['ok' => false, 'error' => 'Impossible de sérialiser les données.'], 500);
@@ -540,6 +564,99 @@ if ($action === 'agent.config') {
         'adresse' => $test, 'origine' => 'saisi dans le site',
         'cleEnregistree' => $key !== '', 'modifiable' => true,
     ]]);
+}
+
+// ══════════════════════════════════════════════════════════════════
+// 🗄️ BASE DE DONNÉES — on teste, on crée les tables, on importe
+// ══════════════════════════════════════════════════════════════════
+if ($action === 'db.config') {
+    exiger_admin();
+    $in = body();
+    $c = db_config();
+    if (!empty($in['lire'])) {
+        $sortie = [
+            'type' => $c['type'], 'hote' => $c['hote'], 'port' => (int) $c['port'],
+            'base' => $c['base'], 'utilisateur' => $c['utilisateur'], 'fichier' => $c['fichier'],
+            'motDePasseEnregistre' => $c['motdepasse'] !== '',
+            'configuree' => db_configuree(),
+            'pilotes' => ['mysql' => extension_loaded('pdo_mysql'), 'sqlite' => extension_loaded('pdo_sqlite')],
+            'modifiable' => is_writable(dirname(DB_STORE)) || is_writable(DB_STORE),
+            'active' => false, 'stats' => null, 'erreur' => null,
+        ];
+        if (db_configuree()) {
+            try { $pdo = db(); db_init($pdo); $sortie['active'] = true; $sortie['stats'] = db_statistiques($pdo); }
+            catch (Throwable $e) { $sortie['erreur'] = $e->getMessage(); }
+        }
+        respond(['ok' => true, 'db' => $sortie]);
+    }
+    if (!empty($in['effacer'])) {
+        db_effacer();
+        respond(['ok' => true, 'efface' => true, 'note' => 'Le site est revenu au fichier data/app.json. Vos tables ne sont pas supprimées.']);
+    }
+
+    $type = ($in['type'] ?? 'mysql') === 'sqlite' ? 'sqlite' : 'mysql';
+    if ($type === 'mysql' && !extension_loaded('pdo_mysql')) {
+        respond(['ok' => false, 'error' => "Votre hébergeur n'a pas l'extension PHP « pdo_mysql » : impossible de se connecter à MySQL. Demandez-la à votre hébergeur, ou choisissez SQLite."], 422);
+    }
+    $neuf = [
+        'type' => $type,
+        'hote' => trim((string) ($in['hote'] ?? '')),
+        'port' => (int) ($in['port'] ?? 3306) ?: 3306,
+        'base' => trim((string) ($in['base'] ?? '')),
+        'utilisateur' => trim((string) ($in['utilisateur'] ?? '')),
+        // Mot de passe laissé vide = on garde celui déjà enregistré.
+        'motdepasse' => ($in['motdepasse'] ?? '') !== '' ? (string) $in['motdepasse'] : $c['motdepasse'],
+        'fichier' => trim((string) ($in['fichier'] ?? '')) ?: (__DIR__ . '/data/site.sqlite'),
+    ];
+    if ($type === 'mysql') {
+        if ($neuf['hote'] === '' || $neuf['base'] === '') {
+            respond(['ok' => false, 'error' => "L'hôte et le nom de la base sont obligatoires."], 422);
+        }
+        // « game1.exemple.fr:3306 » collé dans le champ hôte : on sépare.
+        if (preg_match('/^(.+):(\d+)$/', $neuf['hote'], $m)) {
+            $neuf['hote'] = $m[1];
+            $neuf['port'] = (int) $m[2];
+        }
+    }
+
+    // Connexion réelle AVANT d'enregistrer quoi que ce soit.
+    try {
+        $pdo = new PDO(db_dsn($neuf), $neuf['utilisateur'] ?: null, $neuf['motdepasse'] ?: null, [
+            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_TIMEOUT => 8,
+        ]);
+    } catch (Throwable $e) {
+        $m = $e->getMessage();
+        $aide = "Vérifiez l'hôte, le port, le nom de la base et les identifiants.";
+        if (stripos($m, 'access denied') !== false) $aide = "Le serveur refuse ces identifiants : recopiez le nom d'utilisateur et le mot de passe depuis le panel de votre hébergeur.";
+        elseif (stripos($m, 'unknown database') !== false) $aide = "Ce serveur répond, mais cette base n'existe pas. Vérifiez son nom exact.";
+        elseif (stripos($m, 'timed out') !== false || stripos($m, 'connection refused') !== false) $aide = "Le serveur ne répond pas depuis votre hébergeur web : le port est peut-être fermé, ou l'accès distant n'est pas autorisé pour cette base.";
+        respond(['ok' => false, 'error' => "Connexion refusée. $aide (détail : " . substr($m, 0, 220) . ')'], 422);
+    }
+
+    // Tables + import de l'existant si la base est vierge.
+    $importe = 0;
+    try {
+        $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+        db_init($pdo);
+        if (db_vide($pdo) && is_file(DATA_FILE)) {
+            $json = json_decode((string) @file_get_contents(DATA_FILE), true);
+            if (is_array($json)) {
+                db_sauver($pdo, $json);
+                $importe = count($json['blacklist'] ?? []) + count($json['tickets'] ?? []) + count($json['archives'] ?? []);
+            }
+        }
+    } catch (Throwable $e) {
+        respond(['ok' => false, 'error' => "Connexion réussie, mais la création des tables a échoué : " . substr($e->getMessage(), 0, 240)
+            . " — cet utilisateur a-t-il le droit de créer des tables (CREATE) ?"], 422);
+    }
+
+    if (!db_config_save($neuf)) {
+        respond(['ok' => false, 'error' => "Base joignable, mais impossible d'écrire dans data/ — donnez les droits d'écriture au dossier data (chmod 775)."], 500);
+    }
+    respond(['ok' => true, 'importe' => $importe, 'stats' => db_statistiques($pdo),
+        'note' => $importe > 0
+            ? "Base prête, et vos $importe entrée(s) existantes ont été importées."
+            : "Base prête. Elle contenait déjà des données : rien n'a été écrasé."]);
 }
 
 // 🔑 Application Discord du site (connexion des membres avec leur compte).

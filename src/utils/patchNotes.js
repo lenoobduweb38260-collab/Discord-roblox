@@ -418,6 +418,22 @@ const RELEASES = [
     fix: [],
     retrait: [],
   },
+  {
+    id: 'site-base-donnees-2026-08m',
+    title: 'Site : vraie base de données & fiche de sanction 🗄️',
+    ajout: [
+      '🗄️ **Base de données MySQL / MariaDB** (ou SQLite si vous n\'avez pas de serveur) : sanctions, preuves, tickets, messages, archives, journal et réglages y sont enregistrés',
+      '📥 **Import automatique** de vos données existantes à la première connexion, et **création des tables** toute seule — rien à faire en SQL',
+      '📂 **Fiche d\'une sanction** : cliquez sur une ligne de la blacklist pour voir motif, gravité, serveur, auteur, date et **toutes les preuves** — images en vignettes (clic pour agrandir), PDF et journaux ouvrables',
+    ],
+    amelioration: [
+      '🔌 La connexion est **testée avant d\'être enregistrée**, avec un message adapté : identifiants refusés, base inexistante, port fermé, extension PHP manquante',
+      '🛟 **Si la base tombe**, le site reste consultable et refuse les modifications avec un message clair, au lieu de les perdre en silence',
+      '🖼️ Une preuve dont le fichier a disparu du serveur est signalée au lieu d\'afficher une image cassée',
+    ],
+    fix: [],
+    retrait: [],
+  },
 ];
 
 // Découpe une catégorie en champs d'embed (max 1024 caractères par champ).

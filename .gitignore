@@ -16,3 +16,5 @@ site-php/data/version.txt
 site-php/data/maj.php
 site-php/data/maj.lock
 site-php/data/maj-tmp/
+site-php/data/db.php
+site-php/data/*.sqlite
