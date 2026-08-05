@@ -284,6 +284,39 @@ function agent_post(string $path, int $timeout = 30): array {
   return [$code, is_array($data) ? $data : []];
 }
 
+// Appel POST avec un corps JSON vers l'agent (configuration, envoi de message).
+function agent_post_json(string $path, array $corps, int $timeout = 20): array {
+  $base = agent_url();
+  if ($base === '') return [0, []];
+  $json = json_encode($corps, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+  $headers = ['x-cle: ' . agent_key(), 'Content-Type: application/json'];
+  if (function_exists('curl_init')) {
+    $ch = curl_init($base . $path);
+    curl_setopt_array($ch, [
+      CURLOPT_RETURNTRANSFER => true,
+      CURLOPT_POST => true,
+      CURLOPT_POSTFIELDS => $json,
+      CURLOPT_HTTPHEADER => $headers,
+      CURLOPT_TIMEOUT => $timeout,
+    ]);
+    $raw = curl_exec($ch);
+    $code = (int) (curl_getinfo($ch, CURLINFO_RESPONSE_CODE) ?: 0);
+    curl_close($ch);
+  } else {
+    $ctx = stream_context_create(['http' => [
+      'method' => 'POST', 'header' => implode("\r\n", $headers), 'content' => $json,
+      'timeout' => $timeout, 'ignore_errors' => true,
+    ]]);
+    $raw = @file_get_contents($base . $path, false, $ctx);
+    $code = 0;
+    foreach ($http_response_header ?? [] as $h) {
+      if (preg_match('#^HTTP/\S+\s+(\d{3})#', $h, $m)) $code = (int) $m[1];
+    }
+  }
+  $data = $raw === false ? null : json_decode((string) $raw, true);
+  return [$code, is_array($data) ? $data : []];
+}
+
 // Petit identifiant stable à partir d'un nom (« Colmar RP » → « colmar-rp »).
 function slugify(string $value, string $fallback = 'bot'): string {
   $value = strtolower(trim($value));
@@ -838,6 +871,91 @@ if ($action === 'maj.lancer') {
         $sortie['bots'] = maj_tous_les_bots(loadState());
     }
     respond($sortie);
+}
+
+// ══════════════════════════════════════════════════════════════════
+// 🎛️ CONFIGURATION RÉELLE D'UN SERVEUR — le site parle au bot
+// ══════════════════════════════════════════════════════════════════
+
+// Quel bot gère ce serveur ? (nom chez l'agent)
+function bot_du_serveur(array $state, string $guildId): string {
+    foreach ($state['servers'] ?? [] as $s) {
+        if ((string) ($s['id'] ?? '') !== $guildId) continue;
+        foreach ($state['bots'] ?? [] as $b) {
+            if (in_array($b['id'] ?? '', (array) ($s['botIds'] ?? []), true) && ($b['agentName'] ?? '') !== '') {
+                return (string) $b['agentName'];
+            }
+        }
+    }
+    return '';
+}
+
+// Vérifie le droit de toucher à ce serveur, puis renvoie le nom du bot.
+function exiger_serveur(string $guildId): array {
+    $etat = loadState();
+    if ($guildId === '' || !peut_gerer_serveur($etat, $guildId)) {
+        respond(['ok' => false, 'error' => moi_id() === ''
+            ? "Connectez-vous avec Discord pour configurer un serveur."
+            : "Vous n'êtes ni propriétaire ni administrateur de ce serveur Discord."], 403);
+    }
+    $bot = bot_du_serveur($etat, $guildId);
+    if ($bot === '') {
+        respond(['ok' => false, 'error' => "Aucun bot relié à ce serveur. Vérifiez « Nom chez l'agent » dans ⚙️ Créateur → 🤖 Mes bots, puis synchronisez."], 422);
+    }
+    return [$etat, $bot];
+}
+
+// 📋 Rôles, salons, catégories et configuration actuelle du serveur : c'est
+// ce qui alimente TOUTES les listes déroulantes du site.
+if ($action === 'serveur.parametres') {
+    $guildId = preg_replace('/\D+/', '', (string) (body()['serveur'] ?? $_GET['serveur'] ?? ''));
+    [, $bot] = exiger_serveur((string) $guildId);
+    [$code, $data] = agent_get('/agent/bots/' . rawurlencode($bot) . '/proxy/parametres?guild=' . rawurlencode((string) $guildId), 15);
+    if ($code !== 200) {
+        respond(['ok' => false, 'error' => $code === 0
+            ? "Le bot ne répond pas — est-il démarré ? (agent injoignable ou API interne arrêtée)"
+            : "Le bot a répondu HTTP $code. S'il est ancien, mettez-le à jour (⚙️ Créateur → 🔄 Mises à jour)."], 502);
+    }
+    respond(['ok' => true] + $data);
+}
+
+// 💾 Enregistre UN réglage dans le bot (salon, rôle, interrupteur, texte…).
+if ($action === 'serveur.config') {
+    $in = body();
+    $guildId = preg_replace('/\D+/', '', (string) ($in['serveur'] ?? ''));
+    [, $bot] = exiger_serveur((string) $guildId);
+    [$code, $data] = agent_post_json('/agent/bots/' . rawurlencode($bot) . '/proxy/config', [
+        'guildId' => (string) $guildId,
+        'key' => (string) ($in['cle'] ?? ''),
+        'value' => $in['valeur'] ?? null,
+    ], 15);
+    if ($code !== 200) {
+        respond(['ok' => false, 'error' => $data['error'] ?? ($code === 0
+            ? "Le bot ne répond pas — est-il démarré ?"
+            : "Le bot a répondu HTTP $code.")], 502);
+    }
+    respond(['ok' => true, 'valeur' => $data['value'] ?? null]);
+}
+
+// 📨 Publie sur Discord le message composé dans le site.
+if ($action === 'serveur.message') {
+    $in = body();
+    $guildId = preg_replace('/\D+/', '', (string) ($in['serveur'] ?? ''));
+    [, $bot] = exiger_serveur((string) $guildId);
+    $charge = $in['message'] ?? [];
+    $charge['guildId'] = (string) $guildId;
+    $charge['channelId'] = preg_replace('/\D+/', '', (string) ($in['salon'] ?? ''));
+    if (!empty($in['test'])) $charge['test'] = true;
+    if ($charge['channelId'] === '') {
+        respond(['ok' => false, 'error' => 'Choisissez le salon de destination.'], 422);
+    }
+    [$code, $data] = agent_post_json('/agent/bots/' . rawurlencode($bot) . '/proxy/message-envoyer', $charge, 25);
+    if ($code !== 200) {
+        respond(['ok' => false, 'error' => $data['error'] ?? ($code === 0
+            ? "Le bot ne répond pas — est-il démarré ?"
+            : "Le bot a répondu HTTP $code. Mettez-le à jour si l'envoi de messages est inconnu de lui.")], 502);
+    }
+    respond(['ok' => true, 'note' => $data['note'] ?? 'Message publié.', 'messageId' => $data['messageId'] ?? null]);
 }
 
 // 🎭 Grade réel du membre connecté sur un serveur donné (rôles du bot).

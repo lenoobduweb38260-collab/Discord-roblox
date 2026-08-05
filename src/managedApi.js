@@ -72,6 +72,37 @@ function startManagedApi(client, baseDir) {
     xp_text: 'n',
     xp_voice: 'n',
     xp_cooldown: 'n',
+    // ----- Réglables depuis le site : TOUS les modules -----
+    // Salons
+    goodbye_channel_id: 's',
+    patch_channel_id: 's',
+    partner_channel_id: 's',
+    captcha_channel_id: 's',
+    ticket_transcript_channel_id: 's',
+    // Rôles
+    police_role_ids: 'j',
+    wlrp_role_id: 's',
+    verified_role_id: 's',
+    autorole_role_ids: 'j',
+    // Interrupteurs de module
+    levels_enabled: 'b',
+    antispam_enabled: 'b',
+    antinuke_enabled: 'b',
+    captcha_enabled: 'b',
+    interact_enabled: 'b',
+    sao_enabled: 'b',
+    // Apparence des arrivées / départs
+    welcome_color: 's',
+    welcome_image: 's',
+    welcome_avatar: 's',
+    welcome_title: 't',
+    welcome_fields: 'b',
+    goodbye_color: 's',
+    goodbye_image: 's',
+    goodbye_avatar: 's',
+    goodbye_title: 't',
+    goodbye_fields: 'b',
+    level_image_url: 's',
   };
   const NUM_LIMITS = { xp_text: [1, 1000], xp_voice: [1, 1000], xp_cooldown: [5, 3600] };
   const listWhitelist = db.prepare('SELECT * FROM whitelist_managers WHERE guild_id = ? ORDER BY role_id');
@@ -712,6 +743,117 @@ function startManagedApi(client, baseDir) {
         if (!payload.content && !payload.embeds) return send(400, { error: 'Message vide : remplissez au moins un champ.' });
         await channel.send(payload);
         return send(200, { ok: true });
+      }
+
+      // ----- 📨 Envoi d'un message complet composé depuis le site -----
+      // Reçoit exactement ce que le créateur a construit : texte, plusieurs
+      // embeds (avec champs), boutons et menus déroulants. Sert aussi
+      // d'aperçu : « test: true » renvoie le rendu sans rien publier.
+      if (req.method === 'POST' && url.pathname === '/message-envoyer') {
+        const body = await readBody(req);
+        const guild = client.guilds.cache.get(String(body.guildId || ''));
+        if (!guild) return send(404, { error: 'Serveur introuvable.' });
+        const channel = guild.channels.cache.get(String(body.channelId || ''));
+        if (!channel?.isTextBased() || channel.isThread?.()) {
+          return send(400, { error: 'Choisissez un salon textuel du serveur.' });
+        }
+        const me = guild.members.me;
+        const { PermissionFlagsBits, ButtonStyle, ActionRowBuilder, ButtonBuilder, StringSelectMenuBuilder } = require('discord.js');
+        if (!channel.permissionsFor(me)?.has(PermissionFlagsBits.SendMessages)) {
+          return send(400, { error: `Le bot n'a pas le droit d'écrire dans #${channel.name}.` });
+        }
+
+        const payload = {};
+        if (String(body.content || '').trim()) payload.content = String(body.content).slice(0, 2000);
+
+        // Embeds : autant que Discord en accepte (10 maximum).
+        const embeds = [];
+        for (const e of (Array.isArray(body.embeds) ? body.embeds : []).slice(0, 10)) {
+          const rempli = [e.titre, e.description, e.image, e.miniature, e.footer, e.auteur]
+            .some((v) => String(v || '').trim() !== '') || (Array.isArray(e.champs) && e.champs.length);
+          if (!rempli) continue;
+          const embed = new EmbedBuilder();
+          const c = String(e.couleur || '').match(/^#?([0-9a-f]{6})$/i);
+          embed.setColor(c ? parseInt(c[1], 16) : 0x5865f2);
+          if (String(e.titre || '').trim()) embed.setTitle(String(e.titre).slice(0, 256));
+          if (String(e.description || '').trim()) embed.setDescription(String(e.description).slice(0, 4000));
+          if (String(e.url || '').trim()) { try { embed.setURL(String(e.url).trim()); } catch {} }
+          if (String(e.image || '').trim()) embed.setImage(String(e.image).trim());
+          if (String(e.miniature || '').trim()) embed.setThumbnail(String(e.miniature).trim());
+          if (String(e.footer || '').trim()) {
+            embed.setFooter({ text: String(e.footer).slice(0, 2048), iconURL: String(e.footer_icone || '').trim() || undefined });
+          }
+          if (String(e.auteur || '').trim()) {
+            embed.setAuthor({ name: String(e.auteur).slice(0, 256), iconURL: String(e.auteur_icone || '').trim() || undefined });
+          }
+          if (e.horodatage) embed.setTimestamp();
+          for (const f of (Array.isArray(e.champs) ? e.champs : []).slice(0, 25)) {
+            const nom = String(f.nom || '').trim();
+            const valeur = String(f.valeur || '').trim();
+            if (!nom || !valeur) continue;
+            embed.addFields({ name: nom.slice(0, 256), value: valeur.slice(0, 1024), inline: Boolean(f.aligne) });
+          }
+          embeds.push(embed);
+        }
+        if (embeds.length) payload.embeds = embeds;
+
+        // Boutons et menus : 5 rangées maximum, 5 boutons par rangée.
+        const rows = [];
+        const boutons = (Array.isArray(body.boutons) ? body.boutons : []).filter((b) => String(b.label || '').trim());
+        const STYLES = { primaire: ButtonStyle.Primary, secondaire: ButtonStyle.Secondary, succes: ButtonStyle.Success, danger: ButtonStyle.Danger };
+        for (let i = 0; i < boutons.length && rows.length < 5; i += 5) {
+          const row = new ActionRowBuilder();
+          for (const b of boutons.slice(i, i + 5)) {
+            const bouton = new ButtonBuilder().setLabel(String(b.label).slice(0, 80));
+            if (String(b.lien || '').trim()) {
+              // Un bouton-lien ne déclenche rien côté bot : Discord l'ouvre.
+              try { bouton.setStyle(ButtonStyle.Link).setURL(String(b.lien).trim()); }
+              catch { continue; }
+            } else {
+              bouton.setStyle(STYLES[b.style] || ButtonStyle.Secondary)
+                .setCustomId(`site:${String(b.action || 'rien').slice(0, 80)}`);
+            }
+            if (String(b.emoji || '').trim()) { try { bouton.setEmoji(String(b.emoji).trim()); } catch {} }
+            row.addComponents(bouton);
+          }
+          if (row.components.length) rows.push(row);
+        }
+        const options = (Array.isArray(body.selecteur) ? body.selecteur : []).filter((o) => String(o.label || '').trim());
+        if (options.length && rows.length < 5) {
+          const menu = new StringSelectMenuBuilder()
+            .setCustomId(`site:menu:${Date.now()}`)
+            .setPlaceholder(String(body.selecteurTexte || 'Faites un choix…').slice(0, 150))
+            .addOptions(options.slice(0, 25).map((o, i) => ({
+              label: String(o.label).slice(0, 100),
+              value: String(o.valeur || `option-${i}`).slice(0, 100),
+              description: String(o.description || '').slice(0, 100) || undefined,
+              emoji: String(o.emoji || '').trim() || undefined,
+            })));
+          rows.push(new ActionRowBuilder().addComponents(menu));
+        }
+        if (rows.length) payload.components = rows;
+
+        if (!payload.content && !payload.embeds) {
+          return send(400, { error: 'Message vide : écrivez un texte ou remplissez un embed.' });
+        }
+        if (body.test) return send(200, { ok: true, apercu: true, note: 'Rendu valide — rien n\'a été publié.' });
+
+        // Profil d'envoi (nom + avatar personnalisés) via webhook.
+        const profile = body.profileId ? getProfile.get(parseInt(body.profileId, 10), guild.id) : null;
+        try {
+          if (profile) {
+            if (!channel.permissionsFor(me)?.has(PermissionFlagsBits.ManageWebhooks)) {
+              return send(400, { error: 'Le bot a besoin de « Gérer les webhooks » dans ce salon pour envoyer sous un profil.' });
+            }
+            const webhook = await channel.createWebhook({ name: profile.name.slice(0, 80), avatar: profile.avatar_url || undefined });
+            const msg = await webhook.send({ ...payload, username: profile.name.slice(0, 80), avatarURL: profile.avatar_url || undefined });
+            return send(200, { ok: true, messageId: msg.id, note: `Message publié dans #${channel.name}.` });
+          }
+          const msg = await channel.send(payload);
+          return send(200, { ok: true, messageId: msg.id, note: `Message publié dans #${channel.name}.` });
+        } catch (err) {
+          return send(500, { error: `Publication impossible : ${err.message}` });
+        }
       }
 
       send(404, { error: 'Route inconnue.' });

@@ -430,6 +430,19 @@ for (const column of [
   'wlrp_role_id TEXT',
   'ticket_transcript_channel_id TEXT',
   'levels_enabled INTEGER', // NULL = activé (comportement historique)
+  // 🎭 Rôles automatiques à l'arrivée (liste JSON d'identifiants de rôles)
+  'autorole_role_ids TEXT',
+  // 👋 Apparence des messages d'arrivée / de départ, réglée depuis le site
+  'welcome_color TEXT',        // couleur de la barre de l'embed (#RRGGBB)
+  'welcome_image TEXT',        // grande image de fond de l'embed
+  'welcome_avatar TEXT',       // 'rond' | 'grand' | 'aucun' — cadre de la photo
+  'welcome_title TEXT',        // titre de l'embed
+  'welcome_fields INTEGER',    // 1 = afficher les champs (nom, ID, n°, création)
+  'goodbye_color TEXT',
+  'goodbye_image TEXT',
+  'goodbye_avatar TEXT',
+  'goodbye_title TEXT',
+  'goodbye_fields INTEGER',
 ]) {
   try {
     db.exec(`ALTER TABLE guild_config ADD COLUMN ${column}`);
@@ -529,6 +542,17 @@ const DEFAULT_CONFIG = {
   goodbye_message: null,
   goodbye_channel_id: null,
   welcome_mention: 0,
+  autorole_role_ids: null,
+  welcome_color: null,
+  welcome_image: null,
+  welcome_avatar: 'rond',
+  welcome_title: null,
+  welcome_fields: 1,
+  goodbye_color: null,
+  goodbye_image: null,
+  goodbye_avatar: 'rond',
+  goodbye_title: null,
+  goodbye_fields: 1,
   rp_enabled: 0,
   rp_locked: 0,
   antispam_enabled: 0,
