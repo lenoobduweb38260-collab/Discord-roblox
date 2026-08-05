@@ -258,6 +258,18 @@
   // Une session est-elle ouverte, d'une façon ou d'une autre ?
   function connecte() { return Boolean(MOI) || (AUTH.required && AUTH.ok); }
 
+  // 🔒 A-t-on le droit d'entrer dans l'espace de gestion ?
+  // Même règle que le serveur : un compte Discord listé dans l'équipe, la
+  // session par mot de passe, ou un site sans aucune protection (installation
+  // neuve — signalée par le bandeau rouge).
+  function peutGerer() {
+    if (!AUTH.required) return true;
+    if (MOI && MOI.staff) return true;
+    return AUTH.ok === true;
+  }
+  // Pages accessibles à un visiteur non identifié : la vue d'ensemble seule.
+  const PAGES_PUBLIQUES = ["dashboard"];
+
   // Bloc profil du bandeau : le vrai compte Discord, la session par mot de
   // passe, ou une invitation à se connecter.
   function profileBlock() {
@@ -531,7 +543,9 @@
     // (la sortie de l'aperçu reste possible via le bandeau en haut).
     const navItems = navConfig()
       .filter(item => item.show !== false || (item.id === "site-config" && !ui.previewGrade))
-      .filter(item => !ui.previewGrade || gradeCan("page." + (item.id === "site-config" ? "creator" : item.id)));
+      .filter(item => !ui.previewGrade || gradeCan("page." + (item.id === "site-config" ? "creator" : item.id)))
+      // 🔒 Non identifié : seule la vue d'ensemble figure au menu.
+      .filter(item => peutGerer() || PAGES_PUBLIQUES.includes(item.id));
     app.innerHTML = `
       <div class="app-shell">
         <header class="topbar">
@@ -618,6 +632,9 @@
   }
 
   function renderRoute() {
+    // Visiteur non identifié : la vue d'ensemble, et rien d'autre — même en
+    // tapant l'adresse d'une autre page à la main.
+    if (!peutGerer() && !PAGES_PUBLIQUES.includes(ui.route)) ui.route = "dashboard";
     switch (ui.route) {
       case "dashboard": return dashboardView();
       case "servers": return serversView();
@@ -640,8 +657,17 @@
     const totalMembers = servers.reduce((sum, server) => sum + server.members, 0);
     const totalOnline = servers.reduce((sum, server) => sum + server.online, 0);
     const openTickets = (state.tickets || []).filter(t => t.status !== "fermé").length;
+    // 🔒 Visiteur non identifié : il ne voit que cette page, et ses chiffres
+    // sont vides (le serveur ne lui envoie ni serveurs, ni tickets, ni
+    // sanctions). On lui présente donc le bot et une invitation à se
+    // connecter, plutôt que des panneaux vides et des boutons qui refusent.
+    const gestion = peutGerer();
     return `<div class="content-view">
-      ${pageHead("Cardinal / Centre de contrôle", `Bienvenue dans l'interface ${bot.name}`, "Surveillez vos serveurs Discord et accédez rapidement aux systèmes de gestion.", button("Synchroniser", "pulse-system", "primary"))}
+      ${pageHead("Cardinal / Centre de contrôle", `Bienvenue dans l'interface ${bot.name}`,
+        gestion
+          ? "Surveillez vos serveurs Discord et accédez rapidement aux systèmes de gestion."
+          : "Voici le bot de la communauté. Identifiez-vous avec Discord pour accéder à la gestion.",
+        gestion ? button("Synchroniser", "pulse-system", "primary") : "")}
       <div class="hero-grid">
         <article class="panel hero-panel"><div class="hero-content">
           <span class="hero-kicker">A I N C R A D · FLOOR 75</span>
@@ -650,13 +676,18 @@
           <div class="hero-status"><span class="chip green"><i class="status-dot"></i> BOT EN LIGNE</span><span class="chip">PING ${esc(bot.latency)} MS</span><span class="chip gold">VERSION 2.0.0</span></div>
         </div></article>
         <div class="stat-stack">
+          ${gestion ? `
           <div class="stat-card"><span>Serveurs connectés</span><strong>${servers.length}</strong><em>+1 ce mois</em></div>
           <div class="stat-card"><span>Membres cumulés</span><strong>${formatNumber(totalMembers)}</strong><em>${formatNumber(totalOnline)} en ligne</em></div>
           <div class="stat-card"><span>Tickets actifs</span><strong>${openTickets}</strong><em>support disponible</em></div>
-          <div class="stat-card"><span>Entrées blacklist</span><strong>${state.blacklist?.length || 0}</strong><em>base globale</em></div>
+          <div class="stat-card"><span>Entrées blacklist</span><strong>${state.blacklist?.length || 0}</strong><em>base globale</em></div>`
+          : `
+          <div class="stat-card"><span>Bots de la communauté</span><strong>${(state.bots || []).length}</strong><em>en service</em></div>
+          <div class="stat-card"><span>État</span><strong>En ligne</strong><em>tous les modules actifs</em></div>`}
         </div>
       </div>
 
+      ${gestion ? `
       <section class="panel mt-16"><div class="panel-inner">
         <div class="panel-head"><div><h3>Mes serveurs</h3><p>Sélectionnez un serveur pour ouvrir ses huit modules.</p></div>${button("Voir tous", "navigate", "ghost", 'data-route="servers"')}</div>
         <div class="server-strip">${servers.map(serverCard).join("") || emptyBlock("Aucun serveur", "Ce bot n'est lié à aucun serveur.")}</div>
@@ -675,7 +706,17 @@
       <div class="grid-2 mt-16">
         <section class="panel"><div class="panel-inner"><div class="panel-head"><div><h3>Activité récente</h3><p>Flux des actions importantes du bot.</p></div></div><div class="activity-list">${activityRows()}</div></div></section>
         <section class="panel"><div class="panel-inner"><div class="panel-head"><div><h3>Signal Cardinal</h3><p>État global des connexions Discord.</p></div><span class="chip green">STABLE</span></div><div class="radar"><div class="radar-grid"><i class="radar-dot" style="left:30%;top:42%"></i><i class="radar-dot" style="left:63%;top:25%"></i><i class="radar-dot" style="left:72%;top:68%"></i><i class="radar-dot" style="left:44%;top:73%"></i></div></div></div></section>
-      </div>
+      </div>` : `
+      <section class="panel mt-16"><div class="panel-inner">
+        <div class="panel-head"><div><h3>🔒 Espace de gestion réservé</h3>
+          <p>Serveurs, blacklist, tickets et espace créateur ne sont accessibles qu'à l'équipe.</p></div></div>
+        <div class="row" style="flex-direction:column;align-items:flex-start;gap:8px">
+          <span style="color:var(--muted)">${MOI
+            ? `Vous êtes connecté en tant que <b>${esc(MOI.nom)}</b>, mais votre compte ne fait pas partie de l'équipe de ce site. Demandez au propriétaire de vous ajouter — il lui faudra votre identifiant : <code style="user-select:all">${esc(MOI.id)}</code>`
+            : "Identifiez-vous avec votre compte Discord. Si vous faites partie de l'équipe, l'accès s'ouvrira automatiquement."}</span>
+          ${MOI ? "" : `<div class="page-actions">${button("🎮 Se connecter avec Discord", "auth-open", "primary")}</div>`}
+        </div>
+      </div></section>` }
     </div>`;
   }
 

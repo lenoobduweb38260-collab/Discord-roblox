@@ -430,6 +430,8 @@ const RELEASES = [
       '🔌 La connexion est **testée avant d\'être enregistrée**, avec un message adapté : identifiants refusés, base inexistante, port fermé, extension PHP manquante',
       '🛟 **Si la base tombe**, le site reste consultable et refuse les modifications avec un message clair, au lieu de les perdre en silence',
       '🖼️ Une preuve dont le fichier a disparu du serveur est signalée au lieu d\'afficher une image cassée',
+      '🔒 **Un visiteur non identifié ne voit plus que la vue d\'ensemble** : serveurs, blacklist, tickets et espace créateur disparaissent du menu, et forcer l\'adresse d\'une de ces pages ramène à l\'accueil',
+      '👋 La vue d\'ensemble s\'adapte alors : présentation du bot et invitation à se connecter, au lieu de panneaux vides et de boutons qui refusent',
     ],
     fix: [],
     retrait: [],
