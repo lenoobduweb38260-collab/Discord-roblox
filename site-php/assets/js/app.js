@@ -1094,14 +1094,22 @@
       ${bot.agentName && !connu ? `<option value="${esc(bot.agentName)}" selected>⚠️ ${esc(bot.agentName)} (inconnu chez l'agent)</option>` : ""}
     </select>`;
   }
+  // Lien d'invitation Discord d'un bot, construit depuis son Client ID.
+  // Permissions 8 = Administrateur ; scopes bot + commandes slash.
+  function inviteUrl(bot) {
+    const id = String(bot?.clientId || "").trim();
+    if (!/^\d{17,20}$/.test(id)) return null;
+    return `https://discord.com/oauth2/authorize?client_id=${id}&scope=bot%20applications.commands&permissions=8`;
+  }
+
   // Message d'aide sous le Client ID, qui signale une valeur invalide.
   function clientIdNote(valeur) {
     const v = String(valeur || "").trim();
-    if (v === "") return "Rempli automatiquement à la synchronisation. Sert au lien « Inviter ce bot ».";
+    if (v === "") return "Laissez vide : la synchronisation le récupère toute seule depuis votre bot. Il sert à créer le lien « Inviter ce bot ».";
     if (!/^\d{17,20}$/.test(v)) {
-      return `⚠️ « ${esc(v)} » n'est pas un Client ID Discord (il en faut 17 à 20 chiffres). Ce n'est ni l'adresse de l'agent, ni un port.`;
+      return `⚠️ « ${esc(v)} » n'est pas un Client ID Discord : il faut 17 à 20 chiffres (vous en avez ${v.replace(/\D/g, "").length}). Ce n'est NI l'adresse de votre agent, NI un port — c'est l'« Application ID » du portail développeur Discord.`;
     }
-    return "✅ Format correct.";
+    return "✅ Format correct — le bouton « 🔗 Lien d'invitation » ci-dessus est actif.";
   }
 
   function botsBuilderBody() {
@@ -1116,6 +1124,7 @@
             <button type="button" class="btn ghost small" data-action="bot-move" data-dir="-1" ${index === 0 ? "disabled" : ""}>▲</button>
             <button type="button" class="btn ghost small" data-action="bot-move" data-dir="1" ${index === bots.length - 1 ? "disabled" : ""}>▼</button>
             <button type="button" class="btn small" data-action="bot-test">🔌 Tester</button>
+            ${inviteUrl(bot) ? `<button type="button" class="btn small" data-action="invite-bot" data-bot-id="${esc(bot.id)}">🔗 Lien d'invitation</button>` : ""}
             <button type="button" class="btn danger small" data-action="bot-remove">🗑</button>
           </div>
         </div>
@@ -1954,9 +1963,21 @@
         case "show-notifications":
           showNotifications();
           break;
-        case "invite-bot":
-          openModal("Ajouter le bot à un serveur", `<div class="empty"><div><strong>Connexion Discord OAuth2</strong><span>Branchez ici votre URL d'autorisation Discord avec les permissions nécessaires au bot.</span><div class="form-actions" style="justify-content:center"><button class="btn primary" data-action="close-modal">Compris</button></div></div></div>`);
+        case "invite-bot": {
+          // Lien d'invitation réel, construit avec le Client ID du bot.
+          const bot = target.dataset.botId
+            ? (state.bots || []).find(b => b.id === target.dataset.botId)
+            : activeBot();
+          const url = inviteUrl(bot);
+          if (url) { window.open(url, "_blank"); break; }
+          openModal("Ajouter le bot à un serveur", `<div class="empty"><div>
+            <strong>Client ID manquant pour « ${esc(bot?.name || "ce bot")} »</strong>
+            <span>Renseignez son <b>Client ID Discord</b> dans ⚙️ Créateur → 🤖 Mes bots
+            (ou cliquez sur « Synchroniser » : il se remplit tout seul depuis l'agent).</span>
+            <div class="form-actions" style="justify-content:center"><button class="btn primary" data-action="close-modal">Compris</button></div>
+          </div></div>`);
           break;
+        }
         case "export-state": {
           const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
           const url = URL.createObjectURL(blob);
