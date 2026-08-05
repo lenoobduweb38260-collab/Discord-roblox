@@ -100,7 +100,7 @@ jobs:
       - name: Créer le pack site personnalisable (Site builder)
         run: |
           cd site-php
-          zip -r ../dist/pack-site-builder.zip . -x '*.git*' 'data/agent.php'
+          zip -r ../dist/pack-site-builder.zip . -x '*.git*' 'data/agent.php' 'data/discord.php'
 
       - uses: softprops/action-gh-release@v2
         with:

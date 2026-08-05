@@ -39,6 +39,8 @@
     agentBots: null,     // bots vus chez l'agent (null = pas encore interrogé)
     agentErreur: null,
     agentReglages: null, // adresse retenue + origine (la clé n'arrive jamais ici)
+    discord: null,       // réglages de la connexion Discord (null = pas encore lus)
+    bandeauVu: false,    // bandeau Discord (erreur / bienvenue) déjà refermé
     ticketTab: "open",   // tickets en cours / archives
     selectedArchiveId: null,
     archiveQuery: "",
@@ -219,18 +221,51 @@
     return data;
   }
 
-  // État de la protection par mot de passe (config.php > SITE_ADMIN_PASSWORD).
-  const AUTH = window.AINCRAD_AUTH || { required: false, ok: true };
+  // État de la protection et compte connecté.
+  const AUTH = window.AINCRAD_AUTH || { required: false, ok: true, motDePasse: false };
+  const MOI = window.AINCRAD_MOI || null;                 // profil Discord, ou null
+  const DISCORD = window.AINCRAD_DISCORD || { pret: false };
+
+  // 🔑 Fenêtre de connexion : le compte Discord d'abord, le mot de passe de
+  // secours seulement s'il en existe un.
   function openLoginModal() {
-    openModal("🔒 Administration protégée", `
+    const boutonDiscord = DISCORD.pret
+      ? `<a class="btn primary" href="oauth.php?p=login" style="width:100%;justify-content:center;text-decoration:none">
+           <span style="font-size:15px">🎮</span> Se connecter avec Discord</a>`
+      : `<div class="row" style="border-color:rgba(243,200,106,.45)">⚙️ <b>Connexion Discord pas encore configurée</b>
+           <span style="color:var(--muted)">Le propriétaire du site doit la mettre en place dans ⚙️ Créateur → 🔑 Connexion Discord.</span></div>`;
+    const secours = AUTH.motDePasse ? `
+      <div style="display:flex;align-items:center;gap:10px;margin:16px 0 12px">
+        <i style="flex:1;height:1px;background:rgba(255,255,255,.12)"></i>
+        <span style="color:var(--muted-2);font-size:12px">ou mot de passe de secours</span>
+        <i style="flex:1;height:1px;background:rgba(255,255,255,.12)"></i>
+      </div>
       <form data-form="auth-login">
-        <p style="color:var(--muted);font-size:13px;margin-bottom:14px">
-          Ce site est protégé : entrez le mot de passe défini dans <code>config.php</code>
-          (<code>SITE_ADMIN_PASSWORD</code>) pour pouvoir le modifier.
-        </p>
         <div class="field"><label>Mot de passe</label><input class="input" type="password" name="password" autocomplete="current-password" required></div>
         <div class="form-actions"><button class="btn ghost" type="button" data-action="close-modal">Annuler</button><button class="btn success" type="submit">Se connecter</button></div>
-      </form>`);
+      </form>` : `<div class="form-actions" style="margin-top:14px"><button class="btn ghost" type="button" data-action="close-modal">Fermer</button></div>`;
+    openModal("🔒 Connexion", `
+      <p style="color:var(--muted);font-size:13px;margin-bottom:14px">
+        Identifiez-vous avec <b>votre compte Discord</b> — c'est le même que sur vos serveurs.
+      </p>
+      ${boutonDiscord}
+      ${secours}`);
+  }
+
+  // Bloc profil du bandeau : le vrai compte Discord, ou une invitation à se
+  // connecter.
+  function profileBlock() {
+    if (!MOI) {
+      return `<button class="btn primary small" data-action="auth-open" title="Se connecter avec Discord">🎮 Se connecter</button>`;
+    }
+    const initiales = String(MOI.nom || "?").trim().slice(0, 2).toUpperCase();
+    const role = MOI.admin ? "Administrateur du site" : `${MOI.serveurs} serveur(s) Discord`;
+    return `
+      <div class="profile" data-action="auth-menu" title="${esc(MOI.pseudo ? "@" + MOI.pseudo : MOI.nom)} — cliquez pour vous déconnecter">
+        <div class="profile-avatar">${MOI.avatar ? `<img src="${esc(MOI.avatar)}" alt="">` : esc(initiales)}</div>
+        <div><strong>${esc(MOI.nom)}</strong><span>${esc(role)}</span></div>
+        <i class="status-dot"></i>
+      </div>`;
   }
 
   function toast(title, message, type = "success") {
@@ -394,11 +429,7 @@
             ${AUTH.required ? `<button class="icon-btn" data-action="${AUTH.ok ? "auth-logout" : "auth-open"}" title="${AUTH.ok ? "Se déconnecter de l'administration" : "Se connecter à l'administration"}">${AUTH.ok ? "🔓" : "🔒"}</button>` : ""}
             <button class="icon-btn" data-action="pulse-system" title="Synchroniser">⌁</button>
             <button class="icon-btn" data-action="show-notifications" title="Notifications">♢</button>
-            <div class="profile">
-              <div class="profile-avatar">KS</div>
-              <div><strong>Kirito_Admin</strong><span>Créateur · Cardinal</span></div>
-              <i class="status-dot"></i>
-            </div>
+            ${profileBlock()}
           </div>
         </header>
 
@@ -418,12 +449,33 @@
             <button class="switch-bot" data-action="switch-bot">CHANGER DE BOT</button>
           </div>
         </aside>
-        <section class="content">${previewBanner()}${renderRoute()}</section>
+        <section class="content">${discordBanner()}${previewBanner()}${renderRoute()}</section>
       </div>`;
     startClock();
   }
 
   // Bandeau rappelant que l'on regarde le site à travers un grade.
+  // Bandeau du haut : erreur de connexion Discord, ou prise de possession du
+  // site par le tout premier compte connecté. Affiché une seule fois.
+  function discordBanner() {
+    if (DISCORD.erreur && !ui.bandeauVu) {
+      return `<div class="previewbar" style="--gc:#ff5c74;align-items:flex-start">
+        <span>❌ <b>Connexion Discord impossible</b> — ${esc(DISCORD.erreur)}
+        ${DISCORD.detail ? `<br><i style="color:var(--muted-2);font-size:12px">${esc(DISCORD.detail)}</i>` : ""}</span>
+        <button class="btn small" data-action="banner-close">Fermer</button>
+      </div>`;
+    }
+    if (MOI && MOI.premier && !ui.bandeauVu) {
+      return `<div class="previewbar" style="--gc:#2fe38b;align-items:flex-start">
+        <span>👑 <b>Bienvenue, vous êtes maintenant propriétaire de ce site.</b>
+        Votre compte Discord <b>${esc(MOI.nom)}</b> est le seul à pouvoir le modifier.
+        Pour autoriser quelqu'un d'autre : ⚙️ Créateur → 🔑 Connexion Discord.</span>
+        <button class="btn small" data-action="banner-close">J'ai compris</button>
+      </div>`;
+    }
+    return "";
+  }
+
   function previewBanner() {
     if (!ui.previewGrade) return "";
     const g = gradeById(ui.previewGrade);
@@ -963,12 +1015,13 @@
 
   // ── Espace créateur : bots + page + apparence + écosystème ──────────
   function creatorView() {
-    const valid = ["ecosystem", "page", "builder", "bots", "perms"];
+    const valid = ["ecosystem", "page", "builder", "bots", "perms", "discord"];
     const tab = valid.includes(ui.creatorTab) ? ui.creatorTab : "page";
     const tabs = [
       ["page", "🧱 Constructeur de page", "Blocs de la page d'accueil"],
       ["bots", "🤖 Mes bots", "Ajoutez autant de bots que voulu"],
       ["perms", "🔐 Fonctions & grades", "Qui voit quoi, avec aperçu"],
+      ["discord", "🔑 Connexion Discord", "Se connecter avec son compte"],
       ["builder", "🎨 Apparence du site", "Thème, fond, navigation, CSS"],
       ["ecosystem", "🌍 Écosystème", "Serveurs et indicateurs"],
     ];
@@ -977,6 +1030,7 @@
       bots: pageHead("Créateur / Bots", "Mes bots", "Déclarez ici tous vos bots — il n'y a aucune limite. Reliez-les à votre agent pour récupérer leurs vrais serveurs."),
       perms: pageHead("Créateur / Permissions", "Fonctions & grades", "Toutes les fonctions du bot et toutes les pages du site : choisissez qui y a accès, et prévisualisez le site avec les yeux d'un grade."),
       builder: pageHead("Créateur / Site builder", "Apparence du site", "Identité, thème, fond animé ou image, navigation, effets et CSS libre — appliqués en direct."),
+      discord: pageHead("Créateur / Connexion", "Connexion Discord", "Vos membres se connectent au site avec leur compte Discord. Vous choisissez qui a le droit d'administrer."),
       ecosystem: pageHead("Créateur / Écosystème", "Vue globale", "Consultez l'ensemble des bots, des serveurs et des indicateurs de déploiement.", button("Exporter les données", "export-state", "primary")),
     };
     const tabBar = `<div class="subtabs">${tabs.map(t => `
@@ -987,6 +1041,7 @@
       : tab === "page" ? pageBuilderBody()
       : tab === "bots" ? botsBuilderBody()
       : tab === "perms" ? permissionsBody()
+      : tab === "discord" ? discordBody()
       : creatorEcosystem();
     return `<div class="content-view">${heads[tab]}${tabBar}${body}</div>`;
   }
@@ -1222,6 +1277,80 @@
         </div>
         <div id="agent-config-report" style="margin-top:12px"></div>
       </div></section>`;
+  }
+
+  // ── 🔑 Connexion Discord : application + comptes autorisés ──────────
+  function discordBody() {
+    const d = ui.discord;
+    if (!d) { chargerDiscord(); return `<div class="row">⏳ Lecture des réglages…</div>`; }
+    const origines = {
+      "saisi dans le site": "✅ enregistrés depuis cette page",
+      "aucune": "⚠️ pas encore configurés",
+    };
+    const origine = origines[d.origine] || `📄 ${esc(d.origine || "")}`;
+    const etat = d.clientId
+      ? `<div class="row" style="border-color:rgba(47,227,139,.45)">✅ <b>Connexion Discord active</b><span style="color:var(--muted)">Application <code>${esc(d.clientId)}</code> — ${origine}. Le bouton « Se connecter » du bandeau fonctionne.</span></div>`
+      : `<div class="row" style="border-color:rgba(243,200,106,.45);flex-direction:column;align-items:flex-start;gap:6px">
+           <b>⚠️ Personne ne peut encore se connecter</b>
+           <span style="color:var(--muted)">Renseignez les deux valeurs ci-dessous. Si votre dashboard est installé à côté, ses identifiants sont repris automatiquement.</span></div>`;
+    const alerteEcriture = d.modifiable === false
+      ? `<div class="row" style="border-color:rgba(255,92,116,.45)">🚫 <b>Dossier <code>data/</code> non inscriptible</b><span style="color:var(--muted)">Donnez les droits d'écriture au dossier <code>data</code> (chmod 775).</span></div>` : "";
+    const admins = d.admins || [];
+    const lignes = admins.length ? admins.map(id => `
+      <div class="row" data-admin-id="${esc(id)}">
+        <span>👑 <code>${esc(id)}</code>${MOI && MOI.id === id ? " <b>(vous)</b>" : ""}</span>
+        <button type="button" class="btn danger small" data-action="admin-remove" data-id="${esc(id)}" style="margin-left:auto">Retirer</button>
+      </div>`).join("")
+      : `<div class="row" style="border-color:rgba(255,92,116,.45);flex-direction:column;align-items:flex-start;gap:5px">
+           <b>🚨 Aucun administrateur — le site est modifiable par n'importe qui</b>
+           <span style="color:var(--muted)">Connectez-vous avec Discord : le <b>premier compte</b> à le faire devient automatiquement propriétaire du site. Faites-le <b>maintenant</b>, avant de communiquer l'adresse.</span></div>`;
+    return `
+      <div class="builder-hint">🔑 Vos membres se connectent avec <b>leur compte Discord</b> — le même que sur vos serveurs. Aucun mot de passe à créer, aucun fichier à modifier.</div>
+      ${etat}
+      ${alerteEcriture}
+      <section class="panel mt-16"><div class="panel-inner">
+        <div class="panel-head"><div><h3>1️⃣ Déclarez l'adresse de retour chez Discord</h3>
+          <p>À faire une seule fois, sinon Discord refusera la connexion.</p></div></div>
+        <div class="row" style="flex-direction:column;align-items:flex-start;gap:7px">
+          <span>Ouvrez le <b>Portail développeur Discord</b> → votre application → <b>OAuth2</b> → <b>Redirects</b> → <b>Add Redirect</b>, et collez <b>exactement</b> ceci :</span>
+          <code style="user-select:all;padding:9px 12px;border-radius:8px;background:rgba(255,255,255,.06);display:block;width:100%;word-break:break-all">${esc(d.redirect || "")}</code>
+          <span style="color:var(--muted)">Puis <b>Save Changes</b>. Cette adresse est détectée depuis la page que vous consultez : si vous changez de domaine, revenez la recopier.</span>
+        </div>
+      </div></section>
+      <section class="panel mt-16"><div class="panel-inner">
+        <div class="panel-head"><div><h3>2️⃣ Identifiants de l'application</h3>
+          <p>Portail développeur Discord → votre application → OAuth2.</p></div></div>
+        <div class="form-grid">
+          <div class="field full"><label>Client ID</label>
+            <input class="input" id="dc-id" value="${esc(d.clientId || "")}" placeholder="1528910533183541308" inputmode="numeric" autocomplete="off">
+            <span class="field-note">17 à 20 chiffres. C'est le même que celui de votre bot si c'est la même application.</span></div>
+          <div class="field full"><label>Clé secrète (Client Secret)</label>
+            <input class="input" id="dc-secret" type="password" value="" placeholder="${d.secretEnregistre ? "•••••••• (déjà enregistrée — laissez vide pour la garder)" : "OAuth2 → Reset Secret"}" autocomplete="new-password">
+            <span class="field-note">Environ 32 caractères. ⚠️ Ne la partagez <b>jamais</b> : elle donne accès à votre application. Elle est stockée hors du web et n'est jamais réaffichée.</span></div>
+        </div>
+        <div class="form-actions">
+          ${button("🧹 Effacer", "discord-forget", "ghost")}
+          ${button("🔌 Vérifier et enregistrer", "discord-save", "success")}
+        </div>
+        <div id="discord-report" style="margin-top:12px"></div>
+      </div></section>
+      <section class="panel mt-16"><div class="panel-inner">
+        <div class="panel-head"><div><h3>3️⃣ Qui peut administrer le site</h3>
+          <p>Seuls ces comptes Discord peuvent modifier la page, les bots et les permissions.</p></div>
+          <div class="page-actions">${button("➕ Ajouter un compte", "admin-add", "primary")}</div></div>
+        ${lignes}
+        <span class="field-note" style="display:block;margin-top:10px">L'identifiant Discord d'un membre s'obtient en activant le <b>mode développeur</b> (Discord → Paramètres → Avancés), puis clic droit sur la personne → <b>Copier l'identifiant</b>.</span>
+      </div></section>`;
+  }
+
+  async function chargerDiscord() {
+    try {
+      const r = await api("discord.config", { lire: true });
+      ui.discord = r.discord;
+    } catch (e) {
+      ui.discord = { clientId: "", admins: [], redirect: DISCORD.redirect || "", erreur: e.message };
+    }
+    if (ui.creatorTab === "discord") render();
   }
 
   // ── 🔐 Permissions par grade + aperçu ───────────────────────────────
@@ -1817,11 +1946,24 @@
           // À l'ouverture de « Mes bots », on interroge l'agent une fois pour
           // proposer directement les bons noms dans la liste déroulante.
           if (ui.creatorTab === "bots" && ui.agentBots === null) chargerBotsAgent();
+          if (ui.creatorTab === "discord" && ui.discord === null) chargerDiscord();
           break;
         case "auth-open":
           openLoginModal();
           break;
+        case "banner-close":
+          ui.bandeauVu = true;
+          render();
+          break;
+        case "auth-menu":
+          // Clic sur son propre profil : proposer la déconnexion Discord.
+          if (MOI && confirm(`Se déconnecter du compte Discord « ${MOI.nom} » ?`)) {
+            window.location.href = "oauth.php?p=logout";
+          }
+          break;
         case "auth-logout":
+          // Compte Discord : la session est côté serveur, on passe par oauth.php.
+          if (MOI) { window.location.href = "oauth.php?p=logout"; break; }
           await api("auth.logout");
           AUTH.ok = false;
           render();
@@ -1942,6 +2084,65 @@
             target.textContent = libelle;
             target.disabled = false;
           }
+          break;
+        }
+        // ── 🔑 Connexion Discord ────────────────────────────────────
+        case "discord-save": {
+          const clientId = document.querySelector("#dc-id")?.value.trim() || "";
+          const clientSecret = document.querySelector("#dc-secret")?.value.trim() || "";
+          if (!clientId) { toast("CLIENT ID MANQUANT", "Copiez-le depuis le portail développeur Discord.", "error"); break; }
+          const libelle = target.textContent;
+          target.textContent = "⏳ Vérification…";
+          target.disabled = true;
+          try {
+            const r = await api("discord.config", { clientId, clientSecret });
+            await chargerDiscord();
+            const box = document.querySelector("#discord-report");
+            if (box) {
+              box.innerHTML = `<div class="row" style="border-color:rgba(47,227,139,.45);flex-direction:column;align-items:flex-start;gap:6px">
+                <b>✅ Discord a validé vos identifiants</b>
+                <span style="color:var(--muted)">Rechargez la page : le bouton « Se connecter » du bandeau ouvre maintenant Discord.</span></div>`;
+            }
+            toast("CONNEXION DISCORD PRÊTE", "Vos membres peuvent se connecter avec leur compte.");
+          } catch (e) {
+            const box = document.querySelector("#discord-report");
+            if (box) {
+              box.innerHTML = `<div class="row" style="border-color:rgba(255,92,116,.45);flex-direction:column;align-items:flex-start;gap:6px">
+                <b>❌ Refusé — rien n'a été enregistré</b><span style="color:var(--muted)">${esc(e.message)}</span></div>`;
+            }
+            toast("ÉCHEC", e.message, "error");
+            target.textContent = libelle;
+            target.disabled = false;
+          }
+          break;
+        }
+        case "discord-forget": {
+          if (!confirm("Effacer les identifiants Discord ? Plus personne ne pourra se connecter tant qu'ils ne seront pas ressaisis.")) break;
+          await api("discord.config", { clientId: "" });
+          await chargerDiscord();
+          toast("IDENTIFIANTS EFFACÉS", "Le site reprendra ceux du dashboard voisin, s'il y en a.");
+          break;
+        }
+        case "admin-add": {
+          const saisi = prompt("Identifiant Discord du compte à autoriser (17 à 20 chiffres) :");
+          if (!saisi) break;
+          const id = saisi.replace(/\D+/g, "");
+          if (id.length < 15) { toast("IDENTIFIANT INVALIDE", "Attendu : 17 à 20 chiffres (mode développeur → Copier l'identifiant).", "error"); break; }
+          const liste = [...(ui.discord?.admins || [])];
+          if (liste.includes(id)) { toast("DÉJÀ AUTORISÉ", "Ce compte administre déjà le site."); break; }
+          liste.push(id);
+          await api("discord.admins", { admins: liste });
+          await chargerDiscord();
+          toast("COMPTE AUTORISÉ", `${id} peut désormais administrer le site.`);
+          break;
+        }
+        case "admin-remove": {
+          const id = target.dataset.id;
+          if (!confirm(`Retirer le compte ${id} des administrateurs ?`)) break;
+          const liste = (ui.discord?.admins || []).filter(x => x !== id);
+          await api("discord.admins", { admins: liste });
+          await chargerDiscord();
+          toast("COMPTE RETIRÉ", `${id} ne peut plus modifier le site.`);
           break;
         }
         case "agent-forget": {

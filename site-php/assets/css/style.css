@@ -509,8 +509,11 @@ input[type="file"].input { padding: 9px 12px; }
   color: #0c0713;
   background: linear-gradient(135deg, rgba(var(--accent-rgb), 1), rgba(var(--accent-rgb), .65));
 }
+/* Photo de profil Discord : elle remplit la pastille ronde */
+.profile-avatar img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; display: block; }
 .profile strong { display: block; font-size: 12.5px; }
 .profile span { color: var(--muted); font-size: 10.5px; }
+.profile[data-action] { cursor: pointer; }
 
 /* ── Barre latérale ──────────────────────────────────────────────── */
 .sidebar {

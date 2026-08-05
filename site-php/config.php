@@ -9,11 +9,17 @@
 // Les réglages sont conservés dans data/agent.php, hors d'atteinte du web.
 
 // ================== 🔒 ACCÈS À L'ADMINISTRATION ==================
-// ⚠️ IMPORTANT en ligne : sans mot de passe ici, N'IMPORTE QUI trouvant
-// l'adresse de votre site peut modifier la page d'accueil, les bots, les
-// permissions, les tickets — et la connexion à votre agent.
-// Renseignez un mot de passe : la lecture du site reste publique, mais
-// TOUTE modification demandera ce mot de passe (cadenas 🔒 en haut à droite).
+// 🎉 La connexion se fait normalement avec un COMPTE DISCORD :
+//     ⚙️ Espace créateur → 🔑 Connexion Discord
+// Le PREMIER compte Discord à se connecter devient propriétaire du site et
+// choisit ensuite qui d'autre peut l'administrer.
+// ⚠️ Connectez-vous DÈS L'INSTALLATION, avant de communiquer l'adresse de
+//    votre site : tant que personne ne l'a fait, tout le monde peut modifier
+//    la page d'accueil, les bots, les permissions et les tickets.
+//
+// Ce mot de passe est un ACCÈS DE SECOURS, facultatif : il vous dépanne si
+// vous perdez l'accès à votre compte Discord. Laissé vide, seule la connexion
+// Discord fonctionne.
 const SITE_ADMIN_PASSWORD = '';
 
 // ================== 🔗 LIAISON (ancienne méthode, facultative) ==================

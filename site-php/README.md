@@ -140,7 +140,9 @@ chmod -R 775 data uploads/proofs uploads/backgrounds
 ```text
 Aincrad_Discord_Bot_PHP/
 ├── index.php                 Interface principale
-├── config.php                Mot de passe d'administration (facultatif)
+├── config.php                Mot de passe de secours (facultatif)
+├── oauth.php                 Connexion avec un compte Discord
+├── lib_discord.php           Fonctions communes à la connexion Discord
 ├── api.php                   API PHP et actions d’écriture
 ├── assets/
 │   ├── css/style.css         Direction artistique complète
@@ -149,7 +151,8 @@ Aincrad_Discord_Bot_PHP/
 ├── data/
 │   ├── app.json              Données utilisées par le site
 │   ├── app.default.json      Sauvegarde des données initiales
-│   └── agent.php             Adresse + clé de l'agent (créé par le site, illisible depuis le web)
+│   ├── agent.php             Adresse + clé de l'agent (créé par le site, illisible depuis le web)
+│   └── discord.php           Application Discord + comptes administrateurs (idem)
 ├── uploads/proofs/           Preuves envoyées par le staff
 └── uploads/backgrounds/      Fonds téléversés depuis le Site builder
 ```
@@ -172,6 +175,8 @@ Actions disponibles dans `api.php` :
 - `agent.sync`              (récupère les vrais serveurs depuis l'agent)
 - `agent.config`            (teste puis enregistre l'adresse et la clé de l'agent)
 - `agent.bots`              (liste les bots déclarés chez l'agent)
+- `discord.config`          (vérifie puis enregistre l'application Discord)
+- `discord.admins`          (comptes Discord autorisés à administrer)
 
 Pour une grande communauté, remplacez la persistance JSON par MySQL ou PostgreSQL en conservant les mêmes réponses JSON côté API.
 
@@ -208,3 +213,45 @@ Pour restaurer les données de démonstration :
 ```bash
 cp data/app.default.json data/app.json
 ```
+
+## 🔑 Connexion avec un compte Discord
+
+Vos membres se connectent au site avec **leur compte Discord** — pas de mot de
+passe à créer. Tout se configure dans **⚙️ Créateur → 🔑 Connexion Discord**.
+
+**1. Déclarez l'adresse de retour.** Le site l'affiche, prête à copier (elle
+ressemble à `https://votre-site.fr/oauth.php?p=callback`). Collez-la dans le
+[Portail développeur Discord](https://discord.com/developers/applications) →
+votre application → **OAuth2** → **Redirects** → **Add Redirect** → **Save**.
+Sans cette étape, Discord refuse la connexion.
+
+**2. Renseignez les identifiants** de l'application (OAuth2 → **Client ID** et
+**Client Secret**), puis **🔌 Vérifier et enregistrer** : le site interroge
+réellement Discord et n'enregistre qu'en cas de succès. Si votre dashboard est
+installé à côté, ses identifiants sont repris automatiquement — rien à saisir.
+
+**3. Qui peut administrer.** Le **premier compte Discord** à se connecter
+devient propriétaire du site ; lui seul peut ensuite autoriser d'autres comptes.
+Connectez-vous donc **avant** de communiquer l'adresse de votre site.
+
+> Le mot de passe `SITE_ADMIN_PASSWORD` de `config.php` reste utilisable comme
+> **accès de secours**, si vous perdez l'accès à votre compte Discord. Il est
+> facultatif : la connexion Discord suffit.
+
+La clé secrète est rangée dans `data/discord.php`, illisible depuis le web, et
+n'est jamais renvoyée au navigateur.
+
+## 🎬 Fond vidéo (MP4)
+
+Dans **🎨 Apparence du site → 🌌 Fond du site**, choisissez la vignette
+**Vidéo MP4**, puis téléversez votre fichier (MP4 ou WEBM) ou collez son
+adresse. La vidéo tourne **en boucle et sans son** — les navigateurs
+n'autorisent la lecture automatique qu'à cette condition.
+
+- L'**assombrissement** et le **flou** s'appliquent à la vidéo comme à l'image :
+  gardez un assombrissement suffisant pour que le texte reste lisible.
+- L'**image de fond** sert d'image d'attente le temps que la vidéo se charge.
+- Si le visiteur a coupé les animations (✨ Effets), la vidéo reste figée.
+- La vidéo est téléchargée par **chaque visiteur** : visez quelques Mo. Le site
+  affiche la limite d'envoi de votre hébergeur sous le champ de téléversement ;
+  au-delà, hébergez la vidéo ailleurs et collez son adresse.

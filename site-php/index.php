@@ -11,11 +11,42 @@ if (is_file($dataFile)) {
 }
 $siteName = htmlspecialchars((string) ($bootState['siteConfig']['siteName'] ?? 'Aincrad Control Panel'), ENT_QUOTES, 'UTF-8');
 
-// 🔒 Le site est-il protégé par un mot de passe, et suis-je connecté ?
+// 🔒 Qui est connecté, et le site est-il protégé ?
 if (is_file(__DIR__ . '/config.php')) require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/lib_discord.php';
 if (session_status() !== PHP_SESSION_ACTIVE) session_start();
-$authRequired = defined('SITE_ADMIN_PASSWORD') && SITE_ADMIN_PASSWORD !== '';
-$authOk = !$authRequired || !empty($_SESSION['site_admin']);
+
+$motDePasse = defined('SITE_ADMIN_PASSWORD') ? (string) SITE_ADMIN_PASSWORD : '';
+$authRequired = $motDePasse !== '' || discord_admins() !== [];
+$authOk = !$authRequired || discord_est_admin() || !empty($_SESSION['site_admin']);
+
+// Profil Discord de la session (jamais de secret ici).
+$moi = null;
+if (!empty($_SESSION['discord']['id'])) {
+    $u = $_SESSION['discord'];
+    $moi = [
+        'id' => (string) $u['id'],
+        'nom' => (string) ($u['nom'] ?? 'Membre'),
+        'pseudo' => (string) ($u['pseudo'] ?? ''),
+        'avatar' => (string) ($u['avatar'] ?? ''),
+        'admin' => discord_est_admin(),
+        'serveurs' => count($_SESSION['discord_guilds'] ?? []),
+        'premier' => !empty($_SESSION['discord_premier']),
+    ];
+    unset($_SESSION['discord_premier']);
+}
+$app = discord_app();
+$discordPret = $app['clientId'] !== '' && $app['clientSecret'] !== '';
+// Message d'erreur éventuel du retour OAuth2, traduit en clair.
+$oauthErreurs = [
+    'discord_non_configure' => "La connexion Discord n'est pas encore configurée sur ce site (⚙️ Créateur → 🔑 Connexion Discord).",
+    'oauth_etat' => "Connexion interrompue (jeton de sécurité expiré). Réessayez.",
+    'oauth_echange' => "Discord a refusé la connexion. Vérifiez la clé secrète, et que l'adresse de retour est bien déclarée dans OAuth2 → Redirects.",
+    'discord_profil' => "Discord n'a pas renvoyé votre profil. Réessayez dans un instant.",
+];
+$oauthErreur = $oauthErreurs[$_GET['erreur'] ?? ''] ?? null;
+$oauthDetail = $oauthErreur !== null ? (string) ($_SESSION['oauth_detail'] ?? '') : '';
+unset($_SESSION['oauth_detail']);
 
 // Taille maximale d'un envoi, telle que la impose l'hébergeur (la plus petite
 // des deux limites PHP). Affichée sous le champ de téléversement.
@@ -84,7 +115,15 @@ function taille_envoi_lisible(): string
     <script>
         window.AINCRAD_BOOT_STATE = <?= json_encode($bootState, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
         window.AINCRAD_API = 'api.php';
-        window.AINCRAD_AUTH = <?= json_encode(['required' => $authRequired, 'ok' => $authOk]) ?>;
+        window.AINCRAD_AUTH = <?= json_encode(['required' => $authRequired, 'ok' => $authOk, 'motDePasse' => $motDePasse !== '']) ?>;
+        // 🔑 Compte Discord connecté (null si personne) + état de la liaison.
+        window.AINCRAD_MOI = <?= json_encode($moi, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
+        window.AINCRAD_DISCORD = <?= json_encode([
+            'pret' => $discordPret,
+            'redirect' => oauth_redirect_uri(),
+            'erreur' => $oauthErreur,
+            'detail' => $oauthDetail,
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
         // Limite d'envoi de l'hébergeur : sert à prévenir avant de téléverser
         // une vidéo trop lourde.
         window.AINCRAD_UPLOAD_MAX = <?= json_encode(taille_envoi_lisible(), JSON_UNESCAPED_UNICODE) ?>;

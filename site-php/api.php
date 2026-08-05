@@ -30,21 +30,35 @@ const PROOF_DIR = __DIR__ . '/uploads/proofs';
 
 // Configuration facultative (liaison à l'agent hébergeur).
 if (is_file(__DIR__ . '/config.php')) require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/lib_discord.php';
 
 // ----- 🔒 Protection de l'administration -----
-// Sans mot de passe défini, le site reste ouvert (pratique en local).
-// Dès qu'un mot de passe est renseigné dans config.php, TOUTE modification
-// exige d'être connecté.
+// Deux façons d'être administrateur :
+//   • connecté avec un COMPTE DISCORD autorisé (recommandé) ;
+//   • ou le mot de passe de secours de config.php.
+// Si ni compte autorisé ni mot de passe n'existe, le site reste ouvert
+// (pratique en local, signalé en rouge dans le diagnostic).
 session_start();
 function admin_password(): string {
   return defined('SITE_ADMIN_PASSWORD') ? (string) SITE_ADMIN_PASSWORD : '';
 }
-function admin_requis(): bool { return admin_password() !== ''; }
-function admin_connecte(): bool { return !admin_requis() || !empty($_SESSION['site_admin']); }
+// Une protection est en place dès qu'il y a un mot de passe OU au moins un
+// compte Discord autorisé.
+function admin_requis(): bool { return admin_password() !== '' || discord_admins() !== []; }
+function admin_connecte(): bool {
+  if (!admin_requis()) return true;
+  if (discord_est_admin()) return true;
+  return !empty($_SESSION['site_admin']);
+}
 function exiger_admin(): void {
-  if (!admin_connecte()) {
-    respond(['ok' => false, 'error' => 'Connexion requise : entrez le mot de passe d\'administration.', 'authRequired' => true], 401);
-  }
+  if (admin_connecte()) return;
+  // Message adapté à la protection réellement en place.
+  $message = !empty($_SESSION['discord']['id'])
+    ? "Votre compte Discord n'est pas autorisé à modifier ce site. Demandez au propriétaire de vous ajouter (⚙️ Créateur → 🔑 Connexion Discord)."
+    : (discord_admins()
+      ? "Connexion requise : identifiez-vous avec votre compte Discord."
+      : "Connexion requise : entrez le mot de passe d'administration.");
+  respond(['ok' => false, 'error' => $message, 'authRequired' => true], 401);
 }
 // ----- 🔎 Récupération automatique depuis le dashboard -----
 // Le dashboard installé à côté contient déjà AGENT_URL et AGENT_KEY.
@@ -405,7 +419,15 @@ if ($action === 'selftest') {
         'curl' => function_exists('curl_init'),
         'allow_url_fopen' => (bool) ini_get('allow_url_fopen'),
         'agent' => $agent,
-        'motDePasseAdmin' => admin_requis() ? 'configuré' : 'AUCUN — le site est modifiable par tous',
+        'protection' => admin_requis()
+            ? (discord_admins() ? count(discord_admins()) . ' compte(s) Discord autorisé(s)' : '')
+              . (discord_admins() && admin_password() !== '' ? ' + ' : '')
+              . (admin_password() !== '' ? 'mot de passe de secours' : '')
+            : 'AUCUNE — le site est modifiable par tous : connectez-vous avec Discord pour en devenir propriétaire',
+        'connexionDiscord' => discord_app()['clientId'] !== '' && discord_app()['clientSecret'] !== ''
+            ? 'prête (' . discord_app()['origine'] . ')'
+            : 'non configurée — ⚙️ Créateur → 🔑 Connexion Discord',
+        'adresseDeRetourDiscord' => oauth_redirect_uri(),
         'conseils' => $conseils ?: ['Tout est bon : la synchronisation doit fonctionner.'],
     ]);
 }
@@ -482,6 +504,89 @@ if ($action === 'agent.config') {
     ]]);
 }
 
+// 🔑 Application Discord du site (connexion des membres avec leur compte).
+// Comme pour l'agent : on VÉRIFIE auprès de Discord avant d'enregistrer.
+if ($action === 'discord.config') {
+    exiger_admin();
+    $in = body();
+    $app = discord_app();
+    $store = discord_store();
+    if (!empty($in['lire'])) {
+        respond(['ok' => true, 'discord' => [
+            'clientId' => $app['clientId'],
+            'secretEnregistre' => $app['clientSecret'] !== '',
+            'origine' => $app['origine'],
+            'redirect' => oauth_redirect_uri(),
+            'admins' => discord_admins(),
+            'modifiable' => is_writable(dirname(DISCORD_STORE)) || is_writable(DISCORD_STORE),
+        ]]);
+    }
+    $clientId = preg_replace('/\D+/', '', (string) ($in['clientId'] ?? ''));
+    $secret = trim((string) ($in['clientSecret'] ?? ''));
+    if ($clientId === '') {                 // tout vider = on repart de zéro
+        discord_store_save(['clientId' => '', 'clientSecret' => '']);
+        respond(['ok' => true, 'efface' => true, 'note' => "Identifiants effacés : le site reprendra ceux du dashboard voisin, s'il y en a."]);
+    }
+    if (strlen($clientId) < 17 || strlen($clientId) > 20) {
+        respond(['ok' => false, 'error' => "« $clientId » n'est pas un Client ID Discord : il en faut 17 à 20 chiffres "
+            . "(vous en avez " . strlen($clientId) . "). Portail développeur Discord → votre application → OAuth2 → Client ID."], 422);
+    }
+    // Secret laissé vide alors qu'il est déjà enregistré : on garde l'ancien.
+    if ($secret === '' && $store['clientSecret'] !== '') $secret = $store['clientSecret'];
+    if ($secret === '') {
+        respond(['ok' => false, 'error' => "Il manque la clé secrète (Client Secret). Portail développeur Discord → OAuth2 → « Reset Secret »."], 422);
+    }
+    // Vérification réelle du couple ID + secret auprès de Discord.
+    [$st, $rep, $brut] = discord_http('https://discord.com/api/oauth2/token', 'POST', [
+        'client_id' => $clientId, 'client_secret' => $secret, 'grant_type' => 'client_credentials', 'scope' => 'identify',
+    ]);
+    if ($st === 401) {
+        respond(['ok' => false, 'error' => "Discord REFUSE ce couple Client ID + clé secrète (HTTP 401). "
+            . "Vérifiez que les deux viennent de la MÊME application, et régénérez la clé si besoin (OAuth2 → Reset Secret)."], 422);
+    }
+    if ($st === 0) {
+        respond(['ok' => false, 'error' => "Impossible de joindre Discord depuis votre hébergeur. "
+            . "Les connexions sortantes en HTTPS sont peut-être bloquées."], 502);
+    }
+    if ($st !== 200) {
+        respond(['ok' => false, 'error' => "Discord a répondu HTTP $st : " . substr(strip_tags($brut), 0, 200)], 422);
+    }
+    if (!discord_store_save(['clientId' => $clientId, 'clientSecret' => $secret])) {
+        respond(['ok' => false, 'error' => "Identifiants valides, mais impossible d'écrire dans data/ — donnez les droits d'écriture au dossier data (chmod 775)."], 500);
+    }
+    respond(['ok' => true, 'clientId' => $clientId, 'redirect' => oauth_redirect_uri(), 'admins' => discord_admins()]);
+}
+
+// 👑 Comptes Discord autorisés à administrer le site.
+if ($action === 'discord.admins') {
+    exiger_admin();
+    $in = body();
+    if (!empty($in['lire'])) respond(['ok' => true, 'admins' => discord_admins()]);
+    $ids = is_array($in['admins'] ?? null) ? $in['admins'] : [];
+    $propres = [];
+    foreach ($ids as $id) {
+        $id = preg_replace('/\D+/', '', (string) $id);
+        if ($id !== null && strlen($id) >= 15 && strlen($id) <= 25) $propres[] = $id;
+    }
+    $propres = array_values(array_unique($propres));
+    // Garde-fou : on refuse de retirer TOUS les administrateurs, sinon plus
+    // personne ne pourrait rien modifier (sauf mot de passe de secours).
+    if (!$propres && admin_password() === '') {
+        respond(['ok' => false, 'error' => "Impossible de retirer le dernier administrateur : le site deviendrait modifiable par n'importe qui. "
+            . "Ajoutez d'abord un autre compte, ou renseignez un mot de passe de secours dans config.php."], 422);
+    }
+    // On ne se retire pas soi-même par inadvertance.
+    $moi = (string) ($_SESSION['discord']['id'] ?? '');
+    if ($moi !== '' && $propres && !in_array($moi, $propres, true)) {
+        respond(['ok' => false, 'error' => "Vous alliez retirer VOTRE propre compte de la liste : vous perdriez l'accès immédiatement. "
+            . "Demandez à un autre administrateur de le faire."], 422);
+    }
+    if (!discord_admins_save($propres)) {
+        respond(['ok' => false, 'error' => "Impossible d'écrire dans data/ — donnez les droits d'écriture au dossier data (chmod 775)."], 500);
+    }
+    respond(['ok' => true, 'admins' => discord_admins()]);
+}
+
 // 🤖 Liste des bots déclarés chez l'agent (pour remplir « Nom chez l'agent »).
 if ($action === 'agent.bots') {
     // L'adresse de l'agent ne sort que pour l'administration connectée.
@@ -503,10 +608,31 @@ if ($action === 'agent.bots') {
     respond(['ok' => true, 'adresse' => admin_connecte() ? agent_url() : '', 'bots' => $bots, 'reglages' => $reglages]);
 }
 
+// 🔑 Qui suis-je ? Profil Discord de la session en cours (sans secret).
+function moi_discord(): ?array {
+    if (empty($_SESSION['discord']['id'])) return null;
+    $u = $_SESSION['discord'];
+    return [
+        'id' => (string) $u['id'],
+        'nom' => (string) ($u['nom'] ?? 'Membre'),
+        'pseudo' => (string) ($u['pseudo'] ?? ''),
+        'avatar' => (string) ($u['avatar'] ?? ''),
+        'admin' => discord_est_admin(),
+        'serveurs' => count($_SESSION['discord_guilds'] ?? []),
+        // Vrai uniquement au tout premier passage : le site vient de vous
+        // reconnaître comme propriétaire.
+        'premier' => !empty($_SESSION['discord_premier']),
+    ];
+}
+
 if ($method === 'GET' && $action === 'state') {
+    $moi = moi_discord();
+    unset($_SESSION['discord_premier']);   // le bandeau ne s'affiche qu'une fois
     respond([
         'ok' => true, 'state' => loadState(),
         'authRequired' => admin_requis(), 'authOk' => admin_connecte(),
+        'moi' => $moi,
+        'discordPret' => discord_app()['clientId'] !== '' && discord_app()['clientSecret'] !== '',
         // Sert à prévenir AVANT l'envoi qu'une vidéo est trop lourde.
         'limiteEnvoi' => ['octets' => limite_envoi(), 'lisible' => taille_lisible(limite_envoi())],
     ]);
@@ -522,7 +648,13 @@ $action = $input['action'] ?? $action;
 
 // ----- 🔑 Connexion / déconnexion de l'administration -----
 if ($action === 'auth.login') {
-    if (!admin_requis()) respond(['ok' => true, 'authOk' => true, 'note' => 'Aucun mot de passe configuré.']);
+    if (!admin_requis()) respond(['ok' => true, 'authOk' => true, 'note' => 'Aucune protection configurée.']);
+    // ⚠️ Sans mot de passe de secours, cette voie est FERMÉE : sinon une
+    // requête avec un mot de passe vide passerait le hash_equals ci-dessous
+    // et donnerait les pleins pouvoirs à n'importe qui.
+    if (admin_password() === '') {
+        respond(['ok' => false, 'error' => "Ce site n'a pas de mot de passe de secours : connectez-vous avec votre compte Discord."], 403);
+    }
     $saisi = (string) ($input['password'] ?? '');
     // Petite temporisation : décourage les tentatives en série.
     usleep(300000);

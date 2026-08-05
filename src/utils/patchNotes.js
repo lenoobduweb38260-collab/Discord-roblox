@@ -327,6 +327,25 @@ const RELEASES = [
       '🗑️ `SITE_AGENT_URL` et `SITE_AGENT_KEY` ne sont plus à remplir dans `config.php` (les valeurs déjà en place continuent de fonctionner)',
     ],
   },
+  {
+    id: 'site-discord-video-2026-08h',
+    title: 'Site : connexion avec son compte Discord & fond vidéo 🎮',
+    ajout: [
+      '🎮 **Connexion au site avec son compte Discord** : plus de mot de passe à créer, c\'est le même compte que sur vos serveurs — photo de profil et pseudo affichés dans le bandeau',
+      '👑 **Le premier compte connecté devient propriétaire** du site, et choisit ensuite qui peut l\'administrer (⚙️ Créateur → 🔑 Connexion Discord)',
+      '📋 **L\'adresse de retour à déclarer chez Discord est affichée toute prête** à copier : plus d\'erreur « redirect_uri non valide »',
+      '🎬 **Fond vidéo MP4** dans l\'apparence du site : votre vidéo en boucle et en plein écran, avec l\'assombrissement et le flou déjà réglables',
+      '🖼️ L\'image de fond sert d\'**image d\'attente** le temps que la vidéo se charge',
+    ],
+    amelioration: [
+      '📏 **Les limites de votre hébergeur sont expliquées** au lieu d\'un échec sec : taille maximale affichée sous le champ, et message clair si la vidéo est trop lourde',
+      '🔐 Identifiants Discord **vérifiés auprès de Discord avant d\'être enregistrés**, et rangés hors d\'atteinte du web',
+    ],
+    fix: [
+      '🩹 **Faille corrigée** : avec des administrateurs Discord déclarés mais aucun mot de passe de secours, un mot de passe vide ouvrait l\'administration',
+    ],
+    retrait: [],
+  },
 ];
 
 // Découpe une catégorie en champs d'embed (max 1024 caractères par champ).
