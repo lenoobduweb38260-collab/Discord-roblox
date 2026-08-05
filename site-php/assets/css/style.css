@@ -305,6 +305,13 @@ body[data-bg="none"] .sky-layer::after { display: none; }
 }
 .icon-btn:hover { background: rgba(var(--accent-rgb), .12); border-color: rgba(var(--accent-rgb), .4); transform: translateY(-1px); }
 .icon-btn.animating { animation: pulseSpin .8s ease; }
+/* Bouton de déconnexion : rouge au survol, pour qu'on ne le confonde pas */
+.icon-btn.danger { color: var(--muted); }
+.icon-btn.danger:hover {
+  background: rgba(255, 92, 116, .14);
+  border-color: rgba(255, 92, 116, .5);
+  color: var(--red);
+}
 @keyframes pulseSpin { 50% { transform: rotate(180deg) scale(1.08); } }
 
 /* ── Champs ──────────────────────────────────────────────────────── */

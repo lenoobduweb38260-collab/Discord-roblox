@@ -375,6 +375,9 @@ const RELEASES = [
     amelioration: [
       '🎭 Le bandeau affiche le **grade réel** avec sa couleur (ou 👑 Propriétaire), à la place du compte de démonstration',
       '🖼️ Si la photo Discord ne charge pas, les initiales prennent le relais au lieu d\'une image cassée',
+      '⏻ **Bouton de déconnexion directement dans le bandeau**, à côté de votre profil — un clic, une confirmation, c\'est fait',
+      '🔁 **« Changer de compte »** : le site vous déconnecte puis vous renvoie chez Discord, qui vous laisse choisir un autre compte',
+      '🔑 Connecté avec le **mot de passe de secours**, le bandeau le dit clairement et propose de basculer sur votre compte Discord',
     ],
     fix: [
       '🩹 **Le navigateur ne sert plus une version périmée du site** : l\'adresse des fichiers CSS et JavaScript change à chaque mise à jour. Sans ce correctif, une mise à jour pouvait rester invisible tant que le cache n\'était pas vidé à la main',

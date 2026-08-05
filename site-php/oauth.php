@@ -30,10 +30,14 @@ if ($p === 'login') {
   // identique entre l'autorisation et l'échange du code.
   $redirect = oauth_redirect_uri();
   $_SESSION['oauth_redirect'] = $redirect;
+  // « prompt=consent » force Discord à réafficher le choix du compte, au lieu
+  // de reconnecter silencieusement le précédent (utile pour en changer).
+  $choisir = ($_GET['choisir'] ?? '') === '1' ? '&prompt=consent' : '';
   header('Location: https://discord.com/oauth2/authorize?response_type=code'
     . '&client_id=' . rawurlencode($app['clientId'])
     . '&redirect_uri=' . rawurlencode($redirect)
     . '&scope=identify%20guilds'
+    . $choisir
     . '&state=' . $etat);
   exit;
 }
@@ -109,6 +113,14 @@ if ($p === 'callback') {
 
 if ($p === 'logout') {
   unset($_SESSION['discord'], $_SESSION['discord_guilds'], $_SESSION['site_admin']);
+  // La session est repartie de zéro : un identifiant volé ne resservira pas.
+  session_regenerate_id(true);
+  // « Changer de compte » : on enchaîne directement sur une nouvelle
+  // connexion, avec l'écran de choix de compte de Discord.
+  if (($_GET['puis'] ?? '') === 'login') {
+    header('Location: ' . site_url() . '/oauth.php?p=login&choisir=1');
+    exit;
+  }
   header('Location: ' . $retour);
   exit;
 }

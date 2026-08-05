@@ -253,10 +253,21 @@
       ${secours}`);
   }
 
-  // Bloc profil du bandeau : le vrai compte Discord, ou une invitation à se
-  // connecter.
+  // Une session est-elle ouverte, d'une façon ou d'une autre ?
+  function connecte() { return Boolean(MOI) || (AUTH.required && AUTH.ok); }
+
+  // Bloc profil du bandeau : le vrai compte Discord, la session par mot de
+  // passe, ou une invitation à se connecter.
   function profileBlock() {
     if (!MOI) {
+      // Connecté par le mot de passe de secours, sans compte Discord.
+      if (AUTH.required && AUTH.ok) {
+        return `<div class="profile" data-action="account-open" title="Session ouverte avec le mot de passe de secours">
+          <div class="profile-avatar">🔑</div>
+          <div><strong>Administration</strong><span style="color:var(--muted-2)">mot de passe de secours</span></div>
+          <i class="status-dot"></i>
+        </div>`;
+      }
       return `<button class="btn primary small" data-action="auth-open" title="Se connecter avec Discord">🎮 Se connecter</button>`;
     }
     const g = MOI.grade ? gradeById(MOI.grade) : null;
@@ -279,6 +290,25 @@
   // 👤 Fiche du compte Discord connecté : ce que le site sait de vous, et les
   // réglages qui en découlent.
   function openAccountModal() {
+    // Session ouverte par mot de passe, sans compte Discord : on explique et
+    // on propose de basculer sur un vrai compte.
+    if (!MOI && AUTH.required && AUTH.ok) {
+      openModal("🔑 Session d'administration", `
+        <div class="acc-head">
+          <div class="acc-avatar">🔑</div>
+          <div><strong>Administration</strong><span>connexion par mot de passe de secours</span></div>
+        </div>
+        <div class="row" style="flex-direction:column;align-items:flex-start;gap:6px">
+          <span style="color:var(--muted)">Vous avez tous les droits, mais le site ne sait pas <b>qui</b> vous êtes : aucun nom, aucune photo, aucun grade.</span>
+          <span style="color:var(--muted)">Connectez-vous avec votre compte Discord pour être identifié, et pour que vos actions vous soient attribuées.</span>
+        </div>
+        <div class="form-actions" style="flex-wrap:wrap">
+          ${DISCORD.pret ? `<a class="btn primary" href="oauth.php?p=login" style="text-decoration:none">🎮 Passer à mon compte Discord</a>` : ""}
+          <button class="btn danger" type="button" data-action="deconnexion">Se déconnecter</button>
+          <button class="btn success" type="button" data-action="close-modal">Fermer</button>
+        </div>`);
+      return;
+    }
     if (!MOI) { openLoginModal(); return; }
     const g = MOI.grade ? gradeById(MOI.grade) : null;
     const ligne = (label, valeur, note = "") =>
@@ -306,7 +336,8 @@
       <div class="form-actions" style="flex-wrap:wrap">
         <button class="btn ghost" type="button" data-action="account-copy-id">📋 Copier mon identifiant</button>
         ${MOI.admin ? `<button class="btn ghost" type="button" data-action="account-equipe">🔑 Connexion &amp; équipe</button>` : ""}
-        <button class="btn danger" type="button" data-action="account-logout">Se déconnecter</button>
+        <button class="btn ghost" type="button" data-action="account-switch">🔁 Changer de compte</button>
+        <button class="btn danger" type="button" data-action="deconnexion">⏻ Se déconnecter</button>
         <button class="btn success" type="button" data-action="close-modal">Fermer</button>
       </div>`);
   }
@@ -469,10 +500,10 @@
           <div class="top-actions">
             <div class="clock" id="live-clock">--:--:--</div>
             <button class="icon-btn" data-action="preview-gate" title="Voir la page d'accueil">👁</button>
-            ${AUTH.required ? `<button class="icon-btn" data-action="${AUTH.ok ? "auth-logout" : "auth-open"}" title="${AUTH.ok ? "Se déconnecter de l'administration" : "Se connecter à l'administration"}">${AUTH.ok ? "🔓" : "🔒"}</button>` : ""}
             <button class="icon-btn" data-action="pulse-system" title="Synchroniser">⌁</button>
             <button class="icon-btn" data-action="show-notifications" title="Notifications">♢</button>
             ${profileBlock()}
+            ${connecte() ? `<button class="icon-btn danger" data-action="deconnexion" title="Se déconnecter">⏻</button>` : ""}
           </div>
         </header>
 
@@ -2138,16 +2169,26 @@
           if (ui.discord === null) chargerDiscord();
           render();
           break;
-        case "account-logout":
-          window.location.href = "oauth.php?p=logout";
-          break;
-        case "auth-logout":
-          // Compte Discord : la session est côté serveur, on passe par oauth.php.
-          if (MOI) { window.location.href = "oauth.php?p=logout"; break; }
-          await api("auth.logout");
+        // Déconnexion, quelle que soit la façon dont on s'est connecté.
+        case "deconnexion": {
+          const qui = MOI ? `du compte Discord « ${MOI.nom} »` : "de l'administration";
+          if (!confirm(`Se déconnecter ${qui} ?`)) break;
+          if (MOI) {
+            // La session Discord vit côté serveur : oauth.php la ferme.
+            window.location.href = "oauth.php?p=logout";
+            break;
+          }
+          await api("auth.logout").catch(() => {});
           AUTH.ok = false;
+          closeModal();
           render();
           toast("DÉCONNEXION", "L'administration est de nouveau verrouillée.");
+          break;
+        }
+        // Repasser par Discord pour ouvrir une autre session.
+        case "account-switch":
+          if (!confirm("Vous allez être déconnecté, puis renvoyé vers Discord pour choisir un autre compte. Continuer ?")) break;
+          window.location.href = "oauth.php?p=logout&puis=login";
           break;
         // ── Permissions par grade ───────────────────────────────────
         case "perm-toggle":
