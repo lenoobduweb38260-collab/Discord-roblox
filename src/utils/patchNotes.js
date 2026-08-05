@@ -321,9 +321,11 @@ const RELEASES = [
       '🔐 La clé est rangée hors d\'atteinte du web et **n\'est jamais renvoyée au navigateur** ; laissée vide, elle est conservée telle quelle',
     ],
     fix: [
-      '🩹 **« Réponse serveur invalide » corrigé** : un commentaire du code refermait la balise PHP et faisait renvoyer du texte brut au lieu du JSON — toutes les actions du site en étaient bloquées',
+      '🩹 Une adresse d\'agent invalide n\'envoie plus chercher la panne dans `config.php` : le message pointe désormais l\'encadré à corriger, dans le site',
     ],
-    retrait: [],
+    retrait: [
+      '🗑️ `SITE_AGENT_URL` et `SITE_AGENT_KEY` ne sont plus à remplir dans `config.php` (les valeurs déjà en place continuent de fonctionner)',
+    ],
   },
 ];
 
