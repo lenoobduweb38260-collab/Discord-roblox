@@ -289,17 +289,28 @@
     if (ui.route === "server") render();
   }
 
-  // 🔒 A-t-on le droit d'entrer dans l'espace de gestion ?
-  // Même règle que le serveur : un compte Discord listé dans l'équipe, la
-  // session par mot de passe, ou un site sans aucune protection (installation
-  // neuve — signalée par le bandeau rouge).
+  // 🔒 Droits de la personne connectée, calculés par le serveur.
+  //   gestion     : peut entrer dans l'espace de gestion
+  //   siteEntier  : équipe du site (blacklist, créateur, tous les serveurs)
+  //   mesServeurs : identifiants des serveurs qu'elle administre elle-même
+  const ACCES = window.AINCRAD_ACCES || { gestion: false, siteEntier: false, mesServeurs: [] };
   function peutGerer() {
     if (!AUTH.required) return true;
-    if (MOI && MOI.staff) return true;
-    return AUTH.ok === true;
+    return ACCES.gestion === true || AUTH.ok === true;
+  }
+  // Équipe du site : accès à tout (blacklist mutualisée, espace créateur…).
+  function estEquipeSite() {
+    if (!AUTH.required) return true;
+    return ACCES.siteEntier === true || AUTH.ok === true;
   }
   // Pages accessibles à un visiteur non identifié : la vue d'ensemble seule.
   const PAGES_PUBLIQUES = ["dashboard"];
+  // Pages ouvertes à quelqu'un qui gère seulement SES serveurs.
+  const PAGES_GESTIONNAIRE = ["dashboard", "servers", "server", "tickets"];
+  function pagesAutorisees() {
+    if (estEquipeSite()) return null;                 // null = tout
+    return peutGerer() ? PAGES_GESTIONNAIRE : PAGES_PUBLIQUES;
+  }
 
   // Bloc profil du bandeau : le vrai compte Discord, la session par mot de
   // passe, ou une invitation à se connecter.
@@ -575,8 +586,8 @@
     const navItems = navConfig()
       .filter(item => item.show !== false || (item.id === "site-config" && !ui.previewGrade))
       .filter(item => !ui.previewGrade || gradeCan("page." + (item.id === "site-config" ? "creator" : item.id)))
-      // 🔒 Non identifié : seule la vue d'ensemble figure au menu.
-      .filter(item => peutGerer() || PAGES_PUBLIQUES.includes(item.id));
+      // 🔒 Le menu ne propose que les pages réellement accessibles.
+      .filter(item => { const p = pagesAutorisees(); return !p || p.includes(item.id); });
     app.innerHTML = `
       <div class="app-shell">
         <header class="topbar">
@@ -663,9 +674,9 @@
   }
 
   function renderRoute() {
-    // Visiteur non identifié : la vue d'ensemble, et rien d'autre — même en
-    // tapant l'adresse d'une autre page à la main.
-    if (!peutGerer() && !PAGES_PUBLIQUES.includes(ui.route)) ui.route = "dashboard";
+    // Chacun reste dans son périmètre, même en forçant l'adresse d'une page.
+    const permises = pagesAutorisees();
+    if (permises && !permises.includes(ui.route)) ui.route = "dashboard";
     switch (ui.route) {
       case "dashboard": return dashboardView();
       case "servers": return serversView();
@@ -693,6 +704,9 @@
     // sanctions). On lui présente donc le bot et une invitation à se
     // connecter, plutôt que des panneaux vides et des boutons qui refusent.
     const gestion = peutGerer();
+    // Il gère ses serveurs sans être de l'équipe du site : on le lui dit,
+    // sinon l'absence de blacklist et d'espace créateur paraît anormale.
+    const proprio = gestion && !estEquipeSite();
     return `<div class="content-view">
       ${pageHead("Cardinal / Centre de contrôle", `Bienvenue dans l'interface ${bot.name}`,
         gestion
@@ -718,6 +732,11 @@
         </div>
       </div>
 
+      ${proprio ? `<div class="row mt-16" style="border-color:rgba(47,227,139,.45);flex-direction:column;align-items:flex-start;gap:6px">
+        <b>🏠 Vous gérez vos propres serveurs</b>
+        <span style="color:var(--muted)">Vous administrez ${ACCES.mesServeurs.length} serveur(s) Discord où ce bot est présent : vous pouvez les configurer entièrement.
+        La blacklist et l'espace créateur, eux, sont mutualisés entre tous les serveurs et restent réservés à l'équipe du site.</span>
+      </div>` : ""}
       ${gestion ? `
       <section class="panel mt-16"><div class="panel-inner">
         <div class="panel-head"><div><h3>Mes serveurs</h3><p>Sélectionnez un serveur pour ouvrir ses huit modules.</p></div>${button("Voir tous", "navigate", "ghost", 'data-route="servers"')}</div>
@@ -743,8 +762,11 @@
           <p>Serveurs, blacklist, tickets et espace créateur ne sont accessibles qu'à l'équipe.</p></div></div>
         <div class="row" style="flex-direction:column;align-items:flex-start;gap:8px">
           <span style="color:var(--muted)">${MOI
-            ? `Vous êtes connecté en tant que <b>${esc(MOI.nom)}</b>, mais votre compte ne fait pas partie de l'équipe de ce site. Demandez au propriétaire de vous ajouter — il lui faudra votre identifiant : <code style="user-select:all">${esc(MOI.id)}</code>`
-            : "Identifiez-vous avec votre compte Discord. Si vous faites partie de l'équipe, l'accès s'ouvrira automatiquement."}</span>
+            ? `Vous êtes connecté en tant que <b>${esc(MOI.nom)}</b>, mais aucun de vos serveurs Discord n'a ce bot,
+               et votre compte ne fait pas partie de l'équipe du site.
+               <br>• Si vous administrez un serveur : <b>invitez-y le bot</b>, puis revenez — la gestion de ce serveur s'ouvrira toute seule.
+               <br>• Sinon, demandez au propriétaire de vous ajouter à l'équipe avec votre identifiant : <code style="user-select:all">${esc(MOI.id)}</code>`
+            : "Identifiez-vous avec votre compte Discord. Si vous administrez un serveur où ce bot est présent, la gestion de ce serveur s'ouvrira automatiquement."}</span>
           ${MOI ? "" : `<div class="page-actions">${button("🎮 Se connecter avec Discord", "auth-open", "primary")}</div>`}
         </div>
       </div></section>` }

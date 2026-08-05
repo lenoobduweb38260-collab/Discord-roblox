@@ -165,8 +165,37 @@ function mon_grade(): ?string {
   // Compatibilité : les comptes de l'ancienne liste « admins » sont créateurs.
   return in_array($moi, discord_admins(), true) ? 'createur' : null;
 }
-// A-t-il le droit d'entrer dans l'espace de gestion (tickets, blacklist…) ?
+// A-t-il un grade dans l'équipe DU SITE (tickets, blacklist, créateur) ?
 function est_staff(): bool { return mon_grade() !== null; }
+
+// ----- 🏠 Gestionnaire de SES propres serveurs -----
+// Quelqu'un qui n'est pas de l'équipe du site, mais qui est propriétaire ou
+// administrateur d'un serveur Discord OÙ LE BOT EST PRÉSENT, doit pouvoir
+// gérer CE serveur — et seulement celui-là. C'est le fonctionnement attendu
+// d'un dashboard de bot : chacun configure chez soi.
+function mes_serveurs_geres(array $state): array {
+  $ids = [];
+  $miens = mes_guildes_index();
+  if (!$miens) return $ids;
+  foreach ($state['servers'] ?? [] as $s) {
+    $id = (string) ($s['id'] ?? '');
+    if ($id === '' || !isset($miens[$id])) continue;
+    // Seuls ceux qui peuvent réellement administrer le serveur Discord.
+    if (in_array(role_sur_guilde($miens[$id]), ['Propriétaire', 'Administrateur', 'Gestionnaire'], true)) {
+      $ids[] = $id;
+    }
+  }
+  return $ids;
+}
+// Peut-il ouvrir l'espace de gestion, à un titre ou à un autre ?
+function a_acces_gestion(array $state): bool {
+  return est_staff() || mes_serveurs_geres($state) !== [];
+}
+// A-t-il le droit de configurer CE serveur précis ?
+function peut_gerer_serveur(array $state, string $guildId): bool {
+  if (est_staff()) return true;                       // équipe du site : partout
+  return in_array($guildId, mes_serveurs_geres($state), true);
+}
 
 // ----- 👑 Comptes Discord autorisés à administrer le site -----
 function discord_admins(): array {

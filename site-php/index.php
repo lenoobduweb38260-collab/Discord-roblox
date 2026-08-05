@@ -46,18 +46,57 @@ $discordPret = $app['clientId'] !== '' && $app['clientSecret'] !== '';
 // 🌐 Marque les serveurs où le membre connecté est réellement présent, dès
 // le premier affichage — sans quoi il faudrait attendre un appel à l'API.
 $bootState = marquer_mes_serveurs($bootState);
-$mesServeursSansBot = (est_staff() || $authOk) ? mes_serveurs_sans_bot($bootState) : [];
+$estStaffSite = est_staff() || $authOk;
+// 🏠 Ni équipe du site ni administration : la personne gère peut-être ses
+// propres serveurs (propriétaire/admin d'une guilde où le bot est présent).
+$mesGeres = $estStaffSite ? [] : mes_serveurs_geres($bootState);
+$mesServeursSansBot = ($estStaffSite || $mesGeres) ? mes_serveurs_sans_bot($bootState) : [];
 $nbMesServeurs = count(mes_guildes());
+$acces = [
+    'gestion' => $estStaffSite || $mesGeres !== [],
+    'siteEntier' => $estStaffSite,
+    'mesServeurs' => $mesGeres,
+];
 
-// 🌐 Un visiteur qui n'est pas du staff ne doit PAS recevoir les tickets ni
-// la blacklist : la page publique n'embarque que ce qu'elle affiche.
-if (!est_staff() && !$authOk) {
-    $bootState = [
-        'bots' => $bootState['bots'] ?? [],
-        'siteConfig' => $bootState['siteConfig'] ?? [],
-        'servers' => [], 'blacklist' => [], 'tickets' => [],
-        'archives' => [], 'activity' => [], 'serverSettings' => new stdClass(),
-    ];
+// 🌐 Chacun ne reçoit que ce qui le concerne : tout pour l'équipe du site,
+// ses seuls serveurs pour un gestionnaire, rien de privé pour un visiteur.
+if (!$estStaffSite) {
+    if ($mesGeres) {
+        $garde = array_flip($mesGeres);
+        $serveurs = [];
+        $noms = [];
+        foreach ($bootState['servers'] ?? [] as $sv) {
+            if (!isset($garde[(string) ($sv['id'] ?? '')])) continue;
+            $serveurs[] = $sv;
+            $noms[(string) ($sv['name'] ?? '')] = true;
+        }
+        $filtre = static function (array $liste) use ($noms): array {
+            $out = [];
+            foreach ($liste as $t) if (isset($noms[(string) ($t['server'] ?? '')])) $out[] = $t;
+            return array_values($out);
+        };
+        $reglages = [];
+        foreach ($mesGeres as $id) {
+            if (isset($bootState['serverSettings'][$id])) $reglages[$id] = $bootState['serverSettings'][$id];
+        }
+        $bootState = [
+            'bots' => $bootState['bots'] ?? [],
+            'siteConfig' => $bootState['siteConfig'] ?? [],
+            'servers' => $serveurs,
+            'blacklist' => [],
+            'tickets' => $filtre($bootState['tickets'] ?? []),
+            'archives' => $filtre($bootState['archives'] ?? []),
+            'activity' => [],
+            'serverSettings' => $reglages ?: new stdClass(),
+        ];
+    } else {
+        $bootState = [
+            'bots' => $bootState['bots'] ?? [],
+            'siteConfig' => $bootState['siteConfig'] ?? [],
+            'servers' => [], 'blacklist' => [], 'tickets' => [],
+            'archives' => [], 'activity' => [], 'serverSettings' => new stdClass(),
+        ];
+    }
 }
 // Message d'erreur éventuel du retour OAuth2, traduit en clair.
 $oauthErreurs = [
@@ -167,6 +206,8 @@ function taille_envoi_lisible(): string
             'sansBot' => $mesServeursSansBot,
             'total' => $nbMesServeurs,
         ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
+        // 🔒 Ce que la personne connectée a le droit de faire.
+        window.AINCRAD_ACCES = <?= json_encode($acces, JSON_UNESCAPED_SLASHES) ?>;
     </script>
     <script src="assets/js/app.js?v=<?= empreinte_assets() ?>" defer></script>
 </body>

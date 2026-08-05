@@ -927,6 +927,40 @@ function state_public(array $state): array {
     ];
 }
 
+// 🏠 Vue d'un gestionnaire de ses propres serveurs : il voit SES serveurs,
+// les tickets qui en proviennent, et rien d'autre. La blacklist est
+// mutualisée entre serveurs : elle reste réservée à l'équipe du site.
+function state_pour_gestionnaire(array $state, array $ids): array {
+    $garde = array_flip($ids);
+    $noms = [];
+    $serveurs = [];
+    foreach ($state['servers'] ?? [] as $s) {
+        if (!isset($garde[(string) ($s['id'] ?? '')])) continue;
+        $serveurs[] = $s;
+        $noms[(string) ($s['name'] ?? '')] = true;
+    }
+    // Les tickets ne portent que le NOM du serveur : on filtre là-dessus.
+    $filtreTickets = static function (array $liste) use ($noms): array {
+        $out = [];
+        foreach ($liste as $t) if (isset($noms[(string) ($t['server'] ?? '')])) $out[] = $t;
+        return array_values($out);
+    };
+    $reglages = [];
+    foreach ($ids as $id) {
+        if (isset($state['serverSettings'][$id])) $reglages[$id] = $state['serverSettings'][$id];
+    }
+    return [
+        'bots' => $state['bots'] ?? [],
+        'siteConfig' => $state['siteConfig'] ?? [],
+        'servers' => $serveurs,
+        'blacklist' => [],
+        'tickets' => $filtreTickets($state['tickets'] ?? []),
+        'archives' => $filtreTickets($state['archives'] ?? []),
+        'activity' => [],
+        'serverSettings' => $reglages ?: new stdClass(),
+    ];
+}
+
 // 🎭 Demande au BOT le grade réel du membre sur un serveur : ce sont les
 // rôles staff / administration / police configurés dans le bot qui font foi,
 // pas une liste tenue à la main dans le site.
@@ -966,11 +1000,21 @@ if ($method === 'GET' && $action === 'state') {
     maj_auto_si_besoin();
     $complet = marquer_mes_serveurs(loadState());
     $staff = est_staff() || admin_connecte();
+    // 🏠 Ni équipe du site, ni administration : peut-être gère-t-il malgré
+    // tout ses propres serveurs (propriétaire/admin d'une guilde où le bot est).
+    $miens = $staff ? [] : mes_serveurs_geres($complet);
+    $vue = $staff ? $complet : ($miens ? state_pour_gestionnaire($complet, $miens) : state_public($complet));
     respond([
         'ok' => true,
-        'state' => $staff ? $complet : state_public($complet),
-        'mesServeursSansBot' => $staff ? mes_serveurs_sans_bot($complet) : [],
+        'state' => $vue,
+        'mesServeursSansBot' => ($staff || $miens) ? mes_serveurs_sans_bot($complet) : [],
         'nbMesServeurs' => count(mes_guildes()),
+        // Ce que la personne a le droit de faire, dit clairement au front.
+        'acces' => [
+            'gestion' => $staff || $miens !== [],
+            'siteEntier' => $staff,
+            'mesServeurs' => $miens,
+        ],
         'authRequired' => admin_requis(), 'authOk' => admin_connecte(),
         'moi' => $moi,
         'staff' => $staff,
@@ -1013,8 +1057,23 @@ if ($action === 'auth.logout') {
     respond(['ok' => true, 'authOk' => false]);
 }
 
-// Toutes les autres écritures exigent d'être connecté.
-exiger_admin();
+// 🏠 Exception : configurer SON PROPRE serveur ne demande pas d'être de
+// l'équipe du site. Un propriétaire (ou administrateur) d'un serveur Discord
+// où le bot est présent peut régler CE serveur — et uniquement celui-là.
+if ($action === 'server.module.save' && !admin_connecte()) {
+    $cible = cleanString($input['serverId'] ?? '', 80);
+    $etatComplet = loadState();
+    if ($cible === '' || !peut_gerer_serveur($etatComplet, $cible)) {
+        respond(['ok' => false, 'error' => moi_id() === ''
+            ? "Connectez-vous avec Discord pour configurer un serveur."
+            : "Vous n'êtes ni propriétaire ni administrateur de ce serveur Discord : vous ne pouvez pas le configurer ici.",
+            'authRequired' => moi_id() === ''], 403);
+    }
+    // Autorisé : on laisse le traitement normal se poursuivre plus bas.
+} else {
+    // Toutes les autres écritures exigent d'être connecté à l'administration.
+    exiger_admin();
+}
 
 switch ($action) {
     case 'blacklist.add':

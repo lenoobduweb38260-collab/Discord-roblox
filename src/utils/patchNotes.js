@@ -452,6 +452,22 @@ const RELEASES = [
     fix: [],
     retrait: [],
   },
+  {
+    id: 'site-gestion-ses-serveurs-2026-08o',
+    title: 'Site : chacun gère ses propres serveurs 🏠',
+    ajout: [
+      '🏠 **Vous administrez un serveur Discord où le bot est présent ? Vous pouvez le configurer**, sans avoir à être ajouté à l\'équipe du site : connectez-vous avec Discord et vos serveurs apparaissent',
+      '🎛️ Les **huit modules** de configuration sont accessibles pour chacun de vos serveurs, ainsi que leurs tickets',
+    ],
+    amelioration: [
+      '🔐 Chacun ne voit et ne modifie que **ses** serveurs : impossible de configurer celui d\'un autre',
+      '💬 Un message explique quoi faire selon la situation : inviter le bot sur son serveur, ou demander à rejoindre l\'équipe',
+    ],
+    fix: [
+      '🩹 **Un propriétaire de serveur ne voyait rien** : l\'accès exigeait d\'être inscrit dans l\'équipe du site, alors qu\'administrer son propre serveur devrait suffire',
+    ],
+    retrait: [],
+  },
 ];
 
 // Découpe une catégorie en champs d'embed (max 1024 caractères par champ).
