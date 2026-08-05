@@ -22,14 +22,31 @@ récupère ses **vrais serveurs**, ses compteurs et son Client ID. Un rapport
 ligne par ligne indique ✅ ou ❌ **avec la raison** (bot arrêté, nom inconnu,
 bot qui ne répond pas…).
 
-Pour que la liaison fonctionne, remplissez une seule fois dans **`config.php`** :
+### 🔌 Relier le site à votre agent — sans toucher au moindre fichier
 
-```php
-const SITE_AGENT_URL = 'http://IP-de-votre-serveur:PORT';  // votre agent
-const SITE_AGENT_KEY = 'votre-cle-agent';                  // la même que le dashboard
-```
+Dans **⚙️ Créateur → 🤖 Mes bots**, encadré **« 🔗 Connexion à votre agent »** :
 
-Laissés vides, le site tourne avec des données de démonstration.
+| Champ | Ce que vous collez | Où le trouver |
+|---|---|---|
+| **Adresse de l'agent** | `http://IP-de-votre-serveur:PORT` | La même valeur que `AGENT_URL` dans le dashboard. Le `http://` est ajouté tout seul si vous l'oubliez. |
+| **Clé de l'agent** | la clé de l'agent | `AGENT_KEY` dans le `config.env` de votre agent — identique à celle du dashboard. |
+
+Puis **🔌 Tester et enregistrer**. Le site appelle vraiment votre agent :
+
+- ✅ il répond → les réglages sont enregistrés **et** la liste de vos bots
+  s'affiche immédiatement dans « Nom chez l'agent » ;
+- ❌ il ne répond pas → **rien n'est enregistré** et le site dit précisément
+  pourquoi : clé refusée, port fermé, adresse d'un autre service, ou
+  identifiant Discord saisi à la place de l'adresse.
+
+La clé est rangée dans `data/agent.php`, un fichier que le web ne peut pas
+lire, et n'est **jamais** renvoyée au navigateur. Laissez le champ vide pour
+conserver la clé déjà enregistrée.
+
+> Si le dashboard est installé dans un sous-dossier `dashboard`, le site
+> reprend **automatiquement** ses réglages : vous n'avez généralement rien à
+> saisir. Tant qu'aucun agent n'est joignable, le site tourne avec des données
+> de démonstration.
 
 ## 🎨 Site builder — construisez votre site sans toucher au code
 
@@ -123,7 +140,7 @@ chmod -R 775 data uploads/proofs uploads/backgrounds
 ```text
 Aincrad_Discord_Bot_PHP/
 ├── index.php                 Interface principale
-├── config.php                Liaison à votre agent (SEUL fichier à éditer)
+├── config.php                Mot de passe d'administration (facultatif)
 ├── api.php                   API PHP et actions d’écriture
 ├── assets/
 │   ├── css/style.css         Direction artistique complète
@@ -131,7 +148,8 @@ Aincrad_Discord_Bot_PHP/
 │   └── images/aincrad-bg.jpg Fond Aincrad
 ├── data/
 │   ├── app.json              Données utilisées par le site
-│   └── app.default.json      Sauvegarde des données initiales
+│   ├── app.default.json      Sauvegarde des données initiales
+│   └── agent.php             Adresse + clé de l'agent (créé par le site, illisible depuis le web)
 ├── uploads/proofs/           Preuves envoyées par le staff
 └── uploads/backgrounds/      Fonds téléversés depuis le Site builder
 ```
@@ -152,15 +170,17 @@ Actions disponibles dans `api.php` :
 - `site.background.upload`  (image / GIF de fond)
 - `bots.save`               (liste des bots, sans limite)
 - `agent.sync`              (récupère les vrais serveurs depuis l'agent)
+- `agent.config`            (teste puis enregistre l'adresse et la clé de l'agent)
+- `agent.bots`              (liste les bots déclarés chez l'agent)
 
 Pour une grande communauté, remplacez la persistance JSON par MySQL ou PostgreSQL en conservant les mêmes réponses JSON côté API.
 
 ## Connexion réelle à Discord
 
 Le panneau est entièrement fonctionnel. Les serveurs et bots livrés sont des
-données de démonstration **jusqu’à ce que vous remplissiez `config.php`** :
-renseignez alors vos bots dans ⚙️ Créateur → 🤖 Mes bots puis cliquez sur
-**Synchroniser** pour récupérer vos vrais serveurs.
+données de démonstration **jusqu'à ce que votre agent soit joignable** :
+renseignez la connexion et vos bots dans ⚙️ Créateur → 🤖 Mes bots, puis
+cliquez sur **Synchroniser** pour récupérer vos vrais serveurs.
 
 Pour une utilisation réelle, reliez :
 

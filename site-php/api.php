@@ -83,12 +83,39 @@ function adresse_plausible(string $v): bool {
   return (bool) filter_var($v, FILTER_VALIDATE_URL);
 }
 
-// Adresse de l'agent, normalisée : on ajoute http:// si le schéma manque
-// (erreur très fréquente : « 191.44.119.37:9999 » au lieu de l'URL complète).
-// Si SITE_AGENT_URL est vide OU manifestement erronée, on reprend celle du
-// dashboard installé à côté.
+// ----- 💾 Réglages saisis DEPUIS LE SITE (plus besoin d'éditer un fichier) -----
+// Stockés dans data/agent.php, préfixé par une balise PHP « exit » : même si
+// le fichier est demandé par le web, PHP l'exécute et ne renvoie RIEN. La clé
+// n'est jamais transmise au navigateur.
+// (Ne JAMAIS écrire la balise fermante PHP dans un commentaire : elle sort du
+//  mode PHP et le reste du fichier serait affiché tel quel.)
+const AGENT_STORE = __DIR__ . '/data/agent.php';
+const STORE_PREFIX = "<?php exit; ?>\n";
+function agent_store(): array {
+  static $c = null;
+  if ($c !== null) return $c;
+  $c = ['url' => '', 'key' => ''];
+  $raw = @file_get_contents(AGENT_STORE);
+  if ($raw !== false && strpos($raw, STORE_PREFIX) === 0) {
+    $d = json_decode(substr($raw, strlen(STORE_PREFIX)), true);
+    if (is_array($d)) $c = ['url' => (string) ($d['url'] ?? ''), 'key' => (string) ($d['key'] ?? '')];
+  }
+  return $c;
+}
+function agent_store_save(string $url, string $key): bool {
+  $ok = @file_put_contents(AGENT_STORE, STORE_PREFIX . json_encode(['url' => $url, 'key' => $key])) !== false;
+  if ($ok) { @chmod(AGENT_STORE, 0640); }
+  return $ok;
+}
+
+// Adresse de l'agent, normalisée (http:// ajouté si absent). Trois sources,
+// dans l'ordre : ce que vous avez saisi DANS LE SITE, puis config.php, puis
+// le dashboard installé à côté.
 function agent_url(): string {
-  $brut = defined('SITE_AGENT_URL') ? trim((string) SITE_AGENT_URL) : '';
+  $brut = agent_store()['url'];
+  if (!adresse_plausible($brut)) {
+    $brut = defined('SITE_AGENT_URL') ? trim((string) SITE_AGENT_URL) : '';
+  }
   if (!adresse_plausible($brut)) {
     $reprise = dashboard_agent()['url'];
     if (adresse_plausible($reprise)) $brut = $reprise;
@@ -97,32 +124,56 @@ function agent_url(): string {
   if (!preg_match('#^https?://#i', $brut)) $brut = 'http://' . $brut;
   return rtrim($brut, '/');
 }
+// D'où vient l'adresse réellement utilisée (pour l'afficher dans le site).
+function agent_origine(): string {
+  if (adresse_plausible(agent_store()['url'])) return 'saisi dans le site';
+  if (defined('SITE_AGENT_URL') && adresse_plausible((string) SITE_AGENT_URL)) return 'config.php du site';
+  $d = dashboard_agent();
+  if (adresse_plausible($d['url'])) return 'repris du ' . $d['source'];
+  return 'aucune';
+}
 // L'adresse ressemble-t-elle vraiment à celle d'un agent ? Renvoie null si
 // tout va bien, sinon le problème en clair.
 function agent_url_probleme(): ?string {
-  $brut = defined('SITE_AGENT_URL') ? trim((string) SITE_AGENT_URL) : '';
+  $brut = agent_store()['url'] !== '' ? agent_store()['url'] : (defined('SITE_AGENT_URL') ? trim((string) SITE_AGENT_URL) : '');
   // Si l'adresse a pu être reprise du dashboard, tout va bien : on ne
   // reproche rien à l'utilisateur, la liaison fonctionne.
   if (agent_url() !== '') return null;
   if ($brut === '') {
-    return "Aucune adresse d'agent : renseignez SITE_AGENT_URL dans config.php, "
-      . "ou installez le dashboard dans un sous-dossier « dashboard » (le site reprendra ses réglages automatiquement).";
+    return "Aucune adresse d'agent : renseignez-la juste en dessous, dans « 🔗 Connexion à votre agent », "
+      . "puis cliquez sur « Tester et enregistrer ». Aucun fichier à modifier.";
   }
   if (preg_match('/^\d{15,25}$/', $brut)) {
     return "« $brut » est un identifiant Discord (Client ID), pas l'adresse de votre agent. "
-      . "Attendu : http://IP-de-votre-serveur:PORT (la même valeur que AGENT_URL du dashboard).";
+      . "Attendu : http://IP-de-votre-serveur:PORT (la même valeur que AGENT_URL du dashboard). "
+      . "Corrigez-la dans « 🔗 Connexion à votre agent » ci-dessous.";
   }
-  return "« $brut » n'est pas une adresse valide. Attendu : http://IP-de-votre-serveur:PORT";
+  return "« $brut » n'est pas une adresse valide. Attendu : http://IP-de-votre-serveur:PORT — "
+    . "corrigez-la dans « 🔗 Connexion à votre agent » ci-dessous.";
 }
+// La clé suit la MÊME source que l'adresse retenue : pas de mélange possible.
 function agent_key(): string {
-  $k = defined('SITE_AGENT_KEY') ? trim((string) SITE_AGENT_KEY) : '';
-  // Adresse reprise du dashboard : on reprend aussi sa clé.
-  $brut = defined('SITE_AGENT_URL') ? trim((string) SITE_AGENT_URL) : '';
-  if ($k === '' || !adresse_plausible($brut)) {
-    $reprise = dashboard_agent();
-    if ($reprise['key'] !== '' && adresse_plausible($reprise['url'])) return $reprise['key'];
+  $origine = agent_origine();
+  if ($origine === 'saisi dans le site') return agent_store()['key'];
+  if ($origine === 'config.php du site') {
+    $k = defined('SITE_AGENT_KEY') ? trim((string) SITE_AGENT_KEY) : '';
+    // Clé oubliée dans config.php : on prend celle du dashboard.
+    if ($k === '') { $d = dashboard_agent(); if ($d['key'] !== '') return $d['key']; }
+    return $k;
   }
-  return $k;
+  return dashboard_agent()['key'];
+}
+
+// Résumé de la liaison, affiché dans le site (jamais la clé elle-même).
+function agent_reglages(): array {
+  return [
+    'adresse' => agent_url(),
+    'origine' => agent_origine(),
+    'cleEnregistree' => agent_key() !== '',
+    // Le site peut-il écrire data/agent.php ? Sinon, le bouton
+    // « Tester et enregistrer » ne servirait à rien : on prévient avant.
+    'modifiable' => is_writable(dirname(AGENT_STORE)) || is_writable(AGENT_STORE),
+  ];
 }
 
 // Appel HTTP vers l'agent : renvoie [code, données].
@@ -286,12 +337,10 @@ if ($action === 'selftest') {
     $dataOk = is_file(DATA_FILE) && is_writable(DATA_FILE);
     $bgDir = __DIR__ . '/uploads/backgrounds';
     $probleme = agent_url_probleme();
-    $repris = dashboard_agent();
-    $urlPropre = defined('SITE_AGENT_URL') && adresse_plausible((string) SITE_AGENT_URL);
     $agent = [
         'adresseUtilisee' => agent_url(),
         // D'où viennent réellement l'adresse et la clé employées.
-        'origine' => $urlPropre ? 'config.php du site' : ($repris['source'] ? 'repris du ' . $repris['source'] : 'aucune'),
+        'origine' => agent_origine(),
         'cleFournie' => agent_key() !== '' ? 'oui' : 'non',
         'probleme' => $probleme,
         'joignable' => false,
@@ -308,7 +357,7 @@ if ($action === 'selftest') {
         } else {
             $agent['probleme'] = $code === 0
                 ? "Agent injoignable : adresse/port bloqués, agent éteint, ou l'hébergeur web n'autorise pas les connexions sortantes vers ce port."
-                : "L'agent a répondu HTTP $code — la clé SITE_AGENT_KEY est probablement incorrecte.";
+                : "L'agent a répondu HTTP $code — la clé est probablement incorrecte : corrigez-la dans ⚙️ Créateur → 🤖 Mes bots → « Connexion à votre agent ».";
         }
     }
     $conseils = [];
@@ -334,21 +383,97 @@ if ($action === 'selftest') {
     ]);
 }
 
+// 🔧 Réglages de l'agent SAISIS DEPUIS LE SITE : on teste d'abord, on
+// enregistre seulement si l'agent répond. Réservé à l'administration.
+if ($action === 'agent.config') {
+    exiger_admin();
+    $in = body();
+    // Lecture seule : sert à afficher l'état actuel dans le site.
+    if (!empty($in['lire'])) {
+        respond(['ok' => true, 'reglages' => agent_reglages()]);
+    }
+    $url = trim((string) ($in['url'] ?? ''));
+    $key = trim((string) ($in['key'] ?? ''));
+    if ($url === '') {           // champ vidé = on efface le réglage
+        @unlink(AGENT_STORE);
+        respond([
+            'ok' => true, 'efface' => true,
+            'note' => "Réglage effacé : le site reprendra celui du dashboard installé à côté, s'il y en a un.",
+        ]);
+    }
+    // Clé laissée vide alors qu'une clé est déjà enregistrée : on garde
+    // l'ancienne (le site ne renvoie jamais la clé au navigateur).
+    if ($key === '' && agent_store()['key'] !== '') $key = agent_store()['key'];
+    if (preg_match('/^\d{15,25}$/', $url)) {
+        respond(['ok' => false, 'error' => "« $url » est un identifiant Discord, pas l'adresse de votre agent. Attendu : http://IP-du-serveur:PORT"], 422);
+    }
+    $test = preg_match('#^https?://#i', $url) ? rtrim($url, '/') : 'http://' . rtrim($url, '/');
+    if (!filter_var($test, FILTER_VALIDATE_URL)) {
+        respond(['ok' => false, 'error' => "« $url » n'est pas une adresse valide. Attendu : http://IP-du-serveur:PORT"], 422);
+    }
+    // Essai réel avant d'enregistrer.
+    $ch = function_exists('curl_init') ? curl_init($test . '/agent/etat') : null;
+    if ($ch) {
+        curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_HTTPHEADER => ['x-cle: ' . $key], CURLOPT_TIMEOUT => 10]);
+        $raw = curl_exec($ch);
+        $code = curl_getinfo($ch, CURLINFO_RESPONSE_CODE) ?: 0;
+        $err = curl_error($ch);
+        curl_close($ch);
+    } else {
+        $ctx = stream_context_create(['http' => ['method' => 'GET', 'header' => 'x-cle: ' . $key, 'timeout' => 10, 'ignore_errors' => true]]);
+        $raw = @file_get_contents($test . '/agent/etat', false, $ctx);
+        $code = 0; $err = '';
+        foreach ($http_response_header ?? [] as $h) {
+            if (preg_match('#^HTTP/\S+\s+(\d{3})#', $h, $m)) $code = (int) $m[1];
+        }
+    }
+    if ($code === 401 || $code === 403) {
+        respond(['ok' => false, 'error' => "L'agent répond bien à $test, mais REFUSE la clé (HTTP $code). Recopiez exactement AGENT_KEY du fichier config.env de votre agent."], 422);
+    }
+    if ($code === 404) {
+        respond(['ok' => false, 'error' => "$test répond, mais n'a pas de page /agent/etat (HTTP 404) : "
+            . "ce n'est pas votre agent. Ce port est sans doute celui d'un autre service (site web, bot…). "
+            . "Reprenez l'adresse AGENT_URL de votre dashboard."], 422);
+    }
+    if ($code !== 200) {
+        respond(['ok' => false, 'error' => "Aucune réponse de $test" . ($code ? " (HTTP $code)" : '')
+            . ". Vérifiez que l'agent tourne, que le PORT est le bon, et que votre hébergeur autorise les connexions sortantes."
+            . ($err ? " Détail : $err" : '')], 502);
+    }
+    $data = json_decode((string) $raw, true);
+    if (!is_array($data) || !isset($data['bots'])) {
+        respond(['ok' => false, 'error' => "$test répond, mais ce n'est pas un agent (réponse inattendue). Vérifiez l'adresse et le port."], 422);
+    }
+    if (!agent_store_save($test, $key)) {
+        respond(['ok' => false, 'error' => "Connexion réussie, mais impossible d'écrire dans data/ — donnez les droits d'écriture au dossier data (chmod 775)."], 500);
+    }
+    $bots = [];
+    foreach ($data['bots'] as $b) $bots[] = ['nom' => (string) ($b['name'] ?? ''), 'demarre' => ($b['status'] ?? '') === 'demarre'];
+    respond(['ok' => true, 'adresse' => $test, 'bots' => $bots, 'reglages' => [
+        'adresse' => $test, 'origine' => 'saisi dans le site',
+        'cleEnregistree' => $key !== '', 'modifiable' => true,
+    ]]);
+}
+
 // 🤖 Liste des bots déclarés chez l'agent (pour remplir « Nom chez l'agent »).
 if ($action === 'agent.bots') {
+    // L'adresse de l'agent ne sort que pour l'administration connectée.
+    $reglages = admin_connecte() ? agent_reglages() : null;
     $probleme = agent_url_probleme();
-    if ($probleme !== null) respond(['ok' => false, 'error' => $probleme], 422);
+    if ($probleme !== null) respond(['ok' => false, 'error' => $probleme, 'reglages' => $reglages], 422);
     [$code, $etat] = agent_get('/agent/etat', 10);
     if ($code !== 200) {
-        respond(['ok' => false, 'error' => $code === 0
+        respond(['ok' => false, 'reglages' => $reglages, 'error' => $code === 0
             ? "Agent injoignable à l'adresse " . agent_url() . " (port bloqué, agent éteint, ou sorties réseau interdites par l'hébergeur)."
-            : "L'agent a répondu HTTP $code — vérifiez SITE_AGENT_KEY."], 502);
+            : ($code === 401 || $code === 403
+                ? "L'agent répond bien, mais REFUSE la clé (HTTP $code) — corrigez-la ci-dessous puis « Tester et enregistrer »."
+                : "L'agent a répondu HTTP $code — adresse ou port inattendu.")], 502);
     }
     $bots = [];
     foreach ($etat['bots'] ?? [] as $b) {
         $bots[] = ['nom' => (string) ($b['name'] ?? ''), 'demarre' => ($b['status'] ?? '') === 'demarre'];
     }
-    respond(['ok' => true, 'adresse' => agent_url(), 'bots' => $bots]);
+    respond(['ok' => true, 'adresse' => admin_connecte() ? agent_url() : '', 'bots' => $bots, 'reglages' => $reglages]);
 }
 
 if ($method === 'GET' && $action === 'state') {
@@ -647,7 +772,7 @@ switch ($action) {
         if ($code !== 200) {
             respond(['ok' => false, 'error' => $code === 0
                 ? "Agent injoignable (adresse/port bloqués, ou agent éteint)."
-                : "L'agent a répondu HTTP $code — vérifiez SITE_AGENT_KEY."], 502);
+                : "L'agent a répondu HTTP $code — vérifiez la clé dans « 🔗 Connexion à votre agent »."], 502);
         }
         $enLigne = [];
         foreach ($etat['bots'] ?? [] as $bot) {

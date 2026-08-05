@@ -10,3 +10,4 @@ data.sqlite
 data.sqlite-journal
 data.sqlite-wal
 data.sqlite-shm
+site-php/data/agent.php

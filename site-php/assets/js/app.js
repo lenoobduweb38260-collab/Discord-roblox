@@ -38,6 +38,7 @@
     previewGrade: null,  // grade simulé (aperçu « qui voit quoi »)
     agentBots: null,     // bots vus chez l'agent (null = pas encore interrogé)
     agentErreur: null,
+    agentReglages: null, // adresse retenue + origine (la clé n'arrive jamais ici)
     ticketTab: "open",   // tickets en cours / archives
     selectedArchiveId: null,
     archiveQuery: "",
@@ -204,7 +205,13 @@
       openLoginModal();
       throw new Error("Connexion requise pour modifier le site.");
     }
-    if (!response.ok || !data.ok) throw new Error(data.error || `Une erreur est survenue (HTTP ${response.status}).`);
+    if (!response.ok || !data.ok) {
+      // On garde la réponse complète : certains écrans (connexion à l'agent)
+      // ont besoin du détail même quand l'appel échoue.
+      const erreur = new Error(data.error || `Une erreur est survenue (HTTP ${response.status}).`);
+      erreur.data = data;
+      throw erreur;
+    }
     if (data.state) state = data.state;
     if (typeof data.authOk === "boolean") AUTH.ok = data.authOk;
     return data;
@@ -1146,12 +1153,13 @@
         ? `<div class="row" style="border-color:rgba(47,227,139,.45)">✅ <b>Agent joignable</b><span style="color:var(--muted)">${ui.agentBots.length} bot(s) détecté(s) : ${ui.agentBots.map(b => esc(b.nom)).join(" · ")}. Choisissez-les dans la liste déroulante ci-dessous.</span></div>`
         : `<div class="row" style="border-color:rgba(255,92,116,.45);flex-direction:column;align-items:flex-start;gap:6px">
              <b>❌ Agent injoignable — la synchronisation ne peut pas fonctionner</b>
-             <span style="color:var(--muted)">${esc(ui.agentErreur || "Vérifiez SITE_AGENT_URL et SITE_AGENT_KEY dans config.php.")}</span>
-             <span style="color:var(--muted);font-size:12px">Ouvrez <code>api.php?action=selftest</code> pour le détail.</span>
+             <span style="color:var(--muted)">${esc(ui.agentErreur || "Renseignez l'adresse et la clé dans l'encadré ci-dessous.")}</span>
+             <span style="color:var(--muted);font-size:12px">Corrigez-les dans « 🔗 Connexion à votre agent » juste en dessous — aucun fichier à modifier.</span>
            </div>`);
     return `
-      <div class="builder-hint">🤖 <b>3 étapes</b> : 1) choisissez le bot chez votre agent · 2) laissez le Client ID se remplir tout seul · 3) <b>Enregistrer</b> puis <b>Synchroniser</b>.</div>
+      <div class="builder-hint">🤖 <b>3 étapes</b> : 1) connectez votre agent ci-dessous · 2) choisissez le bot dans la liste · 3) <b>Enregistrer</b> puis <b>Synchroniser</b>.</div>
       ${etatAgent}
+      ${agentConfigPanel()}
       <section class="panel mt-16"><div class="panel-inner">
         <div class="panel-head"><div><h3>❓ Où trouver chaque valeur</h3><p>Les deux champs viennent d'endroits différents — voici lesquels.</p></div></div>
         <div class="row" style="flex-direction:column;align-items:flex-start;gap:7px">
@@ -1167,16 +1175,50 @@
         <div style="margin-top:12px">${button("➕ Ajouter un bot", "bot-add", "primary")}</div>
       </div></section>
       <section class="panel mt-16"><div class="panel-inner">
-        <div class="panel-head"><div><h3>🔗 Liaison à vos bots</h3><p>Renseignée une seule fois dans <code>config.php</code>, à côté de index.php.</p></div>
-          <div class="page-actions">${button("🔎 Voir les bots de l'agent", "agent-bots", "ghost")}</div></div>
-        <div class="row" style="flex-direction:column;align-items:flex-start;gap:6px">
-          <span><b>SITE_AGENT_URL</b> — l'adresse de votre agent, ex. <code>http://123.45.67.89:9999</code>
-            <span style="color:var(--red)"> (ce n'est PAS le Client ID du bot)</span></span>
-          <span><b>SITE_AGENT_KEY</b> — la même clé que dans votre dashboard</span>
-          <span style="color:var(--muted)">Sans ces deux valeurs, le site reste en données de démonstration.</span>
-        </div>
+        <div class="panel-head"><div><h3>🔎 Bots vus chez l'agent</h3><p>La liste exacte des dossiers <code>bots/&lt;nom&gt;</code> de votre hébergeur.</p></div>
+          <div class="page-actions">${button("🔎 Rafraîchir la liste", "agent-bots", "ghost")}</div></div>
         <div id="agent-bots" style="margin-top:12px"></div>
         <div id="sync-report" style="margin-top:12px"></div>
+      </div></section>`;
+  }
+
+  // ── 🔗 Connexion à l'agent, saisie DANS le site (plus de config.php) ──
+  // La clé n'est jamais renvoyée au navigateur : le champ reste vide et,
+  // laissé vide, conserve la clé déjà enregistrée côté serveur.
+  function agentConfigPanel() {
+    const r = ui.agentReglages || {};
+    const origines = {
+      "saisi dans le site": "✅ enregistrée depuis cette page",
+      "config.php du site": "📄 lue dans config.php",
+      "aucune": "⚠️ aucune adresse pour l'instant",
+    };
+    const origine = origines[r.origine] || (r.origine ? `📄 ${esc(r.origine)}` : "…");
+    const alerteEcriture = r.modifiable === false
+      ? `<div class="row" style="border-color:rgba(255,92,116,.45)">🚫 <b>Dossier <code>data/</code> non inscriptible</b><span style="color:var(--muted)">Impossible d'enregistrer ici. Donnez les droits d'écriture au dossier <code>data</code> (chmod 775) chez votre hébergeur.</span></div>`
+      : "";
+    return `
+      <section class="panel mt-16"><div class="panel-inner">
+        <div class="panel-head"><div><h3>🔗 Connexion à votre agent</h3>
+          <p>Collez les deux valeurs ici, cliquez sur « Tester et enregistrer ». <b>Aucun fichier à modifier.</b></p></div></div>
+        ${alerteEcriture}
+        <div class="form-grid">
+          <div class="field full"><label>Adresse de l'agent</label>
+            <input class="input" id="agent-url" value="${esc(r.adresse || "")}" placeholder="http://123.45.67.89:9999" spellcheck="false" autocomplete="off">
+            <span class="field-note">L'<b>IP de votre serveur</b> suivie du <b>port de l'agent</b> (celui du panel de votre hébergeur).
+              Le <code>http://</code> est ajouté tout seul si vous l'oubliez.
+              <span style="color:var(--red)">Ce n'est ni le Client ID du bot, ni l'adresse de votre site.</span>
+              État actuel : <b>${origine}</b>.</span></div>
+          <div class="field full"><label>Clé de l'agent</label>
+            <input class="input" id="agent-key" type="password" value="" placeholder="${r.cleEnregistree ? "•••••••• (déjà enregistrée — laissez vide pour la garder)" : "collez ici AGENT_KEY"}" spellcheck="false" autocomplete="new-password">
+            <span class="field-note">C'est la valeur <code>AGENT_KEY</code> du fichier <code>config.env</code> de votre agent — la <b>même</b> que dans votre dashboard.
+              ${r.cleEnregistree ? "Une clé est déjà enregistrée : laissez ce champ vide pour la conserver." : "Si votre agent n'en demande pas, laissez vide."}
+              Elle est stockée hors du web et n'est jamais réaffichée.</span></div>
+        </div>
+        <div class="form-actions">
+          ${button("🧹 Effacer", "agent-forget", "ghost")}
+          ${button("🔌 Tester et enregistrer", "agent-config-save", "success")}
+        </div>
+        <div id="agent-config-report" style="margin-top:12px"></div>
       </div></section>`;
   }
 
@@ -1236,9 +1278,13 @@
       const r = await api("agent.bots");
       ui.agentBots = r.bots || [];
       ui.agentErreur = null;
+      if (r.reglages) ui.agentReglages = r.reglages;
     } catch (e) {
       ui.agentBots = [];
       ui.agentErreur = e.message;
+      // Même en échec, le serveur renvoie l'adresse retenue : le formulaire
+      // de connexion s'affiche pré-rempli avec ce qui a été essayé.
+      if (e.data && e.data.reglages) ui.agentReglages = e.data.reglages;
     }
     if (ui.creatorTab === "bots") render();
   }
@@ -1790,6 +1836,51 @@
             ui.agentBots.length ? `${ui.agentBots.length} bot(s) détecté(s).` : (ui.agentErreur || ""),
             ui.agentBots.length ? "success" : "error");
           break;
+        // ── 🔗 Connexion à l'agent saisie dans le site ──────────────
+        case "agent-config-save": {
+          const url = document.querySelector("#agent-url")?.value.trim() || "";
+          const key = document.querySelector("#agent-key")?.value.trim() || "";
+          const box = document.querySelector("#agent-config-report");
+          if (!url) { toast("ADRESSE MANQUANTE", "Indiquez http://IP-de-votre-serveur:PORT.", "error"); break; }
+          const libelle = target.textContent;
+          target.textContent = "⏳ Test en cours…";
+          target.disabled = true;
+          try {
+            const r = await api("agent.config", { url, key });
+            ui.agentReglages = r.reglages || ui.agentReglages;
+            ui.agentBots = r.bots || [];
+            ui.agentErreur = null;
+            const noms = (r.bots || []).map(b => `${b.demarre ? "🟢" : "⚪"} ${esc(b.nom)}`).join(" · ");
+            render();
+            const cible = document.querySelector("#agent-config-report");
+            if (cible) {
+              cible.innerHTML = `<div class="row" style="border-color:rgba(47,227,139,.45);flex-direction:column;align-items:flex-start;gap:6px">
+                <b>✅ Connecté à ${esc(r.adresse)}</b>
+                <span style="color:var(--muted)">${r.bots?.length ? `${r.bots.length} bot(s) : ${noms}. Choisissez-les dans « Nom chez l'agent », puis Enregistrer et Synchroniser.` : "Aucun bot déclaré chez cet agent pour l'instant."}</span></div>`;
+            }
+            toast("AGENT CONNECTÉ", r.bots?.length ? `${r.bots.length} bot(s) détecté(s).` : "Connexion établie.");
+          } catch (e) {
+            if (box) {
+              box.innerHTML = `<div class="row" style="border-color:rgba(255,92,116,.45);flex-direction:column;align-items:flex-start;gap:6px">
+                <b>❌ Connexion refusée — rien n'a été enregistré</b>
+                <span style="color:var(--muted)">${esc(e.message)}</span></div>`;
+            }
+            toast("ÉCHEC", e.message, "error");
+            target.textContent = libelle;
+            target.disabled = false;
+          }
+          break;
+        }
+        case "agent-forget": {
+          if (!confirm("Effacer la connexion enregistrée ? Le site retombera sur les réglages du dashboard ou de config.php.")) break;
+          await api("agent.config", { url: "" });
+          ui.agentReglages = null;
+          ui.agentBots = null;
+          render();
+          await chargerBotsAgent();
+          toast("CONNEXION EFFACÉE", "Le site reprend les réglages du dashboard, s'il y en a.");
+          break;
+        }
         case "use-agent-name": {
           const champs = Array.from(document.querySelectorAll('.botcfg [data-f="agentName"]'));
           const cible = champs.find(c => !c.value.trim()) || champs[0];

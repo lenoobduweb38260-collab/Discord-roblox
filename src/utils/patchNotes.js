@@ -308,6 +308,23 @@ const RELEASES = [
     ],
     retrait: [],
   },
+  {
+    id: 'site-connexion-agent-2026-08g',
+    title: 'Site : la connexion à vos bots se fait dans le site 🔌',
+    ajout: [
+      '🔌 **« Connexion à votre agent »** dans ⚙️ Créateur → 🤖 Mes bots : collez l\'adresse et la clé, cliquez sur **Tester et enregistrer** — plus aucun fichier à modifier',
+      '🧪 **Test avant enregistrement** : rien n\'est sauvegardé tant que l\'agent n\'a pas répondu, et la liste de vos bots s\'affiche aussitôt en cas de succès',
+      '🧹 **Bouton Effacer** : le site retombe alors sur les réglages du dashboard installé à côté',
+    ],
+    amelioration: [
+      '🗣️ **Messages d\'erreur qui disent quoi faire** : clé refusée, port fermé, adresse d\'un autre service, identifiant Discord saisi à la place de l\'adresse — chaque cas a son explication',
+      '🔐 La clé est rangée hors d\'atteinte du web et **n\'est jamais renvoyée au navigateur** ; laissée vide, elle est conservée telle quelle',
+    ],
+    fix: [
+      '🩹 **« Réponse serveur invalide » corrigé** : un commentaire du code refermait la balise PHP et faisait renvoyer du texte brut au lieu du JSON — toutes les actions du site en étaient bloquées',
+    ],
+    retrait: [],
+  },
 ];
 
 // Découpe une catégorie en champs d'embed (max 1024 caractères par champ).
