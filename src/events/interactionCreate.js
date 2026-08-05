@@ -84,9 +84,10 @@ module.exports = {
       return require('../utils/tickets').handlePanelBuilder(interaction);
     }
 
-    // ----- Recherche dans les panneaux Blacklist/Whitelist RP -----
+    // ----- Recherche et pagination des panneaux Blacklist/Whitelist RP -----
     if (
       (interaction.isButton() && interaction.customId.startsWith('rprpsearch:')) ||
+      (interaction.isButton() && interaction.customId.startsWith('rprppage:')) ||
       (interaction.isModalSubmit() && interaction.customId.startsWith('rprpmodal:'))
     ) {
       if (!interaction.inGuild()) return;

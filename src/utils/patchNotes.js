@@ -482,6 +482,24 @@ const RELEASES = [
     fix: [],
     retrait: [],
   },
+  {
+    id: 'version-2-listes-paginees-2026-08q',
+    title: '🎉 Version 2.0 — listes RP paginées',
+    everyone: true,
+    ajout: [
+      '◀️▶️ **Boutons « Page précédente » et « Page suivante »** de part et d\'autre de la recherche, sur les panneaux **Whitelist RP** et **Blacklist RP**',
+      '📄 **39 entrées par page**, et l\'embed change selon la page — la liste complète est enfin consultable, quel que soit le nombre d\'inscrits',
+      '🔢 Le pied de page indique où vous en êtes : « Page 2/4 — entrées 40 à 78 sur 145 »',
+    ],
+    amelioration: [
+      '🔎 Les **résultats de recherche se paginent aussi** : plus de résultats perdus au-delà de la limite d\'affichage',
+      '📐 Si les motifs sont longs, la page se réduit d\'elle-même pour rester lisible — jamais au prix d\'une entrée coupée',
+    ],
+    fix: [
+      '🩹 **La 40ᵉ entrée n\'est plus tronquée en plein milieu** : la liste était collée d\'un bloc puis coupée à un nombre de caractères fixe, ce qui sectionnait la dernière ligne affichée et masquait tout le reste',
+    ],
+    retrait: [],
+  },
 ];
 
 // Découpe une catégorie en champs d'embed (max 1024 caractères par champ).

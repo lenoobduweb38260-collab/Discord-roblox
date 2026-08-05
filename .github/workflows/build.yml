@@ -38,7 +38,7 @@ jobs:
       - name: Installer les dépendances
         run: npm install
 
-      - name: Versionner le build (v1.0.${{ github.run_number }})
+      - name: Versionner le build (v2.0.${{ github.run_number }})
         run: npm version --no-git-tag-version "1.0.${{ github.run_number }}"
 
       - name: Compiler l'exécutable
@@ -70,7 +70,7 @@ jobs:
           path: dist/${{ matrix.manager_output }}
 
   release:
-    name: Publier la release v1.0.${{ github.run_number }}
+    name: Publier la release v2.0.${{ github.run_number }}
     needs: build
     runs-on: ubuntu-latest
     steps:
@@ -94,7 +94,7 @@ jobs:
       - name: Créer le pack dashboard PHP (public_html)
         run: |
           cd dashboard-php
-          sed -i "s/const DASH_BUILD = 'dev';/const DASH_BUILD = 'v1.0.${{ github.run_number }}';/" index.php
+          sed -i "s/const DASH_BUILD = 'dev';/const DASH_BUILD = 'v2.0.${{ github.run_number }}';/" index.php
           zip -r ../dist/pack-dashboard-php.zip index.php config.php LISEZMOI.md
 
       - name: Créer le pack site personnalisable (Site builder)
@@ -102,14 +102,14 @@ jobs:
           cd site-php
           # Version installée, pour que la mise à jour automatique sache où
           # elle en est dès la première visite (sinon elle se retéléchargerait).
-          echo "v1.0.${{ github.run_number }}" > data/version.txt
+          echo "v2.0.${{ github.run_number }}" > data/version.txt
           zip -r ../dist/pack-site-builder.zip . -x '*.git*' 'data/agent.php' 'data/discord.php' 'data/maj.php' 'data/maj.lock'
 
       - uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.0.${{ github.run_number }}
+          tag_name: v2.0.${{ github.run_number }}
           target_commitish: ${{ github.sha }}
-          name: Bot Discord RP v1.0.${{ github.run_number }}
+          name: Bot Discord RP v2.0.${{ github.run_number }}
           body: |
             ## 📦 Exécutables (aucune installation de Node.js nécessaire)
 

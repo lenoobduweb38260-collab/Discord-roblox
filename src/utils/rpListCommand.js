@@ -65,7 +65,13 @@ function makeRpListCommand({ kind, name, label, verb }) {
 
       if (sub === 'rechercher') {
         const q = interaction.options.getString('texte');
-        return interaction.reply({ embeds: [rp.renderEmbed(kind, interaction.guildId, q)], flags: MessageFlags.Ephemeral });
+        // Résultats paginés eux aussi : au-delà d'une page, les flèches
+        // ◀️ ▶️ permettent de tout parcourir.
+        return interaction.reply({
+          embeds: [rp.renderEmbed(kind, interaction.guildId, q, 0)],
+          components: [rp.searchRow(kind, interaction.guildId, q, 0)],
+          flags: MessageFlags.Ephemeral,
+        });
       }
 
       if (sub === 'panneau') {

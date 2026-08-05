@@ -52,9 +52,16 @@ function entryLine(r, i) {
   );
 }
 
-// Embed du panneau (ou des résultats de recherche si `filter` est fourni).
-function renderEmbed(kind, guildId, filter) {
-  const meta = META[kind];
+// ----- 📄 Pagination -----
+// 39 entrées par page au maximum. Auparavant toutes les entrées étaient
+// collées puis coupées à 4000 caractères : la dernière ligne affichée se
+// terminait au milieu d'un mot. Ici on découpe par ENTRÉES ENTIÈRES, et on
+// s'arrête avant si le budget de caractères de l'embed est atteint — une
+// entrée n'est donc jamais tronquée.
+const PAR_PAGE = 39;
+const BUDGET = 3900; // marge sous la limite Discord de 4096 caractères
+
+function lignesFiltrees(kind, guildId, filter) {
   let rows = STMTS[kind].listActive.all(guildId);
   const q = String(filter || '').trim().toLowerCase();
   if (q) {
@@ -62,29 +69,92 @@ function renderEmbed(kind, guildId, filter) {
       [r.roblox_name, r.user_id, r.discord_tag, r.reason].filter(Boolean).some((v) => String(v).toLowerCase().includes(q))
     );
   }
-  const lines = rows.map(entryLine);
+  return rows;
+}
+
+// Découpe la liste en pages. Chaque page contient au plus 39 entrées, et
+// tient dans le budget de caractères sans jamais couper une entrée.
+function construirePages(rows) {
+  const pages = [];
+  let courante = [];
+  let taille = 0;
+  rows.forEach((r, i) => {
+    const ligne = entryLine(r, i);
+    const cout = ligne.length + 2; // + le saut de ligne double
+    // Nouvelle page si on atteint 39 entrées, ou si celle-ci ne tient plus.
+    if (courante.length >= PAR_PAGE || (courante.length && taille + cout > BUDGET)) {
+      pages.push(courante);
+      courante = [];
+      taille = 0;
+    }
+    courante.push(ligne);
+    taille += cout;
+  });
+  if (courante.length || !pages.length) pages.push(courante);
+  return pages;
+}
+
+// Embed du panneau (ou des résultats de recherche si `filter` est fourni).
+function renderEmbed(kind, guildId, filter, page = 0) {
+  const meta = META[kind];
+  const rows = lignesFiltrees(kind, guildId, filter);
+  const q = String(filter || '').trim().toLowerCase();
+  const pages = construirePages(rows);
+  const total = pages.length;
+  const num = Math.min(Math.max(0, Number(page) || 0), total - 1);
   const embed = new EmbedBuilder()
     .setColor(meta.color)
     .setTitle(`${meta.title}${q ? ' — recherche' : ''} (${rows.length})`)
     .setTimestamp();
-  let body = lines.join('\n\n');
-  if (body.length > 4096) {
-    body = body.slice(0, 4000);
-    embed.setFooter({ text: 'Liste tronquée — affinez avec 🔎 Rechercher.' });
+  embed.setDescription(pages[num].join('\n\n') || `*${q ? 'Aucun résultat.' : meta.empty}*`);
+  if (total > 1) {
+    const debut = pages.slice(0, num).reduce((n, p) => n + p.length, 0) + 1;
+    embed.setFooter({ text: `Page ${num + 1}/${total} — entrées ${debut} à ${debut + pages[num].length - 1} sur ${rows.length}` });
   }
-  embed.setDescription(body || `*${q ? 'Aucun résultat.' : meta.empty}*`);
   return embed;
 }
 
-function searchRow(kind) {
-  return new ActionRowBuilder().addComponents(
+// Combien de pages pour cette liste ? (sert à activer/désactiver les flèches)
+function nombreDePages(kind, guildId, filter) {
+  return construirePages(lignesFiltrees(kind, guildId, filter)).length;
+}
+
+// Rangée de boutons : recherche + navigation entre les pages.
+// Le filtre voyage dans l'identifiant du bouton (limité à 100 caractères par
+// Discord) : on le raccourcit pour ne jamais dépasser.
+function searchRow(kind, guildId, filter = '', page = 0) {
+  const total = nombreDePages(kind, guildId, filter);
+  const q = String(filter || '').slice(0, 50);
+  const row = new ActionRowBuilder();
+  if (total > 1) {
+    row.addComponents(
+      new ButtonBuilder()
+        .setCustomId(`rprppage:${kind}:${page - 1}:${q}`)
+        .setLabel('Page précédente')
+        .setEmoji('◀️')
+        .setStyle(ButtonStyle.Secondary)
+        .setDisabled(page <= 0)
+    );
+  }
+  row.addComponents(
     new ButtonBuilder().setCustomId(`rprpsearch:${kind}`).setLabel('Rechercher').setEmoji('🔎').setStyle(ButtonStyle.Secondary)
   );
+  if (total > 1) {
+    row.addComponents(
+      new ButtonBuilder()
+        .setCustomId(`rprppage:${kind}:${page + 1}:${q}`)
+        .setLabel('Page suivante')
+        .setEmoji('▶️')
+        .setStyle(ButtonStyle.Secondary)
+        .setDisabled(page >= total - 1)
+    );
+  }
+  return row;
 }
 
 // Publie (ou remplace) le panneau dans un salon et mémorise sa référence.
 async function postBoard(kind, channel, guildId) {
-  const msg = await channel.send({ embeds: [renderEmbed(kind, guildId)], components: [searchRow(kind)] });
+  const msg = await channel.send({ embeds: [renderEmbed(kind, guildId)], components: [searchRow(kind, guildId)] });
   setBoard.run(guildId, kind, channel.id, msg.id);
   return msg;
 }
@@ -98,7 +168,9 @@ async function refreshBoard(client, kind, guildId) {
     if (!channel?.isTextBased()) return;
     const msg = await channel.messages.fetch(board.message_id).catch(() => null);
     if (!msg) return;
-    await msg.edit({ embeds: [renderEmbed(kind, guildId)], components: [searchRow(kind)] });
+    // Le panneau revient toujours à la première page après une modification :
+    // le nombre de pages a pu changer.
+    await msg.edit({ embeds: [renderEmbed(kind, guildId)], components: [searchRow(kind, guildId)] });
   } catch {
     /* le panneau a pu être supprimé : on ignore */
   }
@@ -114,7 +186,22 @@ const activeOf = (kind, guildId, userId) => STMTS[kind].activeOf.get(guildId, us
 const historyOf = (kind, guildId, userId) => STMTS[kind].historyOf.all(guildId, userId);
 
 // Bouton 🔎 → modal ; soumission du modal → résultats éphémères.
+// Boutons ◀️ / ▶️ → on réédite le message affiché avec la page demandée.
 async function handleSearchInteraction(interaction) {
+  if (interaction.isButton() && interaction.customId.startsWith('rprppage:')) {
+    const [, kind, pageBrute, ...reste] = interaction.customId.split(':');
+    const filtre = reste.join(':');
+    const page = Number(pageBrute) || 0;
+    // deferUpdate d'abord : Discord n'attend que 3 secondes, et la liste peut
+    // être longue à reconstruire.
+    await interaction.deferUpdate().catch(() => {});
+    return interaction
+      .editReply({
+        embeds: [renderEmbed(kind, interaction.guildId, filtre, page)],
+        components: [searchRow(kind, interaction.guildId, filtre, page)],
+      })
+      .catch(() => {});
+  }
   if (interaction.isButton()) {
     const kind = interaction.customId.split(':')[1];
     const modal = new ModalBuilder().setCustomId(`rprpmodal:${kind}`).setTitle(META[kind]?.title || 'Recherche');
@@ -133,11 +220,18 @@ async function handleSearchInteraction(interaction) {
   // Modal submit
   const kind = interaction.customId.split(':')[1];
   const q = interaction.fields.getTextInputValue('q');
-  return interaction.reply({ embeds: [renderEmbed(kind, interaction.guildId, q)], flags: MessageFlags.Ephemeral });
+  return interaction.reply({
+    embeds: [renderEmbed(kind, interaction.guildId, q, 0)],
+    components: [searchRow(kind, interaction.guildId, q, 0)],
+    flags: MessageFlags.Ephemeral,
+  });
 }
 
 module.exports = {
   META,
+  PAR_PAGE,
+  nombreDePages,
+  searchRow,
   add,
   remove,
   activeOf,
