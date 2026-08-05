@@ -383,6 +383,8 @@
         "label": "Site builder",
         "show": true
       }
-    ]
-  }
+    ],
+    "permissions": {}
+  },
+  "archives": []
 }

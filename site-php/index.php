@@ -25,12 +25,22 @@ $siteName = htmlspecialchars((string) ($bootState['siteConfig']['siteName'] ?? '
     <link rel="stylesheet" href="assets/css/style.css?v=2.0.0">
 </head>
 <body>
+<?php
+    // Écran de chargement entièrement personnalisable depuis le Site builder.
+    $cfg = $bootState['siteConfig'] ?? [];
+    $bootLogo = trim((string) ($cfg['bootLogo'] ?? $cfg['logo'] ?? '⚔️'));
+    $bootTitle = htmlspecialchars((string) ($cfg['bootTitle'] ?? 'INITIALISATION'), ENT_QUOTES, 'UTF-8');
+    $bootSub = htmlspecialchars((string) ($cfg['bootSubtitle'] ?? 'Chargement du système…'), ENT_QUOTES, 'UTF-8');
+    $bootLogoHtml = preg_match('#^(https?://|uploads/|assets/)#', $bootLogo)
+        ? '<img src="' . htmlspecialchars($bootLogo, ENT_QUOTES, 'UTF-8') . '" alt="">'
+        : htmlspecialchars($bootLogo !== '' ? $bootLogo : '⚔️', ENT_QUOTES, 'UTF-8');
+    ?>
     <div id="boot-screen" class="boot-screen" aria-hidden="true">
         <div class="boot-core">
             <div class="boot-ring"></div>
-            <div class="boot-logo">A</div>
-            <strong>INITIALISATION CARDINAL</strong>
-            <span>Synchronisation avec Aincrad…</span>
+            <div class="boot-logo"><?= $bootLogoHtml ?></div>
+            <strong><?= $bootTitle ?></strong>
+            <span><?= $bootSub ?></span>
         </div>
     </div>
 

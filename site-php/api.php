@@ -278,9 +278,50 @@ switch ($action) {
             respond(['ok' => false, 'error' => 'Ticket introuvable.'], 404);
         }
         $state['tickets'][$index]['status'] = $status;
+        // 🗄️ Fermeture = archivage : le ticket quitte les tickets en cours et
+        // rejoint les archives (conservées avec toute la conversation).
+        if ($status === 'fermé') {
+            $archive = $state['tickets'][$index];
+            $archive['closedAt'] = date('Y-m-d H:i');
+            $archive['closedBy'] = cleanString($input['by'] ?? 'Staff', 60);
+            if (!isset($state['archives']) || !is_array($state['archives'])) $state['archives'] = [];
+            array_unshift($state['archives'], $archive);
+            $state['archives'] = array_slice($state['archives'], 0, 500);
+            array_splice($state['tickets'], $index, 1);
+            appendActivity($state, 'ticket', 'Ticket fermé et archivé', $ticketId);
+            saveState($state);
+            respond(['ok' => true, 'archived' => true, 'state' => $state]);
+        }
         appendActivity($state, 'ticket', 'Statut du ticket modifié', $ticketId . ' · ' . $status);
         saveState($state);
         respond(['ok' => true, 'state' => $state]);
+
+    // 🗄️ Rouvrir un ticket archivé (il revient dans les tickets en cours).
+    case 'ticket.restore': {
+        $ticketId = cleanString($input['ticketId'] ?? '', 40);
+        $archives = $state['archives'] ?? [];
+        $index = findIndexById($archives, $ticketId);
+        if ($index < 0) respond(['ok' => false, 'error' => 'Ticket archivé introuvable.'], 404);
+        $ticket = $archives[$index];
+        unset($ticket['closedAt'], $ticket['closedBy']);
+        $ticket['status'] = 'ouvert';
+        array_splice($state['archives'], $index, 1);
+        array_unshift($state['tickets'], $ticket);
+        appendActivity($state, 'ticket', 'Ticket rouvert depuis les archives', $ticketId);
+        saveState($state);
+        respond(['ok' => true, 'state' => $state]);
+    }
+
+    // 🗑️ Supprimer définitivement un ticket archivé.
+    case 'ticket.purge': {
+        $ticketId = cleanString($input['ticketId'] ?? '', 40);
+        $index = findIndexById($state['archives'] ?? [], $ticketId);
+        if ($index < 0) respond(['ok' => false, 'error' => 'Ticket archivé introuvable.'], 404);
+        array_splice($state['archives'], $index, 1);
+        appendActivity($state, 'ticket', 'Archive supprimée', $ticketId);
+        saveState($state);
+        respond(['ok' => true, 'state' => $state]);
+    }
 
     case 'server.module.save':
         $serverId = cleanString($input['serverId'] ?? '', 80);
@@ -341,11 +382,33 @@ switch ($action) {
                 'latency' => (int) ($raw['latency'] ?? 0),
             ];
         }
+        // Renommer un bot change son identifiant : on reporte l'ancien
+        // identifiant sur le nouveau (même position) pour que les serveurs
+        // déjà liés ne se retrouvent pas orphelins.
+        $anciens = array_column($state['bots'] ?? [], 'id');
+        $nouveaux = array_column($bots, 'id');
+        $remap = [];
+        foreach ($anciens as $position => $ancien) {
+            if (isset($nouveaux[$position])) $remap[$ancien] = $nouveaux[$position];
+        }
+        // On conserve aussi l'avatar Discord déjà récupéré pour ce bot.
+        foreach ($bots as $i => $bot) {
+            $precedent = $state['bots'][$i] ?? null;
+            if ($precedent && !empty($precedent['avatar']) && empty($bot['avatar'])) {
+                $bots[$i]['avatar'] = $precedent['avatar'];
+            }
+        }
         $state['bots'] = $bots;
-        // Les serveurs qui référencent un bot supprimé sont nettoyés.
-        $ids = array_column($bots, 'id');
         foreach ($state['servers'] as $index => $server) {
-            $state['servers'][$index]['botIds'] = array_values(array_intersect($server['botIds'] ?? [], $ids));
+            $liens = [];
+            foreach ($server['botIds'] ?? [] as $ancien) {
+                $cible = $remap[$ancien] ?? (in_array($ancien, $nouveaux, true) ? $ancien : null);
+                if ($cible !== null) $liens[] = $cible;
+            }
+            // Un serveur sans aucun bot resterait invisible : on le rattache
+            // au premier bot déclaré plutôt que de le faire disparaître.
+            if (!$liens && $nouveaux) $liens[] = $nouveaux[0];
+            $state['servers'][$index]['botIds'] = array_values(array_unique($liens));
         }
         appendActivity($state, 'config', 'Liste des bots enregistrée', count($bots) . ' bot(s)');
         saveState($state);
@@ -407,6 +470,9 @@ switch ($action) {
             }
             $state['bots'][$index]['servers'] = count($guilds);
             $state['bots'][$index]['users'] = $membres;
+            // Photo de profil et pseudo Discord réels du bot.
+            if (!empty($infos['bot']['avatar'])) $state['bots'][$index]['avatar'] = (string) $infos['bot']['avatar'];
+            if (!empty($infos['bot']['tag'])) $state['bots'][$index]['discordTag'] = (string) $infos['bot']['tag'];
             if (!empty($infos['bot']['clientId']) && empty($bot['clientId'])) {
                 $state['bots'][$index]['clientId'] = preg_replace('/\D+/', '', (string) $infos['bot']['clientId']);
             }

@@ -34,7 +34,11 @@
     serverQuery: "",
     mobileOpen: false,
     creatorTab: "page",
-    blocks: null, // blocs en cours d'édition dans le constructeur de page
+    blocks: null,        // blocs en cours d'édition dans le constructeur de page
+    previewGrade: null,  // grade simulé (aperçu « qui voit quoi »)
+    ticketTab: "open",   // tickets en cours / archives
+    selectedArchiveId: null,
+    archiveQuery: "",
   };
 
   const icons = {
@@ -64,6 +68,21 @@
     { id: "whitelist", label: "Whitelist métiers", desc: "Candidatures et métiers autorisés" },
     { id: "tickets", label: "Tickets", desc: "Configuration du support intégré" },
   ];
+
+  // Avatar d'un bot : sa VRAIE photo de profil Discord si elle a été
+  // récupérée, sinon l'initiale colorée.
+  function botAvatar(bot, cls = "") {
+    const accent = bot?.accent === "rose" ? "rose" : (bot?.accent || "cyan");
+    if (bot?.avatar) {
+      return `<span class="bot-avatar ${accent} ${cls} has-img"><img src="${esc(bot.avatar)}" alt="" loading="lazy"></span>`;
+    }
+    return `<span class="bot-avatar ${accent} ${cls}">${esc((bot?.name || "B").slice(0, 1))}</span>`;
+  }
+  // Icône d'un serveur : celle de Discord si connue, sinon les initiales.
+  function serverIcon(server) {
+    if (server?.icon) return `<span class="server-emblem has-img"><img src="${esc(server.icon)}" alt="" loading="lazy"></span>`;
+    return `<span class="server-emblem">${esc(server?.short || "SV")}</span>`;
+  }
 
   function esc(value) {
     return String(value ?? "")
@@ -293,8 +312,12 @@
     const openTickets = (state.tickets || []).filter(t => t.status !== "fermé").length;
     const badges = { blacklist: state.blacklist?.length || 0, tickets: openTickets };
     // La navigation est composée dans le Site builder (ordre, libellés,
-    // visibilité). Le builder lui-même reste toujours accessible.
-    const navItems = navConfig().filter(item => item.show !== false || item.id === "site-config");
+    // visibilité) PUIS filtrée par le grade prévisualisé.
+    // En aperçu, le menu est filtré EXACTEMENT comme le verrait ce grade
+    // (la sortie de l'aperçu reste possible via le bandeau en haut).
+    const navItems = navConfig()
+      .filter(item => item.show !== false || (item.id === "site-config" && !ui.previewGrade))
+      .filter(item => !ui.previewGrade || gradeCan("page." + (item.id === "site-config" ? "creator" : item.id)));
     app.innerHTML = `
       <div class="app-shell">
         <header class="topbar">
@@ -328,16 +351,26 @@
           <div class="active-bot-card">
             <small>BOT ACTUEL</small>
             <div class="active-bot-row">
-              <div class="bot-avatar ${bot.accent === "rose" ? "rose" : ""}">${esc(bot.name?.slice(0,1) || "B")}</div>
+              ${botAvatar(bot)}
               <div><strong>${esc(bot.name || "Bot")}</strong><span>${esc(bot.tag || "EN LIGNE")}</span></div>
               <i class="status-dot"></i>
             </div>
             <button class="switch-bot" data-action="switch-bot">CHANGER DE BOT</button>
           </div>
         </aside>
-        <section class="content">${renderRoute()}</section>
+        <section class="content">${previewBanner()}${renderRoute()}</section>
       </div>`;
     startClock();
+  }
+
+  // Bandeau rappelant que l'on regarde le site à travers un grade.
+  function previewBanner() {
+    if (!ui.previewGrade) return "";
+    const g = gradeById(ui.previewGrade);
+    return `<div class="previewbar" style="--gc:${g.color}">
+      <span>👁 Aperçu du grade <b>${esc(g.label)}</b> <i>(${esc(g.family)})</i> — les éléments non autorisés sont masqués.</span>
+      <button class="btn small" data-action="preview-grade" data-grade="">Quitter l'aperçu</button>
+    </div>`;
   }
 
   function renderRoute() {
@@ -404,7 +437,7 @@
 
   function serverCard(server) {
     return `<button class="server-card ${ui.selectedServerId === server.id ? "selected" : ""}" data-action="open-server" data-server-id="${esc(server.id)}">
-      <span class="server-card-top"><span class="server-emblem">${esc(server.short)}</span><i class="status-dot"></i></span>
+      <span class="server-card-top">${serverIcon(server)}<i class="status-dot"></i></span>
       <h4>${esc(server.name)}</h4><p>${esc(server.region)} · ${esc(server.role)}${server.verified ? " · Vérifié" : ""}</p>
       <span class="server-meta"><span>${formatNumber(server.members)} membres</span><span>${formatNumber(server.online)} en ligne</span></span>
       <span class="server-progress"><span style="width:${Math.max(5, Number(server.activity || 0))}%"></span></span>
@@ -446,10 +479,10 @@
       <div class="server-layout">
         <aside class="server-sidebar">
           <section class="panel"><div class="server-id-card">
-            <div class="server-emblem">${esc(server.short)}</div><h3>${esc(server.name)}</h3><p>${formatNumber(server.members)} membres · ${formatNumber(server.online)} en ligne</p>
+            ${serverIcon(server)}<h3>${esc(server.name)}</h3><p>${formatNumber(server.members)} membres · ${formatNumber(server.online)} en ligne</p>
             <div class="hero-status" style="justify-content:center"><span class="chip green">CONNECTÉ</span><span class="chip">${esc(server.region)}</span></div>
           </div></section>
-          <nav class="module-nav">${modules.map((module, index) => `
+          <nav class="module-nav">${modules.filter(m => gradeCan("mod." + m.id)).map((module, index) => `
             <button class="module-btn ${ui.module === module.id ? "active" : ""}" data-action="select-module" data-module="${module.id}"><span class="index">${String(index+1).padStart(2,"0")}</span><span class="label">${esc(module.label)}</span><i class="state"></i></button>`).join("")}</nav>
         </aside>
         <section>${moduleView(ui.module, server)}</section>
@@ -630,17 +663,58 @@
   }
 
   function ticketsView() {
+    // 🗄️ Deux vues : les tickets EN COURS et les ARCHIVES (tickets fermés).
+    if (ui.ticketTab === "archives") return archivesView();
     const ticket = (state.tickets || []).find(item => item.id === ui.selectedTicketId) || state.tickets?.[0];
+    const nbArchives = (state.archives || []).length;
     return `<div class="content-view">
-      ${pageHead("Staff bot / Support", "Gestion des tickets", "Ouvrez une conversation, répondez depuis le site et modifiez son statut.", button("Actualiser", "pulse-system", "primary"))}
+      ${pageHead("Staff bot / Support", "Gestion des tickets", "Ouvrez une conversation, répondez depuis le site et modifiez son statut. Un ticket fermé part automatiquement dans les archives.",
+        button(`🗄️ Archives (${nbArchives})`, "ticket-tab", "ghost", 'data-tab="archives"') + button("Actualiser", "pulse-system", "primary"))}
       <div class="ticket-layout">
-        <section class="panel"><div class="panel-head" style="padding:17px;margin:0"><div><h3>Demandes</h3><p>${state.tickets?.length || 0} tickets enregistrés.</p></div></div><div class="ticket-list">
-          ${(state.tickets || []).map(item => `<button class="ticket-card ${ticket?.id === item.id ? "active" : ""}" data-action="select-ticket" data-ticket-id="${esc(item.id)}"><span><strong>${esc(item.id)} · ${esc(item.user)}</strong><p>${esc(item.subject)}</p><small>${esc(item.server)} · ${esc(item.date)}</small></span><span class="ticket-status ${slug(item.status)}">${esc(item.status)}</span></button>`).join("")}
+        <section class="panel"><div class="panel-head" style="padding:17px;margin:0"><div><h3>Tickets en cours</h3><p>${state.tickets?.length || 0} ticket(s) ouvert(s).</p></div></div><div class="ticket-list">
+          ${(state.tickets || []).map(item => `<button class="ticket-card ${ticket?.id === item.id ? "active" : ""}" data-action="select-ticket" data-ticket-id="${esc(item.id)}"><span><strong>${esc(item.id)} · ${esc(item.user)}</strong><p>${esc(item.subject)}</p><small>${esc(item.server)} · ${esc(item.date)}</small></span><span class="ticket-status ${slug(item.status)}">${esc(item.status)}</span></button>`).join("")
+            || emptyBlock("Aucun ticket en cours", "Les tickets fermés sont dans les archives.")}
         </div></section>
         ${ticket ? `<section class="panel chat-panel"><header class="chat-head"><div><h3>${esc(ticket.id)} · ${esc(ticket.subject)}</h3><p>${esc(ticket.user)} — ${esc(ticket.server)} — priorité ${esc(ticket.priority)}</p></div><select class="select" style="width:auto;min-width:135px" data-action="ticket-status" data-ticket-id="${esc(ticket.id)}"><option value="ouvert" ${ticket.status==="ouvert"?"selected":""}>Ouvert</option><option value="en attente" ${ticket.status==="en attente"?"selected":""}>En attente</option><option value="fermé" ${ticket.status==="fermé"?"selected":""}>Fermé</option></select></header>
           <div class="chat-messages" id="chat-messages">${(ticket.messages || []).map(message => `<article class="message ${message.staff ? "staff" : ""}"><div class="message-head"><strong>${esc(message.author)}</strong><time>${esc(message.time)}</time></div><p>${esc(message.content)}</p></article>`).join("")}</div>
           <form class="chat-compose" data-form="ticket-message" data-ticket-id="${esc(ticket.id)}"><textarea class="textarea" name="content" placeholder="Écrire une réponse au membre…" ${ticket.status === "fermé" ? "" : ""}></textarea><button class="btn success" type="submit">Envoyer la réponse</button></form>
         </section>` : `<section class="panel">${emptyBlock("Aucun ticket", "Aucune conversation n'est disponible.")}</section>`}
+      </div>
+    </div>`;
+  }
+
+  // 🗄️ Archives : tickets fermés, conservés avec toute leur conversation.
+  function archivesView() {
+    const archives = state.archives || [];
+    const query = (ui.archiveQuery || "").trim().toLowerCase();
+    const list = archives.filter(t => !query || `${t.id} ${t.user} ${t.subject} ${t.server}`.toLowerCase().includes(query));
+    const open = archives.find(t => t.id === ui.selectedArchiveId) || list[0];
+    return `<div class="content-view">
+      ${pageHead("Staff bot / Archives", "Tickets archivés", "Chaque ticket fermé est conservé ici avec l'intégralité de sa conversation.",
+        button("← Tickets en cours", "ticket-tab", "ghost", 'data-tab="open"'))}
+      <div class="ticket-layout">
+        <section class="panel">
+          <div class="panel-head" style="padding:17px;margin:0"><div><h3>${archives.length} archive(s)</h3><p>${list.length} résultat(s).</p></div></div>
+          <div style="padding:0 14px 12px"><input class="input" id="archive-search" placeholder="Rechercher (n°, membre, sujet…)" value="${esc(ui.archiveQuery || "")}"></div>
+          <div class="ticket-list">
+            ${list.map(t => `<button class="ticket-card ${open?.id === t.id ? "active" : ""}" data-action="select-archive" data-ticket-id="${esc(t.id)}">
+              <span><strong>${esc(t.id)} · ${esc(t.user)}</strong><p>${esc(t.subject)}</p><small>Fermé le ${esc(t.closedAt || "?")} · ${esc(t.server)}</small></span>
+              <span class="ticket-status ferme">archivé</span></button>`).join("")
+              || emptyBlock("Aucune archive", "Les tickets fermés apparaîtront ici.")}
+          </div>
+        </section>
+        ${open ? `<section class="panel chat-panel">
+          <header class="chat-head">
+            <div><h3>${esc(open.id)} · ${esc(open.subject)}</h3><p>${esc(open.user)} — ${esc(open.server)} — fermé le ${esc(open.closedAt || "?")} par ${esc(open.closedBy || "staff")}</p></div>
+            <div class="page-actions">
+              ${button("↩ Rouvrir", "archive-restore", "ghost small", `data-ticket-id="${esc(open.id)}"`)}
+              ${button("🗑 Supprimer", "archive-purge", "danger small", `data-ticket-id="${esc(open.id)}"`)}
+            </div>
+          </header>
+          <div class="chat-messages">${(open.messages || []).map(m => `
+            <article class="message ${m.staff ? "staff" : ""}"><div class="message-head"><strong>${esc(m.author)}</strong><time>${esc(m.time)}</time></div><p>${esc(m.content)}</p></article>`).join("")}</div>
+          <div style="padding:14px 16px;border-top:1px solid var(--line);color:var(--muted);font-size:12.5px">🔒 Conversation archivée — rouvrez le ticket pour y répondre à nouveau.</div>
+        </section>` : `<section class="panel">${emptyBlock("Aucune archive sélectionnée", "Choisissez un ticket dans la liste.")}</section>`}
       </div>
     </div>`;
   }
@@ -766,7 +840,7 @@
           ${p.title ? `<div class="bot-select-title">${esc(p.title)}</div>` : ""}
           <div class="bot-select">${(state.bots || []).map(bot => `
             <button class="bot-card" data-action="select-bot" data-bot-id="${esc(bot.id)}">
-              <span class="bot-avatar ${bot.accent === "rose" ? "rose" : ""}">${esc(bot.name.slice(0, 1))}</span>
+              ${botAvatar(bot)}
               <span>
                 <span style="display:flex;align-items:center;gap:8px"><h2>${esc(bot.name)}</h2><i class="status-dot"></i></span>
                 <p>${esc(bot.description)}</p>
@@ -829,17 +903,19 @@
 
   // ── Espace créateur : bots + page + apparence + écosystème ──────────
   function creatorView() {
-    const valid = ["ecosystem", "page", "builder", "bots"];
+    const valid = ["ecosystem", "page", "builder", "bots", "perms"];
     const tab = valid.includes(ui.creatorTab) ? ui.creatorTab : "page";
     const tabs = [
       ["page", "🧱 Constructeur de page", "Blocs de la page d'accueil"],
       ["bots", "🤖 Mes bots", "Ajoutez autant de bots que voulu"],
+      ["perms", "🔐 Fonctions & grades", "Qui voit quoi, avec aperçu"],
       ["builder", "🎨 Apparence du site", "Thème, fond, navigation, CSS"],
       ["ecosystem", "🌍 Écosystème", "Serveurs et indicateurs"],
     ];
     const heads = {
       page: pageHead("Créateur / Site builder", "Construisez votre page", "Ajoutez, réordonnez et modifiez les blocs de votre page d'accueil : bannière, cartes, chiffres, galerie, FAQ, annonces…"),
       bots: pageHead("Créateur / Bots", "Mes bots", "Déclarez ici tous vos bots — il n'y a aucune limite. Reliez-les à votre agent pour récupérer leurs vrais serveurs."),
+      perms: pageHead("Créateur / Permissions", "Fonctions & grades", "Toutes les fonctions du bot et toutes les pages du site : choisissez qui y a accès, et prévisualisez le site avec les yeux d'un grade."),
       builder: pageHead("Créateur / Site builder", "Apparence du site", "Identité, thème, fond animé ou image, navigation, effets et CSS libre — appliqués en direct."),
       ecosystem: pageHead("Créateur / Écosystème", "Vue globale", "Consultez l'ensemble des bots, des serveurs et des indicateurs de déploiement.", button("Exporter les données", "export-state", "primary")),
     };
@@ -850,8 +926,102 @@
     const body = tab === "builder" ? siteBuilderBody()
       : tab === "page" ? pageBuilderBody()
       : tab === "bots" ? botsBuilderBody()
+      : tab === "perms" ? permissionsBody()
       : creatorEcosystem();
     return `<div class="content-view">${heads[tab]}${tabBar}${body}</div>`;
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  // GRADES & FONCTIONS DU BOT
+  // ══════════════════════════════════════════════════════════════════
+  // Deux familles de grades : ceux du SERVEUR (comme dans le bot :
+  // Membre → Staff → Administration) et ceux de l'ÉQUIPE DU BOT
+  // (permissions de /botstaff : tickets, blacklist, gestion du staff, créateur).
+  const GRADES = [
+    { id: "membre", label: "Membre", family: "Serveur", rank: 0, color: "#948aa3", desc: "Tout le monde sur le serveur" },
+    { id: "police", label: "Police / Métier", family: "Serveur", rank: 1, color: "#4fd9ff", desc: "Rôle métier whitelisté" },
+    { id: "staff", label: "Staff", family: "Serveur", rank: 2, color: "#2fe38b", desc: "Rôle staff configuré" },
+    { id: "admin", label: "Administration", family: "Serveur", rank: 3, color: "#f3c86a", desc: "Rôle admin ou permission Administrateur" },
+    { id: "bot-tickets", label: "Support du bot", family: "Équipe du bot", rank: 4, color: "#62b8ff", desc: "Permission 🎫 Tickets du QG" },
+    { id: "bot-blacklist", label: "Modérateur du bot", family: "Équipe du bot", rank: 5, color: "#ff7ca5", desc: "Permission 🚫 Blacklist" },
+    { id: "bot-staff", label: "Responsable du bot", family: "Équipe du bot", rank: 6, color: "#a970ff", desc: "Permission 🛡️ Gestion du staff" },
+    { id: "createur", label: "Créateur", family: "Équipe du bot", rank: 7, color: "#ff5c74", desc: "Propriétaire du bot — accès total" },
+  ];
+  const gradeById = id => GRADES.find(g => g.id === id) || GRADES[0];
+
+  // Toutes les fonctions du bot, reprises de ses commandes réelles.
+  // « g » = grades autorisés par défaut (repris des grades du bot).
+  const FEATURES = [
+    // 🎭 Roleplay
+    { id: "cmd.carte", cat: "🎭 Roleplay", label: "/carte", desc: "Cartes d'identité RP (création, recherche, modification)", g: ["staff", "admin"] },
+    { id: "cmd.permis", cat: "🎭 Roleplay", label: "/permis", desc: "Permis de conduire : délivrance, points, invalidation", g: ["staff", "admin"] },
+    { id: "cmd.entreprise", cat: "🎭 Roleplay", label: "/entreprise", desc: "Entreprises RP, patrons et employés", g: ["staff", "admin"] },
+    { id: "cmd.assurance", cat: "🎭 Roleplay", label: "/assurance", desc: "Contrats d'assurance (véhicule, maison, entreprise, santé)", g: ["staff", "admin"] },
+    { id: "cmd.service", cat: "🎭 Roleplay", label: "/service", desc: "Prise et fin de service RP", g: ["membre", "police", "staff", "admin"] },
+    { id: "cmd.temps", cat: "🎭 Roleplay", label: "/temps", desc: "Temps de service des membres d'une faction", g: ["police", "staff", "admin"] },
+    { id: "cmd.casier", cat: "🎭 Roleplay", label: "/casier", desc: "Casier d'un membre (historique RP)", g: ["staff", "admin"] },
+    { id: "cmd.casierjudiciaire", cat: "🎭 Roleplay", label: "/casierjudiciaire", desc: "Casier judiciaire — réservé à la police", g: ["police", "staff", "admin"] },
+    { id: "cmd.warnrp", cat: "🎭 Roleplay", label: "/warnrp", desc: "Avertissements RP à points", g: ["staff", "admin"] },
+    { id: "cmd.whitelistrp", cat: "🎭 Roleplay", label: "/whitelistrp", desc: "Whitelist RP : panneau, recherche, casier", g: ["staff", "admin"] },
+    { id: "cmd.blacklistrp", cat: "🎭 Roleplay", label: "/blacklistrp", desc: "Blacklist RP du serveur", g: ["staff", "admin"] },
+    { id: "cmd.whitelist", cat: "🎭 Roleplay", label: "/whitelist", desc: "Whitelist métiers : les gérants recrutent", g: ["police", "staff", "admin"] },
+    // 🛡️ Modération
+    { id: "cmd.ban", cat: "🛡️ Modération", label: "/ban · /kick · /mute", desc: "Sanctions classiques du serveur", g: ["staff", "admin"] },
+    { id: "cmd.banglobal", cat: "🛡️ Modération", label: "/banglobal", desc: "Bannir sur tous les serveurs du bot", g: ["admin"] },
+    { id: "cmd.securite", cat: "🛡️ Modération", label: "/securite", desc: "Anti-spam, anti-nuke et captcha", g: ["admin"] },
+    { id: "cmd.snipe", cat: "🛡️ Modération", label: "/snipe", desc: "Derniers messages supprimés", g: ["staff", "admin"] },
+    { id: "cmd.report", cat: "🛡️ Modération", label: "/report", desc: "Signaler un utilisateur au staff", g: ["membre", "police", "staff", "admin"] },
+    // ⚙️ Configuration
+    { id: "cmd.config", cat: "⚙️ Configuration", label: "/config", desc: "Panneau central : rôles, salons, XP, whitelist", g: ["staff", "admin"] },
+    { id: "cmd.ticket", cat: "⚙️ Configuration", label: "/ticket", desc: "Tickets : panneau, raisons, ouverture pour un membre", g: ["staff", "admin"] },
+    { id: "cmd.embed", cat: "⚙️ Configuration", label: "/embed", desc: "Composer un embed envoyé par le bot", g: ["staff", "admin"] },
+    { id: "cmd.reseaux", cat: "⚙️ Configuration", label: "/reseaux", desc: "Annonces automatiques des réseaux sociaux", g: ["staff", "admin"] },
+    { id: "cmd.staff", cat: "⚙️ Configuration", label: "/arrivee · /depart", desc: "Annonces d'arrivée et de départ de poste", g: ["staff", "admin"] },
+    { id: "cmd.partenariat", cat: "⚙️ Configuration", label: "/partenariat", desc: "Proposer et publier des partenariats", g: ["membre", "staff", "admin"] },
+    // 📈 Communauté
+    { id: "cmd.niveau", cat: "📈 Communauté", label: "/niveau", desc: "Niveaux et classements (écrit et vocal)", g: ["membre", "police", "staff", "admin"] },
+    { id: "cmd.info", cat: "📈 Communauté", label: "/info", desc: "Fiche d'un membre", g: ["membre", "police", "staff", "admin"] },
+    { id: "cmd.musique", cat: "📈 Communauté", label: "/musique", desc: "Musique en vocal (YouTube, Spotify, Deezer…)", g: ["membre", "police", "staff", "admin"] },
+    { id: "cmd.interact", cat: "📈 Communauté", label: "/interact", desc: "Interactions entre membres (câlin, high-five…)", g: ["membre", "police", "staff", "admin"] },
+    { id: "cmd.sao", cat: "📈 Communauté", label: "/sao", desc: "Mini-jeu Aincrad : personnage et progression", g: ["membre", "police", "staff", "admin"] },
+    { id: "cmd.vgache", cat: "📈 Communauté", label: "/vgache", desc: "Gacha de VTubeuses", g: ["membre", "police", "staff", "admin"] },
+    { id: "cmd.invite", cat: "📈 Communauté", label: "/invite", desc: "Lien d'invitation du bot", g: ["membre", "police", "staff", "admin"] },
+    // 🤖 Équipe du bot
+    { id: "cmd.blacklist", cat: "🤖 Équipe du bot", label: "/blacklist", desc: "Blacklist GLOBALE du bot (MP + ban partout)", g: ["bot-blacklist", "bot-staff", "createur"] },
+    { id: "cmd.botstaff", cat: "🤖 Équipe du bot", label: "/botstaff", desc: "Hiérarchie et permissions de l'équipe du bot", g: ["bot-staff", "createur"] },
+    { id: "cmd.qgtickets", cat: "🤖 Équipe du bot", label: "Tickets du QG", desc: "Traiter les tickets de bannissement remontés", g: ["bot-tickets", "bot-staff", "createur"] },
+    { id: "cmd.scamimage", cat: "🤖 Équipe du bot", label: "/scamimage", desc: "Anti-scam global par image", g: ["createur"] },
+    { id: "cmd.patchnote", cat: "🤖 Équipe du bot", label: "/patchnote", desc: "Notes de mise à jour du bot", g: ["createur"] },
+    { id: "cmd.update", cat: "🤖 Équipe du bot", label: "/update · /forceupdate", desc: "Mise à jour et redémarrage du bot", g: ["admin", "createur"] },
+    // 🖥️ Pages du site
+    { id: "page.dashboard", cat: "🖥️ Pages du site", label: "Vue d'ensemble", desc: "Tableau de bord du site", g: ["staff", "admin", "bot-tickets", "bot-blacklist", "bot-staff", "createur"] },
+    { id: "page.servers", cat: "🖥️ Pages du site", label: "Mes serveurs", desc: "Liste et configuration des serveurs", g: ["staff", "admin", "bot-staff", "createur"] },
+    { id: "page.blacklist", cat: "🖥️ Pages du site", label: "Blacklist & preuves", desc: "Base de sanctions et preuves", g: ["bot-blacklist", "bot-staff", "createur"] },
+    { id: "page.tickets", cat: "🖥️ Pages du site", label: "Gestion des tickets", desc: "Conversations et archives", g: ["bot-tickets", "bot-staff", "createur"] },
+    { id: "page.creator", cat: "🖥️ Pages du site", label: "Espace créateur", desc: "Site builder, bots, permissions", g: ["createur"] },
+    // 🧩 Modules de configuration serveur
+    { id: "mod.overview", cat: "🧩 Modules serveur", label: "Vue d'ensemble", desc: "Identité, langue et réglages généraux", g: ["staff", "admin", "createur"] },
+    { id: "mod.rp", cat: "🧩 Modules serveur", label: "Module RP", desc: "Personnages, économie, inventaire", g: ["admin", "createur"] },
+    { id: "mod.arrivals", cat: "🧩 Modules serveur", label: "Arrivées & départs", desc: "Messages de bienvenue et d'au revoir", g: ["staff", "admin", "createur"] },
+    { id: "mod.roles", cat: "🧩 Modules serveur", label: "Rôles & sécurité", desc: "Anti-raid, autorôles, permissions", g: ["admin", "createur"] },
+    { id: "mod.channels", cat: "🧩 Modules serveur", label: "Salons & logs", desc: "Journalisation du serveur", g: ["admin", "createur"] },
+    { id: "mod.levels", cat: "🧩 Modules serveur", label: "Niveaux", desc: "XP, récompenses et progression", g: ["staff", "admin", "createur"] },
+    { id: "mod.whitelist", cat: "🧩 Modules serveur", label: "Whitelist métiers", desc: "Candidatures et métiers autorisés", g: ["staff", "admin", "createur"] },
+    { id: "mod.tickets", cat: "🧩 Modules serveur", label: "Tickets", desc: "Panneau, rôles support et archives", g: ["staff", "admin", "createur"] },
+  ];
+
+  // Permissions enregistrées (sinon valeurs par défaut de chaque fonction).
+  function permissions() {
+    const saved = siteConfig().permissions || {};
+    const out = {};
+    FEATURES.forEach(f => { out[f.id] = Array.isArray(saved[f.id]) ? saved[f.id] : f.g; });
+    return out;
+  }
+  // Le grade actuellement simulé voit-il cette fonction ?
+  function gradeCan(featureId, gradeId = ui.previewGrade) {
+    if (!gradeId) return true;                       // aperçu désactivé
+    if (gradeId === "createur") return true;         // le créateur voit tout
+    return (permissions()[featureId] || []).includes(gradeId);
   }
 
   // ── 🤖 Gestion des bots : autant de bots que souhaité ───────────────
@@ -864,7 +1034,7 @@
     const rows = bots.map((bot, index) => `
       <div class="botcfg" data-bot-index="${index}">
         <div class="botcfg-head">
-          <span class="bot-avatar ${esc(bot.accent || "cyan")}">${esc((bot.name || "B").slice(0, 1))}</span>
+          ${botAvatar(bot)}
           <strong>${esc(bot.name || "Bot")}</strong>
           <span class="chip">${bot.servers || 0} serveur(s)</span>
           <div class="botcfg-move">
@@ -902,6 +1072,56 @@
         </div>
         <div id="sync-report" style="margin-top:12px"></div>
       </div></section>`;
+  }
+
+  // ── 🔐 Permissions par grade + aperçu ───────────────────────────────
+  function permissionsBody() {
+    const perms = permissions();
+    const cats = [...new Set(FEATURES.map(f => f.cat))];
+    const previewBar = `
+      <section class="panel"><div class="panel-inner">
+        <div class="panel-head"><div><h3>👁 Aperçu par grade</h3><p>Choisissez un grade : le site n'affiche plus que ce que ce grade peut voir (menu, pages et modules).</p></div></div>
+        <div class="gradepick">
+          <button class="gradechip ${!ui.previewGrade ? "on" : ""}" data-action="preview-grade" data-grade="">🔓 Aucun (tout voir)</button>
+          ${GRADES.map(g => `<button class="gradechip ${ui.previewGrade === g.id ? "on" : ""}" data-action="preview-grade" data-grade="${g.id}" style="--gc:${g.color}">
+            <b>${esc(g.label)}</b><span>${esc(g.family)}</span></button>`).join("")}
+        </div>
+        ${ui.previewGrade ? `<div class="previewnote">🎭 Aperçu actif : <b style="color:${gradeById(ui.previewGrade).color}">${esc(gradeById(ui.previewGrade).label)}</b> — ${esc(gradeById(ui.previewGrade).desc)}. ${countVisible()} fonction(s) visible(s) sur ${FEATURES.length}.</div>` : ""}
+      </div></section>`;
+    const table = cats.map(cat => {
+      const rows = FEATURES.filter(f => f.cat === cat).map(f => `
+        <div class="permrow ${ui.previewGrade && !gradeCan(f.id) ? "hidden-for-grade" : ""}" data-feature="${esc(f.id)}">
+          <div class="perminfo"><strong>${esc(f.label)}</strong><span>${esc(f.desc)}</span></div>
+          <div class="permgrades">
+            ${GRADES.map(g => `<button type="button" class="gtoggle ${(perms[f.id] || []).includes(g.id) ? "on" : ""}"
+              data-action="perm-toggle" data-grade="${g.id}" style="--gc:${g.color}" title="${esc(g.label)} — ${esc(g.family)}">${esc(g.label)}</button>`).join("")}
+          </div>
+        </div>`).join("");
+      return `<section class="panel mt-16"><div class="panel-inner">
+        <div class="panel-head"><div><h3>${cat}</h3><p>Cliquez sur un grade pour l'autoriser ou le retirer.</p></div>
+        <div class="page-actions">${button("Tout cocher", "perm-all", "ghost small", `data-cat="${esc(cat)}"`)}${button("Tout décocher", "perm-none", "ghost small", `data-cat="${esc(cat)}"`)}</div></div>
+        ${rows}
+      </div></section>`;
+    }).join("");
+    return `
+      <div class="builder-hint">🔐 Chaque fonction du bot et chaque page du site peut être réservée aux grades de votre choix — <b>grades du serveur</b> (Membre, Police, Staff, Admin) et <b>grades de l'équipe du bot</b> (Support, Modérateur, Responsable, Créateur).</div>
+      ${previewBar}
+      ${table}
+      <div class="form-actions" style="position:sticky;bottom:14px">
+        ${button("↺ Rétablir les valeurs du bot", "perm-reset", "ghost")}
+        ${button("💾 Enregistrer les permissions", "perm-save", "success")}
+      </div>`;
+  }
+  function countVisible() {
+    return FEATURES.filter(f => gradeCan(f.id)).length;
+  }
+  // Lit les permissions depuis les cases affichées.
+  function collectPermissions() {
+    const out = {};
+    document.querySelectorAll(".permrow[data-feature]").forEach(row => {
+      out[row.dataset.feature] = Array.from(row.querySelectorAll(".gtoggle.on")).map(el => el.dataset.grade);
+    });
+    return out;
   }
 
   // Lit la liste des bots depuis les champs affichés.
@@ -990,7 +1210,7 @@
     return `
       <div class="grid-2">${(state.bots || []).map(bot => {
         const servers = botServers(bot.id);
-        return `<section class="panel"><div class="panel-inner"><div class="panel-head"><div style="display:flex;gap:13px;align-items:center"><span class="bot-avatar ${bot.accent === "rose" ? "rose" : ""}">${esc(bot.name.slice(0,1))}</span><div><h3>${esc(bot.name)}</h3><p>${esc(bot.description)}</p></div></div><span class="chip green">EN LIGNE</span></div><div class="grid-3"><div class="stat-card"><span>Serveurs</span><strong>${servers.length}</strong><em>déploiements</em></div><div class="stat-card"><span>Utilisateurs</span><strong>${formatNumber(servers.reduce((s,x)=>s+x.members,0))}</strong><em>portée</em></div><div class="stat-card"><span>Latence</span><strong>${bot.latency}</strong><em>millisecondes</em></div></div></div></section>`;
+        return `<section class="panel"><div class="panel-inner"><div class="panel-head"><div style="display:flex;gap:13px;align-items:center">${botAvatar(bot)}<div><h3>${esc(bot.name)}</h3><p>${esc(bot.description)}</p></div></div><span class="chip green">EN LIGNE</span></div><div class="grid-3"><div class="stat-card"><span>Serveurs</span><strong>${servers.length}</strong><em>déploiements</em></div><div class="stat-card"><span>Utilisateurs</span><strong>${formatNumber(servers.reduce((s,x)=>s+x.members,0))}</strong><em>portée</em></div><div class="stat-card"><span>Latence</span><strong>${bot.latency}</strong><em>millisecondes</em></div></div></div></section>`;
       }).join("")}</div>
       <section class="panel mt-16"><div class="panel-inner"><div class="panel-head"><div><h3>Tous les serveurs</h3><p>${state.servers?.length || 0} déploiements · ${formatNumber(totalMembers)} membres cumulés.</p></div></div><div class="table-wrap"><table class="data-table"><thead><tr><th>Serveur</th><th>Région</th><th>Membres</th><th>En ligne</th><th>Bots installés</th><th>Accès</th></tr></thead><tbody>${(state.servers || []).map(server => `<tr><td><strong>${esc(server.name)}</strong><br><span>${esc(server.id)}</span></td><td>${esc(server.region)}</td><td>${formatNumber(server.members)}</td><td>${formatNumber(server.online)}</td><td>${server.botIds.map(id => `<span class="chip">${esc(state.bots.find(bot=>bot.id===id)?.name || id)}</span>`).join(" ")}</td><td>${button("Configurer", "open-server", "small", `data-server-id="${esc(server.id)}"`)}</td></tr>`).join("")}</tbody></table></div></div></section>
       <div class="grid-3 mt-16"><div class="stat-card"><span>Disponibilité</span><strong>99.98%</strong><em>30 derniers jours</em></div><div class="stat-card"><span>Commandes exécutées</span><strong>1.24 M</strong><em>total historique</em></div><div class="stat-card"><span>Événements traités</span><strong>8.7 M</strong><em>Cardinal System</em></div></div>`;
@@ -1082,11 +1302,21 @@
         ${toggleField("publicStatus", s.publicStatus !== false, "Statut public", "Autorise l'affichage de l'état des bots.")}
       </div></div>
     </div></section>`;
+    const boot = `<section class="panel"><div class="panel-inner"><div class="panel-head"><div><h3>⏳ Écran de chargement</h3><p>Ce que vos visiteurs voient à l'ouverture du site — texte, logo, durée et anneau.</p></div>
+      <div class="page-actions">${button("👁 Le revoir", "replay-boot", "ghost small")}</div></div>
+      <div class="form-grid">
+        ${inputField("bootTitle", "Titre", s.bootTitle ?? "INITIALISATION", "text", "Affiché en gros sous le logo.")}
+        ${inputField("bootSubtitle", "Sous-titre", s.bootSubtitle ?? "Chargement du système…")}
+        ${inputField("bootLogo", "Logo de l'écran", s.bootLogo ?? "", "text", "Emoji ou URL d'image. Vide = le logo du site.")}
+        ${inputField("bootDuration", "Durée d'affichage (ms)", s.bootDuration ?? 650, "range", "0 = disparaît aussitôt, 4000 = 4 secondes.", 'min="0" max="4000" step="50"')}
+      </div>
+      <div class="mt-16">${toggleField("bootRing", s.bootRing !== false, "Anneau animé", "Le cercle lumineux qui tourne autour du logo.")}</div>
+    </div></section>`;
     const advanced = `<section class="panel"><div class="panel-inner"><div class="panel-head"><div><h3>🧪 CSS personnalisé</h3><p>Pouvoir total : ce CSS est injecté tel quel sur tout le site (20 000 caractères max).</p></div></div>
       ${textAreaField("customCss", "Votre CSS", s.customCss || "", "Exemple : .panel { border-width: 2px; }  ·  body { letter-spacing: .02em; }")}
     </div></section>`;
     return `<div class="builder-hint">💡 Chaque réglage se prévisualise <b>en direct</b> pendant que vous le modifiez. « Enregistrer » l'applique pour tout le monde.</div>
-      <form data-form="site-config" id="site-builder-form">${identity}<div class="mt-16">${theme}</div><div class="mt-16">${background}</div><div class="mt-16">${navigation}</div><div class="mt-16">${effects}</div><div class="mt-16">${advanced}</div>
+      <form data-form="site-config" id="site-builder-form">${identity}<div class="mt-16">${theme}</div><div class="mt-16">${background}</div><div class="mt-16">${boot}</div><div class="mt-16">${navigation}</div><div class="mt-16">${effects}</div><div class="mt-16">${advanced}</div>
       <div class="form-actions"><button class="btn ghost" type="button" data-action="reset-site-config">Annuler les modifications</button><button class="btn success" type="submit">💾 Enregistrer le site</button></div></form>
       ${uploadSection}`;
   }
@@ -1170,6 +1400,22 @@
     }
     customTag.textContent = String(cfg.customCss || "").slice(0, 20000);
     document.title = cfg.siteName || "Aincrad Control Panel";
+
+    // Écran de chargement : textes, logo et anneau modifiables en direct.
+    if (boot) {
+      const title = boot.querySelector("strong");
+      const sub = boot.querySelector("span");
+      const logo = boot.querySelector(".boot-logo");
+      const ring = boot.querySelector(".boot-ring");
+      if (title) title.textContent = cfg.bootTitle ?? "INITIALISATION";
+      if (sub) sub.textContent = cfg.bootSubtitle ?? "Chargement du système…";
+      if (logo) {
+        const mark = String(cfg.bootLogo || cfg.logo || "⚔️");
+        logo.innerHTML = /^(https?:\/\/|uploads\/|assets\/)/.test(mark)
+          ? `<img src="${esc(mark)}" alt="">` : esc(mark);
+      }
+      if (ring) ring.style.display = cfg.bootRing === false ? "none" : "";
+    }
   }
 
   function startClock() {
@@ -1331,6 +1577,44 @@
           ui.creatorTab = target.dataset.tab;
           render();
           break;
+        // ── Permissions par grade ───────────────────────────────────
+        case "perm-toggle":
+          target.classList.toggle("on");
+          break;
+        case "perm-all":
+        case "perm-none": {
+          const on = action === "perm-all";
+          target.closest(".panel").querySelectorAll(".gtoggle").forEach(el => el.classList.toggle("on", on));
+          break;
+        }
+        case "perm-save":
+          await api("site.config.save", { config: { ...siteConfig(), permissions: collectPermissions() } });
+          render();
+          toast("PERMISSIONS ENREGISTRÉES", "Chaque grade ne voit plus que ce que vous avez autorisé.");
+          break;
+        case "perm-reset": {
+          if (!confirm("Rétablir les permissions par défaut du bot ?")) break;
+          const defaults = {};
+          FEATURES.forEach(f => { defaults[f.id] = f.g; });
+          await api("site.config.save", { config: { ...siteConfig(), permissions: defaults } });
+          render();
+          toast("PERMISSIONS", "Valeurs par défaut du bot rétablies.");
+          break;
+        }
+        case "replay-boot": {
+          // Rejoue l'écran de chargement avec les réglages en cours d'édition.
+          const form = document.querySelector("#site-builder-form");
+          const cfg = form ? { ...siteConfig(), ...collectSiteConfig(form) } : siteConfig();
+          applySitePreferences(cfg);
+          boot.classList.remove("is-hidden");
+          setTimeout(() => boot.classList.add("is-hidden"), Math.min(4000, Math.max(300, Number(cfg.bootDuration ?? 650))));
+          break;
+        }
+        case "preview-grade":
+          ui.previewGrade = target.dataset.grade || null;
+          render();
+          if (ui.previewGrade) toast("APERÇU", `Le site est affiché comme le voit un « ${gradeById(ui.previewGrade).label} ».`);
+          break;
         // ── Gestion des bots ────────────────────────────────────────
         case "bot-add": {
           const bots = collectBots();
@@ -1490,6 +1774,29 @@
         case "select-ticket":
           ui.selectedTicketId = target.dataset.ticketId;
           render();
+          break;
+        // ── 🗄️ Archives de tickets ──────────────────────────────────
+        case "ticket-tab":
+          ui.ticketTab = target.dataset.tab === "archives" ? "archives" : "open";
+          render();
+          break;
+        case "select-archive":
+          ui.selectedArchiveId = target.dataset.ticketId;
+          render();
+          break;
+        case "archive-restore":
+          await api("ticket.restore", { ticketId: target.dataset.ticketId });
+          ui.ticketTab = "open";
+          ui.selectedTicketId = target.dataset.ticketId;
+          render();
+          toast("TICKET ROUVERT", "Il est de retour dans les tickets en cours.");
+          break;
+        case "archive-purge":
+          if (!confirm("Supprimer définitivement cette archive ? Cette action est irréversible.")) break;
+          await api("ticket.purge", { ticketId: target.dataset.ticketId });
+          ui.selectedArchiveId = null;
+          render();
+          toast("ARCHIVE SUPPRIMÉE", "Le ticket a été effacé définitivement.");
           break;
         case "close-modal":
           closeModal();
@@ -1659,6 +1966,10 @@
       ui.serverQuery = event.target.value;
       render();
     }
+    if (event.key === "Enter" && event.target.id === "archive-search") {
+      ui.archiveQuery = event.target.value;
+      render();
+    }
   });
 
   function createRipple(event, element = event.target.closest("button")) {
@@ -1701,7 +2012,9 @@
   window.addEventListener("load", () => {
     createParticles();
     render();
-    // L'écran de démarrage est désactivable depuis le builder.
-    setTimeout(() => boot.classList.add("is-hidden"), siteConfig().bootScreen === false ? 0 : 650);
+    // Durée de l'écran de démarrage réglée dans le builder (0 = désactivé).
+    const cfg = siteConfig();
+    const delay = cfg.bootScreen === false ? 0 : Math.min(4000, Math.max(0, Number(cfg.bootDuration ?? 650)));
+    setTimeout(() => boot.classList.add("is-hidden"), delay);
   });
 })();

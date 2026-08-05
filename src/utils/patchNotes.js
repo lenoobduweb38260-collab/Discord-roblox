@@ -290,6 +290,24 @@ const RELEASES = [
     ],
     retrait: [],
   },
+  {
+    id: 'site-grades-2026-08f',
+    title: 'Site : fonctions par grade, archives & écran de chargement 🔐',
+    ajout: [
+      '🔐 **Toutes les fonctions du bot** listées dans l\'espace Créateur (RP, modération, configuration, communauté, équipe du bot, pages et modules) : autorisez chacune **grade par grade**',
+      '🎭 **Grades pris en compte** : ceux du serveur (Membre, Police/Métier, Staff, Administration) **et** ceux de l\'équipe du bot (Support, Modérateur, Responsable, Créateur)',
+      '👁 **Aperçu par grade** : le site s\'affiche exactement comme le voit le grade choisi — menu, pages et modules non autorisés sont masqués',
+      '🗄️ **Archives des tickets** : un ticket fermé quitte les tickets en cours et rejoint les archives avec toute sa conversation (recherche, réouverture, suppression définitive)',
+      '⏳ **Écran de chargement personnalisable** : titre, sous-titre, logo, durée et anneau animé',
+    ],
+    amelioration: [
+      '🖼️ **Photos de profil Discord** des bots et **icônes des serveurs** affichées partout, sur le site comme sur le dashboard',
+    ],
+    fix: [
+      '🩹 Renommer un bot ne détache plus ses serveurs : les liens sont reportés sur le nouveau nom (auparavant les serveurs disparaissaient après enregistrement)',
+    ],
+    retrait: [],
+  },
 ];
 
 // Découpe une catégorie en champs d'embed (max 1024 caractères par champ).

@@ -259,11 +259,11 @@ function cache_read(): ?array {
 function guild_map(): array {
   $cache = cache_read();
   if ($cache !== null && isset($cache['at']) && time() - $cache['at'] < 30) {
-    return [$cache['map'] ?? [], $cache['infos'] ?? [], $cache['meta'] ?? ['all' => [], 'bots' => [], 'errors' => []]];
+    return [$cache['map'] ?? [], $cache['infos'] ?? [], $cache['meta'] ?? ['all' => [], 'bots' => [], 'errors' => [], 'avatars' => [], 'tags' => []]];
   }
   $map = [];
   $infos = [];
-  $meta = ['all' => [], 'bots' => [], 'errors' => []];
+  $meta = ['all' => [], 'bots' => [], 'errors' => [], 'avatars' => [], 'tags' => []];
   [$st, $etat] = agent_call('/agent/etat');
   if ($st === 200) {
     foreach ($etat['bots'] ?? [] as $bot) {
@@ -275,6 +275,9 @@ function guild_map(): array {
       }
       $meta['bots'][] = $name;
       [$st2, $data] = agent_call('/agent/bots/' . rawurlencode($name) . '/proxy/infos');
+      // Photo de profil et pseudo Discord du bot (affichés dans l'interface).
+      if (!empty($data['bot']['avatar'])) $meta['avatars'][$name] = (string) $data['bot']['avatar'];
+      if (!empty($data['bot']['tag'])) $meta['tags'][$name] = (string) $data['bot']['tag'];
       if ($st2 !== 200 || empty($data['guilds'])) {
         $meta['errors'][$name] = $st2 === 0
           ? 'Le bot ne répond pas à l\'agent (délai dépassé ou API interne non démarrée).'
@@ -294,7 +297,7 @@ function guild_map(): array {
     @file_put_contents(__DIR__ . '/cache-serveurs.php', CACHE_PREFIX . json_encode(['at' => time(), 'map' => $map, 'infos' => $infos, 'meta' => $meta]));
   } elseif ($cache !== null) {
     // Agent injoignable : on garde l'ancien cache pour ne pas vider le dashboard.
-    return [$cache['map'] ?? [], $cache['infos'] ?? [], $cache['meta'] ?? ['all' => [], 'bots' => [], 'errors' => []]];
+    return [$cache['map'] ?? [], $cache['infos'] ?? [], $cache['meta'] ?? ['all' => [], 'bots' => [], 'errors' => [], 'avatars' => [], 'tags' => []]];
   } else {
     $meta['errors']['agent'] = $st === 0
       ? 'Agent injoignable (AGENT_URL/port bloqués, ou agent éteint).'
@@ -465,6 +468,7 @@ function bots_diagnostic(): array {
       $ligne['erreur'] = 'Bot arrêté chez l\'agent — démarrez-le (▶) depuis votre panel.';
     } else {
       [$st2, $data] = agent_call('/agent/bots/' . rawurlencode($name) . '/proxy/infos');
+      if (!empty($data['bot']['avatar'])) $ligne['avatar'] = (string) $data['bot']['avatar'];
       if ($st2 >= 200 && $st2 < 300 && !empty($data['guilds'])) {
         $ligne['ok'] = true;
         $ligne['serveurs'] = count($data['guilds']);
@@ -835,7 +839,7 @@ if ($p === 'api-moi' || $p === 'api-serveur' || $p === 'api-global') {
       }
       send_json(200, $out);
     }
-    [$map, $infos] = guild_map();
+    [$map, $infos, $meta] = guild_map();
     $servers = [];
     $mine = [];
     foreach ($_SESSION['guilds'] as $g) {
@@ -844,13 +848,20 @@ if ($p === 'api-moi' || $p === 'api-serveur' || $p === 'api-global') {
       $servers[] = [
         'id' => $g['id'],
         'name' => $g['name'],
-        'icon' => $g['icon'] ? "https://cdn.discordapp.com/icons/{$g['id']}/{$g['icon']}.png?size=128" : null,
+        // Icône Discord du serveur : celle du compte connecté, sinon celle
+        // que le bot voit (utile pour les serveurs sans icône côté session).
+        'icon' => $g['icon']
+          ? "https://cdn.discordapp.com/icons/{$g['id']}/{$g['icon']}.png?size=128"
+          : ($infos[$g['id']]['icon'] ?? null),
         'membres' => $infos[$g['id']]['memberCount'] ?? null,
         'bot' => $map[$g['id']],
+        'botAvatar' => $meta['avatars'][$map[$g['id']]] ?? null,
         'enligne' => true,
       ];
     }
-    $out = ['user' => $_SESSION['user'], 'servers' => $servers, 'role' => $role, 'dash' => $dash];
+    // Photos de profil et pseudos Discord des bots (affichés dans l'UI).
+    $out = ['user' => $_SESSION['user'], 'servers' => $servers, 'role' => $role, 'dash' => $dash,
+            'botAvatars' => $meta['avatars'] ?? [], 'botTags' => $meta['tags'] ?? []];
     // ⚙️ Créateur : une section PAR BOT listant TOUS les serveurs où ce bot est
     // présent — y compris ceux où le créateur n'est pas membre (accès créateur).
     if (!empty($role['creator'])) {
@@ -862,6 +873,7 @@ if ($p === 'api-moi' || $p === 'api-serveur' || $p === 'api-global') {
           'icon' => $infos[$gid2]['icon'] ?? null,
           'membres' => $infos[$gid2]['memberCount'] ?? null,
           'bot' => $bname,
+          'botAvatar' => $meta['avatars'][$bname] ?? null,
           'enligne' => true,
           'creatorOnly' => empty($mine[$gid2]),
         ];
@@ -1696,7 +1708,9 @@ function scardHtml(s){
     (s.icon ? '<img src="' + s.icon + '">' : '<div class="noicon">🌐</div>') +
     '<div style="min-width:0"><div style="font-weight:700">' + esc(s.name) +
     (s.creatorOnly ? ' <span class="ownchip">👑 accès créateur</span>' : '') + '</div>' +
-    '<div style="color:var(--muted);font-size:12px">' + (s.membres ? s.membres + ' membres · ' : '') + '🤖 ' + esc(botLabel(s.bot)) + '</div></div></div>';
+    '<div style="color:var(--muted);font-size:12px;display:flex;align-items:center;gap:5px">' + (s.membres ? s.membres + ' membres · ' : '') +
+    (s.botAvatar ? '<img src="' + esc(s.botAvatar) + '" alt="" style="width:16px;height:16px;border-radius:50%;vertical-align:-3px">' : '🤖') +
+    ' ' + esc(botLabel(s.bot)) + '</div></div></div>';
 }
 
 // ----- Accueil : grille des serveurs -----
@@ -1778,6 +1792,7 @@ function renderServer(){
     (srv && srv.icon ? '<img src="' + srv.icon + '">' : '<div class="noicon">🌐</div>') +
     '<div class="nm">' + esc(srv ? srv.name : '') + '</div>' +
     '<div class="stline"><span class="dot ' + (srv && srv.enligne === false ? 'down' : 'up') + '"></span>' +
+    (srv && srv.botAvatar ? '<img src="' + esc(srv.botAvatar) + '" alt="" style="width:15px;height:15px;border-radius:50%">' : '') +
     (srv && srv.enligne === false ? 'Bot hors ligne' : 'Bot en ligne') + '</div></div>';
   var pages = pagesActives();
   if (!pages.some(function(p){ return p[0] === page; })) page = 'apercu';
@@ -2379,6 +2394,7 @@ function renderCreateur(){
           var ok = b.ok;
           html += '<div class="row" style="align-items:flex-start;border-color:' + (ok ? 'rgba(0,255,136,.35)' : 'rgba(255,48,96,.45)') + '">' +
             '<span style="font-size:15px">' + (ok ? '✅' : '❌') + '</span>' +
+            (b.avatar ? '<img src="' + esc(b.avatar) + '" alt="" style="width:30px;height:30px;border-radius:50%;border:1px solid var(--a25)">' : '') +
             '<div style="flex:1;min-width:180px"><b>' + esc(b.nom) + '</b>' + (b.tag ? ' <span style="color:var(--muted)">' + esc(b.tag) + '</span>' : '') +
             '<div style="color:var(--muted);font-size:12px">' + (ok ? (b.serveurs + ' serveur(s) · tout fonctionne') : esc(b.erreur || 'injoignable')) + '</div></div>' +
             '</div>';
