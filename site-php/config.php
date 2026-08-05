@@ -9,7 +9,10 @@
 const SITE_AGENT_URL = '';
 const SITE_AGENT_KEY = '';
 
-// ================== 🔒 ACCÈS À L'ESPACE CRÉATEUR ==================
-// Mot de passe demandé pour ouvrir l'espace ⚙️ Créateur (constructeur de page,
-// thème, bots). Laissez vide pour ne rien demander (déconseillé en ligne).
+// ================== 🔒 ACCÈS À L'ADMINISTRATION ==================
+// ⚠️ IMPORTANT en ligne : sans mot de passe ici, N'IMPORTE QUI trouvant
+// l'adresse de votre site peut modifier la page d'accueil, les bots, les
+// permissions et les tickets.
+// Renseignez un mot de passe : la lecture du site reste publique, mais
+// TOUTE modification demandera ce mot de passe (cadenas 🔒 en haut à droite).
 const SITE_ADMIN_PASSWORD = '';

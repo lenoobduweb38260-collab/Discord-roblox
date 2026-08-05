@@ -10,6 +10,12 @@ if (is_file($dataFile)) {
     }
 }
 $siteName = htmlspecialchars((string) ($bootState['siteConfig']['siteName'] ?? 'Aincrad Control Panel'), ENT_QUOTES, 'UTF-8');
+
+// 🔒 Le site est-il protégé par un mot de passe, et suis-je connecté ?
+if (is_file(__DIR__ . '/config.php')) require_once __DIR__ . '/config.php';
+if (session_status() !== PHP_SESSION_ACTIVE) session_start();
+$authRequired = defined('SITE_ADMIN_PASSWORD') && SITE_ADMIN_PASSWORD !== '';
+$authOk = !$authRequired || !empty($_SESSION['site_admin']);
 ?>
 <!doctype html>
 <html lang="fr">
@@ -56,6 +62,7 @@ $siteName = htmlspecialchars((string) ($bootState['siteConfig']['siteName'] ?? '
     <script>
         window.AINCRAD_BOOT_STATE = <?= json_encode($bootState, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
         window.AINCRAD_API = 'api.php';
+        window.AINCRAD_AUTH = <?= json_encode(['required' => $authRequired, 'ok' => $authOk]) ?>;
     </script>
     <script src="assets/js/app.js?v=2.0.0" defer></script>
 </body>

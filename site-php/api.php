@@ -30,6 +30,22 @@ const PROOF_DIR = __DIR__ . '/uploads/proofs';
 
 // Configuration facultative (liaison à l'agent hébergeur).
 if (is_file(__DIR__ . '/config.php')) require_once __DIR__ . '/config.php';
+
+// ----- 🔒 Protection de l'administration -----
+// Sans mot de passe défini, le site reste ouvert (pratique en local).
+// Dès qu'un mot de passe est renseigné dans config.php, TOUTE modification
+// exige d'être connecté.
+session_start();
+function admin_password(): string {
+  return defined('SITE_ADMIN_PASSWORD') ? (string) SITE_ADMIN_PASSWORD : '';
+}
+function admin_requis(): bool { return admin_password() !== ''; }
+function admin_connecte(): bool { return !admin_requis() || !empty($_SESSION['site_admin']); }
+function exiger_admin(): void {
+  if (!admin_connecte()) {
+    respond(['ok' => false, 'error' => 'Connexion requise : entrez le mot de passe d\'administration.', 'authRequired' => true], 401);
+  }
+}
 function agent_url(): string { return defined('SITE_AGENT_URL') ? rtrim(SITE_AGENT_URL, '/') : ''; }
 function agent_key(): string { return defined('SITE_AGENT_KEY') ? SITE_AGENT_KEY : ''; }
 
@@ -211,7 +227,7 @@ if ($action === 'selftest') {
 }
 
 if ($method === 'GET' && $action === 'state') {
-    respond(['ok' => true, 'state' => loadState()]);
+    respond(['ok' => true, 'state' => loadState(), 'authRequired' => admin_requis(), 'authOk' => admin_connecte()]);
 }
 
 if ($method !== 'POST') {
@@ -221,6 +237,27 @@ if ($method !== 'POST') {
 $state = loadState();
 $input = body();
 $action = $input['action'] ?? $action;
+
+// ----- 🔑 Connexion / déconnexion de l'administration -----
+if ($action === 'auth.login') {
+    if (!admin_requis()) respond(['ok' => true, 'authOk' => true, 'note' => 'Aucun mot de passe configuré.']);
+    $saisi = (string) ($input['password'] ?? '');
+    // Petite temporisation : décourage les tentatives en série.
+    usleep(300000);
+    if (!hash_equals(admin_password(), $saisi)) {
+        respond(['ok' => false, 'error' => 'Mot de passe incorrect.'], 403);
+    }
+    session_regenerate_id(true);
+    $_SESSION['site_admin'] = true;
+    respond(['ok' => true, 'authOk' => true]);
+}
+if ($action === 'auth.logout') {
+    unset($_SESSION['site_admin']);
+    respond(['ok' => true, 'authOk' => false]);
+}
+
+// Toutes les autres écritures exigent d'être connecté.
+exiger_admin();
 
 switch ($action) {
     case 'blacklist.add':

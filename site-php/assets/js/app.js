@@ -197,9 +197,29 @@
         (extrait ? `Réponse : « ${extrait} »` : "Réponse vide.") +
         " — ouvrez api.php?action=selftest pour un diagnostic.");
     }
+    // 🔒 Mot de passe demandé : on ouvre la fenêtre de connexion.
+    if (response.status === 401 && data.authRequired) {
+      openLoginModal();
+      throw new Error("Connexion requise pour modifier le site.");
+    }
     if (!response.ok || !data.ok) throw new Error(data.error || `Une erreur est survenue (HTTP ${response.status}).`);
     if (data.state) state = data.state;
+    if (typeof data.authOk === "boolean") AUTH.ok = data.authOk;
     return data;
+  }
+
+  // État de la protection par mot de passe (config.php > SITE_ADMIN_PASSWORD).
+  const AUTH = window.AINCRAD_AUTH || { required: false, ok: true };
+  function openLoginModal() {
+    openModal("🔒 Administration protégée", `
+      <form data-form="auth-login">
+        <p style="color:var(--muted);font-size:13px;margin-bottom:14px">
+          Ce site est protégé : entrez le mot de passe défini dans <code>config.php</code>
+          (<code>SITE_ADMIN_PASSWORD</code>) pour pouvoir le modifier.
+        </p>
+        <div class="field"><label>Mot de passe</label><input class="input" type="password" name="password" autocomplete="current-password" required></div>
+        <div class="form-actions"><button class="btn ghost" type="button" data-action="close-modal">Annuler</button><button class="btn success" type="submit">Se connecter</button></div>
+      </form>`);
   }
 
   function toast(title, message, type = "success") {
@@ -360,6 +380,7 @@
           <div class="top-actions">
             <div class="clock" id="live-clock">--:--:--</div>
             <button class="icon-btn" data-action="preview-gate" title="Voir la page d'accueil">👁</button>
+            ${AUTH.required ? `<button class="icon-btn" data-action="${AUTH.ok ? "auth-logout" : "auth-open"}" title="${AUTH.ok ? "Se déconnecter de l'administration" : "Se connecter à l'administration"}">${AUTH.ok ? "🔓" : "🔒"}</button>` : ""}
             <button class="icon-btn" data-action="pulse-system" title="Synchroniser">⌁</button>
             <button class="icon-btn" data-action="show-notifications" title="Notifications">♢</button>
             <div class="profile">
@@ -1605,6 +1626,15 @@
           ui.creatorTab = target.dataset.tab;
           render();
           break;
+        case "auth-open":
+          openLoginModal();
+          break;
+        case "auth-logout":
+          await api("auth.logout");
+          AUTH.ok = false;
+          render();
+          toast("DÉCONNEXION", "L'administration est de nouveau verrouillée.");
+          break;
         // ── Permissions par grade ───────────────────────────────────
         case "perm-toggle":
           target.classList.toggle("on");
@@ -1949,6 +1979,15 @@
           await api("site.background.upload", {}, { formData: data });
           render();
           toast("FOND APPLIQUÉ", "Votre image est désormais le fond du site.");
+          break;
+        }
+        case "auth-login": {
+          const values = formToObject(form);
+          await api("auth.login", { password: values.password });
+          AUTH.ok = true;
+          closeModal();
+          render();
+          toast("CONNECTÉ", "Vous pouvez maintenant modifier le site.");
           break;
         }
         case "block-edit": {
