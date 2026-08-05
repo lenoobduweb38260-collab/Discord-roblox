@@ -44,13 +44,45 @@ SE CONNECTER AVEC SON COMPTE DISCORD :
        (Si le dashboard est installé à côté, c'est déjà fait tout seul.)
     3. Cliquez sur « Se connecter » en haut à droite.
 
-  ⚠️ TRÈS IMPORTANT : le PREMIER compte Discord à se connecter devient
-  propriétaire du site. Faites-le DÈS MAINTENANT, avant de communiquer
-  l'adresse de votre site à qui que ce soit. Ensuite, vous seul décidez
-  qui peut administrer (même écran, section 3).
+ÊTRE LE SEUL PROPRIÉTAIRE (à faire en premier) :
+  Ouvrez config.php et collez VOTRE identifiant Discord :
+      const SITE_OWNER_ID = '123456789012345678';
+
+  Pour l'obtenir : Discord > Paramètres > Avancés > activez le
+  « Mode développeur », puis clic droit sur votre nom > Copier l'identifiant.
+
+  Dès cette ligne remplie :
+    • vous êtes propriétaire pour toujours, personne ne peut vous
+      l'enlever depuis le site ;
+    • le site est VERROUILLÉ immédiatement : aucun inconnu ne peut s'en
+      emparer, même s'il trouve l'adresse avant vous.
+  Laissée vide, le site se rabat sur « le premier compte connecté devient
+  propriétaire » — pratique, mais moins sûr.
+
+QUI ENTRE DANS L'ESPACE DE GESTION :
+  Créateur (⚙️) > Connexion & équipe (🔑) > section 3.
+  Vous ajoutez les identifiants Discord un par un, chacun avec son grade
+  (Membre, Police, Staff, Administration, Support du bot, Modérateur,
+  Responsable, Créateur).
+
+  Un visiteur NON listé ne voit que la page d'accueil publique : ni les
+  tickets, ni la blacklist, ni les serveurs — le serveur ne les lui envoie
+  même pas.
 
   Accès de secours facultatif : un mot de passe dans config.php
   (SITE_ADMIN_PASSWORD) vous dépanne si vous perdez votre compte Discord.
+
+MISES À JOUR AUTOMATIQUES :
+  Créateur (⚙️) > Mises à jour (🔄) > interrupteur « Mise à jour
+  automatique ».
+  Le site va chercher la dernière version publiée, se remplace lui-même,
+  puis met à jour TOUS les bots pilotés par votre agent, à la même version.
+    • Vos données sont préservées : data/, uploads/ et config.php ne sont
+      jamais écrasés.
+    • Un hébergeur mutualisé n'a pas de tâche planifiée : la vérification
+      a lieu lors d'une visite du site, au plus une fois toutes les 6 h.
+    • Bouton « Tout mettre à jour » pour le faire à la demande, avec un
+      rapport ligne par ligne.
 
 METTRE UNE VIDÉO EN FOND :
   Créateur (⚙️) > Apparence du site (🎨) > Fond du site > vignette

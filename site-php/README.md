@@ -255,3 +255,60 @@ n'autorisent la lecture automatique qu'à cette condition.
 - La vidéo est téléchargée par **chaque visiteur** : visez quelques Mo. Le site
   affiche la limite d'envoi de votre hébergeur sous le champ de téléversement ;
   au-delà, hébergez la vidéo ailleurs et collez son adresse.
+
+## 👑 Le propriétaire, l'équipe et les grades
+
+**Vous, propriétaire.** Ouvrez `config.php` et collez votre identifiant Discord :
+
+```php
+const SITE_OWNER_ID = '123456789012345678';
+```
+
+Dès cette ligne remplie, vous êtes **le seul et unique propriétaire** :
+personne ne peut vous retirer ce grade depuis le site, et le site est
+**verrouillé immédiatement** — aucun inconnu ne peut s'en emparer, même s'il
+trouve l'adresse avant vous. Laissée vide, le site se rabat sur « le premier
+compte connecté devient propriétaire » : pratique, mais moins sûr.
+
+> Pour obtenir votre identifiant : Discord → Paramètres → Avancés → activez le
+> **Mode développeur**, puis clic droit sur votre nom → **Copier l'identifiant**.
+
+**L'équipe.** Dans ⚙️ Créateur → 🔑 Connexion & équipe, vous listez les
+identifiants Discord autorisés, **chacun avec son grade** (Membre, Police,
+Staff, Administration, Support du bot, Modérateur, Responsable, Créateur).
+
+Un visiteur qui n'y figure pas ne voit que la **page d'accueil publique** : les
+tickets, la blacklist et les serveurs ne lui sont **même pas transmis** par le
+serveur — ni dans `api.php?action=state`, ni dans l'état injecté par la page.
+
+Le grade **Créateur** donne les pleins pouvoirs sur le site ; les autres
+donnent accès à l'espace de gestion selon ce que vous avez coché dans
+🔐 Fonctions & grades.
+
+## 🔄 Mises à jour automatiques
+
+Dans ⚙️ Créateur → 🔄 Mises à jour, l'interrupteur **Mise à jour automatique**
+suffit. Le site :
+
+1. va chercher la dernière version publiée sur GitHub ;
+2. **se remplace lui-même** ;
+3. demande à l'agent de **mettre à jour tous les bots** qu'il pilote, à la
+   même version — chacun est arrêté, mis à jour, puis relancé.
+
+| Garantie | Détail |
+|---|---|
+| Vos données | `data/`, `uploads/` et `config.php` ne sont **jamais** écrasés |
+| Pas de collision | Un verrou empêche deux mises à jour simultanées |
+| Pas de casse | Si l'archive téléchargée ne ressemble pas au site, tout est annulé |
+| Fréquence | Au plus une vérification toutes les 6 h, lors d'une visite |
+
+> Un hébergeur PHP mutualisé n'a pas de tâche planifiée : la vérification se
+> greffe donc sur les visites du site. Sans visite, pas de mise à jour.
+
+Le bouton **▶️ Tout mettre à jour** fait la même chose à la demande, avec un
+rapport ligne par ligne (site + chaque bot). **🤖 Les bots seulement** met à
+jour les bots sans toucher au site.
+
+Si l'extension PHP `zip` manque chez votre hébergeur, ou si le dossier du site
+n'est pas modifiable par PHP, le site vous le dit et **seuls les bots** sont
+mis à jour.
