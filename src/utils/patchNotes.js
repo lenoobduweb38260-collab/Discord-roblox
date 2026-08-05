@@ -468,6 +468,20 @@ const RELEASES = [
     ],
     retrait: [],
   },
+  {
+    id: 'site-diagnostic-acces-2026-08p',
+    title: 'Site : « pourquoi je ne peux rien gérer ? » répond enfin 🩺',
+    ajout: [
+      '🩺 **Panneau de diagnostic** quand l\'accès est refusé : le site affiche ce qu\'il constate — nombre de vos serveurs Discord, ceux que vous administrez, ceux que le bot connaît, votre appartenance à l\'équipe',
+      '🎯 La **cause précise** est nommée et accompagnée du remède : synchronisation jamais faite, bot absent de vos serveurs, ou compte hors de l\'équipe',
+      '📋 Votre identifiant est affiché et copiable, pour être collé dans `SITE_OWNER_ID`',
+    ],
+    amelioration: [
+      '🔎 Le site détecte qu\'il affiche encore des **serveurs de démonstration** — signe qu\'aucune synchronisation n\'a abouti — et le dit clairement au lieu de laisser croire à un problème de droits',
+    ],
+    fix: [],
+    retrait: [],
+  },
 ];
 
 // Découpe une catégorie en champs d'embed (max 1024 caractères par champ).

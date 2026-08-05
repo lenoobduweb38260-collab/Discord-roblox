@@ -57,6 +57,8 @@ $acces = [
     'siteEntier' => $estStaffSite,
     'mesServeurs' => $mesGeres,
 ];
+// 🩺 Faits permettant d'expliquer un refus d'accès, sans deviner.
+$diagnostic = acces_diagnostic($bootState);
 
 // 🌐 Chacun ne reçoit que ce qui le concerne : tout pour l'équipe du site,
 // ses seuls serveurs pour un gestionnaire, rien de privé pour un visiteur.
@@ -208,6 +210,7 @@ function taille_envoi_lisible(): string
         ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
         // 🔒 Ce que la personne connectée a le droit de faire.
         window.AINCRAD_ACCES = <?= json_encode($acces, JSON_UNESCAPED_SLASHES) ?>;
+        window.AINCRAD_DIAG = <?= json_encode($diagnostic, JSON_UNESCAPED_SLASHES) ?>;
     </script>
     <script src="assets/js/app.js?v=<?= empreinte_assets() ?>" defer></script>
 </body>

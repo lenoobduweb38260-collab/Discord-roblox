@@ -1015,6 +1015,8 @@ if ($method === 'GET' && $action === 'state') {
             'siteEntier' => $staff,
             'mesServeurs' => $miens,
         ],
+        // 🩺 De quoi expliquer précisément un refus d'accès.
+        'diagnostic' => acces_diagnostic($complet),
         'authRequired' => admin_requis(), 'authOk' => admin_connecte(),
         'moi' => $moi,
         'staff' => $staff,

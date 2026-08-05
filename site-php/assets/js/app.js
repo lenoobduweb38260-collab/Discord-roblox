@@ -693,6 +693,68 @@
     return `<div class="page-head"><div class="page-title"><small>${esc(kicker)}</small><h2>${esc(title)}</h2><p>${esc(description)}</p></div><div class="page-actions">${actions}</div></div>`;
   }
 
+  // 🩺 Pourquoi je n'ai pas accès ? On affiche les FAITS relevés par le
+  // serveur, puis la seule action qui débloque réellement la situation —
+  // au lieu de laisser deviner.
+  function panneauAccesRefuse() {
+    const d = window.AINCRAD_DIAG || {};
+    if (!MOI) {
+      return `<section class="panel mt-16"><div class="panel-inner">
+        <div class="panel-head"><div><h3>🔒 Espace de gestion</h3>
+          <p>Identifiez-vous pour accéder à vos serveurs.</p></div></div>
+        <div class="row" style="flex-direction:column;align-items:flex-start;gap:8px">
+          <span style="color:var(--muted)">Si vous administrez un serveur Discord où ce bot est présent,
+            la gestion de ce serveur s'ouvrira <b>automatiquement</b> après connexion.</span>
+          <div class="page-actions">${button("🎮 Se connecter avec Discord", "auth-open", "primary")}</div>
+        </div>
+      </div></section>`;
+    }
+    const fait = (ok, texte) => `<div class="diag-ligne"><span>${ok ? "✅" : "❌"}</span><span>${texte}</span></div>`;
+    // La cause la plus probable, dans l'ordre où elle doit être traitée.
+    let cause, remede;
+    if (d.jamaisSynchronise) {
+      cause = "Le site ne connaît aucun serveur réel : la synchronisation avec vos bots n'a jamais abouti.";
+      remede = `Tant qu'elle n'a pas eu lieu, le site ne peut pas savoir sur quels serveurs le bot se trouve —
+        il affiche encore des serveurs de démonstration. <b>Un membre de l'équipe doit ouvrir
+        ⚙️ Créateur → 🤖 Mes bots et cliquer sur « 🔄 Synchroniser »</b> (l'agent doit être joignable et le bot démarré).`;
+    } else if (d.mesGuildesAdmin === 0) {
+      cause = "Vous n'administrez aucun serveur Discord.";
+      remede = "Vous devez être <b>propriétaire ou administrateur</b> d'un serveur pour le configurer ici. Sinon, demandez à rejoindre l'équipe du site.";
+    } else if (d.serveursGeres === 0) {
+      cause = `Le bot n'est présent sur aucun des ${d.mesGuildesAdmin} serveur(s) que vous administrez.`;
+      remede = `<b>Invitez le bot sur votre serveur</b>, puis demandez une synchronisation — la gestion de ce serveur s'ouvrira toute seule.`;
+    } else {
+      cause = "Votre compte ne fait pas partie de l'équipe du site.";
+      remede = "Vos serveurs devraient pourtant apparaître. Rechargez la page ; si le problème persiste, transmettez votre identifiant au propriétaire.";
+    }
+    return `<section class="panel mt-16"><div class="panel-inner">
+      <div class="panel-head"><div><h3>🔒 Pourquoi je ne peux rien gérer ?</h3>
+        <p>Voici exactement ce que le site constate pour votre compte.</p></div></div>
+      <div class="row" style="border-color:rgba(255,92,116,.45);flex-direction:column;align-items:flex-start;gap:6px">
+        <b>${esc(cause)}</b><span style="color:var(--muted)">${remede}</span>
+      </div>
+      <div class="diag mt-16">
+        ${fait(true, `Connecté en tant que <b>${esc(MOI.nom)}</b>`)}
+        ${fait(d.mesGuildes > 0, `Vous êtes sur <b>${d.mesGuildes || 0}</b> serveur(s) Discord, dont <b>${d.mesGuildesAdmin || 0}</b> que vous administrez`)}
+        ${fait(!d.jamaisSynchronise, d.jamaisSynchronise
+          ? `Le site ne connaît <b>aucun serveur réel</b> (jamais synchronisé — ${d.serveursDemo || 0} serveur(s) de démonstration affichés)`
+          : `Le bot est présent sur <b>${d.serveursDuBot}</b> serveur(s) connus du site`)}
+        ${fait(d.serveursGeres > 0, `Serveurs que vous pouvez configurer ici : <b>${d.serveursGeres || 0}</b>`)}
+        ${fait(d.equipeSite, d.equipeSite ? "Vous faites partie de l'équipe du site" : "Vous ne faites pas partie de l'équipe du site")}
+        ${fait(d.proprietaireEpingle, d.proprietaireEpingle
+          ? "Un propriétaire est épinglé dans <code>config.php</code>"
+          : "Aucun propriétaire épinglé dans <code>config.php</code> (<code>SITE_OWNER_ID</code> vide)")}
+      </div>
+      <div class="row mt-16" style="flex-direction:column;align-items:flex-start;gap:6px">
+        <b>👑 Vous êtes le propriétaire du site ?</b>
+        <span style="color:var(--muted)">Ouvrez <code>config.php</code> et collez votre identifiant dans <code>SITE_OWNER_ID</code> :
+          vous aurez alors accès à tout, définitivement.</span>
+        <code class="acc-id" id="acc-id" style="user-select:all">${esc(MOI.id)}</code>
+        <div class="page-actions">${button("📋 Copier mon identifiant", "account-copy-id", "ghost")}</div>
+      </div>
+    </div></section>`;
+  }
+
   function dashboardView() {
     const bot = activeBot();
     const servers = botServers();
@@ -757,19 +819,7 @@
         <section class="panel"><div class="panel-inner"><div class="panel-head"><div><h3>Activité récente</h3><p>Flux des actions importantes du bot.</p></div></div><div class="activity-list">${activityRows()}</div></div></section>
         <section class="panel"><div class="panel-inner"><div class="panel-head"><div><h3>Signal Cardinal</h3><p>État global des connexions Discord.</p></div><span class="chip green">STABLE</span></div><div class="radar"><div class="radar-grid"><i class="radar-dot" style="left:30%;top:42%"></i><i class="radar-dot" style="left:63%;top:25%"></i><i class="radar-dot" style="left:72%;top:68%"></i><i class="radar-dot" style="left:44%;top:73%"></i></div></div></div></section>
       </div>` : `
-      <section class="panel mt-16"><div class="panel-inner">
-        <div class="panel-head"><div><h3>🔒 Espace de gestion réservé</h3>
-          <p>Serveurs, blacklist, tickets et espace créateur ne sont accessibles qu'à l'équipe.</p></div></div>
-        <div class="row" style="flex-direction:column;align-items:flex-start;gap:8px">
-          <span style="color:var(--muted)">${MOI
-            ? `Vous êtes connecté en tant que <b>${esc(MOI.nom)}</b>, mais aucun de vos serveurs Discord n'a ce bot,
-               et votre compte ne fait pas partie de l'équipe du site.
-               <br>• Si vous administrez un serveur : <b>invitez-y le bot</b>, puis revenez — la gestion de ce serveur s'ouvrira toute seule.
-               <br>• Sinon, demandez au propriétaire de vous ajouter à l'équipe avec votre identifiant : <code style="user-select:all">${esc(MOI.id)}</code>`
-            : "Identifiez-vous avec votre compte Discord. Si vous administrez un serveur où ce bot est présent, la gestion de ce serveur s'ouvrira automatiquement."}</span>
-          ${MOI ? "" : `<div class="page-actions">${button("🎮 Se connecter avec Discord", "auth-open", "primary")}</div>`}
-        </div>
-      </div></section>` }
+      ${panneauAccesRefuse()}` }
     </div>`;
   }
 

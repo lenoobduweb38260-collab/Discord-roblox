@@ -197,6 +197,42 @@ function peut_gerer_serveur(array $state, string $guildId): bool {
   return in_array($guildId, mes_serveurs_geres($state), true);
 }
 
+// ----- 🩺 Pourquoi je n'ai pas accès ? -----
+// Sans ça, une personne bloquée n'a aucun moyen de savoir ce qui cloche :
+// pas connectée, jamais synchronisé, bot absent de ses serveurs, ou
+// simplement pas dans l'équipe. On établit les faits, une fois pour toutes.
+function acces_diagnostic(array $state): array {
+  $serveurs = $state['servers'] ?? [];
+  // Un identifiant de serveur est celui d'une guilde Discord dès qu'il n'est
+  // fait que de chiffres. Les données de démonstration ressemblent à
+  // « srv-aincrad » : leur présence signifie qu'aucune synchronisation
+  // réussie n'a eu lieu.
+  $reels = 0;
+  $demo = 0;
+  foreach ($serveurs as $s) {
+    if (preg_match('/^\d{15,25}$/', (string) ($s['id'] ?? ''))) $reels++;
+    else $demo++;
+  }
+  $miens = mes_guildes();
+  $administres = 0;
+  foreach ($miens as $g) {
+    if (in_array(role_sur_guilde($g), ['Propriétaire', 'Administrateur', 'Gestionnaire'], true)) $administres++;
+  }
+  return [
+    'connecte' => moi_id() !== '',
+    'monId' => moi_id(),
+    'equipeSite' => est_staff(),
+    'proprietaireEpingle' => owner_id() !== '',
+    'mesGuildes' => count($miens),
+    'mesGuildesAdmin' => $administres,
+    'serveursDuBot' => $reels,
+    'serveursDemo' => $demo,
+    // Jamais synchronisé : le site ne connaît encore aucun vrai serveur.
+    'jamaisSynchronise' => $reels === 0,
+    'serveursGeres' => count(mes_serveurs_geres($state)),
+  ];
+}
+
 // ----- 👑 Comptes Discord autorisés à administrer le site -----
 function discord_admins(): array {
   $admins = discord_store()['admins'];
