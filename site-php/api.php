@@ -46,7 +46,28 @@ function exiger_admin(): void {
     respond(['ok' => false, 'error' => 'Connexion requise : entrez le mot de passe d\'administration.', 'authRequired' => true], 401);
   }
 }
-function agent_url(): string { return defined('SITE_AGENT_URL') ? rtrim(SITE_AGENT_URL, '/') : ''; }
+// Adresse de l'agent, normalisée : on ajoute http:// si le schéma manque
+// (erreur très fréquente : « 191.44.119.37:9999 » au lieu de l'URL complète).
+function agent_url(): string {
+  $brut = defined('SITE_AGENT_URL') ? trim((string) SITE_AGENT_URL) : '';
+  if ($brut === '') return '';
+  if (!preg_match('#^https?://#i', $brut)) $brut = 'http://' . $brut;
+  return rtrim($brut, '/');
+}
+// L'adresse ressemble-t-elle vraiment à celle d'un agent ? Renvoie null si
+// tout va bien, sinon le problème en clair.
+function agent_url_probleme(): ?string {
+  $brut = defined('SITE_AGENT_URL') ? trim((string) SITE_AGENT_URL) : '';
+  if ($brut === '') return 'Aucune adresse : le site fonctionne avec des données de démonstration.';
+  if (preg_match('/^\d{15,25}$/', $brut)) {
+    return "« $brut » est un identifiant Discord (Client ID), pas l'adresse de votre agent. "
+      . "Attendu : http://IP-de-votre-serveur:PORT (la même valeur que AGENT_URL du dashboard).";
+  }
+  if (!filter_var(agent_url(), FILTER_VALIDATE_URL)) {
+    return "« $brut » n'est pas une adresse valide. Attendu : http://IP-de-votre-serveur:PORT";
+  }
+  return null;
+}
 function agent_key(): string { return defined('SITE_AGENT_KEY') ? SITE_AGENT_KEY : ''; }
 
 // Appel HTTP vers l'agent : renvoie [code, données].
@@ -209,6 +230,29 @@ $method = strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET');
 if ($action === 'selftest') {
     $dataOk = is_file(DATA_FILE) && is_writable(DATA_FILE);
     $bgDir = __DIR__ . '/uploads/backgrounds';
+    $probleme = agent_url_probleme();
+    $agent = ['adresseUtilisee' => agent_url(), 'probleme' => $probleme, 'joignable' => false, 'bots' => []];
+    if ($probleme === null) {
+        [$code, $etat] = agent_get('/agent/etat', 8);
+        $agent['httpAgent'] = $code;
+        if ($code === 200) {
+            $agent['joignable'] = true;
+            foreach ($etat['bots'] ?? [] as $b) {
+                $agent['bots'][] = ['nom' => $b['name'] ?? '?', 'statut' => $b['status'] ?? '?'];
+            }
+        } else {
+            $agent['probleme'] = $code === 0
+                ? "Agent injoignable : adresse/port bloqués, agent éteint, ou l'hébergeur web n'autorise pas les connexions sortantes vers ce port."
+                : "L'agent a répondu HTTP $code — la clé SITE_AGENT_KEY est probablement incorrecte.";
+        }
+    }
+    $conseils = [];
+    if (!$dataOk) $conseils[] = "Donnez les droits d'écriture à data/app.json (chmod 664) et au dossier data/ (chmod 775).";
+    if ($agent['probleme'] !== null) $conseils[] = $agent['probleme'];
+    if ($agent['joignable'] && $agent['bots']) {
+        $noms = implode(' · ', array_map(static fn($b) => $b['nom'], $agent['bots']));
+        $conseils[] = "Bots vus chez l'agent : $noms — recopiez EXACTEMENT l'un de ces noms dans « Nom chez l'agent ».";
+    }
     respond([
         'ok' => true,
         'php' => PHP_VERSION,
@@ -219,11 +263,27 @@ if ($action === 'selftest') {
         'dossierFonds' => is_dir($bgDir) ? is_writable($bgDir) : 'absent',
         'curl' => function_exists('curl_init'),
         'allow_url_fopen' => (bool) ini_get('allow_url_fopen'),
-        'agentConfigure' => agent_url() !== '',
-        'conseil' => $dataOk
-            ? 'Tout est bon : les enregistrements doivent fonctionner.'
-            : 'Donnez les droits d\'écriture à data/app.json (chmod 664) et au dossier data/ (chmod 775).',
+        'agent' => $agent,
+        'motDePasseAdmin' => admin_requis() ? 'configuré' : 'AUCUN — le site est modifiable par tous',
+        'conseils' => $conseils ?: ['Tout est bon : la synchronisation doit fonctionner.'],
     ]);
+}
+
+// 🤖 Liste des bots déclarés chez l'agent (pour remplir « Nom chez l'agent »).
+if ($action === 'agent.bots') {
+    $probleme = agent_url_probleme();
+    if ($probleme !== null) respond(['ok' => false, 'error' => $probleme], 422);
+    [$code, $etat] = agent_get('/agent/etat', 10);
+    if ($code !== 200) {
+        respond(['ok' => false, 'error' => $code === 0
+            ? "Agent injoignable à l'adresse " . agent_url() . " (port bloqué, agent éteint, ou sorties réseau interdites par l'hébergeur)."
+            : "L'agent a répondu HTTP $code — vérifiez SITE_AGENT_KEY."], 502);
+    }
+    $bots = [];
+    foreach ($etat['bots'] ?? [] as $b) {
+        $bots[] = ['nom' => (string) ($b['name'] ?? ''), 'demarre' => ($b['status'] ?? '') === 'demarre'];
+    }
+    respond(['ok' => true, 'adresse' => agent_url(), 'bots' => $bots]);
 }
 
 if ($method === 'GET' && $action === 'state') {
@@ -514,8 +574,9 @@ switch ($action) {
 
     // ── 🔄 Synchronisation avec l'agent : vrais serveurs de chaque bot ──
     case 'agent.sync': {
-        if (agent_url() === '') {
-            respond(['ok' => false, 'error' => "Aucun agent configuré : renseignez SITE_AGENT_URL et SITE_AGENT_KEY dans config.php."], 422);
+        $probleme = agent_url_probleme();
+        if ($probleme !== null) {
+            respond(['ok' => false, 'error' => $probleme], 422);
         }
         [$code, $etat] = agent_get('/agent/etat');
         if ($code !== 200) {

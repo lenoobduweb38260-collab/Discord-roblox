@@ -232,10 +232,18 @@ function http_req(string $url, string $method = 'GET', $body = null, array $head
   return [$status, is_array($data) ? $data : [], (string) $raw];
 }
 
+// Adresse de l'agent normalisée : on ajoute http:// quand le schéma manque
+// (« 191.44.119.37:9999 » au lieu de « http://191.44.119.37:9999 »).
+function agent_base(): string {
+  $brut = trim((string) AGENT_URL);
+  if ($brut === '') return '';
+  if (!preg_match('#^https?://#i', $brut)) $brut = 'http://' . $brut;
+  return rtrim($brut, '/');
+}
 function agent_call(string $path, string $method = 'GET', $body = null): array {
   // 25 s : un bot présent sur beaucoup de serveurs met plusieurs secondes à
   // répondre à /dashboard ; 10 s provoquaient de faux « Bot injoignable ».
-  [$status, $data] = http_req(AGENT_URL . $path, $method, $body, ['x-cle: ' . AGENT_KEY], false, 25);
+  [$status, $data] = http_req(agent_base() . $path, $method, $body, ['x-cle: ' . AGENT_KEY], false, 25);
   return [$status, $data];
 }
 
@@ -722,7 +730,11 @@ if ($p === 'diag') {
   $checks[] = ['URL du dashboard détectée automatiquement : ' . request_scheme() . '://' . request_host() . request_script(), true, ''];
   $aurl = defined('AGENT_URL') ? AGENT_URL : '';
   $akey = defined('AGENT_KEY') ? AGENT_KEY : '';
-  $checks[] = ['Adresse de l\'agent (AGENT_URL) renseignée', $aurl !== '', 'Ex : http://IP-de-votre-serveur:9999 (le pack hébergeur qui fait tourner les bots).'];
+  $urlOk = $aurl !== '' && !preg_match('/^\d{15,25}$/', trim($aurl));
+  $checks[] = ['Adresse de l\'agent (AGENT_URL)' . ($urlOk ? ' : ' . agent_base() : ''), $urlOk,
+    preg_match('/^\d{15,25}$/', trim($aurl))
+      ? 'Vous avez saisi un identifiant Discord (Client ID) au lieu de l\'adresse de l\'agent. Attendu : http://IP-de-votre-serveur:PORT'
+      : 'Ex : http://IP-de-votre-serveur:9999 (le pack hébergeur qui fait tourner les bots).'];
   $checks[] = ['Clé de l\'agent (AGENT_KEY) renseignée', $akey !== '', 'La même clé que dans la configuration du pack hébergeur.'];
   $agentOk = false; $botCount = 0; $srvCount = 0; $agentMsg = '';
   if ($aurl !== '') {

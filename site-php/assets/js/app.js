@@ -1113,12 +1113,15 @@
         <div style="margin-top:12px">${button("➕ Ajouter un bot", "bot-add", "primary")}</div>
       </div></section>
       <section class="panel mt-16"><div class="panel-inner">
-        <div class="panel-head"><div><h3>🔗 Liaison à vos bots</h3><p>Renseignée une seule fois dans <code>config.php</code>, à côté de index.php.</p></div></div>
+        <div class="panel-head"><div><h3>🔗 Liaison à vos bots</h3><p>Renseignée une seule fois dans <code>config.php</code>, à côté de index.php.</p></div>
+          <div class="page-actions">${button("🔎 Voir les bots de l'agent", "agent-bots", "ghost")}</div></div>
         <div class="row" style="flex-direction:column;align-items:flex-start;gap:6px">
-          <span><b>SITE_AGENT_URL</b> — l'adresse de votre agent, ex. <code>http://123.45.67.89:9999</code></span>
+          <span><b>SITE_AGENT_URL</b> — l'adresse de votre agent, ex. <code>http://123.45.67.89:9999</code>
+            <span style="color:var(--red)"> (ce n'est PAS le Client ID du bot)</span></span>
           <span><b>SITE_AGENT_KEY</b> — la même clé que dans votre dashboard</span>
-          <span style="color:var(--muted)">Sans ces deux valeurs, le site fonctionne avec des données de démonstration.</span>
+          <span style="color:var(--muted)">Sans ces deux valeurs, le site reste en données de démonstration.</span>
         </div>
+        <div id="agent-bots" style="margin-top:12px"></div>
         <div id="sync-report" style="margin-top:12px"></div>
       </div></section>`;
   }
@@ -1707,6 +1710,34 @@
           render();
           toast("BOTS ENREGISTRÉS", `${(state.bots || []).length} bot(s) sur votre site.`);
           break;
+        case "agent-bots": {
+          // Affiche les bots que l'agent connaît : un clic recopie le nom
+          // exact dans le champ « Nom chez l'agent » du premier bot vide.
+          const box = document.querySelector("#agent-bots");
+          box.innerHTML = '<div class="row">⏳ Interrogation de l\'agent…</div>';
+          try {
+            const r = await api("agent.bots");
+            box.innerHTML = `<div class="row" style="flex-direction:column;align-items:flex-start;gap:8px">
+              <b>Agent joignable : ${esc(r.adresse)}</b>
+              <span style="color:var(--muted);font-size:12px">Cliquez sur un nom pour le recopier dans « Nom chez l'agent ».</span>
+              <div style="display:flex;gap:7px;flex-wrap:wrap">${(r.bots || []).map(b =>
+                `<button type="button" class="chip" data-action="use-agent-name" data-nom="${esc(b.nom)}" style="cursor:pointer">${b.demarre ? "🟢" : "⚪"} ${esc(b.nom)}</button>`).join("")
+                || "<i style='color:var(--muted)'>Aucun bot déclaré chez l'agent.</i>"}</div></div>`;
+          } catch (e) {
+            box.innerHTML = `<div class="row" style="border-color:rgba(255,92,116,.5)">❌ ${esc(e.message)}</div>`;
+          }
+          break;
+        }
+        case "use-agent-name": {
+          const champs = Array.from(document.querySelectorAll('.botcfg [data-f="agentName"]'));
+          const cible = champs.find(c => !c.value.trim()) || champs[0];
+          if (cible) {
+            cible.value = target.dataset.nom;
+            cible.focus();
+            toast("NOM RECOPIÉ", `« ${target.dataset.nom} » — cliquez sur Enregistrer puis Synchroniser.`);
+          }
+          break;
+        }
         case "bots-sync": {
           target.textContent = "⏳ Synchronisation…";
           await api("bots.save", { bots: collectBots() });
