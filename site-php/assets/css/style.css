@@ -527,6 +527,26 @@ input[type="file"].input { padding: 9px 12px; }
 /* Photo de profil Discord : elle remplit la pastille ronde */
 .profile-avatar img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; display: block; }
 
+/* ── 🌐 Mes serveurs : bascule et repère visuel ──────────────────── */
+.segmented {
+  display: inline-flex; gap: 4px; margin-bottom: 14px;
+  padding: 4px; border-radius: 999px;
+  border: 1px solid var(--line); background: rgba(255, 255, 255, .03);
+}
+.seg {
+  padding: 7px 14px; border: 0; border-radius: 999px;
+  background: transparent; color: var(--muted);
+  font-size: 12.5px; font-weight: 600; cursor: pointer;
+  transition: background .18s, color .18s;
+}
+.seg:hover { color: var(--text); }
+.seg.on { background: rgba(var(--accent-rgb), .18); color: var(--text); }
+/* Un serveur dont le membre connecté fait partie */
+.server-card.mien { border-color: rgba(47, 227, 139, .4); }
+.server-card.mien:hover { border-color: rgba(47, 227, 139, .7); }
+.server-card-top { display: flex; align-items: center; gap: 8px; }
+.server-card-top .chip { padding: 2px 7px; }
+
 /* ── 📂 Fiche de sanction : toutes les preuves ───────────────────── */
 tr.cliquable { cursor: pointer; transition: background .15s; }
 tr.cliquable:hover { background: rgba(var(--accent-rgb), .07); }

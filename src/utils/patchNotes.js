@@ -436,6 +436,22 @@ const RELEASES = [
     fix: [],
     retrait: [],
   },
+  {
+    id: 'site-mes-serveurs-grade-2026-08n',
+    title: 'Site : vos serveurs et votre grade, récupérés depuis Discord 🌐',
+    ajout: [
+      '🌐 **Le site reconnaît vos serveurs** : à la connexion, ceux où vous êtes réellement présent sont marqués « vous y êtes », avec votre rôle Discord (Propriétaire, Administrateur, Gestionnaire)',
+      '🔀 Bascule **« Mes serveurs / Tous »** quand le bot est sur plus de serveurs que les vôtres',
+      '➕ Section **« Vos serveurs sans le bot »** : ceux que vous administrez et où le bot manque encore, avec le lien d\'invitation',
+      '🎭 **Votre grade réel s\'affiche sur chaque serveur** — Membre, Staff ou Administration selon les rôles configurés **dans le bot**, plus les mentions 🚓 Police et propriétaire, et la liste de vos rôles',
+    ],
+    amelioration: [
+      '🔄 Bouton **Synchroniser** directement sur la page des serveurs',
+      '⚡ Le grade est mémorisé 5 minutes : afficher une page ne relance pas d\'interrogation du bot',
+    ],
+    fix: [],
+    retrait: [],
+  },
 ];
 
 // Découpe une catégorie en champs d'embed (max 1024 caractères par champ).

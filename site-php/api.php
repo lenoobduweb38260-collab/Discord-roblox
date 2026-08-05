@@ -840,6 +840,14 @@ if ($action === 'maj.lancer') {
     respond($sortie);
 }
 
+// 🎭 Grade réel du membre connecté sur un serveur donné (rôles du bot).
+if ($action === 'moi.grade') {
+    $guildId = preg_replace('/\D+/', '', (string) (body()['serveur'] ?? $_GET['serveur'] ?? ''));
+    if ($guildId === '' || moi_id() === '') respond(['ok' => true, 'grade' => null]);
+    $g = grade_discord_du_membre(loadState(), $guildId);
+    respond(['ok' => true, 'grade' => $g, 'serveur' => $guildId]);
+}
+
 // 🤖 Liste des bots déclarés chez l'agent (pour remplir « Nom chez l'agent »).
 if ($action === 'agent.bots') {
     // L'adresse de l'agent ne sort que pour l'administration connectée.
@@ -919,15 +927,50 @@ function state_public(array $state): array {
     ];
 }
 
+// 🎭 Demande au BOT le grade réel du membre sur un serveur : ce sont les
+// rôles staff / administration / police configurés dans le bot qui font foi,
+// pas une liste tenue à la main dans le site.
+// Le résultat est gardé 5 minutes en session : sans cela, chaque affichage
+// de page interrogerait l'agent.
+function grade_discord_du_membre(array $state, string $guildId): ?array {
+    $moi = moi_id();
+    if ($moi === '' || $guildId === '') return null;
+    $cle = $moi . ':' . $guildId;
+    $cache = $_SESSION['grades_serveur'] ?? [];
+    if (isset($cache[$cle]) && (time() - (int) $cache[$cle]['t']) < 300) {
+        return $cache[$cle]['v'];
+    }
+    // Quel bot est présent sur ce serveur ?
+    $agentName = '';
+    foreach ($state['servers'] ?? [] as $s) {
+        if ((string) ($s['id'] ?? '') !== $guildId) continue;
+        foreach ($state['bots'] ?? [] as $b) {
+            if (in_array($b['id'] ?? '', (array) ($s['botIds'] ?? []), true) && ($b['agentName'] ?? '') !== '') {
+                $agentName = (string) $b['agentName'];
+                break 2;
+            }
+        }
+    }
+    if ($agentName === '') return null;
+    [$code, $data] = agent_get('/agent/bots/' . rawurlencode($agentName)
+        . '/proxy/membre?guild=' . rawurlencode($guildId) . '&user=' . rawurlencode($moi), 10);
+    $valeur = ($code === 200 && !empty($data['grade'])) ? $data : null;
+    $cache[$cle] = ['t' => time(), 'v' => $valeur];
+    $_SESSION['grades_serveur'] = array_slice($cache, -40, null, true);
+    return $valeur;
+}
+
 if ($method === 'GET' && $action === 'state') {
     $moi = moi_discord();
     unset($_SESSION['discord_premier']);   // le bandeau ne s'affiche qu'une fois
     maj_auto_si_besoin();
-    $complet = loadState();
+    $complet = marquer_mes_serveurs(loadState());
     $staff = est_staff() || admin_connecte();
     respond([
         'ok' => true,
         'state' => $staff ? $complet : state_public($complet),
+        'mesServeursSansBot' => $staff ? mes_serveurs_sans_bot($complet) : [],
+        'nbMesServeurs' => count(mes_guildes()),
         'authRequired' => admin_requis(), 'authOk' => admin_connecte(),
         'moi' => $moi,
         'staff' => $staff,

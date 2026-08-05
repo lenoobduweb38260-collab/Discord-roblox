@@ -42,6 +42,11 @@
     discord: null,       // réglages de la connexion Discord (null = pas encore lus)
     maj: null,           // état des mises à jour (null = pas encore lu)
     db: null,            // configuration de la base (null = pas encore lue)
+    serveursTous: false, // afficher TOUS les serveurs plutôt que les miens
+    // Renseignés dès le chargement de la page, puis rafraîchis par l'API.
+    mesServeursSansBot: (window.AINCRAD_MES_SERVEURS || {}).sansBot || [],
+    nbMesServeurs: (window.AINCRAD_MES_SERVEURS || {}).total || 0,
+    monGrade: {},        // grade réel par serveur, renvoyé par le bot
     bandeauVu: false,    // bandeau Discord (erreur / bienvenue) déjà refermé
     menuProfil: false,   // menu déroulant du profil ouvert ?
     ticketTab: "open",   // tickets en cours / archives
@@ -220,6 +225,8 @@
       throw erreur;
     }
     if (data.state) state = data.state;
+    if (Array.isArray(data.mesServeursSansBot)) ui.mesServeursSansBot = data.mesServeursSansBot;
+    if (typeof data.nbMesServeurs === "number") ui.nbMesServeurs = data.nbMesServeurs;
     if (typeof data.authOk === "boolean") AUTH.ok = data.authOk;
     return data;
   }
@@ -257,6 +264,30 @@
 
   // Une session est-elle ouverte, d'une façon ou d'une autre ?
   function connecte() { return Boolean(MOI) || (AUTH.required && AUTH.ok); }
+
+  // Relit l'état complet (serveurs, mes serveurs, grades) depuis le serveur.
+  async function rafraichirEtat() {
+    const r = await fetch(`${window.AINCRAD_API}?action=state`);
+    const d = await r.json();
+    if (!d.ok) return;
+    state = d.state;
+    ui.mesServeursSansBot = d.mesServeursSansBot || [];
+    ui.nbMesServeurs = d.nbMesServeurs || 0;
+  }
+
+  // 🎭 Grade réel du membre sur un serveur, tel que le bot le calcule
+  // (rôles staff / administration / police configurés dans le bot).
+  async function chargerMonGrade(serveurId) {
+    if (!MOI || !serveurId || ui.monGrade[serveurId] !== undefined) return;
+    ui.monGrade[serveurId] = null;             // évite de redemander en boucle
+    try {
+      const r = await api("moi.grade", { serveur: serveurId });
+      ui.monGrade[serveurId] = r.grade || null;
+    } catch (_) {
+      ui.monGrade[serveurId] = null;
+    }
+    if (ui.route === "server") render();
+  }
 
   // 🔒 A-t-on le droit d'entrer dans l'espace de gestion ?
   // Même règle que le serveur : un compte Discord listé dans l'équipe, la
@@ -720,9 +751,31 @@
     </div>`;
   }
 
+  // Bandeau « votre grade sur ce serveur », renseigné par le bot lui-même.
+  function monGradeBandeau(server) {
+    if (!MOI || !server?.id) return "";
+    const g = ui.monGrade[server.id];
+    if (g === undefined) return `<div class="row">⏳ <span style="color:var(--muted)">Lecture de votre grade sur ce serveur…</span></div>`;
+    if (g === null) {
+      return `<div class="row" style="border-color:rgba(243,200,106,.4)">🎭 <span style="color:var(--muted)">
+        Impossible de lire votre grade ici : le bot doit être <b>démarré</b> et vous devez être membre de ce serveur.
+        ${server.mien ? "" : "D'après Discord, vous n'êtes pas sur ce serveur."}</span></div>`;
+    }
+    const couleurs = { admin: "#f3c86a", staff: "#2fe38b", membre: "#948aa3" };
+    const c = couleurs[g.grade] || "var(--accent)";
+    const roles = (g.roles || []).slice(0, 6);
+    return `<div class="row" style="border-color:${c}55;flex-wrap:wrap;gap:10px">
+      <span>🎭 Votre grade ici : <b style="color:${c}">${esc(g.gradeNom)}</b></span>
+      ${g.proprietaire ? `<span class="chip gold">PROPRIÉTAIRE DU SERVEUR</span>` : ""}
+      ${g.police ? `<span class="chip">🚓 POLICE</span>` : ""}
+      ${roles.length ? `<span style="color:var(--muted);font-size:12px">Rôles : ${roles.map(r =>
+        `<b style="color:${esc(r.couleur && r.couleur !== "#000000" ? r.couleur : "var(--muted)")}">${esc(r.name)}</b>`).join(", ")}${(g.roles || []).length > roles.length ? "…" : ""}</span>` : ""}
+    </div>`;
+  }
+
   function serverCard(server) {
-    return `<button class="server-card ${ui.selectedServerId === server.id ? "selected" : ""}" data-action="open-server" data-server-id="${esc(server.id)}">
-      <span class="server-card-top">${serverIcon(server)}<i class="status-dot"></i></span>
+    return `<button class="server-card ${ui.selectedServerId === server.id ? "selected" : ""}${server.mien ? " mien" : ""}" data-action="open-server" data-server-id="${esc(server.id)}">
+      <span class="server-card-top">${serverIcon(server)}${server.mien ? `<span class="chip green" style="font-size:9.5px">VOUS Y ÊTES</span>` : ""}<i class="status-dot"></i></span>
       <h4>${esc(server.name)}</h4><p>${esc(server.region)} · ${esc(server.role)}${server.verified ? " · Vérifié" : ""}</p>
       <span class="server-meta"><span>${formatNumber(server.members)} membres</span><span>${formatNumber(server.online)} en ligne</span></span>
       <span class="server-progress"><span style="width:${Math.max(5, Number(server.activity || 0))}%"></span></span>
@@ -741,13 +794,48 @@
   function serversView() {
     const bot = activeBot();
     const query = ui.serverQuery.trim().toLowerCase();
-    const servers = botServers().filter(server => !query || `${server.name} ${server.region}`.toLowerCase().includes(query));
+    const tous = botServers();
+    // 🌐 « Mes serveurs » = ceux où le membre connecté est réellement présent,
+    // repérés en croisant son compte Discord avec les serveurs du bot.
+    const miens = tous.filter(s => s.mien);
+    const aDesMiens = miens.length > 0;
+    // Par défaut on montre les siens ; le créateur peut basculer sur tout.
+    const filtreMien = ui.serveursTous ? false : aDesMiens;
+    const base = filtreMien ? miens : tous;
+    const servers = base.filter(server => !query || `${server.name} ${server.region}`.toLowerCase().includes(query));
+    const sansBot = ui.mesServeursSansBot || [];
+    const bascule = aDesMiens && tous.length > miens.length
+      ? `<div class="segmented">
+           <button class="seg ${filtreMien ? "on" : ""}" data-action="serveurs-filtre" data-tous="0">🌐 Mes serveurs (${miens.length})</button>
+           <button class="seg ${filtreMien ? "" : "on"}" data-action="serveurs-filtre" data-tous="1">Tous (${tous.length})</button>
+         </div>` : "";
+    const infoMiens = MOI && !aDesMiens && tous.length
+      ? `<div class="row" style="border-color:rgba(243,200,106,.45);flex-direction:column;align-items:flex-start;gap:6px">
+           <b>ℹ️ Aucun de vos serveurs Discord n'a encore ce bot</b>
+           <span style="color:var(--muted)">Vous êtes sur ${ui.nbMesServeurs || 0} serveur(s) Discord, mais ${esc(bot.name)} n'est présent sur aucun d'eux. Les serveurs ci-dessous sont ceux du bot.</span>
+           <span style="color:var(--muted);font-size:12px">Si vous venez d'inviter le bot, cliquez sur « 🔄 Synchroniser » : la liste se met à jour depuis l'agent.</span>
+         </div>` : "";
     return `<div class="content-view">
-      ${pageHead("Gestion / Serveurs", `Serveurs de ${bot.name}`, "Ouvrez un serveur pour configurer ses modules et consulter ses statistiques.", button("Ajouter un serveur", "invite-bot", "primary"))}
+      ${pageHead("Gestion / Serveurs", `Serveurs de ${bot.name}`, "Ouvrez un serveur pour configurer ses modules et consulter ses statistiques.",
+        button("🔄 Synchroniser", "bots-sync-rapide", "ghost") + button("Ajouter un serveur", "invite-bot", "primary"))}
+      ${infoMiens}
       <section class="panel"><div class="panel-inner">
         <div class="panel-head"><div><h3>Infrastructure Discord</h3><p>${servers.length} serveur(s) correspondent à la sélection actuelle.</p></div><div class="searchbar"><input class="input" id="server-search" value="${esc(ui.serverQuery)}" placeholder="Rechercher un serveur…"><button class="btn" data-action="server-search">Rechercher</button></div></div>
+        ${bascule}
         <div class="grid-3">${servers.map(serverCard).join("") || emptyBlock("Aucun résultat", "Essayez une autre recherche.")}</div>
       </div></section>
+      ${sansBot.length ? `<section class="panel mt-16"><div class="panel-inner">
+        <div class="panel-head"><div><h3>➕ Vos serveurs sans le bot</h3>
+          <p>Vous administrez ${sansBot.length} serveur(s) Discord où ${esc(bot.name)} n'est pas encore présent.</p></div></div>
+        <div class="grid-3">${sansBot.map(s => `
+          <div class="server-card" style="cursor:default">
+            <span class="server-card-top">${s.icon
+              ? `<img class="server-icon" src="https://cdn.discordapp.com/icons/${esc(s.id)}/${esc(s.icon)}.png?size=64" alt="">`
+              : `<span class="server-icon">${esc(String(s.name).slice(0, 2).toUpperCase())}</span>`}</span>
+            <h4>${esc(s.name)}</h4><p>Vous y êtes ${esc(s.role)}</p>
+            <div class="page-actions" style="margin-top:10px">${button("🔗 Inviter le bot", "invite-bot", "primary small")}</div>
+          </div>`).join("")}</div>
+      </div></section>` : ""}
       <div class="grid-3 mt-16">
         <div class="stat-card"><span>Membres gérés</span><strong>${formatNumber(servers.reduce((s,x)=>s+x.members,0))}</strong><em>portée du bot</em></div>
         <div class="stat-card"><span>Utilisateurs en ligne</span><strong>${formatNumber(servers.reduce((s,x)=>s+x.online,0))}</strong><em>temps réel</em></div>
@@ -759,8 +847,11 @@
   function serverView() {
     const server = selectedServer();
     const current = modules.find(module => module.id === ui.module) || modules[0];
+    // 🎭 On demande au bot le grade réel du membre sur CE serveur.
+    if (MOI && server?.id) chargerMonGrade(server.id);
     return `<div class="content-view">
       ${pageHead("Serveurs / Configuration", server.name, `Module actif : ${current.label}. Les modifications sont enregistrées dans le fichier JSON du projet.`, button("Retour aux serveurs", "navigate", "ghost", 'data-route="servers"'))}
+      ${monGradeBandeau(server)}
       <div class="server-layout">
         <aside class="server-sidebar">
           <section class="panel"><div class="server-id-card">
@@ -2649,6 +2740,23 @@
           toast("ÉQUIPE ENREGISTRÉE", `${Object.keys(equipe).length} membre(s) — chacun avec son grade.`);
           break;
         }
+        // ── 🌐 Mes serveurs ─────────────────────────────────────────
+        case "serveurs-filtre":
+          ui.serveursTous = target.dataset.tous === "1";
+          render();
+          break;
+        case "bots-sync-rapide":
+          target.textContent = "⏳ Synchronisation…";
+          try {
+            await api("agent.sync");
+            await rafraichirEtat();
+            render();
+            toast("SYNCHRONISÉ", "Serveurs et grades remis à jour depuis vos bots.");
+          } catch (e) {
+            toast("ÉCHEC", e.message, "error");
+            render();
+          }
+          break;
         // ── 🗄️ Base de données ──────────────────────────────────────
         case "db-save": {
           const type = document.querySelector("#db-type")?.value || "mysql";

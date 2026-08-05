@@ -113,6 +113,40 @@ function startManagedApi(client, baseDir) {
         });
       }
 
+      // ----- Grade RÉEL d'un membre sur un serveur -----
+      // Utilisé par le site : quand quelqu'un s'y connecte avec Discord, on
+      // demande au bot ce que vaut cette personne sur CE serveur (rôles staff,
+      // administration, police configurés), plutôt que de le deviner.
+      if (req.method === 'GET' && url.pathname === '/membre') {
+        const guild = client.guilds.cache.get(url.searchParams.get('guild'));
+        const userId = String(url.searchParams.get('user') || '');
+        if (!guild) return send(404, { error: 'Serveur introuvable (le bot y est-il ?).' });
+        if (!/^\d{15,25}$/.test(userId)) return send(400, { error: 'Identifiant de membre invalide.' });
+        let membre = guild.members.cache.get(userId);
+        if (!membre) {
+          try { membre = await guild.members.fetch(userId); } catch { membre = null; }
+        }
+        if (!membre) return send(404, { error: "Ce membre n'est pas sur ce serveur." });
+        const { GRADES, GRADE_NAMES, getGrade, isPolice } = require('./utils/permissions');
+        const cfg = getGuildConfig(guild.id);
+        const grade = getGrade(membre, cfg);
+        return send(200, {
+          id: membre.id,
+          pseudo: membre.user?.username || null,
+          surnom: membre.nickname || null,
+          avatar: membre.displayAvatarURL?.({ size: 64 }) || null,
+          // « membre » | « staff » | « admin », plus le drapeau police.
+          grade: grade >= GRADES.ADMIN ? 'admin' : grade >= GRADES.STAFF ? 'staff' : 'membre',
+          gradeNom: GRADE_NAMES[grade] || 'Membre',
+          police: isPolice(membre, cfg),
+          proprietaire: guild.ownerId === membre.id,
+          roles: [...membre.roles.cache.values()]
+            .filter((r) => r.id !== guild.id)
+            .sort((a, b) => b.position - a.position)
+            .map((r) => ({ id: r.id, name: r.name, couleur: r.hexColor })),
+        });
+      }
+
       if (req.method === 'GET' && url.pathname === '/dashboard') {
         const guild = client.guilds.cache.get(url.searchParams.get('guild'));
         if (!guild) return send(404, { error: 'Serveur introuvable (le bot y est-il ?).' });

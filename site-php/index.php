@@ -43,6 +43,12 @@ if (!empty($_SESSION['discord']['id'])) {
 $app = discord_app();
 $discordPret = $app['clientId'] !== '' && $app['clientSecret'] !== '';
 
+// 🌐 Marque les serveurs où le membre connecté est réellement présent, dès
+// le premier affichage — sans quoi il faudrait attendre un appel à l'API.
+$bootState = marquer_mes_serveurs($bootState);
+$mesServeursSansBot = (est_staff() || $authOk) ? mes_serveurs_sans_bot($bootState) : [];
+$nbMesServeurs = count(mes_guildes());
+
 // 🌐 Un visiteur qui n'est pas du staff ne doit PAS recevoir les tickets ni
 // la blacklist : la page publique n'embarque que ce qu'elle affiche.
 if (!est_staff() && !$authOk) {
@@ -156,6 +162,11 @@ function taille_envoi_lisible(): string
         // Limite d'envoi de l'hébergeur : sert à prévenir avant de téléverser
         // une vidéo trop lourde.
         window.AINCRAD_UPLOAD_MAX = <?= json_encode(taille_envoi_lisible(), JSON_UNESCAPED_UNICODE) ?>;
+        // 🌐 Vos serveurs Discord : ceux sans le bot, et leur nombre total.
+        window.AINCRAD_MES_SERVEURS = <?= json_encode([
+            'sansBot' => $mesServeursSansBot,
+            'total' => $nbMesServeurs,
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
     </script>
     <script src="assets/js/app.js?v=<?= empreinte_assets() ?>" defer></script>
 </body>

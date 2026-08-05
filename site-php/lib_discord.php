@@ -198,6 +198,71 @@ function discord_est_admin(): bool {
   return $admins ? in_array($id, $admins, true) : false;
 }
 
+// ----- 🌐 Les serveurs Discord du membre connecté -----
+// Discord nous renvoie, à la connexion, la liste de SES serveurs. On s'en
+// sert pour ne montrer à chacun que ce qui le concerne.
+function mes_guildes(): array {
+  $g = $_SESSION['discord_guilds'] ?? [];
+  return is_array($g) ? $g : [];
+}
+// Quel pouvoir le membre a-t-il sur ce serveur ?
+// 0x8 = Administrateur, 0x20 = Gérer le serveur.
+function role_sur_guilde(array $g): string {
+  if (!empty($g['proprietaire'])) return 'Propriétaire';
+  $p = (int) ($g['permissions'] ?? 0);
+  if ($p & 0x8) return 'Administrateur';
+  if ($p & 0x20) return 'Gestionnaire';
+  return 'Membre';
+}
+// Identifiants des serveurs du membre, pour un croisement rapide.
+function mes_guildes_index(): array {
+  $index = [];
+  foreach (mes_guildes() as $g) {
+    $id = (string) ($g['id'] ?? '');
+    if ($id !== '') $index[$id] = $g;
+  }
+  return $index;
+}
+
+// 🌐 Croise les serveurs synchronisés depuis l'agent avec CEUX DU MEMBRE
+// connecté. Après une synchronisation, l'identifiant d'un serveur du site est
+// l'identifiant Discord de la guilde : la correspondance est donc directe.
+function marquer_mes_serveurs(array $state): array {
+    $miens = mes_guildes_index();
+    if (!$miens) return $state;
+    foreach ($state['servers'] ?? [] as $i => $s) {
+        $g = $miens[(string) ($s['id'] ?? '')] ?? null;
+        $state['servers'][$i]['mien'] = $g !== null;
+        if ($g !== null) {
+            // Le rôle affiché devient celui que le membre a VRAIMENT.
+            $state['servers'][$i]['role'] = role_sur_guilde($g);
+        }
+    }
+    return $state;
+}
+
+// Serveurs du membre où le bot n'est PAS encore présent : on les propose,
+// avec le lien d'invitation, plutôt que de les passer sous silence.
+function mes_serveurs_sans_bot(array $state): array {
+    $connus = [];
+    foreach ($state['servers'] ?? [] as $s) $connus[(string) ($s['id'] ?? '')] = true;
+    $sortie = [];
+    foreach (mes_guildes() as $g) {
+        $id = (string) ($g['id'] ?? '');
+        if ($id === '' || isset($connus[$id])) continue;
+        $role = role_sur_guilde($g);
+        // Seuls les serveurs où le membre peut réellement inviter un bot.
+        if (!in_array($role, ['Propriétaire', 'Administrateur', 'Gestionnaire'], true)) continue;
+        $sortie[] = [
+            'id' => $id,
+            'name' => (string) ($g['nom'] ?? $id),
+            'icon' => $g['icone'] ?? null,
+            'role' => $role,
+        ];
+    }
+    return $sortie;
+}
+
 // ----- Appel HTTP vers l'API Discord -----
 // Renvoie [code, données décodées, corps brut].
 function discord_http(string $url, string $methode = 'GET', ?array $corps = null, array $entetes = []): array {
