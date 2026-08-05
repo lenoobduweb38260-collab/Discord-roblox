@@ -47,6 +47,8 @@
     mesServeursSansBot: (window.AINCRAD_MES_SERVEURS || {}).sansBot || [],
     nbMesServeurs: (window.AINCRAD_MES_SERVEURS || {}).total || 0,
     monGrade: {},        // grade réel par serveur, renvoyé par le bot
+    srvParams: {},       // salons/rôles/config par serveur (venant du bot)
+    msg: null,           // brouillon du constructeur de messages
     bandeauVu: false,    // bandeau Discord (erreur / bienvenue) déjà refermé
     menuProfil: false,   // menu déroulant du profil ouvert ?
     ticketTab: "open",   // tickets en cours / archives
@@ -78,7 +80,7 @@
     { id: "roles", label: "Rôles & sécurité", desc: "Protection, permissions et autorôles" },
     { id: "channels", label: "Salons & logs", desc: "Journalisation complète du serveur" },
     { id: "levels", label: "Niveaux", desc: "XP, récompenses et progression" },
-    { id: "whitelist", label: "Whitelist métiers", desc: "Candidatures et métiers autorisés" },
+    { id: "messages", label: "Messages & embeds", desc: "Composer et envoyer sur Discord" },
     { id: "tickets", label: "Tickets", desc: "Configuration du support intégré" },
   ];
 
@@ -938,150 +940,520 @@
     </div>`;
   }
 
+  // ══════════════════════════════════════════════════════════════════
+  // 🎛️ MODULES D'UN SERVEUR — réglages RÉELS, écrits dans le bot
+  // ══════════════════════════════════════════════════════════════════
+  // Les salons et les rôles proviennent du serveur Discord lui-même
+  // (récupérés auprès du bot) : on choisit dans une liste, jamais en tapant
+  // un nom. Chaque changement est envoyé au bot, pas seulement au site.
+
+  // Réglages du serveur en cours : { config, roles, channels, categories }
+  function srvParams() { return ui.srvParams[ui.selectedServerId] || null; }
+
+  async function chargerParametresServeur(guildId) {
+    if (!guildId || ui.srvParams[guildId] !== undefined) return;
+    ui.srvParams[guildId] = null;                 // évite les appels en rafale
+    try {
+      const r = await api("serveur.parametres", { serveur: guildId });
+      ui.srvParams[guildId] = { config: r.config || {}, roles: r.roles || [], channels: r.channels || [], categories: r.categories || [] };
+    } catch (e) {
+      ui.srvParams[guildId] = { erreur: e.message, config: {}, roles: [], channels: [], categories: [] };
+    }
+    if (ui.route === "server") render();
+  }
+
+  // Liste déroulante de SALONS du serveur.
+  function champSalon(cle, label, aide = "") {
+    const p = srvParams();
+    const valeur = String(p?.config?.[cle] ?? "");
+    const options = (p?.channels || []).map(c =>
+      `<option value="${esc(c.id)}"${c.id === valeur ? " selected" : ""}># ${esc(c.name)}</option>`).join("");
+    return `<div class="field"><label>${label}</label>
+      <select class="select" data-cfg="${esc(cle)}">
+        <option value="">— Aucun —</option>${options}
+      </select>
+      ${aide ? `<span class="field-note">${aide}</span>` : ""}</div>`;
+  }
+
+  // Liste déroulante de CATÉGORIES.
+  function champCategorie(cle, label, aide = "") {
+    const p = srvParams();
+    const valeur = String(p?.config?.[cle] ?? "");
+    const options = (p?.categories || []).map(c =>
+      `<option value="${esc(c.id)}"${c.id === valeur ? " selected" : ""}>${esc(c.name)}</option>`).join("");
+    return `<div class="field"><label>${label}</label>
+      <select class="select" data-cfg="${esc(cle)}">
+        <option value="">— Aucune —</option>${options}
+      </select>
+      ${aide ? `<span class="field-note">${aide}</span>` : ""}</div>`;
+  }
+
+  // Liste déroulante de RÔLES — simple, ou à choix multiple.
+  function champRole(cle, label, aide = "", multiple = false) {
+    const p = srvParams();
+    let valeur = p?.config?.[cle] ?? "";
+    let choisis = [];
+    if (multiple) {
+      try { choisis = JSON.parse(valeur || "[]").map(String); } catch { choisis = valeur ? [String(valeur)] : []; }
+    }
+    const options = (p?.roles || []).map(r => {
+      const pris = multiple ? choisis.includes(String(r.id)) : String(r.id) === String(valeur);
+      return `<option value="${esc(r.id)}"${pris ? " selected" : ""}>@ ${esc(r.name)}</option>`;
+    }).join("");
+    return `<div class="field"><label>${label}</label>
+      <select class="select" data-cfg="${esc(cle)}"${multiple ? ' multiple size="5" data-multi="1"' : ""}>
+        ${multiple ? "" : '<option value="">— Aucun —</option>'}${options}
+      </select>
+      <span class="field-note">${multiple ? "Maintenez Ctrl (⌘ sur Mac) pour en choisir plusieurs. " : ""}${aide}</span></div>`;
+  }
+
+  // Interrupteur enregistré dans le bot.
+  function champBascule(cle, label, aide = "") {
+    const p = srvParams();
+    const actif = Number(p?.config?.[cle] ?? 0) === 1;
+    return `<div class="row" style="justify-content:flex-start;gap:12px">
+      <button type="button" class="toggle ${actif ? "on" : ""}" data-cfg-toggle="${esc(cle)}" aria-label="${esc(label)}"></button>
+      <span><b>${label}</b>${aide ? `<i style="display:block;color:var(--muted);font-size:11.5px;font-style:normal">${aide}</i>` : ""}</span>
+    </div>`;
+  }
+
+  // Champ texte enregistré dans le bot.
+  function champTexte(cle, label, aide = "", zone = false, placeholder = "") {
+    const p = srvParams();
+    const valeur = String(p?.config?.[cle] ?? "");
+    return `<div class="field full"><label>${label}</label>
+      ${zone
+        ? `<textarea class="textarea" rows="3" data-cfg="${esc(cle)}" placeholder="${esc(placeholder)}">${esc(valeur)}</textarea>`
+        : `<input class="input" data-cfg="${esc(cle)}" value="${esc(valeur)}" placeholder="${esc(placeholder)}">`}
+      ${aide ? `<span class="field-note">${aide}</span>` : ""}</div>`;
+  }
+
+  // Cadre d'un module : bandeau d'état + bouton d'enregistrement vers le bot.
   function modulePanel(title, description, formBody, moduleId) {
+    const p = srvParams();
+    if (p === null) return `<section class="panel"><div class="panel-inner"><div class="row">⏳ Lecture des salons et rôles du serveur…</div></div></section>`;
+    if (p?.erreur) {
+      return `<section class="panel"><div class="panel-inner">
+        <div class="panel-head"><div><h3>${esc(title)}</h3><p>${esc(description)}</p></div></div>
+        <div class="row" style="border-color:rgba(255,92,116,.45);flex-direction:column;align-items:flex-start;gap:6px">
+          <b>❌ Impossible de lire la configuration de ce serveur</b>
+          <span style="color:var(--muted)">${esc(p.erreur)}</span>
+          <span style="color:var(--muted);font-size:12px">Le bot doit être <b>démarré</b> et à jour. Vérifiez ⚙️ Créateur → 🤖 Mes bots.</span>
+        </div>
+      </div></section>`;
+    }
     return `<section class="panel"><div class="panel-inner">
-      <div class="panel-head"><div><h3>${esc(title)}</h3><p>${esc(description)}</p></div><span class="chip green">MODULE ACTIF</span></div><div class="panel-line"></div>
-      <form data-form="module" data-module="${esc(moduleId)}">${formBody}<div class="form-actions"><button type="button" class="btn ghost" data-action="reset-module">Réinitialiser</button><button type="submit" class="btn success">Enregistrer le module</button></div></form>
+      <div class="panel-head"><div><h3>${esc(title)}</h3><p>${esc(description)}</p></div><span class="chip green">RÉGLAGES DU BOT</span></div><div class="panel-line"></div>
+      <form data-form="module-bot" data-module="${esc(moduleId)}">${formBody}
+        <div class="form-actions">
+          <button type="button" class="btn ghost" data-action="module-recharger">↺ Recharger</button>
+          <button type="submit" class="btn success">💾 Enregistrer dans le bot</button>
+        </div>
+      </form>
     </div></section>`;
   }
 
   function moduleView(moduleId, server) {
-    const settings = serverSettings(server.id)[moduleId] || {};
+    chargerParametresServeur(server.id);
     switch (moduleId) {
-      case "overview": return overviewModule(server, settings);
-      case "rp": return rpModule(settings);
-      case "arrivals": return arrivalsModule(settings);
-      case "roles": return rolesModule(settings);
-      case "channels": return channelsModule(settings);
-      case "levels": return levelsModule(settings);
-      case "whitelist": return whitelistModule(settings);
-      case "tickets": return ticketModule(settings);
-      default: return overviewModule(server, settings);
+      case "overview": return overviewModule(server);
+      case "rp": return rpModule();
+      case "arrivals": return arrivalsModule();
+      case "roles": return rolesModule();
+      case "channels": return channelsModule();
+      case "levels": return levelsModule();
+      case "messages": return messagesModule(server);
+      case "tickets": return ticketModule();
+      default: return overviewModule(server);
     }
   }
 
-  function overviewModule(server, s) {
+  function overviewModule(server) {
+    const p = srvParams();
+    const cfg = p?.config || {};
+    const compte = (liste) => (p?.[liste] || []).length;
     const body = `<div class="grid-3">
-      <div class="stat-card"><span>Niveau de configuration</span><strong>${server.level}%</strong><em>profil serveur</em></div>
-      <div class="stat-card"><span>Activité Discord</span><strong>${server.activity}%</strong><em>7 derniers jours</em></div>
-      <div class="stat-card"><span>Modules actifs</span><strong>8 / 8</strong><em>système complet</em></div>
+      <div class="stat-card"><span>Membres</span><strong>${formatNumber(server.members)}</strong><em>sur ce serveur</em></div>
+      <div class="stat-card"><span>Salons textuels</span><strong>${compte("channels")}</strong><em>utilisables par le bot</em></div>
+      <div class="stat-card"><span>Rôles</span><strong>${compte("roles")}</strong><em>attribuables</em></div>
     </div>
-    <div class="form-grid mt-22">
-      ${selectField("language", "Langue du bot", s.language || "fr", [{value:"fr",label:"Français"},{value:"en",label:"English"},{value:"de",label:"Deutsch"}])}
-      ${selectField("timezone", "Fuseau horaire", s.timezone || "Europe/Paris", ["Europe/Paris","Europe/Brussels","Europe/Berlin","UTC"])}
-      ${inputField("prefix", "Préfixe des commandes", s.prefix || "!", "text", "Utilisé pour les commandes textuelles.", "maxlength=4")}
-      ${selectField("presence", "Présence du bot", s.presence || "Aincrad", ["Aincrad","Sword Art Online","Gestion du serveur","Mode maintenance"])}
+    <div class="mt-22">
+      ${champBascule("rp_enabled", "Module RP", "Cartes d'identité, permis, entreprises, assurances. Change les commandes disponibles sur le serveur.")}
+      ${champBascule("levels_enabled", "Niveaux", "XP écrit et vocal, classement et récompenses.")}
+      ${champBascule("interact_enabled", "Interactions", "Câlins, bisous et autres interactions entre membres.")}
+      ${champBascule("sao_enabled", "Aventure SAO", "Les 100 étages d'Aincrad, boss et badges.")}
+    </div>`;
+    return modulePanel("Vue d'ensemble", "Activez ou coupez les grands modules du bot sur ce serveur.", body, "overview");
+  }
+
+  function rpModule() {
+    const body = `<div class="builder-hint">🎭 Le module RP apporte les cartes d'identité, permis, entreprises et assurances. Les rôles ci-dessous décident qui peut quoi.</div>
+    <div class="form-grid">
+      ${champRole("police_role_ids", "Rôles Police", "Peuvent retirer des points de permis et tenir le casier judiciaire.", true)}
+      ${champRole("wlrp_role_id", "Rôle donné par la Whitelist RP", "Attribué automatiquement quand vous whitelistez quelqu'un.")}
     </div>
-    <div class="mt-16">${toggleField("maintenance", !!s.maintenance, "Mode maintenance", "Suspend les modules publics sans déconnecter le bot.")}</div>`;
-    return modulePanel("Vue d'ensemble", "Identité, langue, statut et paramètres généraux du serveur.", body, "overview");
+    <div class="mt-16">
+      ${champBascule("rp_enabled", "Activer le module RP", "Synchronise les commandes RP sur ce serveur.")}
+      ${champBascule("rp_locked", "Verrouiller les modifications RP", "Empêche les changements de cartes et de permis.")}
+    </div>`;
+    return modulePanel("Module RP", "Personnages, permis, entreprises et rôles métier.", body, "rp");
   }
 
-  function rpModule(s) {
-    const body = `<div class="grid-2"><div>
-      ${toggleField("enabled", s.enabled !== false, "Activer le module RP", "Active les personnages, profils et commandes RP.")}
-      ${toggleField("characterCreation", s.characterCreation !== false, "Création de personnages", "Permet aux membres de créer leur identité RP.")}
-      ${toggleField("economy", s.economy !== false, "Économie Col", "Active la monnaie, les achats et les récompenses.")}
-      ${toggleField("inventory", s.inventory !== false, "Inventaire", "Active les objets, équipements et consommables.")}
-    </div><div class="form-grid">
-      ${inputField("startingCoins", "Col de départ", s.startingCoins ?? 250, "number", "Montant remis à la création.", "min=0 max=100000")}
-      ${inputField("deathPenalty", "Pénalité de mort (%)", s.deathPenalty ?? 15, "number", "Perte appliquée au portefeuille.", "min=0 max=100")}
-      ${inputField("maxCharacters", "Personnages maximum", s.maxCharacters ?? 3, "number", "Par utilisateur Discord.", "min=1 max=10")}
-      ${selectField("combatMode", "Mode de combat", s.combatMode || "semi-rp", [{value:"narratif",label:"Narratif"},{value:"semi-rp",label:"Semi-RP"},{value:"statistiques",label:"Statistiques complètes"}])}
-    </div></div>`;
-    return modulePanel("Module RP", "Configurez la progression, l'économie et les mécaniques de rôleplay.", body, "rp");
+  // 👋 Arrivées & départs : salon, message, et APPARENCE de l'embed.
+  function arrivalsModule() {
+    const p = srvParams();
+    const cfg = p?.config || {};
+    const cadres = [
+      { value: "rond", label: "Vignette ronde (en haut à droite)" },
+      { value: "grand", label: "Grande image (pleine largeur)" },
+      { value: "aucun", label: "Ne pas afficher la photo" },
+    ];
+    const choixCadre = (cle) => `<div class="field"><label>Cadre de la photo de profil</label>
+      <select class="select" data-cfg="${cle}">
+        ${cadres.map(c => `<option value="${c.value}"${String(cfg[cle] || "rond") === c.value ? " selected" : ""}>${c.label}</option>`).join("")}
+      </select></div>`;
+    const couleur = (cle, label) => `<div class="field"><label>${label}</label>
+      <input class="input" type="color" data-cfg="${cle}" value="${esc(/^#[0-9a-f]{6}$/i.test(cfg[cle] || "") ? cfg[cle] : (cle === "welcome_color" ? "#2ecc71" : "#e74c3c"))}">
+      <span class="field-note">Barre colorée à gauche de l'embed.</span></div>`;
+
+    const body = `<div class="builder-hint">👋 Variables utilisables dans les messages : <code>{user}</code> (mention), <code>{user.username}</code>, <code>{server}</code>, <code>{membercount}</code>.</div>
+      <h4 class="sous-titre">📥 Arrivées</h4>
+      <div class="form-grid">
+        ${champSalon("member_channel_id", "Salon des arrivées", "Laissez « Aucun » pour désactiver les messages d'arrivée.")}
+        ${couleur("welcome_color", "Couleur de l'embed")}
+        ${champTexte("welcome_title", "Titre de l'embed", "Vide = « 📥 Arrivée d'un membre ».", false, "Bienvenue sur {server} !")}
+        ${choixCadre("welcome_avatar")}
+        ${champTexte("welcome_image", "Image de fond (URL)", "Grande image affichée dans l'embed. Laissez vide pour aucune.", false, "https://…/banniere.png")}
+        ${champTexte("welcome_message", "Message de bienvenue", "", true, "Bienvenue sur {server}, {user} ! 🎉")}
+      </div>
+      <div class="mt-16">
+        ${champBascule("welcome_fields", "Afficher les informations du membre", "Nom Discord, identifiant, numéro de membre et date de création du compte.")}
+        ${champBascule("welcome_mention", "Mentionner le membre", "Le ping s'ajoute au-dessus de l'embed.")}
+      </div>
+      ${apercuArrivee(cfg, "welcome")}
+
+      <h4 class="sous-titre mt-22">📤 Départs</h4>
+      <div class="form-grid">
+        ${champSalon("goodbye_channel_id", "Salon des départs", "Peut être différent du salon d'arrivée.")}
+        ${couleur("goodbye_color", "Couleur de l'embed")}
+        ${champTexte("goodbye_title", "Titre de l'embed", "", false, "À bientôt…")}
+        ${choixCadre("goodbye_avatar")}
+        ${champTexte("goodbye_image", "Image de fond (URL)", "", false, "https://…/aurevoir.png")}
+        ${champTexte("goodbye_message", "Message de départ", "", true, "{user.username} nous a quittés.")}
+      </div>
+      <div class="mt-16">${champBascule("goodbye_fields", "Afficher les informations du membre", "")}</div>`;
+    return modulePanel("Arrivées & départs", "Salon, message et apparence complète de l'embed.", body, "arrivals");
   }
 
-  function arrivalsModule(s) {
-    const body = `<div class="grid-2"><div>
-      ${toggleField("welcome", s.welcome !== false, "Message d'arrivée", "Annonce chaque nouveau joueur dans le salon choisi.")}
-      ${toggleField("goodbye", s.goodbye !== false, "Message de départ", "Informe la communauté lorsqu'un membre quitte le serveur.")}
-      ${toggleField("directMessage", !!s.directMessage, "Message privé d'accueil", "Envoie également les règles en message privé.")}
-    </div><div class="form-grid">
-      ${inputField("welcomeChannel", "Salon d'arrivée", s.welcomeChannel || "#arrivées")}
-      ${inputField("goodbyeChannel", "Salon de départ", s.goodbyeChannel || "#départs")}
-      ${textAreaField("welcomeMessage", "Message d'accueil", s.welcomeMessage || "Bienvenue {user} dans Aincrad. Votre aventure commence ici.", "Variables : {user}, {server}, {memberCount}.")}
-      ${textAreaField("goodbyeMessage", "Message de départ", s.goodbyeMessage || "{user} a quitté Aincrad. Son nom restera inscrit dans les archives.")}
-    </div></div>`;
-    return modulePanel("Arrivées & départs", "Créez une entrée immersive pour chaque nouveau membre.", body, "arrivals");
+  // Aperçu façon Discord de l'embed d'arrivée.
+  function apercuArrivee(cfg, prefixe) {
+    const couleur = /^#[0-9a-f]{6}$/i.test(cfg[`${prefixe}_color`] || "") ? cfg[`${prefixe}_color`] : "#2ecc71";
+    const titre = cfg[`${prefixe}_title`] || "📥 Arrivée d'un membre";
+    const message = (cfg[`${prefixe}_message`] || "Bienvenue à {user} sur **{server}** ! 🎉")
+      .replace(/\{user\.username\}/g, "NouveauMembre")
+      .replace(/\{user\.mention\}|\{user\}/g, "@NouveauMembre")
+      .replace(/\{server\}/g, "Votre serveur")
+      .replace(/\{membercount\}/g, "128");
+    const cadre = cfg[`${prefixe}_avatar`] || "rond";
+    const image = String(cfg[`${prefixe}_image`] || "").trim();
+    const avatar = `<div class="dc-avatar-mini"></div>`;
+    return `<div class="apercu mt-16">
+      <span class="apercu-titre">PRÉVISUALISATION</span>
+      <div class="dc-msg">
+        <div class="dc-pp"></div>
+        <div class="dc-corps">
+          <div class="dc-nom">Votre bot <span class="dc-tag">APP</span></div>
+          <div class="dc-embed" style="border-left-color:${esc(couleur)}">
+            <div class="dc-embed-corps">
+              <div class="dc-titre">${esc(titre)}</div>
+              <div class="dc-desc">${esc(message)}</div>
+              ${Number(cfg[`${prefixe}_fields`] ?? 1) === 1 ? `<div class="dc-champs">
+                <div><b>💬 Nom Discord</b><span>NouveauMembre</span></div>
+                <div><b>🔢 ID Discord</b><span>123456789012345678</span></div>
+                <div><b>👥 Membre n°</b><span>128</span></div>
+              </div>` : ""}
+              ${image ? `<img class="dc-image" src="${esc(image)}" alt="" onerror="this.style.display='none'">`
+                : (cadre === "grand" ? `<div class="dc-image dc-image-vide">photo du membre en grand</div>` : "")}
+            </div>
+            ${cadre === "rond" && !image ? `<div class="dc-miniature"></div>` : ""}
+            ${image && cadre !== "aucun" ? `<div class="dc-miniature"></div>` : ""}
+          </div>
+        </div>
+      </div>
+    </div>`;
   }
 
-  function rolesModule(s) {
-    const body = `<div class="grid-2"><div>
-      ${toggleField("antiRaid", s.antiRaid !== false, "Protection anti-raid", "Bloque les arrivées massives et actions coordonnées.")}
-      ${toggleField("antiSpam", s.antiSpam !== false, "Protection anti-spam", "Analyse la fréquence, les liens et les mentions.")}
-      ${toggleField("lockDangerousPermissions", s.lockDangerousPermissions !== false, "Verrouillage des permissions", "Surveille les rôles administrateur et les webhooks.")}
-      ${toggleField("captcha", !!s.captcha, "Vérification captcha", "Demande une validation avant d'accéder au serveur.")}
-    </div><div class="form-grid">
-      ${inputField("autoRole", "Rôle automatique", s.autoRole || "Joueur")}
-      ${inputField("verifiedRole", "Rôle vérifié", s.verifiedRole || "Citoyen d'Aincrad")}
-      ${inputField("minimumAccountDays", "Âge minimum du compte", s.minimumAccountDays ?? 7, "number", "En jours.", "min=0 max=365")}
-      ${selectField("raidAction", "Action en cas de raid", s.raidAction || "quarantaine", [{value:"alerte",label:"Alerte uniquement"},{value:"quarantaine",label:"Quarantaine automatique"},{value:"ban",label:"Bannissement automatique"}])}
-    </div></div>`;
-    return modulePanel("Rôles & sécurité", "Centralisez les protections et les rôles attribués automatiquement.", body, "roles");
+  function rolesModule() {
+    const body = `<div class="builder-hint">🎭 Les rôles ci-dessous viennent directement de votre serveur Discord. Le bot ne peut donner qu'un rôle situé <b>sous le sien</b> dans la hiérarchie.</div>
+      <div class="form-grid">
+        ${champRole("autorole_role_ids", "🤖 Rôles automatiques à l'arrivée", "Donnés à chaque nouveau membre. Ignorés si le captcha est actif : c'est alors sa validation qui débloque l'accès.", true)}
+        ${champRole("staff_role_ids", "🛡️ Rôles Staff", "Accès aux commandes de modération.", true)}
+        ${champRole("admin_role_ids", "👑 Rôles Administration", "Accès complet à la configuration.", true)}
+        ${champRole("verified_role_id", "✅ Rôle donné après le captcha", "Attribué quand le membre réussit la vérification.")}
+        ${champRole("service_role_id", "🧑‍💼 Rôle « en service »", "Ajouté pendant une prise de service.")}
+      </div>
+      <div class="mt-16">
+        ${champBascule("captcha_enabled", "Captcha de vérification", "Le nouveau membre doit se vérifier avant d'accéder au serveur.")}
+        ${champBascule("antispam_enabled", "Anti-spam", "Sanctionne les envois répétés.")}
+        ${champBascule("antinuke_enabled", "Anti-nuke", "Bloque les suppressions massives de salons et de rôles.")}
+      </div>
+      <div class="form-grid mt-16">
+        ${champSalon("captcha_channel_id", "Salon du captcha", "Là où le message de vérification est publié.")}
+      </div>`;
+    return modulePanel("Rôles & sécurité", "Rôles automatiques, staff, vérification et protections.", body, "roles");
   }
 
-  function channelsModule(s) {
-    const body = `<div class="grid-2"><div>
-      ${toggleField("messageLogs", s.messageLogs !== false, "Logs des messages", "Suppressions, éditions et pièces jointes.")}
-      ${toggleField("voiceLogs", s.voiceLogs !== false, "Logs vocaux", "Entrées, sorties et déplacements vocaux.")}
-      ${toggleField("moderationLogs", s.moderationLogs !== false, "Logs de modération", "Avertissements, exclusions et bannissements.")}
-      ${toggleField("memberLogs", s.memberLogs !== false, "Logs des membres", "Pseudos, rôles et changements de profil.")}
-    </div><div class="form-grid">
-      ${inputField("logChannel", "Salon principal des logs", s.logChannel || "#logs-cardinal")}
-      ${inputField("ticketLogChannel", "Archives des tickets", s.ticketLogChannel || "#archives-tickets")}
-      ${selectField("retention", "Conservation", s.retention || "90", [{value:"30",label:"30 jours"},{value:"90",label:"90 jours"},{value:"365",label:"1 an"},{value:"unlimited",label:"Illimitée"}])}
-      ${selectField("detailLevel", "Niveau de détail", s.detailLevel || "complet", [{value:"minimal",label:"Minimal"},{value:"standard",label:"Standard"},{value:"complet",label:"Complet"}])}
-    </div></div>`;
-    return modulePanel("Salons & logs", "Définissez les salons d'archives et les événements enregistrés.", body, "channels");
+  function channelsModule() {
+    const body = `<div class="builder-hint">📁 Chaque salon se choisit dans la liste — impossible de se tromper de nom ou d'identifiant.</div>
+      <div class="form-grid">
+        ${champSalon("log_channel_id", "📋 Salon des logs", "Modération, rôles, messages supprimés, vocaux.")}
+        ${champSalon("member_channel_id", "👋 Salon des arrivées", "")}
+        ${champSalon("goodbye_channel_id", "📤 Salon des départs", "")}
+        ${champSalon("staff_channel_id", "🛡️ Salon du staff", "")}
+        ${champSalon("service_channel_id", "🧑‍💼 Salon des prises de service", "")}
+        ${champSalon("level_channel_id", "📈 Salon des niveaux", "Annonces de montée de niveau.")}
+        ${champSalon("proof_channel_id", "📎 Salon des preuves", "")}
+        ${champSalon("partner_channel_id", "🤝 Salon des partenariats", "")}
+        ${champSalon("patch_channel_id", "📝 Salon des notes de mise à jour", "Le bot y publie ses nouveautés.")}
+        ${champSalon("update_channel_id", "🔄 Salon des mises à jour techniques", "")}
+        ${champSalon("ticket_transcript_channel_id", "🗄️ Salon des transcriptions de tickets", "")}
+      </div>`;
+    return modulePanel("Salons & logs", "Où le bot écrit chacune de ses annonces.", body, "channels");
   }
 
-  function levelsModule(s) {
-    const body = `<div class="grid-2"><div>
-      ${toggleField("enabled", s.enabled !== false, "Système de niveaux", "Distribue de l'XP lors des interactions valides.")}
-      ${toggleField("voiceXp", s.voiceXp !== false, "XP vocal", "Récompense le temps passé dans les salons vocaux.")}
-      ${toggleField("roleRewards", s.roleRewards !== false, "Récompenses de rôle", "Attribue automatiquement les rôles de palier.")}
-      ${toggleField("antiFarm", s.antiFarm !== false, "Protection anti-farm", "Ignore les messages répétés ou artificiels.")}
-    </div><div class="form-grid">
-      ${inputField("xpMin", "XP minimum", s.xpMin ?? 10, "number", "Par message valide.", "min=1 max=100")}
-      ${inputField("xpMax", "XP maximum", s.xpMax ?? 25, "number", "Par message valide.", "min=1 max=200")}
-      ${inputField("cooldown", "Délai entre gains (s)", s.cooldown ?? 60, "number", "Protection contre le farm.", "min=10 max=3600")}
-      ${inputField("announceChannel", "Salon des niveaux", s.announceChannel || "#progression")}
-      ${selectField("curve", "Courbe de progression", s.curve || "progressive", [{value:"rapide",label:"Rapide"},{value:"progressive",label:"Progressive"},{value:"difficile",label:"Difficile"}])}
-      ${inputField("maxLevel", "Niveau maximum", s.maxLevel ?? 100, "number", "Plafond du classement.", "min=10 max=1000")}
-    </div></div>`;
-    return modulePanel("Niveaux", "Réglez l'expérience, les délais et les récompenses de progression.", body, "levels");
+  function levelsModule() {
+    const body = `<div class="form-grid">
+        ${champSalon("level_channel_id", "Salon des annonces de niveau", "Vide = annonce dans le salon où le membre écrit.")}
+        ${champTexte("level_image_url", "Image de fond de la carte de niveau", "URL d'une image large (1000×300 environ).", false, "https://…/fond-niveau.png")}
+      </div>
+      <div class="mt-16">${champBascule("levels_enabled", "Système de niveaux", "XP écrit et vocal.")}</div>
+      <div class="builder-hint mt-16">💡 Les valeurs d'XP (par message, par minute de vocal, temps de recharge) se règlent avec la commande <code>/config</code> sur Discord — elles demandent des bornes que le site ne peut pas deviner.</div>`;
+    return modulePanel("Niveaux", "Progression, annonces et carte personnalisée.", body, "levels");
   }
 
-  function whitelistModule(s) {
-    const jobs = Array.isArray(s.jobs) ? s.jobs : [];
-    const body = `<div class="grid-2"><div>
-      ${toggleField("enabled", s.enabled !== false, "Whitelist métiers", "Active les candidatures pour les métiers protégés.")}
-      ${toggleField("dmResult", s.dmResult !== false, "Résultat en message privé", "Informe automatiquement le candidat.")}
-      ${toggleField("requireCharacter", s.requireCharacter !== false, "Personnage RP obligatoire", "Refuse les candidatures sans profil actif.")}
-    </div><div class="form-grid">
-      ${inputField("reviewRole", "Rôle chargé des validations", s.reviewRole || "Responsable Whitelist")}
-      ${inputField("reviewChannel", "Salon des candidatures", s.reviewChannel || "#candidatures-métiers")}
-      ${inputField("reviewDelay", "Délai conseillé (h)", s.reviewDelay ?? 48, "number", "Affiché au candidat.", "min=1 max=720")}
-      <div class="field full"><label>Métiers disponibles</label><input class="input" name="jobs" value="${esc(jobs.join(", "))}" placeholder="Forgeron, Alchimiste, Garde…"><span class="field-note">Séparez les métiers par une virgule.</span></div>
-      <div class="field full"><label>Aperçu</label><div class="tag-list">${jobs.map(job => `<span class="tag-item">${esc(job)}</span>`).join("") || `<span class="field-note">Aucun métier configuré.</span>`}</div></div>
-    </div></div>`;
-    return modulePanel("Whitelist métiers", "Gérez les métiers accessibles uniquement après validation du staff.", body, "whitelist");
+  function ticketModule() {
+    const body = `<div class="builder-hint">🎫 Les types de tickets (catégories, rôles support, emojis) se créent avec <code>/ticket</code> sur Discord. Ici vous réglez les salons associés.</div>
+      <div class="form-grid">
+        ${champSalon("ticket_transcript_channel_id", "Salon des transcriptions", "Chaque ticket fermé y est archivé.")}
+        ${champRole("staff_role_ids", "Rôles pouvant traiter les tickets", "", true)}
+      </div>`;
+    return modulePanel("Tickets", "Archives et rôles du support.", body, "tickets");
   }
 
-  function ticketModule(s) {
-    const body = `<div class="grid-2"><div>
-      ${toggleField("enabled", s.enabled !== false, "Système de tickets", "Permet aux membres d'ouvrir une demande privée.")}
-      ${toggleField("transcripts", s.transcripts !== false, "Transcriptions automatiques", "Archive chaque conversation à sa fermeture.")}
-      ${toggleField("claimSystem", s.claimSystem !== false, "Attribution aux membres du staff", "Empêche plusieurs agents de traiter le même ticket.")}
-      ${toggleField("rating", !!s.rating, "Évaluation du support", "Demande une note après la fermeture.")}
-    </div><div class="form-grid">
-      ${inputField("category", "Catégorie Discord", s.category || "TICKETS")}
-      ${inputField("staffRole", "Rôle du support", s.staffRole || "Support")}
-      ${inputField("closeDelay", "Délai de fermeture (min)", s.closeDelay ?? 15, "number", "Avant suppression du salon.", "min=0 max=1440")}
-      ${inputField("maxOpen", "Tickets maximum par membre", s.maxOpen ?? 2, "number", "Limite simultanée.", "min=1 max=20")}
-      ${textAreaField("panelMessage", "Texte du panneau", s.panelMessage || "Besoin d'aide ? Ouvrez un ticket et un membre du staff vous répondra.")}
-    </div></div>`;
-    return modulePanel("Tickets", "Configurez le panneau, les rôles du staff et les archives.", body, "tickets");
+  // ══════════════════════════════════════════════════════════════════
+  // 📨 CONSTRUCTEUR DE MESSAGES — composer, prévisualiser, envoyer
+  // ══════════════════════════════════════════════════════════════════
+
+  // Relit le brouillon depuis les champs affichés (avant toute action).
+  function lireBrouillon() {
+    const m = brouillon();
+    const v = sel => document.querySelector(sel)?.value ?? "";
+    m.salon = v("#msg-salon");
+    m.content = v("#msg-content");
+    m.selecteurTexte = v("#msg-sel-texte");
+    document.querySelectorAll(".embed-edit[data-embed]").forEach(bloc => {
+      const i = Number(bloc.dataset.embed);
+      const e = m.embeds[i];
+      if (!e) return;
+      bloc.querySelectorAll("[data-emb]").forEach(ch => { e[ch.dataset.emb] = ch.value; });
+      e.champs = [...bloc.querySelectorAll("[data-champ]")].map(l => ({
+        nom: l.querySelector("[data-champ-nom]")?.value || "",
+        valeur: l.querySelector("[data-champ-valeur]")?.value || "",
+        aligne: l.querySelector("[data-champ-aligne]")?.classList.contains("on") || false,
+      }));
+    });
+    m.boutons = [...document.querySelectorAll("[data-bouton]")].map(l => ({
+      label: l.querySelector("[data-btn-label]")?.value || "",
+      style: l.querySelector("[data-btn-style]")?.value || "secondaire",
+      lien: l.querySelector("[data-btn-lien]")?.value || "",
+    }));
+    m.selecteur = [...document.querySelectorAll("[data-option]")].map(l => ({
+      label: l.querySelector("[data-opt-label]")?.value || "",
+      description: l.querySelector("[data-opt-desc]")?.value || "",
+    }));
+    return m;
+  }
+
+  // 💾 Enregistre TOUS les réglages modifiés d'un module dans le bot.
+  // Chaque clé part séparément : le bot valide chacune, et un refus isolé
+  // n'annule pas les autres.
+  async function enregistrerModule(form) {
+    const p = srvParams();
+    if (!p) return;
+    const aEnvoyer = [];
+    form.querySelectorAll("[data-cfg]").forEach(ch => {
+      const cle = ch.dataset.cfg;
+      let valeur;
+      if (ch.multiple) valeur = [...ch.selectedOptions].map(o => o.value).filter(Boolean);
+      else valeur = ch.value;
+      // Inchangé ? on n'envoie rien.
+      const actuel = p.config[cle];
+      const pareil = Array.isArray(valeur)
+        ? JSON.stringify(valeur) === JSON.stringify((() => { try { return JSON.parse(actuel || "[]"); } catch { return []; } })())
+        : String(actuel ?? "") === String(valeur);
+      if (!pareil) aEnvoyer.push({ cle, valeur });
+    });
+    form.querySelectorAll("[data-cfg-toggle]").forEach(b => {
+      const cle = b.dataset.cfgToggle;
+      const valeur = b.classList.contains("on") ? 1 : 0;
+      if (Number(p.config[cle] ?? 0) !== valeur) aEnvoyer.push({ cle, valeur });
+    });
+    if (!aEnvoyer.length) { toast("RIEN À ENREGISTRER", "Aucun réglage n'a changé."); return; }
+    const echecs = [];
+    for (const { cle, valeur } of aEnvoyer) {
+      try {
+        await api("serveur.config", { serveur: ui.selectedServerId, cle, valeur });
+        p.config[cle] = Array.isArray(valeur) ? JSON.stringify(valeur) : valeur;
+      } catch (e) { echecs.push(`${cle} : ${e.message}`); }
+    }
+    render();
+    if (echecs.length) toast("ENREGISTREMENT PARTIEL", echecs[0], "error");
+    else toast("ENREGISTRÉ DANS LE BOT", `${aEnvoyer.length} réglage(s) appliqué(s) sur Discord.`);
+  }
+
+  function brouillon() {
+    if (!ui.msg) {
+      ui.msg = { salon: "", content: "", embeds: [], boutons: [], selecteur: [], selecteurTexte: "" };
+    }
+    return ui.msg;
+  }
+
+  function messagesModule(server) {
+    const p = srvParams();
+    if (p === null) return `<section class="panel"><div class="panel-inner"><div class="row">⏳ Lecture des salons du serveur…</div></div></section>`;
+    if (p?.erreur) return modulePanel("Messages", "", "", "messages");
+    const m = brouillon();
+    const salons = (p.channels || []).map(c =>
+      `<option value="${esc(c.id)}"${c.id === m.salon ? " selected" : ""}># ${esc(c.name)}</option>`).join("");
+    return `
+      <div class="builder-hint">📨 Composez votre message — texte, embeds, boutons, menu déroulant — puis <b>Envoyer</b> : le bot le publiera dans le salon choisi.</div>
+      <section class="panel"><div class="panel-inner">
+        <div class="panel-head"><div><h3>📨 Messages & embeds</h3><p>Ce que vous voyez à droite est ce que Discord affichera.</p></div></div>
+        <div class="field full"><label>Salon de destination</label>
+          <select class="select" id="msg-salon">
+            <option value="">Veuillez sélectionner un salon</option>${salons}
+          </select>
+        </div>
+        <div class="msg-layout mt-16">
+          <div class="msg-edit">
+            <div class="field full"><label>Contenu du message (hors embed)</label>
+              <textarea class="textarea" rows="3" id="msg-content" placeholder="Texte affiché au-dessus des embeds…">${esc(m.content)}</textarea>
+              <span class="field-note">2000 caractères maximum. Laissez vide si vous n'envoyez qu'un embed.</span></div>
+            ${m.embeds.map((e, i) => editeurEmbed(e, i)).join("")}
+            ${editeurBoutons(m)}
+            ${editeurSelecteur(m)}
+            <div class="page-actions mt-16">
+              ${button("➕ Ajouter un embed", "msg-embed-add", "ghost")}
+              ${button("➕ Bouton", "msg-bouton-add", "ghost")}
+              ${button("➕ Option de menu", "msg-option-add", "ghost")}
+            </div>
+          </div>
+          <div class="msg-apercu">
+            <span class="apercu-titre">PRÉVISUALISATION</span>
+            ${apercuMessage(m)}
+            <div class="form-actions" style="margin-top:14px">
+              ${button("🧪 Vérifier", "msg-tester", "ghost")}
+              ${button("📨 Envoyer sur Discord", "msg-envoyer", "success")}
+            </div>
+            <div id="msg-rapport"></div>
+          </div>
+        </div>
+      </div></section>`;
+  }
+
+  function editeurEmbed(e, i) {
+    return `<div class="embed-edit" data-embed="${i}">
+      <div class="embed-edit-head">
+        <strong>Embed ${i + 1}</strong>
+        <button type="button" class="btn danger small" data-action="msg-embed-suppr" data-index="${i}">🗑 Retirer</button>
+      </div>
+      <div class="form-grid">
+        <div class="field"><label>Couleur</label><input class="input" type="color" data-emb="couleur" value="${esc(e.couleur || "#5865f2")}"></div>
+        <div class="field"><label>Titre</label><input class="input" data-emb="titre" value="${esc(e.titre || "")}" placeholder="Titre de l'embed"></div>
+        <div class="field full"><label>Description</label><textarea class="textarea" rows="3" data-emb="description" placeholder="Texte principal…">${esc(e.description || "")}</textarea></div>
+        <div class="field"><label>Nom de l'auteur</label><input class="input" data-emb="auteur" value="${esc(e.auteur || "")}"></div>
+        <div class="field"><label>Icône de l'auteur (URL)</label><input class="input" data-emb="auteur_icone" value="${esc(e.auteur_icone || "")}"></div>
+        <div class="field"><label>Grande image (URL)</label><input class="input" data-emb="image" value="${esc(e.image || "")}" placeholder="https://…"></div>
+        <div class="field"><label>Miniature (URL)</label><input class="input" data-emb="miniature" value="${esc(e.miniature || "")}" placeholder="https://…"></div>
+        <div class="field full"><label>Pied de page</label><input class="input" data-emb="footer" value="${esc(e.footer || "")}"></div>
+      </div>
+      <div class="mt-16">
+        <div class="panel-head" style="margin:0 0 8px"><div><h3 style="font-size:13px">Champs</h3></div>
+          <button type="button" class="btn ghost small" data-action="msg-champ-add" data-index="${i}">➕ Ajouter un champ</button></div>
+        ${(e.champs || []).map((c, j) => `<div class="row" data-champ="${j}" style="gap:8px">
+          <input class="input" data-champ-nom value="${esc(c.nom || "")}" placeholder="Nom du champ" style="max-width:190px">
+          <input class="input" data-champ-valeur value="${esc(c.valeur || "")}" placeholder="Valeur du champ">
+          <button type="button" class="toggle ${c.aligne ? "on" : ""}" data-champ-aligne title="Afficher sur la même ligne"></button>
+          <button type="button" class="btn danger small" data-action="msg-champ-suppr" data-index="${i}" data-champ-index="${j}">🗑</button>
+        </div>`).join("")}
+      </div>
+    </div>`;
+  }
+
+  function editeurBoutons(m) {
+    if (!m.boutons.length) return "";
+    const styles = [["primaire","Bleu"],["secondaire","Gris"],["succes","Vert"],["danger","Rouge"]];
+    return `<div class="embed-edit"><div class="embed-edit-head"><strong>Boutons</strong></div>
+      ${m.boutons.map((b, i) => `<div class="row" data-bouton="${i}" style="gap:8px;flex-wrap:wrap">
+        <input class="input" data-btn-label value="${esc(b.label || "")}" placeholder="Texte du bouton" style="max-width:170px">
+        <select class="select" data-btn-style style="max-width:110px">
+          ${styles.map(([v, l]) => `<option value="${v}"${b.style === v ? " selected" : ""}>${l}</option>`).join("")}
+        </select>
+        <input class="input" data-btn-lien value="${esc(b.lien || "")}" placeholder="Lien (facultatif)" style="max-width:210px">
+        <button type="button" class="btn danger small" data-action="msg-bouton-suppr" data-index="${i}">🗑</button>
+      </div>`).join("")}
+      <span class="field-note" style="display:block;margin-top:8px">Un bouton avec un lien ouvre une page. Sans lien, il ne déclenche encore aucune action côté bot.</span>
+    </div>`;
+  }
+
+  function editeurSelecteur(m) {
+    if (!m.selecteur.length) return "";
+    return `<div class="embed-edit"><div class="embed-edit-head"><strong>Menu déroulant</strong></div>
+      <div class="field full"><label>Texte affiché quand rien n'est choisi</label>
+        <input class="input" id="msg-sel-texte" value="${esc(m.selecteurTexte || "")}" placeholder="Faites un choix…"></div>
+      ${m.selecteur.map((o, i) => `<div class="row" data-option="${i}" style="gap:8px">
+        <input class="input" data-opt-label value="${esc(o.label || "")}" placeholder="Intitulé" style="max-width:190px">
+        <input class="input" data-opt-desc value="${esc(o.description || "")}" placeholder="Description (facultatif)">
+        <button type="button" class="btn danger small" data-action="msg-option-suppr" data-index="${i}">🗑</button>
+      </div>`).join("")}
+    </div>`;
+  }
+
+  // Rendu fidèle du message, façon Discord.
+  function apercuMessage(m) {
+    const vide = !m.content.trim() && !m.embeds.length;
+    if (vide) return `<div class="dc-msg"><div class="dc-pp"></div><div class="dc-corps">
+      <div class="dc-nom">Votre bot <span class="dc-tag">APP</span></div>
+      <div style="color:var(--muted-2);font-size:13px">Votre message apparaîtra ici.</div></div></div>`;
+    return `<div class="dc-msg">
+      <div class="dc-pp"></div>
+      <div class="dc-corps">
+        <div class="dc-nom">Votre bot <span class="dc-tag">APP</span> <span class="dc-heure">aujourd'hui</span></div>
+        ${m.content.trim() ? `<div class="dc-texte">${esc(m.content)}</div>` : ""}
+        ${m.embeds.map(e => apercuEmbed(e)).join("")}
+        ${m.boutons.length ? `<div class="dc-boutons">${m.boutons.map(b =>
+          `<span class="dc-bouton ${b.lien ? "lien" : esc(b.style || "secondaire")}">${esc(b.label || "Bouton")}${b.lien ? " ↗" : ""}</span>`).join("")}</div>` : ""}
+        ${m.selecteur.length ? `<div class="dc-select">${esc(m.selecteurTexte || "Faites un choix…")} ▾</div>` : ""}
+      </div>
+    </div>`;
+  }
+
+  function apercuEmbed(e) {
+    const rien = ![e.titre, e.description, e.image, e.miniature, e.footer, e.auteur].some(v => String(v || "").trim())
+      && !(e.champs || []).length;
+    if (rien) return "";
+    return `<div class="dc-embed" style="border-left-color:${esc(e.couleur || "#5865f2")}">
+      <div class="dc-embed-corps">
+        ${e.auteur ? `<div class="dc-auteur">${e.auteur_icone ? `<img src="${esc(e.auteur_icone)}" alt="" onerror="this.remove()">` : ""}${esc(e.auteur)}</div>` : ""}
+        ${e.titre ? `<div class="dc-titre">${esc(e.titre)}</div>` : ""}
+        ${e.description ? `<div class="dc-desc">${esc(e.description)}</div>` : ""}
+        ${(e.champs || []).length ? `<div class="dc-champs">${(e.champs || []).filter(c => c.nom || c.valeur).map(c =>
+          `<div class="${c.aligne ? "aligne" : ""}"><b>${esc(c.nom || "")}</b><span>${esc(c.valeur || "")}</span></div>`).join("")}</div>` : ""}
+        ${e.image ? `<img class="dc-image" src="${esc(e.image)}" alt="" onerror="this.style.display='none'">` : ""}
+        ${e.footer ? `<div class="dc-footer">${esc(e.footer)}</div>` : ""}
+      </div>
+      ${e.miniature ? `<img class="dc-miniature-img" src="${esc(e.miniature)}" alt="" onerror="this.remove()">` : ""}
+    </div>`;
   }
 
   function blacklistView() {
@@ -2447,6 +2819,13 @@
   }
 
   document.addEventListener("click", async event => {
+    // Interrupteurs des réglages du bot : bascule immédiate, enregistrée
+    // seulement au clic sur « Enregistrer dans le bot ».
+    const bascule = event.target.closest("[data-cfg-toggle]");
+    if (bascule) { bascule.classList.toggle("on"); return; }
+    // Cases « aligné » des champs d'embed.
+    const aligne = event.target.closest("[data-champ-aligne]");
+    if (aligne) { aligne.classList.toggle("on"); return; }
     const target = event.target.closest("[data-action]");
     if (!target) {
       createRipple(event);
@@ -2829,6 +3208,83 @@
             render();
           }
           break;
+        // ── 🎛️ Réglages d'un serveur, écrits dans le bot ────────────
+        case "module-recharger":
+          delete ui.srvParams[ui.selectedServerId];
+          render();
+          break;
+        // ── 📨 Constructeur de messages ─────────────────────────────
+        case "msg-embed-add":
+          lireBrouillon();
+          brouillon().embeds.push({ couleur: "#5865f2", titre: "", description: "", champs: [] });
+          render();
+          break;
+        case "msg-embed-suppr":
+          lireBrouillon();
+          brouillon().embeds.splice(Number(target.dataset.index), 1);
+          render();
+          break;
+        case "msg-champ-add": {
+          lireBrouillon();
+          const e = brouillon().embeds[Number(target.dataset.index)];
+          if (e) { e.champs = e.champs || []; e.champs.push({ nom: "", valeur: "", aligne: false }); }
+          render();
+          break;
+        }
+        case "msg-champ-suppr": {
+          lireBrouillon();
+          const e = brouillon().embeds[Number(target.dataset.index)];
+          if (e) e.champs.splice(Number(target.dataset.champIndex), 1);
+          render();
+          break;
+        }
+        case "msg-bouton-add":
+          lireBrouillon();
+          brouillon().boutons.push({ label: "", style: "secondaire", lien: "" });
+          render();
+          break;
+        case "msg-bouton-suppr":
+          lireBrouillon();
+          brouillon().boutons.splice(Number(target.dataset.index), 1);
+          render();
+          break;
+        case "msg-option-add":
+          lireBrouillon();
+          brouillon().selecteur.push({ label: "", description: "" });
+          render();
+          break;
+        case "msg-option-suppr":
+          lireBrouillon();
+          brouillon().selecteur.splice(Number(target.dataset.index), 1);
+          render();
+          break;
+        case "msg-tester":
+        case "msg-envoyer": {
+          lireBrouillon();
+          const m = brouillon();
+          const test = target.dataset.action === "msg-tester";
+          if (!m.salon) { toast("SALON MANQUANT", "Choisissez le salon de destination.", "error"); break; }
+          if (!test && !confirm("Publier ce message sur Discord maintenant ?")) break;
+          const libelle = target.textContent;
+          target.textContent = test ? "⏳ Vérification…" : "⏳ Envoi…";
+          target.disabled = true;
+          try {
+            const r = await api("serveur.message", {
+              serveur: ui.selectedServerId, salon: m.salon, test,
+              message: { content: m.content, embeds: m.embeds, boutons: m.boutons, selecteur: m.selecteur, selecteurTexte: m.selecteurTexte },
+            });
+            const box = document.querySelector("#msg-rapport");
+            if (box) box.innerHTML = `<div class="row mt-16" style="border-color:rgba(47,227,139,.45)">✅ <span>${esc(r.note)}</span></div>`;
+            toast(test ? "RENDU VALIDE" : "MESSAGE PUBLIÉ", r.note);
+          } catch (err) {
+            const box = document.querySelector("#msg-rapport");
+            if (box) box.innerHTML = `<div class="row mt-16" style="border-color:rgba(255,92,116,.45);flex-direction:column;align-items:flex-start;gap:5px">❌ <span style="color:var(--muted)">${esc(err.message)}</span></div>`;
+            toast("ÉCHEC", err.message, "error");
+          } finally {
+            if (target.isConnected) { target.textContent = libelle; target.disabled = false; }
+          }
+          break;
+        }
         // ── 🗄️ Base de données ──────────────────────────────────────
         case "db-save": {
           const type = document.querySelector("#db-type")?.value || "mysql";
@@ -3253,13 +3709,10 @@
           toast("TICKET", "Votre réponse a été envoyée.");
           break;
         }
-        case "module": {
-          const settings = formToObject(form);
-          await api("server.module.save", { serverId: ui.selectedServerId, module: form.dataset.module, settings });
-          render();
-          toast("MODULE ENREGISTRÉ", `${modules.find(item=>item.id===form.dataset.module)?.label || "Configuration"} a été mis à jour.`);
+        // Réglages écrits DANS LE BOT (salons, rôles, interrupteurs, textes).
+        case "module-bot":
+          await enregistrerModule(form);
           break;
-        }
         case "site-config": {
           const config = collectSiteConfig(form);
           await api("site.config.save", { config });

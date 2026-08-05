@@ -500,6 +500,24 @@ const RELEASES = [
     ],
     retrait: [],
   },
+  {
+    id: 'site-modules-dashboard-2026-08r',
+    title: 'Site : tous les modules configurables, et envoi de messages 🎛️',
+    ajout: [
+      '📋 **Listes déroulantes partout** : salons, catégories et rôles viennent directement de votre serveur Discord — plus rien à taper à la main',
+      '📨 **Constructeur de messages** : texte, embeds (titre, description, auteur, images, champs), boutons et menu déroulant, avec un **aperçu fidèle façon Discord** à côté',
+      '🚀 **Bouton « Envoyer sur Discord »** : le bot publie dans le salon choisi ce que vous venez de composer. Un bouton « Vérifier » valide le rendu sans rien publier',
+      '🤖 **Rôles automatiques à l\'arrivée**, choisis dans la liste des rôles du serveur (plusieurs possibles)',
+      '👋 **Arrivées & départs entièrement personnalisables** : salon, couleur, titre, image de fond, cadre de la photo de profil (vignette, grande image ou aucune) et affichage des informations — avec aperçu',
+    ],
+    amelioration: [
+      '💾 **Les réglages partent enfin dans le bot** : ils ne restaient auparavant que dans le site, sans effet sur Discord',
+      '🎚️ Modules RP, Niveaux, Interactions et Aventure SAO activables d\'un interrupteur',
+      '📁 Onze salons (logs, arrivées, départs, staff, service, niveaux, preuves, partenariats, notes de mise à jour, transcriptions) se choisissent dans une liste',
+    ],
+    fix: [],
+    retrait: [],
+  },
 ];
 
 // Découpe une catégorie en champs d'embed (max 1024 caractères par champ).
