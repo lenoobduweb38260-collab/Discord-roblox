@@ -1,0 +1,384 @@
+{
+  "bots": [
+    {
+      "id": "kirito",
+      "name": "Kirito",
+      "tag": "BOT PRINCIPAL",
+      "status": "online",
+      "description": "Gestion RP, progression, économie et automatisations avancées.",
+      "accent": "cyan",
+      "servers": 6,
+      "users": 14237,
+      "latency": 28
+    },
+    {
+      "id": "asuna",
+      "name": "Asuna",
+      "tag": "BOT SÉCURITÉ",
+      "status": "online",
+      "description": "Modération, tickets, sécurité, logs et gestion communautaire.",
+      "accent": "rose",
+      "servers": 5,
+      "users": 9816,
+      "latency": 34
+    }
+  ],
+  "servers": [
+    {
+      "id": "srv-aincrad",
+      "name": "Aincrad Officiel",
+      "short": "AO",
+      "members": 4820,
+      "online": 234,
+      "region": "EU",
+      "verified": true,
+      "botIds": [
+        "kirito",
+        "asuna"
+      ],
+      "role": "Administrateur",
+      "level": 96,
+      "activity": 88
+    },
+    {
+      "id": "srv-sao-fr",
+      "name": "SAO France RP",
+      "short": "FR",
+      "members": 2341,
+      "online": 156,
+      "region": "FR",
+      "verified": true,
+      "botIds": [
+        "kirito"
+      ],
+      "role": "Administrateur",
+      "level": 81,
+      "activity": 74
+    },
+    {
+      "id": "srv-blood",
+      "name": "Knights of Blood",
+      "short": "KB",
+      "members": 1892,
+      "online": 89,
+      "region": "EU",
+      "verified": false,
+      "botIds": [
+        "asuna"
+      ],
+      "role": "Modérateur",
+      "level": 73,
+      "activity": 66
+    },
+    {
+      "id": "srv-ggo",
+      "name": "GGO Survivors",
+      "short": "GG",
+      "members": 987,
+      "online": 45,
+      "region": "FR",
+      "verified": false,
+      "botIds": [
+        "kirito"
+      ],
+      "role": "Administrateur",
+      "level": 57,
+      "activity": 52
+    },
+    {
+      "id": "srv-underworld",
+      "name": "Underworld Sanctum",
+      "short": "UW",
+      "members": 3210,
+      "online": 198,
+      "region": "EU",
+      "verified": true,
+      "botIds": [
+        "kirito",
+        "asuna"
+      ],
+      "role": "Administrateur",
+      "level": 90,
+      "activity": 83
+    },
+    {
+      "id": "srv-cardinal",
+      "name": "Cardinal System",
+      "short": "CS",
+      "members": 567,
+      "online": 34,
+      "region": "FR",
+      "verified": false,
+      "botIds": [
+        "asuna"
+      ],
+      "role": "Modérateur",
+      "level": 42,
+      "activity": 46
+    }
+  ],
+  "blacklist": [
+    {
+      "id": "BL-1042",
+      "discordId": "123456789012345678",
+      "username": "DarkBlade_X",
+      "reason": "Harcèlement répété, menaces et contournement de sanctions.",
+      "severity": "critique",
+      "server": "Aincrad Officiel",
+      "author": "Kirito_Admin",
+      "date": "2026-08-01",
+      "proofs": [
+        "capture_chat_01.png",
+        "logs_moderation.txt"
+      ]
+    },
+    {
+      "id": "BL-1038",
+      "discordId": "987654321098765432",
+      "username": "RaiderBot",
+      "reason": "Tentative de raid coordonné sur plusieurs serveurs.",
+      "severity": "élevée",
+      "server": "SAO France RP",
+      "author": "Asuna_Staff",
+      "date": "2026-07-29",
+      "proofs": [
+        "raid_timeline.pdf"
+      ]
+    },
+    {
+      "id": "BL-1026",
+      "discordId": "456789123456789012",
+      "username": "SpamKing",
+      "reason": "Publicité non autorisée et spam de messages privés.",
+      "severity": "moyenne",
+      "server": "Knights of Blood",
+      "author": "Heathcliff",
+      "date": "2026-07-21",
+      "proofs": []
+    }
+  ],
+  "tickets": [
+    {
+      "id": "TCK-047",
+      "user": "Kazuto_Kirigaya",
+      "subject": "Rang RP non mis à jour après migration",
+      "status": "ouvert",
+      "priority": "haute",
+      "server": "Aincrad Officiel",
+      "date": "2026-08-04",
+      "messages": [
+        {
+          "author": "Kazuto_Kirigaya",
+          "staff": false,
+          "time": "14:32",
+          "content": "Bonjour, mon rang Joueur Solo — Rang S ne s'affiche plus depuis la mise à jour."
+        },
+        {
+          "author": "Staff · Asuna",
+          "staff": true,
+          "time": "14:35",
+          "content": "Bonjour Kazuto. Je vérifie votre profil. Pouvez-vous confirmer votre identifiant RP ?"
+        },
+        {
+          "author": "Kazuto_Kirigaya",
+          "staff": false,
+          "time": "14:37",
+          "content": "CHAR-4521, serveur Aincrad, niveau 96."
+        }
+      ]
+    },
+    {
+      "id": "TCK-046",
+      "user": "Silica_Ayano",
+      "subject": "Candidature whitelist Forgeron refusée",
+      "status": "en attente",
+      "priority": "normale",
+      "server": "SAO France RP",
+      "date": "2026-08-03",
+      "messages": [
+        {
+          "author": "Silica_Ayano",
+          "staff": false,
+          "time": "19:15",
+          "content": "Bonsoir, ma candidature a été refusée sans motif alors que toutes les conditions semblent remplies."
+        }
+      ]
+    },
+    {
+      "id": "TCK-045",
+      "user": "Klein_Ryoutarou",
+      "subject": "Bot hors ligne sur GGO Survivors",
+      "status": "fermé",
+      "priority": "basse",
+      "server": "GGO Survivors",
+      "date": "2026-08-02",
+      "messages": [
+        {
+          "author": "Klein_Ryoutarou",
+          "staff": false,
+          "time": "22:10",
+          "content": "Le bot Kirito ne répond plus depuis trente minutes."
+        },
+        {
+          "author": "Staff · Heathcliff",
+          "staff": true,
+          "time": "22:45",
+          "content": "Interruption détectée. Le bot a été redémarré et fonctionne de nouveau."
+        }
+      ]
+    }
+  ],
+  "activity": [
+    {
+      "type": "ticket",
+      "label": "Nouveau ticket créé",
+      "detail": "TCK-047",
+      "time": "il y a 2 min"
+    },
+    {
+      "type": "blacklist",
+      "label": "Utilisateur blacklisté",
+      "detail": "DarkBlade_X",
+      "time": "il y a 10 min"
+    },
+    {
+      "type": "proof",
+      "label": "Preuve ajoutée",
+      "detail": "BL-1038",
+      "time": "il y a 15 min"
+    },
+    {
+      "type": "server",
+      "label": "Nouveau serveur connecté",
+      "detail": "Underworld Sanctum",
+      "time": "il y a 1 h"
+    },
+    {
+      "type": "config",
+      "label": "Configuration modifiée",
+      "detail": "Module RP",
+      "time": "il y a 2 h"
+    }
+  ],
+  "serverSettings": {
+    "srv-aincrad": {
+      "overview": {
+        "language": "fr",
+        "timezone": "Europe/Paris",
+        "prefix": "!",
+        "maintenance": false
+      },
+      "rp": {
+        "enabled": true,
+        "characterCreation": true,
+        "economy": true,
+        "inventory": true,
+        "deathPenalty": 15,
+        "startingCoins": 250
+      },
+      "arrivals": {
+        "welcome": true,
+        "goodbye": true,
+        "welcomeChannel": "#arrivées",
+        "goodbyeChannel": "#départs",
+        "welcomeMessage": "Bienvenue {user} dans Aincrad. Votre aventure commence ici."
+      },
+      "roles": {
+        "antiRaid": true,
+        "antiSpam": true,
+        "autoRole": "Joueur",
+        "verifiedRole": "Citoyen d'Aincrad",
+        "minimumAccountDays": 7
+      },
+      "channels": {
+        "messageLogs": true,
+        "voiceLogs": true,
+        "moderationLogs": true,
+        "memberLogs": true,
+        "logChannel": "#logs-cardinal"
+      },
+      "levels": {
+        "enabled": true,
+        "xpMin": 10,
+        "xpMax": 25,
+        "cooldown": 60,
+        "announceChannel": "#progression"
+      },
+      "whitelist": {
+        "enabled": true,
+        "reviewRole": "Responsable Whitelist",
+        "jobs": [
+          "Forgeron",
+          "Alchimiste",
+          "Garde",
+          "Marchand",
+          "Éclaireur"
+        ]
+      },
+      "tickets": {
+        "enabled": true,
+        "category": "TICKETS",
+        "staffRole": "Support",
+        "transcripts": true,
+        "closeDelay": 15
+      }
+    }
+  },
+  "siteConfig": {
+    "siteName": "Aincrad Control Panel",
+    "subtitle": "Sword Art Online Discord Management",
+    "maintenance": false,
+    "publicStatus": true,
+    "animations": true,
+    "particles": true,
+    "compactMode": false,
+    "accent": "cyan",
+    "footer": "© 2026 Aincrad Corporation — Cardinal System",
+    "logo": "⚔️",
+    "accentColor": "#a970ff",
+    "font": "exo",
+    "buttonStyle": "pill",
+    "radius": 18,
+    "bgType": "image",
+    "bgImage": "assets/images/aincrad-bg.jpg",
+    "bgOverlay": 62,
+    "bgBlur": 0,
+    "scanline": true,
+    "cursorAura": true,
+    "bootScreen": true,
+    "parallax": true,
+    "customCss": "",
+    "nav": [
+      {
+        "id": "dashboard",
+        "label": "Vue d'ensemble",
+        "show": true
+      },
+      {
+        "id": "servers",
+        "label": "Mes serveurs",
+        "show": true
+      },
+      {
+        "id": "blacklist",
+        "label": "Blacklist & preuves",
+        "show": true
+      },
+      {
+        "id": "tickets",
+        "label": "Gestion des tickets",
+        "show": true
+      },
+      {
+        "id": "creator",
+        "label": "Espace créateur",
+        "show": true
+      },
+      {
+        "id": "site-config",
+        "label": "Site builder",
+        "show": true
+      }
+    ]
+  }
+}

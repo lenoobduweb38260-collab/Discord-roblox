@@ -259,6 +259,20 @@ const RELEASES = [
     fix: [],
     retrait: [],
   },
+  {
+    id: 'site-builder-2026-08d',
+    title: 'Site personnalisable : construisez votre site 🎨',
+    ajout: [
+      '🎨 **Nouveau site web complet** (`pack-site-builder.zip`) que vous construisez vous-même depuis l\'onglet **Site builder**, sans toucher au code',
+      '🌌 **Fond au choix** : votre image ou **GIF animé** téléversé depuis le PC, ou un fond animé généré (Aurora, Étoiles, Grille), avec assombrissement et flou réglables',
+      '🖌️ **Thème libre** : couleur d\'accent, police, style des boutons (pilule, arrondi, carré, coins coupés) et arrondi des cartes — le tout en **aperçu direct**',
+      '🧭 **Navigation composable** : renommez, masquez et réordonnez les onglets du menu',
+      '🧪 **CSS personnalisé** injecté sur tout le site pour un contrôle total du style',
+    ],
+    amelioration: [],
+    fix: [],
+    retrait: [],
+  },
 ];
 
 // Découpe une catégorie en champs d'embed (max 1024 caractères par champ).

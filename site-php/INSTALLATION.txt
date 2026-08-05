@@ -1,0 +1,19 @@
+AINCRAD CONTROL PANEL — INSTALLATION RAPIDE
+
+1. Vérifiez que PHP 8.0 ou plus récent est installé.
+2. Ouvrez un terminal dans le dossier du projet.
+3. Lancez : php -S localhost:8000
+4. Ouvrez : http://localhost:8000
+
+DOSSIERS À RENDRE MODIFIABLES PAR PHP :
+- data/
+- uploads/proofs/
+- uploads/backgrounds/   (images de fond téléversées depuis le Site builder)
+
+PERSONNALISER LE SITE :
+Ouvrez l'onglet « Site builder » dans le menu : couleur, police, style des
+boutons, arrondi, fond (votre image/GIF ou un fond animé), navigation,
+effets et CSS libre. Tout se prévisualise en direct, puis « Enregistrer ».
+
+L’interface et la persistance locale fonctionnent directement.
+Pour gérer de vrais serveurs Discord, reliez ensuite votre OAuth2 Discord et l’API de vos bots.

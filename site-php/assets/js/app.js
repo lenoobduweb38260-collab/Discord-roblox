@@ -1,0 +1,1184 @@
+(() => {
+  "use strict";
+
+  const app = document.querySelector("#app");
+  const modalRoot = document.querySelector("#modal-root");
+  const toastRoot = document.querySelector("#toast-root");
+  const boot = document.querySelector("#boot-screen");
+  const sky = document.querySelector(".sky-layer");
+  const cursorAura = document.querySelector("#cursor-aura");
+
+  let state = window.AINCRAD_BOOT_STATE || {};
+  const storage = (() => {
+    try {
+      const probe = "aincrad.storage.probe";
+      window.localStorage.setItem(probe, "1");
+      window.localStorage.removeItem(probe);
+      return window.localStorage;
+    } catch (_) {
+      const memory = new Map();
+      return {
+        getItem: key => memory.has(key) ? memory.get(key) : null,
+        setItem: (key, value) => memory.set(key, String(value)),
+        removeItem: key => memory.delete(key),
+      };
+    }
+  })();
+  const ui = {
+    activeBotId: storage.getItem("aincrad.activeBot") || null,
+    route: storage.getItem("aincrad.activeBot") ? "dashboard" : "gate",
+    selectedServerId: storage.getItem("aincrad.server") || (state.servers?.[0]?.id ?? null),
+    module: "overview",
+    selectedTicketId: state.tickets?.find(t => t.status !== "fermé")?.id || state.tickets?.[0]?.id || null,
+    blacklistQuery: "",
+    serverQuery: "",
+    mobileOpen: false,
+  };
+
+  const icons = {
+    dashboard: "⌂",
+    servers: "⌘",
+    blacklist: "⊘",
+    tickets: "▣",
+    creator: "◇",
+    config: "⚙",
+    overview: "01",
+    rp: "02",
+    arrivals: "03",
+    roles: "04",
+    channels: "05",
+    levels: "06",
+    whitelist: "07",
+    ticketModule: "08",
+  };
+
+  const modules = [
+    { id: "overview", label: "Vue d'ensemble", desc: "État global, activité et identité du serveur" },
+    { id: "rp", label: "Module RP", desc: "Personnages, économie et systèmes de jeu" },
+    { id: "arrivals", label: "Arrivées & départs", desc: "Messages et salons d'accueil" },
+    { id: "roles", label: "Rôles & sécurité", desc: "Protection, permissions et autorôles" },
+    { id: "channels", label: "Salons & logs", desc: "Journalisation complète du serveur" },
+    { id: "levels", label: "Niveaux", desc: "XP, récompenses et progression" },
+    { id: "whitelist", label: "Whitelist métiers", desc: "Candidatures et métiers autorisés" },
+    { id: "tickets", label: "Tickets", desc: "Configuration du support intégré" },
+  ];
+
+  function esc(value) {
+    return String(value ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
+  function formatNumber(value) {
+    return new Intl.NumberFormat("fr-FR").format(Number(value || 0));
+  }
+
+  function slug(value) {
+    return String(value || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+  }
+
+  function activeBot() {
+    return state.bots?.find(bot => bot.id === ui.activeBotId) || state.bots?.[0] || {};
+  }
+
+  function selectedServer() {
+    return state.servers?.find(server => server.id === ui.selectedServerId) || state.servers?.[0] || {};
+  }
+
+  function botServers(botId = ui.activeBotId) {
+    return (state.servers || []).filter(server => server.botIds?.includes(botId));
+  }
+
+  function siteConfig() {
+    return state.siteConfig || {};
+  }
+
+  // ── Site builder : navigation configurable ─────────────────────────
+  const NAV_DEFAULTS = [
+    { id: "dashboard", label: "Vue d'ensemble", show: true },
+    { id: "servers", label: "Mes serveurs", show: true },
+    { id: "blacklist", label: "Blacklist & preuves", show: true },
+    { id: "tickets", label: "Gestion des tickets", show: true },
+    { id: "creator", label: "Espace créateur", show: true },
+    { id: "site-config", label: "Site builder", show: true },
+  ];
+  function navConfig() {
+    const saved = Array.isArray(siteConfig().nav) ? siteConfig().nav : [];
+    const merged = saved
+      .filter(item => NAV_DEFAULTS.some(d => d.id === item.id))
+      .map(item => ({ ...NAV_DEFAULTS.find(d => d.id === item.id), ...item }));
+    NAV_DEFAULTS.forEach(d => { if (!merged.some(item => item.id === d.id)) merged.push({ ...d }); });
+    return merged;
+  }
+
+  // Accents nommés hérités de l'ancienne version + conversion hexadécimale.
+  const ACCENT_PRESETS = { cyan: "#4fd9ff", rose: "#ff7ca5", gold: "#f3c86a" };
+  const SWATCHES = ["#a970ff", "#4fd9ff", "#ff7ca5", "#2fe38b", "#f3c86a", "#ff5c74", "#6a8bff", "#ff9d5c"];
+  function accentHex(cfg = siteConfig()) {
+    const value = cfg.accentColor || ACCENT_PRESETS[cfg.accent] || "#a970ff";
+    return /^#[0-9a-fA-F]{6}$/.test(value) ? value : "#a970ff";
+  }
+  function hexToRgb(hex) {
+    return `${parseInt(hex.slice(1, 3), 16)}, ${parseInt(hex.slice(3, 5), 16)}, ${parseInt(hex.slice(5, 7), 16)}`;
+  }
+
+  function defaultServerSettings() {
+    return state.serverSettings?.["srv-aincrad"] || {
+      overview: {}, rp: {}, arrivals: {}, roles: {}, channels: {}, levels: {}, whitelist: {}, tickets: {},
+    };
+  }
+
+  function serverSettings(serverId = ui.selectedServerId) {
+    const original = state.serverSettings?.[serverId];
+    if (original) return original;
+    return JSON.parse(JSON.stringify(defaultServerSettings()));
+  }
+
+  async function api(action, payload = {}, options = {}) {
+    const config = options.formData
+      ? { method: "POST", body: options.formData }
+      : {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action, ...payload }),
+        };
+
+    const response = await fetch(`${window.AINCRAD_API}?action=${encodeURIComponent(action)}`, config);
+    const data = await response.json().catch(() => ({ ok: false, error: "Réponse serveur invalide." }));
+    if (!response.ok || !data.ok) throw new Error(data.error || "Une erreur est survenue.");
+    if (data.state) state = data.state;
+    return data;
+  }
+
+  function toast(title, message, type = "success") {
+    const element = document.createElement("div");
+    element.className = `toast ${type === "error" ? "error" : ""}`;
+    element.innerHTML = `<strong>${esc(title)}</strong><span>${esc(message)}</span>`;
+    toastRoot.appendChild(element);
+    setTimeout(() => {
+      element.style.opacity = "0";
+      element.style.transform = "translateX(18px)";
+      setTimeout(() => element.remove(), 250);
+    }, 3300);
+  }
+
+  function openModal(title, body, wide = false) {
+    modalRoot.innerHTML = `
+      <div class="modal-layer" data-action="close-modal">
+        <section class="modal ${wide ? "modal-wide" : ""}" role="dialog" aria-modal="true" aria-label="${esc(title)}" data-modal-panel>
+          <header class="modal-head">
+            <h3>${esc(title)}</h3>
+            <button class="modal-close" type="button" data-action="close-modal" aria-label="Fermer">×</button>
+          </header>
+          <div class="modal-body">${body}</div>
+        </section>
+      </div>`;
+    const firstInput = modalRoot.querySelector("input, textarea, select");
+    setTimeout(() => firstInput?.focus(), 40);
+  }
+
+  function closeModal() {
+    modalRoot.innerHTML = "";
+  }
+
+  function button(label, action, cls = "", extra = "") {
+    return `<button type="button" class="btn ${cls}" data-action="${esc(action)}" ${extra}>${label}</button>`;
+  }
+
+  function toggleField(name, checked, title, description) {
+    return `
+      <div class="toggle-row">
+        <div class="toggle-copy"><strong>${esc(title)}</strong><span>${esc(description)}</span></div>
+        <input type="checkbox" name="${esc(name)}" ${checked ? "checked" : ""} hidden>
+        <button type="button" class="toggle ${checked ? "on" : ""}" data-action="toggle-input" aria-label="Activer ou désactiver ${esc(title)}"></button>
+      </div>`;
+  }
+
+  function inputField(name, label, value, type = "text", note = "", attrs = "") {
+    return `
+      <div class="field">
+        <label for="field-${esc(name)}">${esc(label)}</label>
+        <input class="input" id="field-${esc(name)}" name="${esc(name)}" type="${esc(type)}" value="${esc(value)}" ${attrs}>
+        ${note ? `<span class="field-note">${esc(note)}</span>` : ""}
+      </div>`;
+  }
+
+  function selectField(name, label, value, options, note = "") {
+    return `
+      <div class="field">
+        <label for="field-${esc(name)}">${esc(label)}</label>
+        <select class="select" id="field-${esc(name)}" name="${esc(name)}">
+          ${options.map(option => {
+            const item = typeof option === "string" ? { value: option, label: option } : option;
+            return `<option value="${esc(item.value)}" ${String(item.value) === String(value) ? "selected" : ""}>${esc(item.label)}</option>`;
+          }).join("")}
+        </select>
+        ${note ? `<span class="field-note">${esc(note)}</span>` : ""}
+      </div>`;
+  }
+
+  function textAreaField(name, label, value, note = "") {
+    return `
+      <div class="field full">
+        <label for="field-${esc(name)}">${esc(label)}</label>
+        <textarea class="textarea" id="field-${esc(name)}" name="${esc(name)}">${esc(value)}</textarea>
+        ${note ? `<span class="field-note">${esc(note)}</span>` : ""}
+      </div>`;
+  }
+
+  function renderGate() {
+    const totalServers = state.servers?.length || 0;
+    const totalUsers = (state.servers || []).reduce((sum, server) => sum + Number(server.members || 0), 0);
+    const cfg = siteConfig();
+    const rawName = String(cfg.siteName || "Aincrad Control");
+    const words = rawName.trim().split(/\s+/);
+    const lastWord = words.length > 1 ? words.pop() : "";
+    const titleHtml = lastWord
+      ? `${esc(words.join(" "))}<br><span>${esc(lastWord)}</span>`
+      : `<span>${esc(rawName)}</span>`;
+    app.innerHTML = `
+      <section class="gate">
+        <div class="gate-copy">
+          <div class="eyebrow">${esc(cfg.logo || "⚔️")} ${esc(cfg.subtitle || "Cardinal System connecté")}</div>
+          <h1>${titleHtml}</h1>
+          <p>Une interface de gestion Discord complète : administration des serveurs, modules RP, sécurité, blacklist, preuves et tickets avec chat en temps réel.</p>
+          <div class="gate-metrics">
+            <div class="gate-metric"><strong>${formatNumber(totalServers)}</strong><span>serveurs liés</span></div>
+            <div class="gate-metric"><strong>${formatNumber(totalUsers)}</strong><span>utilisateurs</span></div>
+            <div class="gate-metric"><strong>8</strong><span>modules serveur</span></div>
+          </div>
+        </div>
+        <div class="bot-select">
+          <div class="bot-select-title">Sélectionnez l'interface du bot</div>
+          ${(state.bots || []).map(bot => `
+            <button class="bot-card" data-action="select-bot" data-bot-id="${esc(bot.id)}">
+              <span class="bot-avatar ${bot.accent === "rose" ? "rose" : ""}">${esc(bot.name.slice(0, 1))}</span>
+              <span>
+                <span style="display:flex;align-items:center;gap:8px"><h2>${esc(bot.name)}</h2><i class="status-dot"></i></span>
+                <p>${esc(bot.description)}</p>
+                <small>${esc(bot.tag)} · ${formatNumber(bot.servers)} SERVEURS · ${formatNumber(bot.latency)} MS</small>
+              </span>
+              <span class="arrow">›</span>
+            </button>`).join("")}
+          ${siteConfig().footer ? `<div class="bot-select-title" style="margin-top:8px">${esc(siteConfig().footer)}</div>` : ""}
+        </div>
+      </section>
+      ${ui.activeBotId ? `<button class="btn primary gate-back" data-action="navigate" data-route="dashboard">← Retour à l'administration</button>` : ""}`;
+  }
+
+  function sidebarNavButton(route, label, icon, badge = "") {
+    return `<button class="nav-btn ${ui.route === route ? "active" : ""}" data-action="navigate" data-route="${route}">
+      <span class="nav-icon">${icon}</span><span class="nav-text">${label}</span>${badge ? `<span class="nav-badge">${badge}</span>` : ""}
+    </button>`;
+  }
+
+  function brandMark() {
+    const logo = String(siteConfig().logo || "⚔️");
+    if (/^https?:\/\//.test(logo) || logo.startsWith("uploads/") || logo.startsWith("assets/")) {
+      return `<img src="${esc(logo)}" alt="">`;
+    }
+    return `<span>${esc(logo)}</span>`;
+  }
+
+  function renderShell() {
+    const bot = activeBot();
+    const openTickets = (state.tickets || []).filter(t => t.status !== "fermé").length;
+    const badges = { blacklist: state.blacklist?.length || 0, tickets: openTickets };
+    // La navigation est composée dans le Site builder (ordre, libellés,
+    // visibilité). Le builder lui-même reste toujours accessible.
+    const navItems = navConfig().filter(item => item.show !== false || item.id === "site-config");
+    app.innerHTML = `
+      <div class="app-shell">
+        <header class="topbar">
+          <div class="brand">
+            <button class="icon-btn mobile-menu" data-action="toggle-sidebar" aria-label="Ouvrir le menu">☰</button>
+            <div class="brand-mark">${brandMark()}</div>
+            <div><h1>${esc(siteConfig().siteName || "AINCRAD CONTROL PANEL")}</h1><p>${esc(siteConfig().subtitle || "Sword Art Online Discord Management")}</p></div>
+          </div>
+          <div class="top-actions">
+            <div class="clock" id="live-clock">--:--:--</div>
+            <button class="icon-btn" data-action="preview-gate" title="Voir la page d'accueil">👁</button>
+            <button class="icon-btn" data-action="pulse-system" title="Synchroniser">⌁</button>
+            <button class="icon-btn" data-action="show-notifications" title="Notifications">♢</button>
+            <div class="profile">
+              <div class="profile-avatar">KS</div>
+              <div><strong>Kirito_Admin</strong><span>Créateur · Cardinal</span></div>
+              <i class="status-dot"></i>
+            </div>
+          </div>
+        </header>
+
+        <aside class="sidebar ${ui.mobileOpen ? "open" : ""}">
+          <div class="sidebar-scroll">
+            <nav class="nav-section"><div class="nav-label">Menu</div>
+              ${navItems.map(item => sidebarNavButton(item.id, item.label, icons[item.id === "site-config" ? "config" : item.id] || "◆", badges[item.id] || "")).join("")}
+            </nav>
+          </div>
+          <div class="active-bot-card">
+            <small>BOT ACTUEL</small>
+            <div class="active-bot-row">
+              <div class="bot-avatar ${bot.accent === "rose" ? "rose" : ""}">${esc(bot.name?.slice(0,1) || "B")}</div>
+              <div><strong>${esc(bot.name || "Bot")}</strong><span>${esc(bot.tag || "EN LIGNE")}</span></div>
+              <i class="status-dot"></i>
+            </div>
+            <button class="switch-bot" data-action="switch-bot">CHANGER DE BOT</button>
+          </div>
+        </aside>
+        <section class="content">${renderRoute()}</section>
+      </div>`;
+    startClock();
+  }
+
+  function renderRoute() {
+    switch (ui.route) {
+      case "dashboard": return dashboardView();
+      case "servers": return serversView();
+      case "server": return serverView();
+      case "blacklist": return blacklistView();
+      case "tickets": return ticketsView();
+      case "creator": return creatorView();
+      case "site-config": return siteConfigView();
+      default: return dashboardView();
+    }
+  }
+
+  function pageHead(kicker, title, description, actions = "") {
+    return `<div class="page-head"><div class="page-title"><small>${esc(kicker)}</small><h2>${esc(title)}</h2><p>${esc(description)}</p></div><div class="page-actions">${actions}</div></div>`;
+  }
+
+  function dashboardView() {
+    const bot = activeBot();
+    const servers = botServers();
+    const totalMembers = servers.reduce((sum, server) => sum + server.members, 0);
+    const totalOnline = servers.reduce((sum, server) => sum + server.online, 0);
+    const openTickets = (state.tickets || []).filter(t => t.status !== "fermé").length;
+    return `<div class="content-view">
+      ${pageHead("Cardinal / Centre de contrôle", `Bienvenue dans l'interface ${bot.name}`, "Surveillez vos serveurs Discord et accédez rapidement aux systèmes de gestion.", button("Synchroniser", "pulse-system", "primary"))}
+      <div class="hero-grid">
+        <article class="panel hero-panel"><div class="hero-content">
+          <span class="hero-kicker">A I N C R A D · FLOOR 75</span>
+          <h3>Cardinal System opérationnel</h3>
+          <p>${esc(bot.description)} Tous les modules sont synchronisés avec l'infrastructure Discord.</p>
+          <div class="hero-status"><span class="chip green"><i class="status-dot"></i> BOT EN LIGNE</span><span class="chip">PING ${esc(bot.latency)} MS</span><span class="chip gold">VERSION 2.0.0</span></div>
+        </div></article>
+        <div class="stat-stack">
+          <div class="stat-card"><span>Serveurs connectés</span><strong>${servers.length}</strong><em>+1 ce mois</em></div>
+          <div class="stat-card"><span>Membres cumulés</span><strong>${formatNumber(totalMembers)}</strong><em>${formatNumber(totalOnline)} en ligne</em></div>
+          <div class="stat-card"><span>Tickets actifs</span><strong>${openTickets}</strong><em>support disponible</em></div>
+          <div class="stat-card"><span>Entrées blacklist</span><strong>${state.blacklist?.length || 0}</strong><em>base globale</em></div>
+        </div>
+      </div>
+
+      <section class="panel mt-16"><div class="panel-inner">
+        <div class="panel-head"><div><h3>Mes serveurs</h3><p>Sélectionnez un serveur pour ouvrir ses huit modules.</p></div>${button("Voir tous", "navigate", "ghost", 'data-route="servers"')}</div>
+        <div class="server-strip">${servers.map(serverCard).join("") || emptyBlock("Aucun serveur", "Ce bot n'est lié à aucun serveur.")}</div>
+      </div></section>
+
+      <section class="panel mt-16"><div class="panel-inner">
+        <div class="panel-head"><div><h3>Accès rapides</h3><p>Les systèmes les plus utilisés par votre équipe.</p></div></div>
+        <div class="quick-grid">
+          ${quickAction("BL", "Blacklist", `${state.blacklist?.length || 0} utilisateurs enregistrés`, "blacklist")}
+          ${quickAction("TK", "Tickets", `${openTickets} conversations actives`, "tickets")}
+          ${quickAction("SV", "Serveurs", `${servers.length} configurations disponibles`, "servers")}
+          ${quickAction("CF", "Configuration", "Personnaliser le Cardinal System", "site-config")}
+        </div>
+      </div></section>
+
+      <div class="grid-2 mt-16">
+        <section class="panel"><div class="panel-inner"><div class="panel-head"><div><h3>Activité récente</h3><p>Flux des actions importantes du bot.</p></div></div><div class="activity-list">${activityRows()}</div></div></section>
+        <section class="panel"><div class="panel-inner"><div class="panel-head"><div><h3>Signal Cardinal</h3><p>État global des connexions Discord.</p></div><span class="chip green">STABLE</span></div><div class="radar"><div class="radar-grid"><i class="radar-dot" style="left:30%;top:42%"></i><i class="radar-dot" style="left:63%;top:25%"></i><i class="radar-dot" style="left:72%;top:68%"></i><i class="radar-dot" style="left:44%;top:73%"></i></div></div></div></section>
+      </div>
+    </div>`;
+  }
+
+  function serverCard(server) {
+    return `<button class="server-card ${ui.selectedServerId === server.id ? "selected" : ""}" data-action="open-server" data-server-id="${esc(server.id)}">
+      <span class="server-card-top"><span class="server-emblem">${esc(server.short)}</span><i class="status-dot"></i></span>
+      <h4>${esc(server.name)}</h4><p>${esc(server.region)} · ${esc(server.role)}${server.verified ? " · Vérifié" : ""}</p>
+      <span class="server-meta"><span>${formatNumber(server.members)} membres</span><span>${formatNumber(server.online)} en ligne</span></span>
+      <span class="server-progress"><span style="width:${Math.max(5, Number(server.activity || 0))}%"></span></span>
+    </button>`;
+  }
+
+  function quickAction(icon, title, subtitle, route) {
+    return `<button class="quick-action" data-action="navigate" data-route="${route}"><span class="quick-icon">${icon}</span><span><strong>${esc(title)}</strong><span>${esc(subtitle)}</span></span></button>`;
+  }
+
+  function activityRows() {
+    return (state.activity || []).slice(0, 7).map((item, index) => `
+      <div class="activity-row"><span class="activity-icon">${String(index + 1).padStart(2,"0")}</span><span><strong>${esc(item.label)}</strong><span> · ${esc(item.detail)}</span></span><time>${esc(item.time)}</time></div>`).join("");
+  }
+
+  function serversView() {
+    const bot = activeBot();
+    const query = ui.serverQuery.trim().toLowerCase();
+    const servers = botServers().filter(server => !query || `${server.name} ${server.region}`.toLowerCase().includes(query));
+    return `<div class="content-view">
+      ${pageHead("Gestion / Serveurs", `Serveurs de ${bot.name}`, "Ouvrez un serveur pour configurer ses modules et consulter ses statistiques.", button("Ajouter un serveur", "invite-bot", "primary"))}
+      <section class="panel"><div class="panel-inner">
+        <div class="panel-head"><div><h3>Infrastructure Discord</h3><p>${servers.length} serveur(s) correspondent à la sélection actuelle.</p></div><div class="searchbar"><input class="input" id="server-search" value="${esc(ui.serverQuery)}" placeholder="Rechercher un serveur…"><button class="btn" data-action="server-search">Rechercher</button></div></div>
+        <div class="grid-3">${servers.map(serverCard).join("") || emptyBlock("Aucun résultat", "Essayez une autre recherche.")}</div>
+      </div></section>
+      <div class="grid-3 mt-16">
+        <div class="stat-card"><span>Membres gérés</span><strong>${formatNumber(servers.reduce((s,x)=>s+x.members,0))}</strong><em>portée du bot</em></div>
+        <div class="stat-card"><span>Utilisateurs en ligne</span><strong>${formatNumber(servers.reduce((s,x)=>s+x.online,0))}</strong><em>temps réel</em></div>
+        <div class="stat-card"><span>Serveurs vérifiés</span><strong>${servers.filter(x=>x.verified).length}</strong><em>permissions complètes</em></div>
+      </div>
+    </div>`;
+  }
+
+  function serverView() {
+    const server = selectedServer();
+    const current = modules.find(module => module.id === ui.module) || modules[0];
+    return `<div class="content-view">
+      ${pageHead("Serveurs / Configuration", server.name, `Module actif : ${current.label}. Les modifications sont enregistrées dans le fichier JSON du projet.`, button("Retour aux serveurs", "navigate", "ghost", 'data-route="servers"'))}
+      <div class="server-layout">
+        <aside class="server-sidebar">
+          <section class="panel"><div class="server-id-card">
+            <div class="server-emblem">${esc(server.short)}</div><h3>${esc(server.name)}</h3><p>${formatNumber(server.members)} membres · ${formatNumber(server.online)} en ligne</p>
+            <div class="hero-status" style="justify-content:center"><span class="chip green">CONNECTÉ</span><span class="chip">${esc(server.region)}</span></div>
+          </div></section>
+          <nav class="module-nav">${modules.map((module, index) => `
+            <button class="module-btn ${ui.module === module.id ? "active" : ""}" data-action="select-module" data-module="${module.id}"><span class="index">${String(index+1).padStart(2,"0")}</span><span class="label">${esc(module.label)}</span><i class="state"></i></button>`).join("")}</nav>
+        </aside>
+        <section>${moduleView(ui.module, server)}</section>
+      </div>
+    </div>`;
+  }
+
+  function modulePanel(title, description, formBody, moduleId) {
+    return `<section class="panel"><div class="panel-inner">
+      <div class="panel-head"><div><h3>${esc(title)}</h3><p>${esc(description)}</p></div><span class="chip green">MODULE ACTIF</span></div><div class="panel-line"></div>
+      <form data-form="module" data-module="${esc(moduleId)}">${formBody}<div class="form-actions"><button type="button" class="btn ghost" data-action="reset-module">Réinitialiser</button><button type="submit" class="btn success">Enregistrer le module</button></div></form>
+    </div></section>`;
+  }
+
+  function moduleView(moduleId, server) {
+    const settings = serverSettings(server.id)[moduleId] || {};
+    switch (moduleId) {
+      case "overview": return overviewModule(server, settings);
+      case "rp": return rpModule(settings);
+      case "arrivals": return arrivalsModule(settings);
+      case "roles": return rolesModule(settings);
+      case "channels": return channelsModule(settings);
+      case "levels": return levelsModule(settings);
+      case "whitelist": return whitelistModule(settings);
+      case "tickets": return ticketModule(settings);
+      default: return overviewModule(server, settings);
+    }
+  }
+
+  function overviewModule(server, s) {
+    const body = `<div class="grid-3">
+      <div class="stat-card"><span>Niveau de configuration</span><strong>${server.level}%</strong><em>profil serveur</em></div>
+      <div class="stat-card"><span>Activité Discord</span><strong>${server.activity}%</strong><em>7 derniers jours</em></div>
+      <div class="stat-card"><span>Modules actifs</span><strong>8 / 8</strong><em>système complet</em></div>
+    </div>
+    <div class="form-grid mt-22">
+      ${selectField("language", "Langue du bot", s.language || "fr", [{value:"fr",label:"Français"},{value:"en",label:"English"},{value:"de",label:"Deutsch"}])}
+      ${selectField("timezone", "Fuseau horaire", s.timezone || "Europe/Paris", ["Europe/Paris","Europe/Brussels","Europe/Berlin","UTC"])}
+      ${inputField("prefix", "Préfixe des commandes", s.prefix || "!", "text", "Utilisé pour les commandes textuelles.", "maxlength=4")}
+      ${selectField("presence", "Présence du bot", s.presence || "Aincrad", ["Aincrad","Sword Art Online","Gestion du serveur","Mode maintenance"])}
+    </div>
+    <div class="mt-16">${toggleField("maintenance", !!s.maintenance, "Mode maintenance", "Suspend les modules publics sans déconnecter le bot.")}</div>`;
+    return modulePanel("Vue d'ensemble", "Identité, langue, statut et paramètres généraux du serveur.", body, "overview");
+  }
+
+  function rpModule(s) {
+    const body = `<div class="grid-2"><div>
+      ${toggleField("enabled", s.enabled !== false, "Activer le module RP", "Active les personnages, profils et commandes RP.")}
+      ${toggleField("characterCreation", s.characterCreation !== false, "Création de personnages", "Permet aux membres de créer leur identité RP.")}
+      ${toggleField("economy", s.economy !== false, "Économie Col", "Active la monnaie, les achats et les récompenses.")}
+      ${toggleField("inventory", s.inventory !== false, "Inventaire", "Active les objets, équipements et consommables.")}
+    </div><div class="form-grid">
+      ${inputField("startingCoins", "Col de départ", s.startingCoins ?? 250, "number", "Montant remis à la création.", "min=0 max=100000")}
+      ${inputField("deathPenalty", "Pénalité de mort (%)", s.deathPenalty ?? 15, "number", "Perte appliquée au portefeuille.", "min=0 max=100")}
+      ${inputField("maxCharacters", "Personnages maximum", s.maxCharacters ?? 3, "number", "Par utilisateur Discord.", "min=1 max=10")}
+      ${selectField("combatMode", "Mode de combat", s.combatMode || "semi-rp", [{value:"narratif",label:"Narratif"},{value:"semi-rp",label:"Semi-RP"},{value:"statistiques",label:"Statistiques complètes"}])}
+    </div></div>`;
+    return modulePanel("Module RP", "Configurez la progression, l'économie et les mécaniques de rôleplay.", body, "rp");
+  }
+
+  function arrivalsModule(s) {
+    const body = `<div class="grid-2"><div>
+      ${toggleField("welcome", s.welcome !== false, "Message d'arrivée", "Annonce chaque nouveau joueur dans le salon choisi.")}
+      ${toggleField("goodbye", s.goodbye !== false, "Message de départ", "Informe la communauté lorsqu'un membre quitte le serveur.")}
+      ${toggleField("directMessage", !!s.directMessage, "Message privé d'accueil", "Envoie également les règles en message privé.")}
+    </div><div class="form-grid">
+      ${inputField("welcomeChannel", "Salon d'arrivée", s.welcomeChannel || "#arrivées")}
+      ${inputField("goodbyeChannel", "Salon de départ", s.goodbyeChannel || "#départs")}
+      ${textAreaField("welcomeMessage", "Message d'accueil", s.welcomeMessage || "Bienvenue {user} dans Aincrad. Votre aventure commence ici.", "Variables : {user}, {server}, {memberCount}.")}
+      ${textAreaField("goodbyeMessage", "Message de départ", s.goodbyeMessage || "{user} a quitté Aincrad. Son nom restera inscrit dans les archives.")}
+    </div></div>`;
+    return modulePanel("Arrivées & départs", "Créez une entrée immersive pour chaque nouveau membre.", body, "arrivals");
+  }
+
+  function rolesModule(s) {
+    const body = `<div class="grid-2"><div>
+      ${toggleField("antiRaid", s.antiRaid !== false, "Protection anti-raid", "Bloque les arrivées massives et actions coordonnées.")}
+      ${toggleField("antiSpam", s.antiSpam !== false, "Protection anti-spam", "Analyse la fréquence, les liens et les mentions.")}
+      ${toggleField("lockDangerousPermissions", s.lockDangerousPermissions !== false, "Verrouillage des permissions", "Surveille les rôles administrateur et les webhooks.")}
+      ${toggleField("captcha", !!s.captcha, "Vérification captcha", "Demande une validation avant d'accéder au serveur.")}
+    </div><div class="form-grid">
+      ${inputField("autoRole", "Rôle automatique", s.autoRole || "Joueur")}
+      ${inputField("verifiedRole", "Rôle vérifié", s.verifiedRole || "Citoyen d'Aincrad")}
+      ${inputField("minimumAccountDays", "Âge minimum du compte", s.minimumAccountDays ?? 7, "number", "En jours.", "min=0 max=365")}
+      ${selectField("raidAction", "Action en cas de raid", s.raidAction || "quarantaine", [{value:"alerte",label:"Alerte uniquement"},{value:"quarantaine",label:"Quarantaine automatique"},{value:"ban",label:"Bannissement automatique"}])}
+    </div></div>`;
+    return modulePanel("Rôles & sécurité", "Centralisez les protections et les rôles attribués automatiquement.", body, "roles");
+  }
+
+  function channelsModule(s) {
+    const body = `<div class="grid-2"><div>
+      ${toggleField("messageLogs", s.messageLogs !== false, "Logs des messages", "Suppressions, éditions et pièces jointes.")}
+      ${toggleField("voiceLogs", s.voiceLogs !== false, "Logs vocaux", "Entrées, sorties et déplacements vocaux.")}
+      ${toggleField("moderationLogs", s.moderationLogs !== false, "Logs de modération", "Avertissements, exclusions et bannissements.")}
+      ${toggleField("memberLogs", s.memberLogs !== false, "Logs des membres", "Pseudos, rôles et changements de profil.")}
+    </div><div class="form-grid">
+      ${inputField("logChannel", "Salon principal des logs", s.logChannel || "#logs-cardinal")}
+      ${inputField("ticketLogChannel", "Archives des tickets", s.ticketLogChannel || "#archives-tickets")}
+      ${selectField("retention", "Conservation", s.retention || "90", [{value:"30",label:"30 jours"},{value:"90",label:"90 jours"},{value:"365",label:"1 an"},{value:"unlimited",label:"Illimitée"}])}
+      ${selectField("detailLevel", "Niveau de détail", s.detailLevel || "complet", [{value:"minimal",label:"Minimal"},{value:"standard",label:"Standard"},{value:"complet",label:"Complet"}])}
+    </div></div>`;
+    return modulePanel("Salons & logs", "Définissez les salons d'archives et les événements enregistrés.", body, "channels");
+  }
+
+  function levelsModule(s) {
+    const body = `<div class="grid-2"><div>
+      ${toggleField("enabled", s.enabled !== false, "Système de niveaux", "Distribue de l'XP lors des interactions valides.")}
+      ${toggleField("voiceXp", s.voiceXp !== false, "XP vocal", "Récompense le temps passé dans les salons vocaux.")}
+      ${toggleField("roleRewards", s.roleRewards !== false, "Récompenses de rôle", "Attribue automatiquement les rôles de palier.")}
+      ${toggleField("antiFarm", s.antiFarm !== false, "Protection anti-farm", "Ignore les messages répétés ou artificiels.")}
+    </div><div class="form-grid">
+      ${inputField("xpMin", "XP minimum", s.xpMin ?? 10, "number", "Par message valide.", "min=1 max=100")}
+      ${inputField("xpMax", "XP maximum", s.xpMax ?? 25, "number", "Par message valide.", "min=1 max=200")}
+      ${inputField("cooldown", "Délai entre gains (s)", s.cooldown ?? 60, "number", "Protection contre le farm.", "min=10 max=3600")}
+      ${inputField("announceChannel", "Salon des niveaux", s.announceChannel || "#progression")}
+      ${selectField("curve", "Courbe de progression", s.curve || "progressive", [{value:"rapide",label:"Rapide"},{value:"progressive",label:"Progressive"},{value:"difficile",label:"Difficile"}])}
+      ${inputField("maxLevel", "Niveau maximum", s.maxLevel ?? 100, "number", "Plafond du classement.", "min=10 max=1000")}
+    </div></div>`;
+    return modulePanel("Niveaux", "Réglez l'expérience, les délais et les récompenses de progression.", body, "levels");
+  }
+
+  function whitelistModule(s) {
+    const jobs = Array.isArray(s.jobs) ? s.jobs : [];
+    const body = `<div class="grid-2"><div>
+      ${toggleField("enabled", s.enabled !== false, "Whitelist métiers", "Active les candidatures pour les métiers protégés.")}
+      ${toggleField("dmResult", s.dmResult !== false, "Résultat en message privé", "Informe automatiquement le candidat.")}
+      ${toggleField("requireCharacter", s.requireCharacter !== false, "Personnage RP obligatoire", "Refuse les candidatures sans profil actif.")}
+    </div><div class="form-grid">
+      ${inputField("reviewRole", "Rôle chargé des validations", s.reviewRole || "Responsable Whitelist")}
+      ${inputField("reviewChannel", "Salon des candidatures", s.reviewChannel || "#candidatures-métiers")}
+      ${inputField("reviewDelay", "Délai conseillé (h)", s.reviewDelay ?? 48, "number", "Affiché au candidat.", "min=1 max=720")}
+      <div class="field full"><label>Métiers disponibles</label><input class="input" name="jobs" value="${esc(jobs.join(", "))}" placeholder="Forgeron, Alchimiste, Garde…"><span class="field-note">Séparez les métiers par une virgule.</span></div>
+      <div class="field full"><label>Aperçu</label><div class="tag-list">${jobs.map(job => `<span class="tag-item">${esc(job)}</span>`).join("") || `<span class="field-note">Aucun métier configuré.</span>`}</div></div>
+    </div></div>`;
+    return modulePanel("Whitelist métiers", "Gérez les métiers accessibles uniquement après validation du staff.", body, "whitelist");
+  }
+
+  function ticketModule(s) {
+    const body = `<div class="grid-2"><div>
+      ${toggleField("enabled", s.enabled !== false, "Système de tickets", "Permet aux membres d'ouvrir une demande privée.")}
+      ${toggleField("transcripts", s.transcripts !== false, "Transcriptions automatiques", "Archive chaque conversation à sa fermeture.")}
+      ${toggleField("claimSystem", s.claimSystem !== false, "Attribution aux membres du staff", "Empêche plusieurs agents de traiter le même ticket.")}
+      ${toggleField("rating", !!s.rating, "Évaluation du support", "Demande une note après la fermeture.")}
+    </div><div class="form-grid">
+      ${inputField("category", "Catégorie Discord", s.category || "TICKETS")}
+      ${inputField("staffRole", "Rôle du support", s.staffRole || "Support")}
+      ${inputField("closeDelay", "Délai de fermeture (min)", s.closeDelay ?? 15, "number", "Avant suppression du salon.", "min=0 max=1440")}
+      ${inputField("maxOpen", "Tickets maximum par membre", s.maxOpen ?? 2, "number", "Limite simultanée.", "min=1 max=20")}
+      ${textAreaField("panelMessage", "Texte du panneau", s.panelMessage || "Besoin d'aide ? Ouvrez un ticket et un membre du staff vous répondra.")}
+    </div></div>`;
+    return modulePanel("Tickets", "Configurez le panneau, les rôles du staff et les archives.", body, "tickets");
+  }
+
+  function blacklistView() {
+    const query = ui.blacklistQuery.trim().toLowerCase();
+    const entries = (state.blacklist || []).filter(item => !query || `${item.username} ${item.discordId} ${item.reason} ${item.server}`.toLowerCase().includes(query));
+    return `<div class="content-view">
+      ${pageHead("Staff bot / Sécurité", "Blacklist globale", "Recherchez un utilisateur, consultez le motif et associez des preuves à chaque sanction.", button("Ajouter une entrée", "open-blacklist-modal", "danger"))}
+      <section class="panel"><div class="panel-inner">
+        <div class="panel-head"><div><h3>Base de sanctions</h3><p>${entries.length} résultat(s) sur ${state.blacklist?.length || 0} entrées.</p></div><div class="searchbar"><input class="input" id="blacklist-search" value="${esc(ui.blacklistQuery)}" placeholder="Nom, ID Discord, serveur ou motif…"><button class="btn" data-action="blacklist-search">Rechercher</button></div></div>
+        <div class="table-wrap"><table class="data-table"><thead><tr><th>Utilisateur</th><th>Motif</th><th>Sévérité</th><th>Serveur</th><th>Preuves</th><th>Actions</th></tr></thead><tbody>
+        ${entries.map(entry => `<tr>
+          <td><strong>${esc(entry.username)}</strong><br><span>${esc(entry.discordId)}</span><br><span>${esc(entry.id)} · ${esc(entry.date)}</span></td>
+          <td>${esc(entry.reason)}</td>
+          <td><span class="severity ${esc(entry.severity)}">${esc(entry.severity)}</span></td>
+          <td>${esc(entry.server)}<br><span>par ${esc(entry.author)}</span></td>
+          <td><div class="proof-list">${entry.proofs?.length ? entry.proofs.map(proof => `<span class="proof-pill">${esc(proof)}</span>`).join("") : `<span class="field-note">Aucune preuve</span>`}</div></td>
+          <td><div class="page-actions">${button("Preuve", "open-proof-modal", "small", `data-id="${esc(entry.id)}"`)}${button("Retirer", "delete-blacklist", "danger small", `data-id="${esc(entry.id)}"`)}</div></td>
+        </tr>`).join("") || `<tr><td colspan="6">${emptyBlock("Aucun résultat", "Aucune entrée ne correspond à cette recherche.")}</td></tr>`}
+        </tbody></table></div>
+      </div></section>
+      <div class="grid-3 mt-16">
+        <div class="stat-card"><span>Sanctions critiques</span><strong>${(state.blacklist || []).filter(x=>x.severity==="critique").length}</strong><em>surveillance renforcée</em></div>
+        <div class="stat-card"><span>Preuves enregistrées</span><strong>${(state.blacklist || []).reduce((s,x)=>s+(x.proofs?.length||0),0)}</strong><em>images, PDF et logs</em></div>
+        <div class="stat-card"><span>Serveurs concernés</span><strong>${new Set((state.blacklist || []).map(x=>x.server)).size}</strong><em>base mutualisée</em></div>
+      </div>
+    </div>`;
+  }
+
+  function ticketsView() {
+    const ticket = (state.tickets || []).find(item => item.id === ui.selectedTicketId) || state.tickets?.[0];
+    return `<div class="content-view">
+      ${pageHead("Staff bot / Support", "Gestion des tickets", "Ouvrez une conversation, répondez depuis le site et modifiez son statut.", button("Actualiser", "pulse-system", "primary"))}
+      <div class="ticket-layout">
+        <section class="panel"><div class="panel-head" style="padding:17px;margin:0"><div><h3>Demandes</h3><p>${state.tickets?.length || 0} tickets enregistrés.</p></div></div><div class="ticket-list">
+          ${(state.tickets || []).map(item => `<button class="ticket-card ${ticket?.id === item.id ? "active" : ""}" data-action="select-ticket" data-ticket-id="${esc(item.id)}"><span><strong>${esc(item.id)} · ${esc(item.user)}</strong><p>${esc(item.subject)}</p><small>${esc(item.server)} · ${esc(item.date)}</small></span><span class="ticket-status ${slug(item.status)}">${esc(item.status)}</span></button>`).join("")}
+        </div></section>
+        ${ticket ? `<section class="panel chat-panel"><header class="chat-head"><div><h3>${esc(ticket.id)} · ${esc(ticket.subject)}</h3><p>${esc(ticket.user)} — ${esc(ticket.server)} — priorité ${esc(ticket.priority)}</p></div><select class="select" style="width:auto;min-width:135px" data-action="ticket-status" data-ticket-id="${esc(ticket.id)}"><option value="ouvert" ${ticket.status==="ouvert"?"selected":""}>Ouvert</option><option value="en attente" ${ticket.status==="en attente"?"selected":""}>En attente</option><option value="fermé" ${ticket.status==="fermé"?"selected":""}>Fermé</option></select></header>
+          <div class="chat-messages" id="chat-messages">${(ticket.messages || []).map(message => `<article class="message ${message.staff ? "staff" : ""}"><div class="message-head"><strong>${esc(message.author)}</strong><time>${esc(message.time)}</time></div><p>${esc(message.content)}</p></article>`).join("")}</div>
+          <form class="chat-compose" data-form="ticket-message" data-ticket-id="${esc(ticket.id)}"><textarea class="textarea" name="content" placeholder="Écrire une réponse au membre…" ${ticket.status === "fermé" ? "" : ""}></textarea><button class="btn success" type="submit">Envoyer la réponse</button></form>
+        </section>` : `<section class="panel">${emptyBlock("Aucun ticket", "Aucune conversation n'est disponible.")}</section>`}
+      </div>
+    </div>`;
+  }
+
+  function creatorView() {
+    const totalMembers = (state.servers || []).reduce((s,x)=>s+x.members,0);
+    return `<div class="content-view">
+      ${pageHead("Administration / Créateur", "Vue globale de l'écosystème", "Consultez l'ensemble des bots, des serveurs et des indicateurs de déploiement.", button("Exporter les données", "export-state", "primary"))}
+      <div class="grid-2">${(state.bots || []).map(bot => {
+        const servers = botServers(bot.id);
+        return `<section class="panel"><div class="panel-inner"><div class="panel-head"><div style="display:flex;gap:13px;align-items:center"><span class="bot-avatar ${bot.accent === "rose" ? "rose" : ""}">${esc(bot.name.slice(0,1))}</span><div><h3>${esc(bot.name)}</h3><p>${esc(bot.description)}</p></div></div><span class="chip green">EN LIGNE</span></div><div class="grid-3"><div class="stat-card"><span>Serveurs</span><strong>${servers.length}</strong><em>déploiements</em></div><div class="stat-card"><span>Utilisateurs</span><strong>${formatNumber(servers.reduce((s,x)=>s+x.members,0))}</strong><em>portée</em></div><div class="stat-card"><span>Latence</span><strong>${bot.latency}</strong><em>millisecondes</em></div></div></div></section>`;
+      }).join("")}</div>
+      <section class="panel mt-16"><div class="panel-inner"><div class="panel-head"><div><h3>Tous les serveurs</h3><p>${state.servers?.length || 0} déploiements · ${formatNumber(totalMembers)} membres cumulés.</p></div></div><div class="table-wrap"><table class="data-table"><thead><tr><th>Serveur</th><th>Région</th><th>Membres</th><th>En ligne</th><th>Bots installés</th><th>Accès</th></tr></thead><tbody>${(state.servers || []).map(server => `<tr><td><strong>${esc(server.name)}</strong><br><span>${esc(server.id)}</span></td><td>${esc(server.region)}</td><td>${formatNumber(server.members)}</td><td>${formatNumber(server.online)}</td><td>${server.botIds.map(id => `<span class="chip">${esc(state.bots.find(bot=>bot.id===id)?.name || id)}</span>`).join(" ")}</td><td>${button("Configurer", "open-server", "small", `data-server-id="${esc(server.id)}"`)}</td></tr>`).join("")}</tbody></table></div></div></section>
+      <div class="grid-3 mt-16"><div class="stat-card"><span>Disponibilité</span><strong>99.98%</strong><em>30 derniers jours</em></div><div class="stat-card"><span>Commandes exécutées</span><strong>1.24 M</strong><em>total historique</em></div><div class="stat-card"><span>Événements traités</span><strong>8.7 M</strong><em>Cardinal System</em></div></div>
+    </div>`;
+  }
+
+  function siteConfigView() {
+    const s = siteConfig();
+    const accent = accentHex(s);
+    const bgType = ["image", "aurora", "stars", "grid", "none"].includes(s.bgType) ? s.bgType : "image";
+    const bgChoice = (id, label, note, thumbStyle) => `
+      <div class="bg-choice ${bgType === id ? "on" : ""}" data-action="pick-bg" data-bg="${id}">
+        <div class="thumb" style="${thumbStyle}"></div>
+        <strong>${label}</strong><span>${note}</span>
+      </div>`;
+    const identity = `<section class="panel"><div class="panel-inner"><div class="panel-head"><div><h3>🪪 Identité</h3><p>Nom, logo, sous-titre et pied de page — visibles partout.</p></div></div><div class="form-grid">
+      ${inputField("siteName", "Nom du site", s.siteName || "Aincrad Control Panel")}
+      ${inputField("subtitle", "Sous-titre / accroche", s.subtitle || "Sword Art Online Discord Management")}
+      ${inputField("logo", "Logo (emoji ou URL d'image)", s.logo || "⚔️", "text", "Un emoji (⚔️, 🐉…) ou l'URL d'une image carrée.")}
+      ${inputField("footer", "Pied de page", s.footer || "© 2026 Aincrad Corporation")}
+    </div></div></section>`;
+    const theme = `<section class="panel"><div class="panel-inner"><div class="panel-head"><div><h3>🎨 Thème</h3><p>Couleur, police, forme des boutons et arrondi des cartes — appliqués en direct.</p></div></div>
+      <div class="form-grid">
+        <div class="field"><label>Couleur d'accent</label>
+          <div class="swatch-row">
+            ${SWATCHES.map(c => `<span class="swatch ${accent.toLowerCase() === c ? "on" : ""}" data-action="pick-swatch" data-color="${c}" style="background:${c}"></span>`).join("")}
+            <input class="input" type="color" name="accentColor" value="${esc(accent)}">
+          </div>
+          <span class="field-note">Cliquez une pastille ou choisissez une couleur libre.</span>
+        </div>
+        ${selectField("font", "Police du site", s.font || "exo", [
+          { value: "exo", label: "Exo 2 (défaut)" }, { value: "orbitron", label: "Orbitron (titres futuristes)" },
+          { value: "inter", label: "Inter (moderne sobre)" }, { value: "poppins", label: "Poppins (arrondie)" },
+        ])}
+        ${selectField("buttonStyle", "Style des boutons", s.buttonStyle || "pill", [
+          { value: "pill", label: "Pilule (arrondi complet)" }, { value: "rounded", label: "Arrondi" },
+          { value: "square", label: "Carré" }, { value: "cut", label: "Coins coupés (SAO)" },
+        ])}
+        ${inputField("radius", "Arrondi des cartes", s.radius ?? 18, "range", "", 'min="0" max="30" step="1"')}
+      </div>
+    </div></section>`;
+    const background = `<section class="panel"><div class="panel-inner"><div class="panel-head"><div><h3>🌌 Fond du site</h3><p>Une image (ou un GIF animé) à vous, ou un fond animé généré.</p></div></div>
+      <div class="bg-choices">
+        ${bgChoice("image", "Image / GIF", "votre visuel", `background-image:url('${esc(String(s.bgImage || "assets/images/aincrad-bg.jpg").replaceAll("'", "%27"))}')`)}
+        ${bgChoice("aurora", "Aurora", "dégradé animé", "background:radial-gradient(60% 80% at 25% 20%, rgba(169,112,255,.6), transparent 60%), radial-gradient(50% 70% at 80% 60%, rgba(79,140,255,.45), transparent 60%), #0b090e")}
+        ${bgChoice("stars", "Étoiles", "ciel dérivant", "background:radial-gradient(2px 2px at 25% 30%, #fff, transparent 55%), radial-gradient(1.5px 1.5px at 60% 65%, rgba(255,255,255,.8), transparent 55%), radial-gradient(1.5px 1.5px at 80% 25%, rgba(255,255,255,.7), transparent 55%), #0b090e")}
+        ${bgChoice("grid", "Grille", "trame discrète", "background:linear-gradient(rgba(169,112,255,.25) 1px, transparent 1px), linear-gradient(90deg, rgba(169,112,255,.25) 1px, transparent 1px), #0b090e; background-size:11px 11px")}
+        ${bgChoice("none", "Uni", "couleur sombre", "background:#0b090e")}
+      </div>
+      <input type="hidden" name="bgType" value="${esc(bgType)}">
+      <div class="form-grid mt-22">
+        ${inputField("bgImage", "URL de l'image de fond", s.bgImage || "assets/images/aincrad-bg.jpg", "text", "Collez une URL (PNG, JPG, WEBP, GIF animé) — ou téléversez ci-dessous.")}
+        ${inputField("bgOverlay", "Assombrissement du fond", s.bgOverlay ?? 62, "range", "0 = image pure, 92 = presque noir.", 'min="0" max="92" step="1"')}
+        ${inputField("bgBlur", "Flou du fond", s.bgBlur ?? 0, "range", "0 à 24 pixels.", 'min="0" max="24" step="1"')}
+      </div>
+    </div></section>`;
+    // Le téléversement est un formulaire séparé (un <form> ne peut pas en
+    // contenir un autre) — affiché juste sous la section « Fond du site ».
+    const uploadSection = `<section class="panel mt-16"><div class="panel-inner"><div class="panel-head"><div><h3>📤 Téléverser un fond</h3><p>Depuis votre PC — PNG, JPG, WEBP ou GIF animé (10 Mo max). Il devient immédiatement le fond du site.</p></div></div>
+      <form data-form="bg-upload" enctype="multipart/form-data" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+        <input class="input" type="file" name="background" accept="image/png,image/jpeg,image/webp,image/gif" required style="max-width:340px">
+        <button class="btn primary" type="submit">Téléverser et appliquer</button>
+      </form>
+    </div></section>`;
+    const navigation = `<section class="panel"><div class="panel-inner"><div class="panel-head"><div><h3>🧭 Navigation</h3><p>Renommez, masquez et réordonnez les onglets du menu. Le Site builder reste toujours accessible.</p></div></div>
+      <div id="nav-builder">
+        ${navConfig().map((item, index, list) => `
+          <div class="navbuild-row" data-nav-id="${esc(item.id)}">
+            <div class="navbuild-move">
+              <button type="button" class="btn ghost" data-action="nav-move" data-dir="-1" ${index === 0 ? "disabled" : ""}>▲</button>
+              <button type="button" class="btn ghost" data-action="nav-move" data-dir="1" ${index === list.length - 1 ? "disabled" : ""}>▼</button>
+            </div>
+            <input class="input navbuild-label" value="${esc(item.label)}" maxlength="40">
+            <button type="button" class="toggle navbuild-show ${item.show !== false ? "on" : ""}" data-action="nav-toggle" aria-label="Afficher ou masquer cet onglet" ${item.id === "site-config" ? "disabled title='Toujours visible'" : ""}></button>
+          </div>`).join("")}
+      </div>
+    </div></section>`;
+    const effects = `<section class="panel"><div class="panel-inner"><div class="panel-head"><div><h3>✨ Effets & comportement</h3><p>Chaque effet s'active ou se coupe indépendamment.</p></div></div>
+      <div class="grid-2"><div>
+        ${toggleField("animations", s.animations !== false, "Animations", "Transitions, apparitions et effets lumineux.")}
+        ${toggleField("particles", s.particles !== false, "Particules flottantes", "Fragments lumineux en arrière-plan.")}
+        ${toggleField("scanline", s.scanline !== false, "Balayage lumineux", "Ligne de scan qui traverse l'écran.")}
+        ${toggleField("cursorAura", s.cursorAura !== false, "Aura du curseur", "Halo lumineux qui suit la souris.")}
+      </div><div>
+        ${toggleField("bootScreen", s.bootScreen !== false, "Écran de démarrage", "Séquence d'initialisation à l'ouverture.")}
+        ${toggleField("compactMode", !!s.compactMode, "Mode compact", "Réduit les espacements sur grands écrans.")}
+        ${toggleField("maintenance", !!s.maintenance, "Maintenance publique", "Affiche une alerte aux utilisateurs non-staff.")}
+        ${toggleField("publicStatus", s.publicStatus !== false, "Statut public", "Autorise l'affichage de l'état des bots.")}
+      </div></div>
+    </div></section>`;
+    const advanced = `<section class="panel"><div class="panel-inner"><div class="panel-head"><div><h3>🧪 CSS personnalisé</h3><p>Pouvoir total : ce CSS est injecté tel quel sur tout le site (20 000 caractères max).</p></div></div>
+      ${textAreaField("customCss", "Votre CSS", s.customCss || "", "Exemple : .panel { border-width: 2px; }  ·  body { letter-spacing: .02em; }")}
+    </div></section>`;
+    return `<div class="content-view">${pageHead("Administration / Site builder", "Construisez votre site", "Composez le site de A à Z : identité, thème, fond animé ou image, navigation, effets et CSS libre. Tout s'applique en direct — enregistrez pour le rendre permanent.")}
+      <div class="builder-hint">💡 Chaque réglage se prévisualise <b>en direct</b> pendant que vous le modifiez. « Enregistrer » l'applique pour tout le monde.</div>
+      <form data-form="site-config" id="site-builder-form">${identity}<div class="mt-16">${theme}</div><div class="mt-16">${background}</div><div class="mt-16">${navigation}</div><div class="mt-16">${effects}</div><div class="mt-16">${advanced}</div>
+      <div class="form-actions"><button class="btn ghost" type="button" data-action="reset-site-config">Annuler les modifications</button><button class="btn success" type="submit">💾 Enregistrer le site</button></div></form>
+      ${uploadSection}
+    </div>`;
+  }
+
+  // Reconstitue la configuration complète du site depuis le formulaire du
+  // builder (champs + pastilles + lignes de navigation), pour l'aperçu en
+  // direct comme pour l'enregistrement.
+  function collectSiteConfig(form) {
+    const config = formToObject(form);
+    config.radius = Number(config.radius ?? 18);
+    config.bgOverlay = Number(config.bgOverlay ?? 62);
+    config.bgBlur = Number(config.bgBlur ?? 0);
+    config.nav = Array.from(form.querySelectorAll(".navbuild-row")).map(row => ({
+      id: row.dataset.navId,
+      label: (row.querySelector(".navbuild-label")?.value || "").trim().slice(0, 40) || row.dataset.navId,
+      show: row.querySelector(".navbuild-show")?.classList.contains("on") !== false,
+    }));
+    return config;
+  }
+
+  function emptyBlock(title, text) {
+    return `<div class="empty"><div><strong>${esc(title)}</strong><span>${esc(text)}</span></div></div>`;
+  }
+
+  function render() {
+    if (!ui.activeBotId || ui.route === "gate") renderGate();
+    else renderShell();
+    applySitePreferences();
+    setTimeout(scrollChatToBottom, 0);
+  }
+
+  // Applique TOUTE la configuration du builder (accent, police, boutons,
+  // rayon, fond, effets, CSS personnalisé). Accepte une config temporaire
+  // pour l'aperçu en direct pendant l'édition.
+  function applySitePreferences(cfg = siteConfig()) {
+    const root = document.documentElement;
+    const accent = accentHex(cfg);
+    root.style.setProperty("--accent", accent);
+    root.style.setProperty("--accent-rgb", hexToRgb(accent));
+    const radius = Math.min(30, Math.max(0, Number(cfg.radius ?? 18)));
+    root.style.setProperty("--radius", `${radius}px`);
+    document.body.dataset.font = ["exo", "inter", "poppins", "orbitron"].includes(cfg.font) ? cfg.font : "exo";
+    document.body.dataset.btnstyle = ["pill", "rounded", "square", "cut"].includes(cfg.buttonStyle) ? cfg.buttonStyle : "pill";
+
+    // Fond du site : image téléversée / URL, ou fond animé.
+    const bgType = ["image", "aurora", "stars", "grid", "none"].includes(cfg.bgType) ? cfg.bgType : "image";
+    document.body.dataset.bg = bgType;
+    if (bgType === "image") {
+      const image = String(cfg.bgImage || "assets/images/aincrad-bg.jpg").replaceAll('"', "%22");
+      root.style.setProperty("--bg-image", `url("${image}")`);
+      root.style.setProperty("--bg-overlay", String(Math.min(92, Math.max(0, Number(cfg.bgOverlay ?? 62))) / 100));
+      root.style.setProperty("--bg-blur", `${Math.min(24, Math.max(0, Number(cfg.bgBlur ?? 0)))}px`);
+    }
+
+    // Effets activables un par un.
+    document.body.classList.toggle("reduce-effects", cfg.animations === false);
+    document.body.classList.toggle("compact", cfg.compactMode === true);
+    const particleField = document.querySelector("#particle-field");
+    if (particleField) particleField.style.display = cfg.particles === false ? "none" : "block";
+    const scan = document.querySelector(".scanline");
+    if (scan) scan.style.display = cfg.scanline === false ? "none" : "block";
+    if (cursorAura) cursorAura.style.display = cfg.cursorAura === false ? "none" : "block";
+
+    // CSS personnalisé du créateur (pouvoir total sur le style).
+    let customTag = document.querySelector("#site-custom-css");
+    if (!customTag) {
+      customTag = document.createElement("style");
+      customTag.id = "site-custom-css";
+      document.head.appendChild(customTag);
+    }
+    customTag.textContent = String(cfg.customCss || "").slice(0, 20000);
+    document.title = cfg.siteName || "Aincrad Control Panel";
+  }
+
+  function startClock() {
+    const clock = document.querySelector("#live-clock");
+    if (!clock) return;
+    const update = () => {
+      if (!document.body.contains(clock)) return;
+      clock.textContent = new Intl.DateTimeFormat("fr-FR", { hour: "2-digit", minute: "2-digit", second: "2-digit" }).format(new Date());
+      requestAnimationFrame(() => setTimeout(update, 900));
+    };
+    update();
+  }
+
+  function scrollChatToBottom() {
+    const chat = document.querySelector("#chat-messages");
+    if (chat) chat.scrollTop = chat.scrollHeight;
+  }
+
+  function navigate(route) {
+    ui.route = route;
+    ui.mobileOpen = false;
+    render();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function openBlacklistModal() {
+    openModal("Ajouter à la blacklist", `
+      <form data-form="blacklist-add"><div class="form-grid">
+        ${inputField("username", "Nom Discord", "", "text", "Exemple : DarkBlade_X", "required")}
+        ${inputField("discordId", "Identifiant Discord", "", "text", "17 à 20 chiffres.", "required pattern=\\d{15,22}")}
+        ${selectField("severity", "Sévérité", "moyenne", ["faible","moyenne","élevée","critique"])}
+        ${selectField("server", "Serveur concerné", state.servers?.[0]?.name || "Global", ["Global", ...(state.servers || []).map(server=>server.name)])}
+        ${textAreaField("reason", "Motif complet", "", "Décrivez précisément les faits, les avertissements et le contexte.")}
+      </div><div class="form-actions"><button class="btn ghost" type="button" data-action="close-modal">Annuler</button><button class="btn danger" type="submit">Confirmer la sanction</button></div></form>`);
+  }
+
+  function openProofModal(id) {
+    const entry = state.blacklist?.find(item => item.id === id);
+    if (!entry) return;
+    openModal(`Ajouter une preuve · ${entry.username}`, `
+      <form data-form="proof-upload" data-id="${esc(id)}" enctype="multipart/form-data">
+        <div class="field"><label>Fichier de preuve</label><input class="input" type="file" name="proof" accept="image/png,image/jpeg,image/webp,application/pdf,text/plain" required><span class="field-note">PNG, JPG, WEBP, PDF ou TXT — 8 Mo maximum.</span></div>
+        <div class="form-actions"><button class="btn ghost" type="button" data-action="close-modal">Annuler</button><button class="btn success" type="submit">Téléverser la preuve</button></div>
+      </form>`);
+  }
+
+  function showNotifications() {
+    openModal("Notifications du système", `<div class="activity-list">${activityRows()}</div>`);
+  }
+
+  function formToObject(form) {
+    const result = {};
+    form.querySelectorAll("[name]").forEach(field => {
+      if (field.type === "checkbox") result[field.name] = field.checked;
+      else if (field.type === "number") result[field.name] = field.value === "" ? 0 : Number(field.value);
+      else result[field.name] = field.value;
+    });
+    if (form.dataset.module === "whitelist" && typeof result.jobs === "string") {
+      result.jobs = result.jobs.split(",").map(item => item.trim()).filter(Boolean);
+    }
+    return result;
+  }
+
+  document.addEventListener("click", async event => {
+    const target = event.target.closest("[data-action]");
+    if (!target) {
+      createRipple(event);
+      return;
+    }
+
+    const action = target.dataset.action;
+    if (action === "close-modal" && target.classList.contains("modal-layer") && event.target !== target) return;
+
+    try {
+      switch (action) {
+        case "select-bot":
+          ui.activeBotId = target.dataset.botId;
+          storage.setItem("aincrad.activeBot", ui.activeBotId);
+          ui.route = "dashboard";
+          render();
+          toast("LINK START", `Interface ${activeBot().name} chargée.`);
+          break;
+        case "switch-bot":
+          ui.activeBotId = null;
+          storage.removeItem("aincrad.activeBot");
+          ui.route = "gate";
+          render();
+          break;
+        case "navigate":
+          navigate(target.dataset.route || "dashboard");
+          break;
+        case "toggle-sidebar":
+          ui.mobileOpen = !ui.mobileOpen;
+          document.querySelector(".sidebar")?.classList.toggle("open", ui.mobileOpen);
+          break;
+        case "open-server":
+          ui.selectedServerId = target.dataset.serverId;
+          storage.setItem("aincrad.server", ui.selectedServerId);
+          ui.module = "overview";
+          navigate("server");
+          break;
+        case "select-module":
+          ui.module = target.dataset.module || "overview";
+          render();
+          break;
+        case "toggle-input": {
+          const row = target.closest(".toggle-row");
+          const input = row?.querySelector('input[type="checkbox"]');
+          if (input) {
+            input.checked = !input.checked;
+            target.classList.toggle("on", input.checked);
+            livePreview();
+          }
+          break;
+        }
+        // ── Site builder ────────────────────────────────────────────
+        case "pick-swatch": {
+          const picker = document.querySelector('#site-builder-form input[name="accentColor"]');
+          if (picker) picker.value = target.dataset.color;
+          document.querySelectorAll(".swatch").forEach(el => el.classList.toggle("on", el === target));
+          livePreview();
+          break;
+        }
+        case "pick-bg": {
+          const hidden = document.querySelector('#site-builder-form input[name="bgType"]');
+          if (hidden) hidden.value = target.dataset.bg;
+          document.querySelectorAll(".bg-choice").forEach(el => el.classList.toggle("on", el === target));
+          livePreview();
+          break;
+        }
+        case "nav-toggle":
+          target.classList.toggle("on");
+          break;
+        case "nav-move": {
+          const row = target.closest(".navbuild-row");
+          const list = row?.parentElement;
+          if (!row || !list) break;
+          const dir = Number(target.dataset.dir);
+          if (dir < 0 && row.previousElementSibling) list.insertBefore(row, row.previousElementSibling);
+          if (dir > 0 && row.nextElementSibling) list.insertBefore(row.nextElementSibling, row);
+          // Réactive les flèches selon la nouvelle position.
+          Array.from(list.children).forEach((item, index, all) => {
+            const up = item.querySelector('[data-dir="-1"]');
+            const down = item.querySelector('[data-dir="1"]');
+            if (up) up.disabled = index === 0;
+            if (down) down.disabled = index === all.length - 1;
+          });
+          break;
+        }
+        case "preview-gate":
+          ui.route = "gate";
+          renderGate();
+          applySitePreferences();
+          toast("APERÇU", "Page d'accueil — cliquez sur « Retour à l'administration ».");
+          break;
+        case "server-search":
+          ui.serverQuery = document.querySelector("#server-search")?.value || "";
+          render();
+          break;
+        case "blacklist-search":
+          ui.blacklistQuery = document.querySelector("#blacklist-search")?.value || "";
+          render();
+          break;
+        case "open-blacklist-modal":
+          openBlacklistModal();
+          break;
+        case "open-proof-modal":
+          openProofModal(target.dataset.id);
+          break;
+        case "delete-blacklist":
+          if (confirm("Retirer définitivement cette entrée de la blacklist ?")) {
+            await api("blacklist.delete", { id: target.dataset.id });
+            render();
+            toast("BLACKLIST", "L'entrée a été retirée.");
+          }
+          break;
+        case "select-ticket":
+          ui.selectedTicketId = target.dataset.ticketId;
+          render();
+          break;
+        case "close-modal":
+          closeModal();
+          break;
+        case "pulse-system":
+          target.classList.add("animating");
+          const response = await fetch(`${window.AINCRAD_API}?action=state`);
+          const payload = await response.json();
+          if (payload.ok) state = payload.state;
+          render();
+          toast("SYNCHRONISATION", "Le Cardinal System est à jour.");
+          break;
+        case "show-notifications":
+          showNotifications();
+          break;
+        case "invite-bot":
+          openModal("Ajouter le bot à un serveur", `<div class="empty"><div><strong>Connexion Discord OAuth2</strong><span>Branchez ici votre URL d'autorisation Discord avec les permissions nécessaires au bot.</span><div class="form-actions" style="justify-content:center"><button class="btn primary" data-action="close-modal">Compris</button></div></div></div>`);
+          break;
+        case "export-state": {
+          const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
+          const url = URL.createObjectURL(blob);
+          const anchor = document.createElement("a");
+          anchor.href = url;
+          anchor.download = `aincrad-export-${new Date().toISOString().slice(0,10)}.json`;
+          anchor.click();
+          URL.revokeObjectURL(url);
+          toast("EXPORT", "Les données JSON ont été exportées.");
+          break;
+        }
+        case "reset-module":
+          render();
+          toast("MODULE", "Les modifications non enregistrées ont été annulées.");
+          break;
+        case "reset-site-config":
+          render();
+          toast("CONFIGURATION", "Les modifications non enregistrées ont été annulées.");
+          break;
+      }
+    } catch (error) {
+      toast("ERREUR", error.message || "Une erreur est survenue.", "error");
+    }
+    createRipple(event, target);
+  });
+
+  // Aperçu en direct : chaque frappe/glissement du builder est appliqué
+  // immédiatement au site (sans enregistrer).
+  function livePreview() {
+    const form = document.querySelector("#site-builder-form");
+    if (!form) return;
+    applySitePreferences({ ...siteConfig(), ...collectSiteConfig(form) });
+  }
+  document.addEventListener("input", event => {
+    if (event.target.closest("#site-builder-form")) livePreview();
+  });
+
+  document.addEventListener("change", async event => {
+    const target = event.target;
+    if (target.closest("#site-builder-form")) livePreview();
+    if (target.matches('[data-action="ticket-status"]')) {
+      try {
+        await api("ticket.status", { ticketId: target.dataset.ticketId, status: target.value });
+        render();
+        toast("TICKET", "Le statut a été mis à jour.");
+      } catch (error) {
+        toast("ERREUR", error.message, "error");
+      }
+    }
+  });
+
+  document.addEventListener("submit", async event => {
+    const form = event.target.closest("form[data-form]");
+    if (!form) return;
+    event.preventDefault();
+    const submit = form.querySelector('[type="submit"]');
+    const originalText = submit?.textContent;
+    if (submit) { submit.disabled = true; submit.textContent = "TRAITEMENT…"; }
+
+    try {
+      switch (form.dataset.form) {
+        case "blacklist-add": {
+          const values = formToObject(form);
+          await api("blacklist.add", values);
+          closeModal();
+          render();
+          toast("BLACKLIST", `${values.username} a été ajouté à la base globale.`);
+          break;
+        }
+        case "proof-upload": {
+          const data = new FormData(form);
+          data.append("action", "blacklist.proof");
+          data.append("id", form.dataset.id);
+          await api("blacklist.proof", {}, { formData: data });
+          closeModal();
+          render();
+          toast("PREUVE", "Le fichier a été associé à la sanction.");
+          break;
+        }
+        case "ticket-message": {
+          const values = formToObject(form);
+          await api("ticket.message", { ticketId: form.dataset.ticketId, content: values.content });
+          render();
+          toast("TICKET", "Votre réponse a été envoyée.");
+          break;
+        }
+        case "module": {
+          const settings = formToObject(form);
+          await api("server.module.save", { serverId: ui.selectedServerId, module: form.dataset.module, settings });
+          render();
+          toast("MODULE ENREGISTRÉ", `${modules.find(item=>item.id===form.dataset.module)?.label || "Configuration"} a été mis à jour.`);
+          break;
+        }
+        case "site-config": {
+          const config = collectSiteConfig(form);
+          await api("site.config.save", { config });
+          render();
+          toast("SITE ENREGISTRÉ", "Votre site est à jour pour tout le monde.");
+          break;
+        }
+        case "bg-upload": {
+          const data = new FormData(form);
+          data.append("action", "site.background.upload");
+          await api("site.background.upload", {}, { formData: data });
+          render();
+          toast("FOND APPLIQUÉ", "Votre image est désormais le fond du site.");
+          break;
+        }
+      }
+    } catch (error) {
+      toast("ERREUR", error.message || "Impossible d'enregistrer.", "error");
+    } finally {
+      if (submit && document.body.contains(submit)) { submit.disabled = false; submit.textContent = originalText; }
+    }
+  });
+
+  document.addEventListener("keydown", event => {
+    if (event.key === "Escape") closeModal();
+    if (event.key === "Enter" && event.target.id === "blacklist-search") {
+      ui.blacklistQuery = event.target.value;
+      render();
+    }
+    if (event.key === "Enter" && event.target.id === "server-search") {
+      ui.serverQuery = event.target.value;
+      render();
+    }
+  });
+
+  function createRipple(event, element = event.target.closest("button")) {
+    if (!element || !(element instanceof HTMLElement)) return;
+    const rect = element.getBoundingClientRect();
+    const size = Math.max(rect.width, rect.height);
+    const ripple = document.createElement("span");
+    ripple.className = "ripple";
+    ripple.style.width = ripple.style.height = `${size}px`;
+    ripple.style.left = `${event.clientX - rect.left - size / 2}px`;
+    ripple.style.top = `${event.clientY - rect.top - size / 2}px`;
+    element.appendChild(ripple);
+    setTimeout(() => ripple.remove(), 650);
+  }
+
+  function createParticles() {
+    const field = document.querySelector("#particle-field");
+    if (!field) return;
+    field.innerHTML = Array.from({ length: 22 }, (_, index) => {
+      const left = (index * 37 + 11) % 100;
+      const size = 3 + (index % 4) * 2;
+      const duration = 12 + (index % 7) * 2.3;
+      const delay = -(index % 9) * 2.1;
+      return `<i class="particle" style="left:${left}%;--size:${size}px;--dur:${duration}s;--delay:${delay}s"></i>`;
+    }).join("");
+  }
+
+  window.addEventListener("mousemove", event => {
+    if (cursorAura) {
+      cursorAura.style.left = `${event.clientX}px`;
+      cursorAura.style.top = `${event.clientY}px`;
+    }
+    // Parallaxe du fond (désactivable dans le builder).
+    if (!sky || siteConfig().parallax === false) return;
+    const x = (event.clientX / innerWidth - .5) * 8;
+    const y = (event.clientY / innerHeight - .5) * 5;
+    sky.style.transform = `scale(1.04) translate(${x}px, ${y}px)`;
+  }, { passive: true });
+
+  window.addEventListener("load", () => {
+    createParticles();
+    render();
+    // L'écran de démarrage est désactivable depuis le builder.
+    setTimeout(() => boot.classList.add("is-hidden"), siteConfig().bootScreen === false ? 0 : 650);
+  });
+})();

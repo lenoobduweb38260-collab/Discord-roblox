@@ -97,6 +97,11 @@ jobs:
           sed -i "s/const DASH_BUILD = 'dev';/const DASH_BUILD = 'v1.0.${{ github.run_number }}';/" index.php
           zip -r ../dist/pack-dashboard-php.zip index.php config.php LISEZMOI.md
 
+      - name: Créer le pack site personnalisable (Site builder)
+        run: |
+          cd site-php
+          zip -r ../dist/pack-site-builder.zip . -x '*.git*'
+
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: v1.0.${{ github.run_number }}
@@ -124,6 +129,14 @@ jobs:
             - `pack-dashboard-php.zip` : hébergement web classique **PHP/public_html**
               (2 fichiers à déposer, rien à installer)
             Voir le LISEZMOI.md inclus dans chaque pack.
+
+            ### 🎨 Site personnalisable (`pack-site-builder.zip`)
+            Un site complet en PHP que vous **construisez vous-même** depuis l'onglet
+            **Site builder** : couleur d'accent libre, police, style des boutons, arrondi,
+            **fond au choix** (votre image ou GIF animé téléversé, ou un fond animé
+            Aurora / Étoiles / Grille), navigation renommable et réordonnable, effets
+            activables un par un et **CSS personnalisé**. Aperçu en direct, puis
+            « Enregistrer ». Déposez le dossier chez votre hébergeur PHP 8+.
 
             ### 🤖 Gestionnaire de bots
             Application locale pour gérer **plusieurs bots** (chacun relié à son propre dépôt GitHub) :
