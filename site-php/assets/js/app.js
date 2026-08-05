@@ -36,6 +36,8 @@
     creatorTab: "page",
     blocks: null,        // blocs en cours d'édition dans le constructeur de page
     previewGrade: null,  // grade simulé (aperçu « qui voit quoi »)
+    agentBots: null,     // bots vus chez l'agent (null = pas encore interrogé)
+    agentErreur: null,
     ticketTab: "open",   // tickets en cours / archives
     selectedArchiveId: null,
     archiveQuery: "",
@@ -1078,6 +1080,30 @@
     { value: "cyan", label: "Bleu" }, { value: "violet", label: "Violet" },
     { value: "rose", label: "Rose" }, { value: "gold", label: "Or" }, { value: "green", label: "Vert" },
   ];
+  // Champ « Nom chez l'agent » : liste déroulante quand l'agent est joignable
+  // (impossible de se tromper de nom), champ libre sinon.
+  function agentNameField(bot) {
+    const dispo = ui.agentBots;
+    if (!Array.isArray(dispo) || !dispo.length) {
+      return `<input class="input" data-f="agentName" value="${esc(bot.agentName || "")}" placeholder="colmar_rp">`;
+    }
+    const connu = dispo.some(b => b.nom === bot.agentName);
+    return `<select class="select" data-f="agentName">
+      <option value="">— Choisissez le bot —</option>
+      ${dispo.map(b => `<option value="${esc(b.nom)}"${b.nom === bot.agentName ? " selected" : ""}>${b.demarre ? "🟢" : "⚪"} ${esc(b.nom)}</option>`).join("")}
+      ${bot.agentName && !connu ? `<option value="${esc(bot.agentName)}" selected>⚠️ ${esc(bot.agentName)} (inconnu chez l'agent)</option>` : ""}
+    </select>`;
+  }
+  // Message d'aide sous le Client ID, qui signale une valeur invalide.
+  function clientIdNote(valeur) {
+    const v = String(valeur || "").trim();
+    if (v === "") return "Rempli automatiquement à la synchronisation. Sert au lien « Inviter ce bot ».";
+    if (!/^\d{17,20}$/.test(v)) {
+      return `⚠️ « ${esc(v)} » n'est pas un Client ID Discord (il en faut 17 à 20 chiffres). Ce n'est ni l'adresse de l'agent, ni un port.`;
+    }
+    return "✅ Format correct.";
+  }
+
   function botsBuilderBody() {
     const bots = state.bots || [];
     const rows = bots.map((bot, index) => `
@@ -1098,14 +1124,33 @@
           <div class="field"><label>Étiquette</label><input class="input" data-f="tag" value="${esc(bot.tag || "")}" placeholder="BOT RP"></div>
           <div class="field"><label>Couleur</label><select class="select" data-f="accent">${ACCENTS.map(a => `<option value="${a.value}"${(bot.accent || "cyan") === a.value ? " selected" : ""}>${a.label}</option>`).join("")}</select></div>
           <div class="field full"><label>Description</label><input class="input" data-f="description" value="${esc(bot.description || "")}" placeholder="Ce que fait ce bot"></div>
-          <div class="field"><label>Nom chez l'agent</label><input class="input" data-f="agentName" value="${esc(bot.agentName || "")}" placeholder="Colmar_rp">
-            <span class="field-note">Le nom EXACT du bot dans votre panel / dossier bots/.</span></div>
-          <div class="field"><label>Client ID Discord</label><input class="input" data-f="clientId" value="${esc(bot.clientId || "")}" placeholder="123456789012345678">
-            <span class="field-note">Sert au lien « Inviter ce bot ».</span></div>
+          <div class="field"><label>1️⃣ Nom chez l'agent</label>${agentNameField(bot)}
+            <span class="field-note">Le nom EXACT du bot chez votre agent (dossier <code>bots/&lt;nom&gt;</code>). C'est ce qui relie le site au bot.</span></div>
+          <div class="field"><label>2️⃣ Client ID Discord <span style="color:var(--muted-2);font-weight:400">(facultatif)</span></label>
+            <input class="input" data-f="clientId" value="${esc(bot.clientId || "")}" placeholder="1528910533183541308" inputmode="numeric">
+            <span class="field-note">${clientIdNote(bot.clientId)}</span></div>
         </div>
       </div>`).join("");
+    const etatAgent = ui.agentBots === null
+      ? `<div class="row" style="border-color:rgba(243,200,106,.45)">⏳ Recherche de votre agent…</div>`
+      : (Array.isArray(ui.agentBots) && ui.agentBots.length
+        ? `<div class="row" style="border-color:rgba(47,227,139,.45)">✅ <b>Agent joignable</b><span style="color:var(--muted)">${ui.agentBots.length} bot(s) détecté(s) : ${ui.agentBots.map(b => esc(b.nom)).join(" · ")}. Choisissez-les dans la liste déroulante ci-dessous.</span></div>`
+        : `<div class="row" style="border-color:rgba(255,92,116,.45);flex-direction:column;align-items:flex-start;gap:6px">
+             <b>❌ Agent injoignable — la synchronisation ne peut pas fonctionner</b>
+             <span style="color:var(--muted)">${esc(ui.agentErreur || "Vérifiez SITE_AGENT_URL et SITE_AGENT_KEY dans config.php.")}</span>
+             <span style="color:var(--muted);font-size:12px">Ouvrez <code>api.php?action=selftest</code> pour le détail.</span>
+           </div>`);
     return `
-      <div class="builder-hint">🤖 Ajoutez <b>autant de bots que vous voulez</b>. Renseignez le « nom chez l'agent » puis cliquez sur <b>Synchroniser</b> : le site récupère les vrais serveurs de chaque bot.</div>
+      <div class="builder-hint">🤖 <b>3 étapes</b> : 1) choisissez le bot chez votre agent · 2) laissez le Client ID se remplir tout seul · 3) <b>Enregistrer</b> puis <b>Synchroniser</b>.</div>
+      ${etatAgent}
+      <section class="panel mt-16"><div class="panel-inner">
+        <div class="panel-head"><div><h3>❓ Où trouver chaque valeur</h3><p>Les deux champs viennent d'endroits différents — voici lesquels.</p></div></div>
+        <div class="row" style="flex-direction:column;align-items:flex-start;gap:7px">
+          <span><b>1️⃣ Nom chez l'agent</b> — le nom du bot dans <b>votre panel</b> (Gestionnaire de bots), c'est-à-dire le dossier <code>bots/&lt;nom&gt;</code> chez votre hébergeur. Exemple : <code>colmar_rp</code>. <b>Ce n'est pas</b> le nom affiché sur le site.</span>
+          <span><b>2️⃣ Client ID Discord</b> — l'<b>Application ID</b> du bot, dans le <b>Portail développeur Discord</b> (17 à 20 chiffres). Exemple : <code>1528910533183541308</code>. <b>Ce n'est ni l'IP, ni le port de votre agent.</b> Laissez vide : la synchronisation le remplit toute seule.</span>
+        </div>
+      </div></section>
+      <div style="height:16px"></div>
       <section class="panel"><div class="panel-inner">
         <div class="panel-head"><div><h3>Mes bots</h3><p>${bots.length} bot(s) déclaré(s) — aucune limite.</p></div>
           <div class="page-actions">${button("🔄 Synchroniser avec l'agent", "bots-sync", "ghost")}${button("💾 Enregistrer les bots", "bots-save", "success")}</div></div>
@@ -1174,6 +1219,19 @@
       out[row.dataset.feature] = Array.from(row.querySelectorAll(".gtoggle.on")).map(el => el.dataset.grade);
     });
     return out;
+  }
+
+  // Interroge l'agent pour connaître les bots disponibles (sans bloquer l'UI).
+  async function chargerBotsAgent() {
+    try {
+      const r = await api("agent.bots");
+      ui.agentBots = r.bots || [];
+      ui.agentErreur = null;
+    } catch (e) {
+      ui.agentBots = [];
+      ui.agentErreur = e.message;
+    }
+    if (ui.creatorTab === "bots") render();
   }
 
   // Lit la liste des bots depuis les champs affichés.
@@ -1628,6 +1686,9 @@
         case "creator-tab":
           ui.creatorTab = target.dataset.tab;
           render();
+          // À l'ouverture de « Mes bots », on interroge l'agent une fois pour
+          // proposer directement les bons noms dans la liste déroulante.
+          if (ui.creatorTab === "bots" && ui.agentBots === null) chargerBotsAgent();
           break;
         case "auth-open":
           openLoginModal();
@@ -1710,24 +1771,16 @@
           render();
           toast("BOTS ENREGISTRÉS", `${(state.bots || []).length} bot(s) sur votre site.`);
           break;
-        case "agent-bots": {
-          // Affiche les bots que l'agent connaît : un clic recopie le nom
-          // exact dans le champ « Nom chez l'agent » du premier bot vide.
-          const box = document.querySelector("#agent-bots");
-          box.innerHTML = '<div class="row">⏳ Interrogation de l\'agent…</div>';
-          try {
-            const r = await api("agent.bots");
-            box.innerHTML = `<div class="row" style="flex-direction:column;align-items:flex-start;gap:8px">
-              <b>Agent joignable : ${esc(r.adresse)}</b>
-              <span style="color:var(--muted);font-size:12px">Cliquez sur un nom pour le recopier dans « Nom chez l'agent ».</span>
-              <div style="display:flex;gap:7px;flex-wrap:wrap">${(r.bots || []).map(b =>
-                `<button type="button" class="chip" data-action="use-agent-name" data-nom="${esc(b.nom)}" style="cursor:pointer">${b.demarre ? "🟢" : "⚪"} ${esc(b.nom)}</button>`).join("")
-                || "<i style='color:var(--muted)'>Aucun bot déclaré chez l'agent.</i>"}</div></div>`;
-          } catch (e) {
-            box.innerHTML = `<div class="row" style="border-color:rgba(255,92,116,.5)">❌ ${esc(e.message)}</div>`;
-          }
+        case "agent-bots":
+          // Relance la détection : la liste déroulante « Nom chez l'agent »
+          // se remplit avec les noms exacts vus chez l'agent.
+          ui.agentBots = null;
+          render();
+          await chargerBotsAgent();
+          toast(ui.agentBots.length ? "AGENT JOIGNABLE" : "AGENT INJOIGNABLE",
+            ui.agentBots.length ? `${ui.agentBots.length} bot(s) détecté(s).` : (ui.agentErreur || ""),
+            ui.agentBots.length ? "success" : "error");
           break;
-        }
         case "use-agent-name": {
           const champs = Array.from(document.querySelectorAll('.botcfg [data-f="agentName"]'));
           const cible = champs.find(c => !c.value.trim()) || champs[0];

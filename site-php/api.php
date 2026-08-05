@@ -591,8 +591,12 @@ switch ($action) {
         $servers = [];
         $rapport = [];
         foreach ($state['bots'] as $index => $bot) {
+            // Un bot non relié ou injoignable ne doit pas garder de chiffres
+            // de démonstration : on remet ses compteurs à zéro.
+            $state['bots'][$index]['servers'] = 0;
+            $state['bots'][$index]['users'] = 0;
             $agentName = (string) ($bot['agentName'] ?? '');
-            if ($agentName === '') { $rapport[] = ['bot' => $bot['name'], 'ok' => false, 'message' => 'Aucun « nom chez l\'agent » renseigné.']; continue; }
+            if ($agentName === '') { $rapport[] = ['bot' => $bot['name'], 'ok' => false, 'message' => 'Aucun « nom chez l\'agent » renseigné — choisissez-le dans la liste déroulante.']; continue; }
             if (!in_array($agentName, $enLigne, true)) { $rapport[] = ['bot' => $bot['name'], 'ok' => false, 'message' => "« $agentName » n'est pas démarré chez l'agent."]; continue; }
             [$c2, $infos] = agent_get('/agent/bots/' . rawurlencode($agentName) . '/proxy/infos');
             if ($c2 !== 200) {
