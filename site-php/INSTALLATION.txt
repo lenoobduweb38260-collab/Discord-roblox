@@ -34,11 +34,29 @@ RELIER VOS BOTS — TOUT SE FAIT DANS LE SITE, AUCUN FICHIER À MODIFIER :
 
   Sans agent joignable, le site tourne avec des données de démonstration.
 
-METTRE UN MOT DE PASSE (fortement conseillé en ligne) :
-Ouvrez config.php et renseignez SITE_ADMIN_PASSWORD. La lecture du site
-reste publique, mais toute modification demandera ce mot de passe
-(cadenas 🔒 en haut à droite). Sans mot de passe, n'importe qui trouvant
-l'adresse de votre site peut tout modifier.
+SE CONNECTER AVEC SON COMPTE DISCORD :
+  Créateur (⚙️) > Connexion Discord (🔑)
+    1. Le site affiche une ADRESSE DE RETOUR toute prête. Copiez-la dans
+       le Portail développeur Discord > votre application > OAuth2 >
+       Redirects > Add Redirect > Save Changes.
+    2. Collez le Client ID et la clé secrète (OAuth2 > Reset Secret),
+       puis « Vérifier et enregistrer ».
+       (Si le dashboard est installé à côté, c'est déjà fait tout seul.)
+    3. Cliquez sur « Se connecter » en haut à droite.
+
+  ⚠️ TRÈS IMPORTANT : le PREMIER compte Discord à se connecter devient
+  propriétaire du site. Faites-le DÈS MAINTENANT, avant de communiquer
+  l'adresse de votre site à qui que ce soit. Ensuite, vous seul décidez
+  qui peut administrer (même écran, section 3).
+
+  Accès de secours facultatif : un mot de passe dans config.php
+  (SITE_ADMIN_PASSWORD) vous dépanne si vous perdez votre compte Discord.
+
+METTRE UNE VIDÉO EN FOND :
+  Créateur (⚙️) > Apparence du site (🎨) > Fond du site > vignette
+  « Vidéo MP4 », puis téléversez votre MP4 (ou collez son adresse).
+  La vidéo tourne en boucle et SANS SON (les navigateurs l'imposent).
+  Gardez-la courte et compressée : chaque visiteur la télécharge.
 
 PERSONNALISER LE SITE :
 Ouvrez l'onglet « Site builder » dans le menu : couleur, police, style des
