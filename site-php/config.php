@@ -4,8 +4,14 @@
 // dans l'espace ⚙️ Créateur.
 
 // ================== 🔗 LIAISON AVEC VOS BOTS ==================
-// Adresse et clé de l'agent hébergeur (pack-hebergeur.zip) — LES MÊMES que
-// dans votre dashboard. Laissez vides pour rester en données de démonstration.
+// ✅ RIEN À FAIRE si votre dashboard est installé dans un sous-dossier
+//    « dashboard » : le site reprend automatiquement son AGENT_URL et son
+//    AGENT_KEY. Laissez ces deux lignes vides.
+//
+// Sinon, recopiez ici les mêmes valeurs que dans le config.php du dashboard :
+//   SITE_AGENT_URL = l'ADRESSE de votre agent  -> http://IP-du-serveur:PORT
+//                    (ce n'est PAS le Client ID du bot)
+//   SITE_AGENT_KEY = la clé de l'agent
 const SITE_AGENT_URL = '';
 const SITE_AGENT_KEY = '';
 

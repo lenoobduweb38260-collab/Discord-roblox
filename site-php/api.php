@@ -46,10 +46,53 @@ function exiger_admin(): void {
     respond(['ok' => false, 'error' => 'Connexion requise : entrez le mot de passe d\'administration.', 'authRequired' => true], 401);
   }
 }
+// ----- 🔎 Récupération automatique depuis le dashboard -----
+// Le dashboard installé à côté contient déjà AGENT_URL et AGENT_KEY.
+// Plutôt que de vous faire ressaisir ces valeurs (et risquer une erreur),
+// on va les lire directement s'il est présent. Le fichier est LU (regex),
+// jamais exécuté : aucun risque de conflit de constantes.
+function dashboard_agent(): array {
+  static $cache = null;
+  if ($cache !== null) return $cache;
+  $cache = ['url' => '', 'key' => '', 'source' => null];
+  $pistes = [
+    __DIR__ . '/dashboard/config.php',
+    __DIR__ . '/../dashboard/config.php',
+    __DIR__ . '/../dashboard-php/config.php',
+    dirname(__DIR__) . '/config.php',
+  ];
+  foreach ($pistes as $chemin) {
+    if (!is_file($chemin) || !is_readable($chemin)) continue;
+    $contenu = (string) @file_get_contents($chemin);
+    if ($contenu === '' || strpos($contenu, 'AGENT_URL') === false) continue;
+    if (preg_match("/const\s+AGENT_URL\s*=\s*'([^']*)'/", $contenu, $m1)
+     && preg_match("/const\s+AGENT_KEY\s*=\s*'([^']*)'/", $contenu, $m2)
+     && trim($m1[1]) !== '') {
+      $cache = ['url' => trim($m1[1]), 'key' => trim($m2[1]), 'source' => basename(dirname($chemin)) . '/config.php'];
+      break;
+    }
+  }
+  return $cache;
+}
+
+// Une valeur est-elle une adresse d'agent plausible ? (pas un ID Discord)
+function adresse_plausible(string $v): bool {
+  $v = trim($v);
+  if ($v === '' || preg_match('/^\d{15,25}$/', $v)) return false;
+  if (!preg_match('#^https?://#i', $v)) $v = 'http://' . $v;
+  return (bool) filter_var($v, FILTER_VALIDATE_URL);
+}
+
 // Adresse de l'agent, normalisée : on ajoute http:// si le schéma manque
 // (erreur très fréquente : « 191.44.119.37:9999 » au lieu de l'URL complète).
+// Si SITE_AGENT_URL est vide OU manifestement erronée, on reprend celle du
+// dashboard installé à côté.
 function agent_url(): string {
   $brut = defined('SITE_AGENT_URL') ? trim((string) SITE_AGENT_URL) : '';
+  if (!adresse_plausible($brut)) {
+    $reprise = dashboard_agent()['url'];
+    if (adresse_plausible($reprise)) $brut = $reprise;
+  }
   if ($brut === '') return '';
   if (!preg_match('#^https?://#i', $brut)) $brut = 'http://' . $brut;
   return rtrim($brut, '/');
@@ -58,17 +101,29 @@ function agent_url(): string {
 // tout va bien, sinon le problème en clair.
 function agent_url_probleme(): ?string {
   $brut = defined('SITE_AGENT_URL') ? trim((string) SITE_AGENT_URL) : '';
-  if ($brut === '') return 'Aucune adresse : le site fonctionne avec des données de démonstration.';
+  // Si l'adresse a pu être reprise du dashboard, tout va bien : on ne
+  // reproche rien à l'utilisateur, la liaison fonctionne.
+  if (agent_url() !== '') return null;
+  if ($brut === '') {
+    return "Aucune adresse d'agent : renseignez SITE_AGENT_URL dans config.php, "
+      . "ou installez le dashboard dans un sous-dossier « dashboard » (le site reprendra ses réglages automatiquement).";
+  }
   if (preg_match('/^\d{15,25}$/', $brut)) {
     return "« $brut » est un identifiant Discord (Client ID), pas l'adresse de votre agent. "
       . "Attendu : http://IP-de-votre-serveur:PORT (la même valeur que AGENT_URL du dashboard).";
   }
-  if (!filter_var(agent_url(), FILTER_VALIDATE_URL)) {
-    return "« $brut » n'est pas une adresse valide. Attendu : http://IP-de-votre-serveur:PORT";
-  }
-  return null;
+  return "« $brut » n'est pas une adresse valide. Attendu : http://IP-de-votre-serveur:PORT";
 }
-function agent_key(): string { return defined('SITE_AGENT_KEY') ? SITE_AGENT_KEY : ''; }
+function agent_key(): string {
+  $k = defined('SITE_AGENT_KEY') ? trim((string) SITE_AGENT_KEY) : '';
+  // Adresse reprise du dashboard : on reprend aussi sa clé.
+  $brut = defined('SITE_AGENT_URL') ? trim((string) SITE_AGENT_URL) : '';
+  if ($k === '' || !adresse_plausible($brut)) {
+    $reprise = dashboard_agent();
+    if ($reprise['key'] !== '' && adresse_plausible($reprise['url'])) return $reprise['key'];
+  }
+  return $k;
+}
 
 // Appel HTTP vers l'agent : renvoie [code, données].
 function agent_get(string $path, int $timeout = 20): array {
