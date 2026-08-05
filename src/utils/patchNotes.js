@@ -364,6 +364,23 @@ const RELEASES = [
     fix: [],
     retrait: [],
   },
+  {
+    id: 'site-compte-cache-2026-08j',
+    title: 'Site : fiche du compte Discord & fin du cache périmé 👤',
+    ajout: [
+      '👤 **Cliquez sur votre profil en haut à droite** : photo Discord, pseudo, identifiant, grade et nombre de serveurs — tout ce que le site sait de vous',
+      '📋 **Bouton « Copier mon identifiant »** : plus besoin d\'activer le mode développeur de Discord pour remplir `SITE_OWNER_ID`',
+      '🔑 Raccourci direct de la fiche vers **Connexion & équipe**, et déconnexion en un clic',
+    ],
+    amelioration: [
+      '🎭 Le bandeau affiche le **grade réel** avec sa couleur (ou 👑 Propriétaire), à la place du compte de démonstration',
+      '🖼️ Si la photo Discord ne charge pas, les initiales prennent le relais au lieu d\'une image cassée',
+    ],
+    fix: [
+      '🩹 **Le navigateur ne sert plus une version périmée du site** : l\'adresse des fichiers CSS et JavaScript change à chaque mise à jour. Sans ce correctif, une mise à jour pouvait rester invisible tant que le cache n\'était pas vidé à la main',
+    ],
+    retrait: [],
+  },
 ];
 
 // Découpe une catégorie en champs d'embed (max 1024 caractères par champ).

@@ -64,6 +64,19 @@ $oauthErreur = $oauthErreurs[$_GET['erreur'] ?? ''] ?? null;
 $oauthDetail = $oauthErreur !== null ? (string) ($_SESSION['oauth_detail'] ?? '') : '';
 unset($_SESSION['oauth_detail']);
 
+// 🧹 Empreinte des fichiers statiques : elle change dès que le CSS ou le JS
+// change (mise à jour automatique comprise). Sans elle, le navigateur garderait
+// l'ancienne version en cache et la mise à jour resterait invisible.
+function empreinte_assets(): string
+{
+    $parts = [];
+    foreach (['/assets/js/app.js', '/assets/css/style.css'] as $f) {
+        $parts[] = (string) @filemtime(__DIR__ . $f);
+    }
+    $parts[] = trim((string) @file_get_contents(__DIR__ . '/data/version.txt'));
+    return substr(md5(implode('|', $parts)), 0, 10);
+}
+
 // Taille maximale d'un envoi, telle que la impose l'hébergeur (la plus petite
 // des deux limites PHP). Affichée sous le champ de téléversement.
 function taille_envoi_lisible(): string
@@ -97,7 +110,7 @@ function taille_envoi_lisible(): string
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Exo+2:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Orbitron:wght@500;600;700;800;900&family=Inter:wght@400;500;600;700;800&family=Poppins:wght@400;500;600;700;800&display=swap">
-    <link rel="stylesheet" href="assets/css/style.css?v=2.0.0">
+    <link rel="stylesheet" href="assets/css/style.css?v=<?= empreinte_assets() ?>">
 </head>
 <body>
 <?php
@@ -144,6 +157,6 @@ function taille_envoi_lisible(): string
         // une vidéo trop lourde.
         window.AINCRAD_UPLOAD_MAX = <?= json_encode(taille_envoi_lisible(), JSON_UNESCAPED_UNICODE) ?>;
     </script>
-    <script src="assets/js/app.js?v=2.0.0" defer></script>
+    <script src="assets/js/app.js?v=<?= empreinte_assets() ?>" defer></script>
 </body>
 </html>

@@ -259,14 +259,56 @@
     if (!MOI) {
       return `<button class="btn primary small" data-action="auth-open" title="Se connecter avec Discord">🎮 Se connecter</button>`;
     }
-    const initiales = String(MOI.nom || "?").trim().slice(0, 2).toUpperCase();
-    const role = MOI.admin ? "Administrateur du site" : `${MOI.serveurs} serveur(s) Discord`;
+    const g = MOI.grade ? gradeById(MOI.grade) : null;
+    const sousTitre = MOI.owner ? "👑 Propriétaire du site" : (g ? g.label : "Visiteur connecté");
     return `
-      <div class="profile" data-action="auth-menu" title="${esc(MOI.pseudo ? "@" + MOI.pseudo : MOI.nom)} — cliquez pour vous déconnecter">
-        <div class="profile-avatar">${MOI.avatar ? `<img src="${esc(MOI.avatar)}" alt="">` : esc(initiales)}</div>
-        <div><strong>${esc(MOI.nom)}</strong><span>${esc(role)}</span></div>
+      <div class="profile" data-action="account-open" title="Voir et configurer mon compte Discord">
+        <div class="profile-avatar">${avatarImg(MOI)}</div>
+        <div><strong>${esc(MOI.nom)}</strong><span${g ? ` style="color:${g.color}"` : ""}>${esc(sousTitre)}</span></div>
         <i class="status-dot"></i>
       </div>`;
+  }
+  // Photo de profil Discord, avec repli sur les initiales si elle ne charge pas.
+  function avatarImg(u) {
+    const initiales = String(u.nom || "?").trim().slice(0, 2).toUpperCase();
+    return u.avatar
+      ? `<img src="${esc(u.avatar)}" alt="" onerror="this.replaceWith(document.createTextNode('${esc(initiales)}'))">`
+      : esc(initiales);
+  }
+
+  // 👤 Fiche du compte Discord connecté : ce que le site sait de vous, et les
+  // réglages qui en découlent.
+  function openAccountModal() {
+    if (!MOI) { openLoginModal(); return; }
+    const g = MOI.grade ? gradeById(MOI.grade) : null;
+    const ligne = (label, valeur, note = "") =>
+      `<div class="acc-row"><span>${label}</span><div><b>${valeur}</b>${note ? `<i>${note}</i>` : ""}</div></div>`;
+    const badgeGrade = g
+      ? `<span class="acc-grade" style="--gc:${g.color}">${esc(g.label)}</span> <i style="color:var(--muted-2)">${esc(g.family)}</i>`
+      : `<span style="color:var(--red)">Aucun grade</span> <i style="color:var(--muted-2)">pas d'accès à la gestion</i>`;
+    const conseilOwner = MOI.owner
+      ? `<div class="row" style="border-color:rgba(47,227,139,.45)">👑 <span style="color:var(--muted)">Vous êtes le propriétaire : accès total, et personne ne peut vous le retirer.</span></div>`
+      : `<div class="row" style="border-color:rgba(243,200,106,.45);flex-direction:column;align-items:flex-start;gap:6px">
+           <b>💡 Pour être propriétaire définitif</b>
+           <span style="color:var(--muted)">Collez l'identifiant ci-dessus dans <code>SITE_OWNER_ID</code>, dans le fichier <code>config.php</code> du site. Vous serez alors le seul et unique propriétaire.</span></div>`;
+    openModal("👤 Mon compte Discord", `
+      <div class="acc-head">
+        <div class="acc-avatar">${avatarImg(MOI)}</div>
+        <div>
+          <strong>${esc(MOI.nom)}</strong>
+          ${MOI.pseudo ? `<span>@${esc(MOI.pseudo)}</span>` : ""}
+        </div>
+      </div>
+      ${ligne("Identifiant Discord", `<code class="acc-id" id="acc-id">${esc(MOI.id)}</code>`, "sert à vous déclarer propriétaire ou membre de l'équipe")}
+      ${ligne("Grade sur ce site", badgeGrade, MOI.admin ? "peut tout modifier" : "selon ce qui est coché dans 🔐 Fonctions & grades")}
+      ${ligne("Serveurs Discord", `${MOI.serveurs}`, "ceux dont Discord nous a communiqué la liste")}
+      <div style="margin-top:14px">${conseilOwner}</div>
+      <div class="form-actions" style="flex-wrap:wrap">
+        <button class="btn ghost" type="button" data-action="account-copy-id">📋 Copier mon identifiant</button>
+        ${MOI.admin ? `<button class="btn ghost" type="button" data-action="account-equipe">🔑 Connexion &amp; équipe</button>` : ""}
+        <button class="btn danger" type="button" data-action="account-logout">Se déconnecter</button>
+        <button class="btn success" type="button" data-action="close-modal">Fermer</button>
+      </div>`);
   }
 
   function toast(title, message, type = "success") {
@@ -2065,11 +2107,39 @@
           ui.bandeauVu = true;
           render();
           break;
-        case "auth-menu":
-          // Clic sur son propre profil : proposer la déconnexion Discord.
-          if (MOI && confirm(`Se déconnecter du compte Discord « ${MOI.nom} » ?`)) {
-            window.location.href = "oauth.php?p=logout";
+        // ── 👤 Fiche du compte connecté ─────────────────────────────
+        case "account-open":
+          openAccountModal();
+          break;
+        case "account-copy-id": {
+          const id = MOI?.id || "";
+          try {
+            await navigator.clipboard.writeText(id);
+            toast("IDENTIFIANT COPIÉ", "Collez-le dans SITE_OWNER_ID (config.php) pour être propriétaire.");
+          } catch (_) {
+            // Presse-papiers refusé (page non sécurisée) : on sélectionne
+            // le texte pour que la copie manuelle soit immédiate.
+            const el = document.querySelector("#acc-id");
+            if (el) {
+              const plage = document.createRange();
+              plage.selectNodeContents(el);
+              const sel = window.getSelection();
+              sel.removeAllRanges();
+              sel.addRange(plage);
+            }
+            toast("COPIE MANUELLE", "L'identifiant est sélectionné : faites Ctrl+C.", "error");
           }
+          break;
+        }
+        case "account-equipe":
+          closeModal();
+          ui.route = "creator";
+          ui.creatorTab = "discord";
+          if (ui.discord === null) chargerDiscord();
+          render();
+          break;
+        case "account-logout":
+          window.location.href = "oauth.php?p=logout";
           break;
         case "auth-logout":
           // Compte Discord : la session est côté serveur, on passe par oauth.php.
