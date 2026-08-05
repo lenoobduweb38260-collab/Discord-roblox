@@ -384,6 +384,25 @@ const RELEASES = [
     ],
     retrait: [],
   },
+  {
+    id: 'site-mobile-menu-2026-08k',
+    title: 'Site : affichage téléphone repensé & menu du profil 📱',
+    ajout: [
+      '📂 **Menu déroulant sur le profil** : aperçu de la page d\'accueil, synchronisation, notifications, mon compte, changer de compte et déconnexion — tout au même endroit',
+      '🚨 **Alerte permanente quand le site n\'est protégé par personne** : elle rappelle que n\'importe qui peut tout modifier, et donne votre identifiant à coller dans `SITE_OWNER_ID`',
+    ],
+    amelioration: [
+      '📱 **Téléphone** : le bandeau ne garde que le nom du site et votre avatar — les boutons ne débordent plus sur le titre',
+      '📐 Formulaires, onglets, cartes et fenêtres s\'empilent sur une colonne ; plus aucun débordement horizontal, quel que soit l\'écran',
+      '💬 Les encarts d\'aide ne découpent plus leurs phrases en colonnes',
+    ],
+    fix: [
+      '🩹 Le voile de fermeture du menu ne couvrait que le bandeau (et non la page) : un clic à côté ne refermait pas le menu',
+    ],
+    retrait: [
+      '🗑️ Les boutons isolés du bandeau (horloge, œil, éclair, losange) : ils sont désormais dans le menu du profil',
+    ],
+  },
 ];
 
 // Découpe une catégorie en champs d'embed (max 1024 caractères par champ).

@@ -42,6 +42,7 @@
     discord: null,       // réglages de la connexion Discord (null = pas encore lus)
     maj: null,           // état des mises à jour (null = pas encore lu)
     bandeauVu: false,    // bandeau Discord (erreur / bienvenue) déjà refermé
+    menuProfil: false,   // menu déroulant du profil ouvert ?
     ticketTab: "open",   // tickets en cours / archives
     selectedArchiveId: null,
     archiveQuery: "",
@@ -259,24 +260,28 @@
   // Bloc profil du bandeau : le vrai compte Discord, la session par mot de
   // passe, ou une invitation à se connecter.
   function profileBlock() {
+    const ouvert = ui.menuProfil ? " on" : "";
     if (!MOI) {
       // Connecté par le mot de passe de secours, sans compte Discord.
       if (AUTH.required && AUTH.ok) {
-        return `<div class="profile" data-action="account-open" title="Session ouverte avec le mot de passe de secours">
+        return `<div class="profile${ouvert}" data-action="menu-profil" title="Session ouverte avec le mot de passe de secours">
           <div class="profile-avatar">🔑</div>
           <div><strong>Administration</strong><span style="color:var(--muted-2)">mot de passe de secours</span></div>
           <i class="status-dot"></i>
         </div>`;
       }
-      return `<button class="btn primary small" data-action="auth-open" title="Se connecter avec Discord">🎮 Se connecter</button>`;
+      // Visiteur : le menu reste accessible (aperçu, notifications…), mais
+      // c'est « Se connecter » qui saute aux yeux.
+      return `<button class="btn primary small" data-action="auth-open" title="Se connecter avec Discord">🎮 Se connecter</button>
+        <button class="icon-btn${ouvert}" data-action="menu-profil" title="Menu" aria-haspopup="menu">⋯</button>`;
     }
     const g = MOI.grade ? gradeById(MOI.grade) : null;
     const sousTitre = MOI.owner ? "👑 Propriétaire du site" : (g ? g.label : "Visiteur connecté");
     return `
-      <div class="profile" data-action="account-open" title="Voir et configurer mon compte Discord">
+      <div class="profile${ouvert}" data-action="menu-profil" title="Mon compte et réglages" aria-haspopup="menu">
         <div class="profile-avatar">${avatarImg(MOI)}</div>
         <div><strong>${esc(MOI.nom)}</strong><span${g ? ` style="color:${g.color}"` : ""}>${esc(sousTitre)}</span></div>
-        <i class="status-dot"></i>
+        <i class="pm-chevron">▾</i>
       </div>`;
   }
   // Photo de profil Discord, avec repli sur les initiales si elle ne charge pas.
@@ -285,6 +290,46 @@
     return u.avatar
       ? `<img src="${esc(u.avatar)}" alt="" onerror="this.replaceWith(document.createTextNode('${esc(initiales)}'))">`
       : esc(initiales);
+  }
+
+  // ── 📂 Menu déroulant du profil ─────────────────────────────────────
+  // Tout ce qui encombrait le bandeau (horloge, aperçu, synchronisation,
+  // notifications) vit ici : sur téléphone, le bandeau ne garde que le nom
+  // du site et l'avatar.
+  function profileMenu() {
+    if (!ui.menuProfil) return "";
+    const item = (action, icone, texte, note = "", classe = "") =>
+      `<button class="pm-item ${classe}" data-action="${action}">
+         <span class="pm-ico">${icone}</span>
+         <span><b>${texte}</b>${note ? `<i>${note}</i>` : ""}</span>
+       </button>`;
+    const entete = MOI
+      ? `<div class="pm-head">
+           <div class="profile-avatar">${avatarImg(MOI)}</div>
+           <div><strong>${esc(MOI.nom)}</strong><span>${MOI.pseudo ? "@" + esc(MOI.pseudo) : (MOI.owner ? "Propriétaire" : "Connecté")}</span></div>
+         </div>`
+      : (connecte()
+        ? `<div class="pm-head"><div class="profile-avatar">🔑</div>
+             <div><strong>Administration</strong><span>mot de passe de secours</span></div></div>`
+        : `<div class="pm-head"><div class="profile-avatar">👤</div>
+             <div><strong>Visiteur</strong><span>non connecté</span></div></div>`);
+    const compte = connecte()
+      ? `${item("account-open", "👤", "Mon compte", MOI ? "identifiant, grade, serveurs" : "session en cours")}
+         ${MOI ? item("account-switch", "🔁", "Changer de compte", "choisir un autre compte Discord") : ""}
+         ${item("deconnexion", "⏻", "Se déconnecter", "", "danger")}`
+      : `${item("auth-open", "🎮", "Se connecter", "avec votre compte Discord")}`;
+    return `
+      <div class="pm-layer" data-action="menu-profil-fermer"></div>
+      <div class="profile-menu" role="menu">
+        ${entete}
+        <div class="pm-clock" id="live-clock">--:--:--</div>
+        <div class="pm-sep"></div>
+        ${item("preview-gate", "👁", "Voir la page d'accueil", "telle que la voient vos visiteurs")}
+        ${item("pulse-system", "⌁", "Synchroniser", "rafraîchir les données")}
+        ${item("show-notifications", "♢", "Notifications", "")}
+        <div class="pm-sep"></div>
+        ${compte}
+      </div>`;
   }
 
   // 👤 Fiche du compte Discord connecté : ce que le site sait de vous, et les
@@ -498,14 +543,14 @@
             </div>
           </div>
           <div class="top-actions">
-            <div class="clock" id="live-clock">--:--:--</div>
-            <button class="icon-btn" data-action="preview-gate" title="Voir la page d'accueil">👁</button>
-            <button class="icon-btn" data-action="pulse-system" title="Synchroniser">⌁</button>
-            <button class="icon-btn" data-action="show-notifications" title="Notifications">♢</button>
             ${profileBlock()}
-            ${connecte() ? `<button class="icon-btn danger" data-action="deconnexion" title="Se déconnecter">⏻</button>` : ""}
           </div>
         </header>
+        <!-- Le menu du profil vit HORS du bandeau : celui-ci a un
+             backdrop-filter, qui en fait le bloc conteneur de ses enfants en
+             position fixe — le voile de fermeture n'aurait couvert que le
+             bandeau, pas la page. -->
+        ${profileMenu()}
 
         <aside class="sidebar ${ui.mobileOpen ? "open" : ""}">
           <div class="sidebar-scroll">
@@ -532,6 +577,18 @@
   // Bandeau du haut : erreur de connexion Discord, ou prise de possession du
   // site par le tout premier compte connecté. Affiché une seule fois.
   function discordBanner() {
+    // 🚨 Site ouvert à tous : le plus important, donc affiché en premier et
+    // impossible à refermer tant que ce n'est pas réglé.
+    if (!AUTH.required) {
+      return `<div class="previewbar alerte" style="--gc:#ff5c74;align-items:flex-start">
+        <span>🚨 <b>Ce site est modifiable par N'IMPORTE QUI.</b>
+        Aucun propriétaire n'est déclaré : toute personne connaissant l'adresse peut changer la page,
+        les bots, les permissions et lire les tickets — <b>sans se connecter</b>.
+        <br>Ouvrez <code>config.php</code> et collez votre identifiant Discord dans <code>SITE_OWNER_ID</code>${
+          MOI ? ` — le vôtre : <code style="user-select:all">${esc(MOI.id)}</code>` : ""}.
+        ${DISCORD.pret ? "Ou connectez-vous avec Discord dès maintenant : le premier compte connecté devient propriétaire." : ""}</span>
+      </div>`;
+    }
     if (DISCORD.erreur && !ui.bandeauVu) {
       return `<div class="previewbar" style="--gc:#ff5c74;align-items:flex-start">
         <span>❌ <b>Connexion Discord impossible</b> — ${esc(DISCORD.erreur)}
@@ -2118,6 +2175,7 @@
         case "go-home":
           // Page d'accueil du site en restant CONNECTÉ (le bot actif est
           // conservé) — le bouton « Retour à l'administration » ramène ici.
+          ui.menuProfil = false;
           ui.route = "gate";
           render();
           window.scrollTo({ top: 0, behavior: "smooth" });
@@ -2132,14 +2190,25 @@
           if (ui.creatorTab === "maj" && ui.maj === null) chargerMaj();
           break;
         case "auth-open":
+          ui.menuProfil = false;
           openLoginModal();
           break;
         case "banner-close":
           ui.bandeauVu = true;
           render();
           break;
+        // ── 📂 Menu du profil ───────────────────────────────────────
+        case "menu-profil":
+          ui.menuProfil = !ui.menuProfil;
+          render();
+          break;
+        case "menu-profil-fermer":
+          ui.menuProfil = false;
+          render();
+          break;
         // ── 👤 Fiche du compte connecté ─────────────────────────────
         case "account-open":
+          ui.menuProfil = false;
           openAccountModal();
           break;
         case "account-copy-id": {
@@ -2612,6 +2681,7 @@
           closeModal();
           break;
         case "pulse-system":
+          ui.menuProfil = false;
           target.classList.add("animating");
           const response = await fetch(`${window.AINCRAD_API}?action=state`);
           const payload = await response.json();
@@ -2620,6 +2690,7 @@
           toast("SYNCHRONISATION", "Le Cardinal System est à jour.");
           break;
         case "show-notifications":
+          ui.menuProfil = false;
           showNotifications();
           break;
         case "invite-bot": {

@@ -469,7 +469,9 @@ input[type="file"].input { padding: 9px 12px; }
 /* ── Coquille de l'application ───────────────────────────────────── */
 .app-shell { min-height: 100vh; padding-top: var(--topbar); }
 .topbar {
-  position: fixed; top: 0; left: 0; right: 0; z-index: 40;
+  /* Au-dessus du voile du menu (44) : le profil reste cliquable, donc le
+     menu se referme en recliquant dessus. */
+  position: fixed; top: 0; left: 0; right: 0; z-index: 46;
   height: var(--topbar);
   display: flex; align-items: center; justify-content: space-between; gap: 16px;
   padding: 0 22px;
@@ -518,6 +520,55 @@ input[type="file"].input { padding: 9px 12px; }
 }
 /* Photo de profil Discord : elle remplit la pastille ronde */
 .profile-avatar img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; display: block; }
+
+/* ── 📂 Menu déroulant du profil ─────────────────────────────────── */
+.profile[data-action], .profile.on { cursor: pointer; }
+.profile.on { border-color: rgba(var(--accent-rgb), .5); background: rgba(var(--accent-rgb), .1); }
+.pm-chevron { color: var(--muted-2); font-size: 11px; transition: transform .2s; font-style: normal; }
+.profile.on .pm-chevron { transform: rotate(180deg); }
+/* Voile transparent : un clic à côté referme le menu */
+.pm-layer { position: fixed; inset: 0; z-index: 44; }
+.profile-menu {
+  position: fixed; top: calc(var(--topbar) - 8px); right: 16px; z-index: 45;
+  width: min(292px, calc(100vw - 24px));
+  padding: 8px;
+  border-radius: 16px;
+  border: 1px solid var(--line-strong);
+  background: rgba(17, 14, 22, .97);
+  backdrop-filter: blur(16px);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, .6);
+  animation: slideUp .16s ease both;
+}
+.pm-head { display: flex; align-items: center; gap: 11px; padding: 9px 10px 11px; }
+.pm-head .profile-avatar { width: 40px; height: 40px; flex: 0 0 40px; font-size: 15px; }
+.pm-head strong { display: block; font-size: 13.5px; }
+.pm-head span { color: var(--muted); font-size: 11px; }
+.pm-clock {
+  font-family: var(--font-display); font-size: 11.5px; letter-spacing: .12em;
+  color: var(--muted-2); text-align: center; padding: 2px 0 8px;
+}
+.pm-sep { height: 1px; background: var(--line); margin: 5px 2px; }
+.pm-item {
+  width: 100%;
+  display: flex; align-items: center; gap: 11px;
+  padding: 9px 10px;
+  border: 0; border-radius: 11px;
+  background: transparent; color: var(--text);
+  cursor: pointer; text-align: left;
+  transition: background .15s;
+}
+.pm-item:hover { background: rgba(var(--accent-rgb), .12); }
+.pm-item b { display: block; font-size: 13px; font-weight: 600; }
+.pm-item i { display: block; margin-top: 1px; color: var(--muted-2); font-size: 11px; font-style: normal; }
+.pm-ico {
+  width: 30px; height: 30px; flex: 0 0 30px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 9px; font-size: 14px;
+  background: rgba(255, 255, 255, .05);
+  border: 1px solid var(--line);
+}
+.pm-item.danger b { color: var(--red); }
+.pm-item.danger:hover { background: rgba(255, 92, 116, .13); }
 
 /* ── 👤 Fiche du compte Discord ──────────────────────────────────── */
 .acc-head { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; }
@@ -941,7 +992,9 @@ input[type="file"].input { padding: 9px 12px; }
 
 /* ── Site builder ────────────────────────────────────────────────── */
 .builder-hint {
-  display: flex; align-items: center; gap: 10px;
+  /* Bloc, et non flex : en flex, chaque morceau de texte et chaque <b>
+     devenait une « colonne » et la phrase se découpait au milieu. */
+  display: block; line-height: 1.55;
   padding: 12px 16px;
   border-radius: var(--radius-sm);
   border: 1px solid rgba(var(--accent-rgb), .4);
@@ -1082,13 +1135,63 @@ body.compact .content-view { max-width: 1320px; }
   .sidebar.open { transform: none; box-shadow: 40px 0 80px rgba(0,0,0,.5); }
   .content { margin-left: 0; padding: 20px 14px 50px; }
   .mobile-menu { display: inline-flex; }
-  .clock, .profile div { display: none; }
-  .profile { padding: 5px; border: 0; background: transparent; }
-  .brand p { display: none; }
   .stat-stack { grid-template-columns: 1fr 1fr; }
   .page-head { align-items: flex-start; flex-direction: column; }
 }
 @media (min-width: 861px) { .mobile-menu { display: none; } }
+
+/* ══════════════════════════════════════════════════════════════════
+   📱 TÉLÉPHONE — affichage épuré
+   Le bandeau ne garde que le nom du site et l'avatar : tout le reste
+   (aperçu, synchronisation, notifications, compte) est dans le menu
+   déroulant du profil. Sans cela, les boutons débordaient sur le titre.
+   ══════════════════════════════════════════════════════════════════ */
+@media (max-width: 720px) {
+  :root { --topbar: 62px; }
+  .topbar { padding: 0 12px; gap: 8px; }
+  /* Le nom du site peut rétrécir ; l'avatar, jamais. */
+  .brand { min-width: 0; flex: 1 1 auto; overflow: hidden; }
+  .brand-home { padding: 4px; gap: 9px; min-width: 0; }
+  .brand-mark { width: 34px; height: 34px; border-radius: 11px; font-size: 16px; }
+  .brand h1 { font-size: 13px; letter-spacing: .05em; }
+  .brand p { display: none; }
+  .top-actions { flex: 0 0 auto; gap: 6px; }
+  /* Seul l'avatar reste : le nom et le grade sont dans le menu. */
+  .profile { padding: 4px; border: 0; background: transparent; gap: 0; }
+  .profile > div:not(.profile-avatar), .profile .status-dot, .profile .pm-chevron { display: none; }
+  .profile.on { background: rgba(var(--accent-rgb), .14); border-radius: 50%; }
+  .profile-menu { right: 10px; left: 10px; width: auto; top: calc(var(--topbar) - 6px); }
+
+  /* Contenu : on récupère de la largeur, et rien ne déborde. */
+  .content { padding: 16px 12px 46px; }
+  .panel-inner { padding: 15px 13px; }
+  .page-head h2 { font-size: 23px; line-height: 1.15; }
+  .page-head p { font-size: 12.5px; }
+  .page-actions { width: 100%; flex-wrap: wrap; }
+  .page-actions .btn { flex: 1 1 auto; justify-content: center; }
+  .form-grid { grid-template-columns: 1fr; }
+  .grid-2, .grid-3, .hero-grid, .stat-stack { grid-template-columns: 1fr; }
+  .subtabs { grid-template-columns: 1fr; }
+  .form-actions { flex-wrap: wrap; }
+  .form-actions .btn { flex: 1 1 140px; justify-content: center; }
+  .row { flex-wrap: wrap; }
+  /* Les tableaux et blocs larges défilent au lieu d'élargir la page. */
+  .table-wrap, .permgrades { overflow-x: auto; }
+  .modal { width: calc(100vw - 20px); max-height: calc(100vh - 80px); }
+  .acc-row { flex-direction: column; gap: 4px; }
+  .acc-row > span { flex: none; }
+  .botcfg-move { margin-left: 0; width: 100%; }
+  .toast-root { left: 12px; right: 12px; bottom: 12px; }
+  .toast { width: auto; }
+}
+/* Très petits écrans : on abrège encore. */
+@media (max-width: 420px) {
+  .brand h1 { font-size: 12px; }
+  .gradepick { grid-template-columns: 1fr 1fr; }
+  .stat-stack { grid-template-columns: 1fr; }
+}
+/* Aucune page ne doit jamais déborder horizontalement. */
+html, body { max-width: 100%; overflow-x: hidden; }
 
 /* ══════════════════════════════════════════════════════════════════
    CONSTRUCTEUR DE PAGE — sous-onglets créateur, blocs publics
@@ -1312,6 +1415,16 @@ code { background: rgba(0,0,0,.35); border: 1px solid var(--line); border-radius
   animation: slideUp .3s ease both;
 }
 .previewbar i { font-style: normal; color: var(--muted); font-size: 11.5px; }
+/* Alerte de sécurité : elle doit accrocher l'œil et ne pas se refermer. */
+.previewbar.alerte {
+  background: color-mix(in srgb, var(--gc) 20%, transparent);
+  line-height: 1.55;
+  animation: slideUp .3s ease both, alerte 2.6s ease-in-out infinite;
+}
+@keyframes alerte {
+  50% { border-color: color-mix(in srgb, var(--gc) 55%, transparent); }
+}
+body.reduce-effects .previewbar.alerte { animation: slideUp .3s ease both; }
 .permrow {
   display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
   padding: 12px 14px;
