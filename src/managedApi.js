@@ -745,6 +745,44 @@ function startManagedApi(client, baseDir) {
         return send(200, { ok: true });
       }
 
+      // ----- 🎭 Rattrapage : donner les rôles automatiques à TOUS -----
+      // Les membres déjà présents avant la configuration n'ont rien reçu.
+      // Cette route les rattrape, sans toucher à ceux qui ont déjà le rôle.
+      if (req.method === 'POST' && url.pathname === '/autorole-rattraper') {
+        const body = await readBody(req);
+        const guild = client.guilds.cache.get(String(body.guildId || ''));
+        if (!guild) return send(404, { error: 'Serveur introuvable.' });
+        const autoRoles = require('./utils/autoRoles');
+        const ids = autoRoles.rolesConfigures(getGuildConfig(guild.id));
+        if (!ids.length) return send(400, { error: 'Aucun rôle automatique configuré.' });
+        let membres;
+        try {
+          membres = await guild.members.fetch();
+        } catch (err) {
+          return send(500, { error: `Impossible de lister les membres : ${err.message}. L'intention « SERVER MEMBERS » est-elle activée pour le bot ?` });
+        }
+        let traites = 0;
+        let deja = 0;
+        const echecs = [];
+        for (const membre of membres.values()) {
+          if (membre.user.bot) continue;
+          if (ids.every((id) => membre.roles.cache.has(id))) { deja++; continue; }
+          const r = await autoRoles.appliquer(membre, 'Rattrapage des rôles automatiques');
+          if (r.donnes.length) traites++;
+          else if (r.refuses.length && echecs.length < 3) echecs.push(r.refuses[0].motif);
+          // Discord limite le rythme des requêtes : on souffle un peu.
+          await new Promise((r2) => setTimeout(r2, 350));
+        }
+        return send(200, {
+          ok: true,
+          traites,
+          deja,
+          total: membres.filter((m) => !m.user.bot).size,
+          note: `${traites} membre(s) mis à jour, ${deja} avaient déjà le rôle.`,
+          echecs: [...new Set(echecs)],
+        });
+      }
+
       // ----- 📨 Envoi d'un message complet composé depuis le site -----
       // Reçoit exactement ce que le créateur a construit : texte, plusieurs
       // embeds (avec champs), boutons et menus déroulants. Sert aussi

@@ -518,6 +518,22 @@ const RELEASES = [
     fix: [],
     retrait: [],
   },
+  {
+    id: 'autorole-visiteur-2026-08s',
+    title: 'Le rôle d\'accueil est enfin donné 🎭',
+    ajout: [
+      '⏱️ **Rattrapage en un clic** : dans ⚙️ Mes serveurs → 🎭 Rôles, le bouton « Donner le rôle à tous les membres » attribue les rôles automatiques à **tout le monde**, y compris ceux arrivés avant que vous ne les configuriez. Ceux qui les ont déjà sont ignorés',
+      '📊 Le site affiche le résultat : combien de membres ont été mis à jour, combien étaient déjà en règle',
+    ],
+    amelioration: [
+      '🧾 Quand un rôle ne peut pas être donné, la raison est écrite dans les logs du bot au lieu d\'échouer en silence : rôle supprimé, rôle placé **au-dessus** de celui du bot, rôle géré par une intégration, ou permission « Gérer les rôles » manquante',
+      '🛡️ Un rôle impossible n\'annule plus les autres — le bot donne tout ce qu\'il peut donner',
+    ],
+    fix: [
+      '🩹 **Les nouveaux membres ne restent plus bloqués en « Visiteur » quand le captcha est actif.** Le rôle automatique n\'était alors jamais attribué : le donner à l\'arrivée aurait contourné la vérification, mais ne jamais le donner laissait le membre sans aucun accès. Il est maintenant attribué **juste après la validation du captcha**',
+    ],
+    retrait: [],
+  },
 ];
 
 // Découpe une catégorie en champs d'embed (max 1024 caractères par champ).

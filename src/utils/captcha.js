@@ -72,6 +72,11 @@ async function handle(interaction) {
   if (cfg.verified_role_id && member) {
     await member.roles.add(cfg.verified_role_id, 'Captcha validé').catch(() => null);
   }
+  // 🎭 Rôles automatiques : c'est ICI qu'ils arrivent quand un captcha est
+  // actif. Sans cela, le membre resterait « Visiteur » après s'être vérifié.
+  if (member) {
+    await require('./autoRoles').appliquer(member, 'Rôle automatique après captcha').catch(() => null);
+  }
   return interaction.reply({ content: '✅ Vérifié ! Bienvenue 🎉', flags: MessageFlags.Ephemeral });
 }
 

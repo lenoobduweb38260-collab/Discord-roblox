@@ -1199,7 +1199,15 @@
       </div>
       <div class="form-grid mt-16">
         ${champSalon("captcha_channel_id", "Salon du captcha", "Là où le message de vérification est publié.")}
-      </div>`;
+      </div>
+      <div class="row mt-16" style="flex-direction:column;align-items:flex-start;gap:7px">
+        <b>🕒 Et les membres déjà présents ?</b>
+        <span style="color:var(--muted)">Les rôles automatiques ne s'appliquent qu'aux nouvelles arrivées.
+          Ce bouton les donne à <b>tous les membres actuels</b> qui ne les ont pas encore — ceux qui les ont déjà sont ignorés.</span>
+        <span style="color:var(--muted);font-size:12px">⚠️ Enregistrez d'abord vos rôles ci-dessus. Sur un grand serveur, comptez environ une seconde pour trois membres.</span>
+        <div class="page-actions">${button("🎭 Donner le rôle à tous les membres", "autorole-rattraper", "primary")}</div>
+      </div>
+      <div id="autorole-rapport"></div>`;
     return modulePanel("Rôles & sécurité", "Rôles automatiques, staff, vérification et protections.", body, "roles");
   }
 
@@ -3213,6 +3221,30 @@
           delete ui.srvParams[ui.selectedServerId];
           render();
           break;
+        case "autorole-rattraper": {
+          if (!confirm("Donner les rôles automatiques à TOUS les membres actuels du serveur ?\n\nCeux qui les ont déjà sont ignorés. Sur un grand serveur, l'opération peut durer plusieurs minutes.")) break;
+          const libelle = target.textContent;
+          target.textContent = "⏳ Attribution en cours…";
+          target.disabled = true;
+          try {
+            const r = await api("serveur.autorole.rattraper", { serveur: ui.selectedServerId });
+            const box = document.querySelector("#autorole-rapport");
+            if (box) {
+              box.innerHTML = `<div class="row mt-16" style="border-color:rgba(47,227,139,.45);flex-direction:column;align-items:flex-start;gap:5px">
+                <b>✅ ${esc(r.note)}</b>
+                <span style="color:var(--muted)">${r.total} membre(s) humains examinés.</span>
+                ${(r.echecs || []).length ? `<span style="color:var(--gold)">⚠️ ${esc(r.echecs.join(" · "))}</span>` : ""}</div>`;
+            }
+            toast("RÔLES ATTRIBUÉS", r.note);
+          } catch (e) {
+            const box = document.querySelector("#autorole-rapport");
+            if (box) box.innerHTML = `<div class="row mt-16" style="border-color:rgba(255,92,116,.45);flex-direction:column;align-items:flex-start;gap:5px">❌ <span style="color:var(--muted)">${esc(e.message)}</span></div>`;
+            toast("ÉCHEC", e.message, "error");
+          } finally {
+            if (target.isConnected) { target.textContent = libelle; target.disabled = false; }
+          }
+          break;
+        }
         // ── 📨 Constructeur de messages ─────────────────────────────
         case "msg-embed-add":
           lireBrouillon();

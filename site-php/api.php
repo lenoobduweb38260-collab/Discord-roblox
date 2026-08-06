@@ -937,6 +937,21 @@ if ($action === 'serveur.config') {
     respond(['ok' => true, 'valeur' => $data['value'] ?? null]);
 }
 
+// 🎭 Donne les rôles automatiques à TOUS les membres déjà présents.
+if ($action === 'serveur.autorole.rattraper') {
+    $guildId = preg_replace('/\D+/', '', (string) (body()['serveur'] ?? ''));
+    [, $bot] = exiger_serveur((string) $guildId);
+    // Un gros serveur prend du temps : on laisse largement respirer.
+    [$code, $data] = agent_post_json('/agent/bots/' . rawurlencode($bot) . '/proxy/autorole-rattraper',
+        ['guildId' => (string) $guildId], 300);
+    if ($code !== 200) {
+        respond(['ok' => false, 'error' => $data['error'] ?? ($code === 0
+            ? "Le bot ne répond pas, ou l'opération a dépassé le temps imparti. Sur un très grand serveur, relancez : les membres déjà traités seront ignorés."
+            : "Le bot a répondu HTTP $code.")], 502);
+    }
+    respond(['ok' => true] + $data);
+}
+
 // 📨 Publie sur Discord le message composé dans le site.
 if ($action === 'serveur.message') {
     $in = body();

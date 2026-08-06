@@ -58,23 +58,13 @@ module.exports = {
 
     const cfg = getGuildConfig(member.guild.id);
 
-    // 2 bis) 🎭 Rôles automatiques : attribués dès l'arrivée.
-    // Si un captcha est actif, on n'attribue rien ici — c'est la validation du
-    // captcha qui doit débloquer l'accès, sinon il ne servirait à rien.
-    if (!cfg.captcha_enabled) {
-      let roles = [];
-      try { roles = JSON.parse(cfg.autorole_role_ids || '[]'); } catch {}
-      const aDonner = roles
-        .map(String)
-        .filter((id) => {
-          const role = member.guild.roles.cache.get(id);
-          // Un rôle plus haut que le bot, ou géré par une intégration, est
-          // impossible à donner : on l'ignore au lieu de tout faire échouer.
-          return role && !role.managed && role.position < (member.guild.members.me?.roles.highest.position ?? 0);
-        });
-      if (aDonner.length) {
-        await member.roles.add(aDonner, 'Rôle automatique à l\'arrivée').catch(() => null);
-      }
+    // 2 bis) 🎭 Rôles automatiques.
+    // Avec un captcha actif, on ne donne RIEN ici : c'est sa validation qui
+    // les attribuera (voir utils/captcha.js). Sans captcha, tout de suite —
+    // pour que le membre ne reste pas « Visiteur » sans pouvoir agir.
+    const autoRoles = require('../utils/autoRoles');
+    if (!autoRoles.captchaActif(member.guild.id)) {
+      await autoRoles.appliquer(member, 'Rôle automatique à l\'arrivée');
     }
 
     // 3) Embed d'arrivée dans le salon membres configuré.
