@@ -1148,6 +1148,29 @@ tr.cliquable .page-actions { cursor: default; }
   backdrop-filter: blur(8px);
   animation: fadeIn .2s ease both;
 }
+/* ⚡ Pop-up ouverte : le décor animé du fond est mis en PAUSE.
+   Les 22 particules, la ligne de scan et les points d'état continuaient de
+   s'animer derrière la pop-up. Chaque image obligeait le navigateur à
+   recalculer leur style PUIS à reflouter tout l'écran (backdrop-filter) —
+   pour un décor que le flou rend de toute façon invisible.
+   Mesuré à CPU bridé ×6 : 283 ms de recalcul de style par tranche de 2,5 s
+   → 25 ms une fois en pause.
+   « pause » et non « visibility: hidden » ni « display: none » : un élément
+   caché continue de s'animer, et ces deux pistes ne changeaient rien (mesuré). */
+body.overlay-open .particle,
+body.overlay-open .scanline,
+body.overlay-open .status-dot,
+body.overlay-open .boot-ring,
+body.overlay-open .sky-layer,
+body.overlay-open .panel,
+body.overlay-open .row { animation-play-state: paused; }
+/* L'aura qui suit la souris n'a plus de raison d'être : elle forcerait une
+   nouvelle passe de flou à chaque mouvement, sous une pop-up qui la masque. */
+body.overlay-open #cursor-aura { display: none; }
+/* La page derrière ne défile plus : sur téléphone, le doigt faisait glisser le
+   fond au lieu du contenu de la pop-up. Réservé aux vraies pop-ups : le menu
+   du profil, lui, ne doit pas bloquer le défilement de la page. */
+body.modal-open { overflow: hidden; }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 .modal {
   width: min(560px, 100%);
@@ -1280,7 +1303,10 @@ body.compact .content-view { max-width: 1320px; }
   .topbar { backdrop-filter: none; background: rgba(11, 9, 14, .96); }
   .sidebar { backdrop-filter: none; background: rgba(13, 11, 17, .98); }
   .profile-menu { backdrop-filter: none; background: rgba(17, 14, 22, .99); }
-  .modal { backdrop-filter: none; }
+  /* Le flou était posé sur .modal-layer, pas sur .modal : cette ligne visait le
+     mauvais élément et ne retirait donc rien. C'est ce plein écran flouté qui
+     faisait ramer l'ouverture des pop-ups sur téléphone. */
+  .modal-layer { backdrop-filter: none; background: rgba(5, 3, 8, .93); }
   /* Les entrées en fondu se rejouaient à chaque reconstruction de la page :
      on les raccourcit fortement plutôt que d'animer des dizaines de blocs. */
   .panel, .row, .botcfg, .permrow, .blk-row { animation-duration: .12s; }

@@ -890,6 +890,88 @@ function bot_du_serveur(array $state, string $guildId): string {
     return '';
 }
 
+// ══════════════════════════════════════════════════════════════════
+// 🚫 BLACKLIST — du site vers Discord
+// ══════════════════════════════════════════════════════════════════
+// Une sanction posée sur le site ne servait à rien côté Discord : c'était
+// une simple fiche. Elle est maintenant transmise au(x) bot(s), qui la
+// font appliquer pour de vrai (message privé + bannissement sur chacun de
+// leurs serveurs, et re-bannissement à toute tentative de retour).
+//
+// Deux portées :
+//   • « globale »  → tous les bots enregistrés sur le site ;
+//   • « un bot »   → uniquement celui qui est choisi.
+
+// Les bots visés par une sanction, selon sa portée.
+function blacklist_cibles(array $state, string $portee, string $botChoisi): array {
+    $cibles = [];
+    foreach ($state['bots'] ?? [] as $b) {
+        $agent = trim((string) ($b['agentName'] ?? ''));
+        $id = (string) ($b['id'] ?? '');
+        $nom = (string) ($b['name'] ?? $id);
+        if ($portee === 'bot' && $id !== $botChoisi) continue;
+        // Sans « nom chez l'agent », le site ne sait pas joindre ce bot.
+        $cibles[] = ['id' => $id, 'nom' => $nom, 'agent' => $agent];
+    }
+    return $cibles;
+}
+
+// Les bots visés par une fiche déjà enregistrée. Les fiches créées avant
+// l'arrivée de la portée n'ont ni « portee » ni « bots » : on les traite
+// comme globales, ce qu'elles étaient implicitement.
+function blacklist_cibles_entree(array $state, array $entree): array {
+    $portee = ($entree['portee'] ?? 'global') === 'bot' ? 'bot' : 'global';
+    $ids = array_map('strval', (array) ($entree['bots'] ?? []));
+    if ($portee === 'global' || !$ids) return blacklist_cibles($state, 'global', '');
+    $cibles = [];
+    foreach ($ids as $id) {
+        foreach (blacklist_cibles($state, 'bot', $id) as $c) $cibles[] = $c;
+    }
+    return $cibles;
+}
+
+// Qui signe la sanction ? Le compte Discord connecté, sinon l'administration.
+function moi_nom(): string {
+    $n = trim((string) ($_SESSION['discord']['nom'] ?? ''));
+    return $n !== '' ? $n : 'Administration';
+}
+
+// Transmet la sanction (ou sa levée) aux bots visés.
+// $sens vaut 'ajouter' ou 'retirer'. Renvoie un rapport par bot : le site
+// n'affirme jamais « appliqué » sans avoir la réponse du bot.
+function blacklist_diffuser(array $cibles, string $sens, string $discordId, string $reason, string $acteur): array {
+    $rapport = [];
+    foreach ($cibles as $c) {
+        if ($c['agent'] === '') {
+            $rapport[] = ['bot' => $c['nom'], 'ok' => false,
+                'message' => "Aucun « nom chez l'agent » renseigné : le site ne peut pas le joindre."];
+            continue;
+        }
+        $charge = ['userId' => $discordId, 'actorId' => $acteur];
+        if ($sens === 'ajouter') $charge['reason'] = $reason;
+        [$code, $data] = agent_post_json(
+            '/agent/bots/' . rawurlencode($c['agent']) . '/proxy/blacklist-' . $sens,
+            $charge, 30
+        );
+        if ($code === 200) {
+            $rapport[] = ['bot' => $c['nom'], 'ok' => true, 'message' => $sens === 'ajouter'
+                ? ('Appliquée sur ' . (int) ($data['banned'] ?? 0) . ' serveur(s)'
+                   . (empty($data['dmOk']) ? ', message privé non remis.' : ', message privé remis.'))
+                : ('Levée sur ' . (int) ($data['unbanned'] ?? 0) . ' serveur(s).')];
+            continue;
+        }
+        // 404 sur un retrait = le bot ne l'avait pas : ce n'est pas un échec.
+        if ($sens === 'retirer' && $code === 404) {
+            $rapport[] = ['bot' => $c['nom'], 'ok' => true, 'message' => "N'était pas blacklisté sur ce bot."];
+            continue;
+        }
+        $rapport[] = ['bot' => $c['nom'], 'ok' => false, 'message' => $data['error'] ?? ($code === 0
+            ? "Bot injoignable (éteint, ou agent hors service) — réessayez avec « Réappliquer sur Discord »."
+            : "Le bot a répondu HTTP $code.")];
+    }
+    return $rapport;
+}
+
 // Vérifie le droit de toucher à ce serveur, puis renvoie le nom du bot.
 function exiger_serveur(string $guildId): array {
     $etat = loadState();
@@ -1215,11 +1297,23 @@ switch ($action) {
         $username = cleanString($input['username'] ?? '', 80);
         $discordId = preg_replace('/\D+/', '', (string) ($input['discordId'] ?? ''));
         $reason = cleanString($input['reason'] ?? '', 800);
-        $server = cleanString($input['server'] ?? '', 120);
         $severity = cleanString($input['severity'] ?? 'moyenne', 20);
+        // Portée : « global » (tous les bots) ou « bot » (celui qui est choisi).
+        $portee = ($input['portee'] ?? 'global') === 'bot' ? 'bot' : 'global';
+        $botChoisi = cleanString($input['bot'] ?? '', 60);
 
         if ($username === '' || $discordId === '' || $reason === '') {
             respond(['ok' => false, 'error' => 'Nom, identifiant Discord et motif sont obligatoires.'], 422);
+        }
+        if ($portee === 'bot' && $botChoisi === '') {
+            respond(['ok' => false, 'error' => 'Choisissez le bot sur lequel appliquer la sanction.'], 422);
+        }
+
+        $cibles = blacklist_cibles($state, $portee, $botChoisi);
+        if (!$cibles) {
+            respond(['ok' => false, 'error' => $portee === 'bot'
+                ? "Ce bot n'existe plus dans la liste."
+                : "Aucun bot enregistré : ajoutez-en un dans ⚙️ Créateur → 🤖 Mes bots."], 422);
         }
 
         $entry = [
@@ -1228,16 +1322,29 @@ switch ($action) {
             'username' => $username,
             'reason' => $reason,
             'severity' => in_array($severity, ['faible', 'moyenne', 'élevée', 'critique'], true) ? $severity : 'moyenne',
-            'server' => $server !== '' ? $server : 'Global',
-            'author' => 'Kirito_Admin',
+            'portee' => $portee,
+            'bots' => array_column($cibles, 'id'),
+            // Colonne historique du tableau : on y met la portée en clair.
+            'server' => $portee === 'global' ? 'Global' : (string) $cibles[0]['nom'],
+            'author' => moi_nom(),
             'date' => date('Y-m-d'),
             'proofs' => [],
         ];
 
+        // On applique sur Discord AVANT d'enregistrer : si le bot refuse (membre
+        // immunisé, créateur…), aucune fiche fantôme ne reste sur le site.
+        $diffusion = blacklist_diffuser($cibles, 'ajouter', $discordId, $reason, moi_id());
+        $reussites = array_filter($diffusion, static fn($r) => $r['ok']);
+        if (!$reussites) {
+            respond(['ok' => false, 'diffusion' => $diffusion,
+                'error' => "Aucun bot n'a pu appliquer la sanction : " . $diffusion[0]['message']], 502);
+        }
+        $entry['diffusion'] = $diffusion;
+
         array_unshift($state['blacklist'], $entry);
         appendActivity($state, 'blacklist', 'Utilisateur blacklisté', $username);
         saveState($state);
-        respond(['ok' => true, 'entry' => $entry, 'state' => $state]);
+        respond(['ok' => true, 'entry' => $entry, 'diffusion' => $diffusion, 'state' => $state]);
 
     case 'blacklist.delete':
         $id = cleanString($input['id'] ?? '', 40);
@@ -1246,10 +1353,36 @@ switch ($action) {
             respond(['ok' => false, 'error' => 'Entrée introuvable.'], 404);
         }
         $removed = $state['blacklist'][$index];
+        // Le déban part vers les mêmes bots que la sanction d'origine.
+        $diffusion = blacklist_diffuser(
+            blacklist_cibles_entree($state, $removed), 'retirer',
+            preg_replace('/\D+/', '', (string) ($removed['discordId'] ?? '')), '', moi_id()
+        );
         array_splice($state['blacklist'], $index, 1);
         appendActivity($state, 'blacklist', 'Blacklist retirée', (string) ($removed['username'] ?? $id));
         saveState($state);
-        respond(['ok' => true, 'state' => $state]);
+        respond(['ok' => true, 'diffusion' => $diffusion, 'state' => $state]);
+
+    // 🔁 Réapplique une sanction sur Discord : sert quand un bot était éteint
+    // au moment de l'ajout, ou pour les fiches créées avant que le site ne
+    // sache parler aux bots (elles n'étaient alors que du papier).
+    case 'blacklist.resync':
+        $id = cleanString($input['id'] ?? '', 40);
+        $index = findIndexById($state['blacklist'], $id);
+        if ($index < 0) {
+            respond(['ok' => false, 'error' => 'Entrée introuvable.'], 404);
+        }
+        $e = $state['blacklist'][$index];
+        $cid = preg_replace('/\D+/', '', (string) ($e['discordId'] ?? ''));
+        if ($cid === '') {
+            respond(['ok' => false, 'error' => "Cette fiche n'a pas d'identifiant Discord : impossible de l'appliquer."], 422);
+        }
+        $diffusion = blacklist_diffuser(
+            blacklist_cibles_entree($state, $e), 'ajouter', $cid, (string) ($e['reason'] ?? ''), moi_id()
+        );
+        $state['blacklist'][$index]['diffusion'] = $diffusion;
+        saveState($state);
+        respond(['ok' => true, 'diffusion' => $diffusion, 'state' => $state]);
 
     case 'blacklist.proof':
         $id = cleanString($_POST['id'] ?? '', 40);

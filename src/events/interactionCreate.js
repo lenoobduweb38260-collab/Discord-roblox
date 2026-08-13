@@ -95,8 +95,11 @@ module.exports = {
     }
 
     // ----- Captcha de vérification -----
+    // Le bouton porte désormais l'identifiant de son destinataire
+    // (« captcha:verify:123456 ») : on compare le préfixe, sans quoi les
+    // nouveaux boutons ne seraient plus routés du tout.
     if (
-      (interaction.isButton() && interaction.customId === 'captcha:verify') ||
+      (interaction.isButton() && interaction.customId.startsWith('captcha:verify')) ||
       (interaction.isModalSubmit() && interaction.customId === 'captcha:check')
     ) {
       if (!interaction.inGuild()) return;

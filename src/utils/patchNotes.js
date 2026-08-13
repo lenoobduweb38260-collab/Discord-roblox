@@ -534,6 +534,30 @@ const RELEASES = [
     ],
     retrait: [],
   },
+  {
+    id: 'blacklist-discord-captcha-2026-08t',
+    title: 'La blacklist du site agit enfin sur Discord 🚫',
+    ajout: [
+      '🌍 **Deux portées au choix** : une blacklist **globale** (tous vos bots) ou ciblée sur **un seul bot**',
+      '📊 **Rapport par bot** après chaque sanction : combien de serveurs, message privé remis ou non — et la raison exacte quand un bot n\'a pas pu',
+      '🔁 **Bouton « Réappliquer sur Discord »** dans la fiche de sanction : rattrape les fiches créées avant cette version, et celles posées pendant qu\'un bot était éteint',
+      '🔢 **Captcha : nombre d\'erreurs tolérées** (3 par défaut) puis **expulsion** — le membre peut revenir et réessayer. L\'expulsion se désactive si vous préférez',
+      '🧹 **Captcha : rôle retiré en cas de réussite**, à choisir dans une liste — typiquement « Visiteur », celui qui bloquait l\'accès',
+      '🔤 **Un code neuf à chaque tentative**, mêlant toujours lettres ET chiffres',
+    ],
+    amelioration: [
+      '🗑️ Retirer une sanction **débannit** l\'utilisateur des serveurs concernés, au lieu de seulement effacer la fiche',
+      '⚡ **Les pop-ups du site ne rament plus** : le décor animé du fond est mis en pause tant qu\'une fenêtre est ouverte. Mesuré sur un appareil lent : 850 ms de travail par 3 s → 69 ms',
+      '📱 La page derrière une pop-up ne défile plus sous le doigt sur téléphone',
+    ],
+    fix: [
+      '🩹 **La blacklist du site n\'était qu\'une fiche** : rien n\'était transmis aux bots, l\'utilisateur sanctionné pouvait rester sur vos serveurs. Elle est maintenant appliquée sur Discord au moment de l\'enregistrement, et refusée si aucun bot ne peut l\'appliquer — plus de fiche « fantôme »',
+      '🩹 **N\'importe qui pouvait valider le captcha d\'un autre** : le bouton porte désormais l\'identifiant du membre à qui il s\'adresse',
+      '🩹 Le code de vérification pouvait ne contenir **que des lettres** (une fois sur trois) : les caractères sont maintenant tirés pour garantir le mélange, et les signes ambigus (I, L, O, 0, 1) restent exclus',
+      '🩹 Le flou d\'arrière-plan des pop-ups n\'était jamais désactivé sur téléphone : la règle prévue pour ça visait le mauvais élément',
+    ],
+    retrait: [],
+  },
 ];
 
 // Découpe une catégorie en champs d'embed (max 1024 caractères par champ).

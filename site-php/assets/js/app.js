@@ -457,6 +457,10 @@
   }
 
   function openModal(title, body, wide = false) {
+    // ⚡ Les classes sont posées AVANT d'écrire la pop-up : le décor animé du
+    // fond est déjà figé quand le navigateur calcule le flou, au lieu de devoir
+    // le recalculer sur une scène encore en mouvement.
+    document.body.classList.add("overlay-open", "modal-open");
     modalRoot.innerHTML = `
       <div class="modal-layer" data-action="close-modal">
         <section class="modal ${wide ? "modal-wide" : ""}" role="dialog" aria-modal="true" aria-label="${esc(title)}" data-modal-panel>
@@ -473,6 +477,9 @@
 
   function closeModal() {
     modalRoot.innerHTML = "";
+    document.body.classList.remove("modal-open");
+    // Le décor ne repart que si aucun autre calque n'est ouvert.
+    if (!ui.menuProfil) document.body.classList.remove("overlay-open");
   }
 
   function button(label, action, cls = "", extra = "") {
@@ -1028,6 +1035,15 @@
       ${aide ? `<span class="field-note">${aide}</span>` : ""}</div>`;
   }
 
+  function champNombre(cle, label, aide = "", min = 1, max = 10, defaut = "") {
+    const p = srvParams();
+    const brut = p?.config?.[cle];
+    const valeur = brut === null || brut === undefined || brut === "" ? defaut : brut;
+    return `<div class="field"><label>${label}</label>
+      <input class="input" type="number" min="${min}" max="${max}" data-cfg="${esc(cle)}" value="${esc(String(valeur))}">
+      ${aide ? `<span class="field-note">${aide}</span>` : ""}</div>`;
+  }
+
   // Cadre d'un module : bandeau d'état + bouton d'enregistrement vers le bot.
   function modulePanel(title, description, formBody, moduleId) {
     const p = srvParams();
@@ -1186,19 +1202,26 @@
   function rolesModule() {
     const body = `<div class="builder-hint">🎭 Les rôles ci-dessous viennent directement de votre serveur Discord. Le bot ne peut donner qu'un rôle situé <b>sous le sien</b> dans la hiérarchie.</div>
       <div class="form-grid">
-        ${champRole("autorole_role_ids", "🤖 Rôles automatiques à l'arrivée", "Donnés à chaque nouveau membre. Ignorés si le captcha est actif : c'est alors sa validation qui débloque l'accès.", true)}
+        ${champRole("autorole_role_ids", "🤖 Rôles automatiques à l'arrivée", "Donnés à chaque nouveau membre — ou, si le captcha est actif, juste après sa validation.", true)}
         ${champRole("staff_role_ids", "🛡️ Rôles Staff", "Accès aux commandes de modération.", true)}
         ${champRole("admin_role_ids", "👑 Rôles Administration", "Accès complet à la configuration.", true)}
-        ${champRole("verified_role_id", "✅ Rôle donné après le captcha", "Attribué quand le membre réussit la vérification.")}
         ${champRole("service_role_id", "🧑‍💼 Rôle « en service »", "Ajouté pendant une prise de service.")}
       </div>
       <div class="mt-16">
-        ${champBascule("captcha_enabled", "Captcha de vérification", "Le nouveau membre doit se vérifier avant d'accéder au serveur.")}
         ${champBascule("antispam_enabled", "Anti-spam", "Sanctionne les envois répétés.")}
         ${champBascule("antinuke_enabled", "Anti-nuke", "Bloque les suppressions massives de salons et de rôles.")}
       </div>
+
+      <div class="builder-hint mt-16">🤖 <b>Captcha de vérification</b> — le bouton n'obéit qu'au membre pour qui il a été publié : personne ne peut se vérifier à sa place.</div>
+      <div class="mt-16">
+        ${champBascule("captcha_enabled", "Captcha de vérification", "Le nouveau membre doit se vérifier avant d'accéder au serveur.")}
+        ${champBascule("captcha_kick", "Expulser après trop d'erreurs", "Le membre pourra revenir et réessayer. Désactivé, il reste bloqué sans accès.")}
+      </div>
       <div class="form-grid mt-16">
         ${champSalon("captcha_channel_id", "Salon du captcha", "Là où le message de vérification est publié.")}
+        ${champNombre("captcha_max_essais", "🔢 Erreurs tolérées", "Au-delà, le membre est expulsé (si l'option ci-dessus est active).", 1, 10, 3)}
+        ${champRole("verified_role_id", "✅ Rôle donné en cas de réussite", "Celui qui débloque l'accès au serveur.")}
+        ${champRole("captcha_role_remove", "🧹 Rôle retiré en cas de réussite", "Le rôle d'attente, par exemple « Visiteur » ou « Non vérifié ». Laissez vide si vous n'en utilisez pas.")}
       </div>
       <div class="row mt-16" style="flex-direction:column;align-items:flex-start;gap:7px">
         <b>🕒 Et les membres déjà présents ?</b>
@@ -1528,15 +1551,20 @@
         <span class="acc-grade" style="--gc:${g};margin-left:auto">${esc(e.severity)}</span>
       </div>
       <div class="acc-row"><span>Motif</span><div><b>${esc(e.reason)}</b></div></div>
-      <div class="acc-row"><span>Serveur</span><div><b>${esc(e.server || "—")}</b><i>sanction prononcée par ${esc(e.author || "inconnu")}</i></div></div>
+      <div class="acc-row"><span>Portée</span><div><b>${e.portee === "bot" ? "🤖 " + esc(e.server || "un bot") : "🌍 Globale — tous les bots"}</b><i>sanction prononcée par ${esc(e.author || "inconnu")}</i></div></div>
       <div class="acc-row"><span>Date</span><div><b>${esc(e.date || "—")}</b></div></div>
       <div class="acc-row"><span>Preuves</span><div><b>${preuves.length} fichier(s)</b></div></div>
+      <div class="acc-row"><span>Sur Discord</span><div>${e.diffusion?.length
+        ? rapportDiffusion(e.diffusion)
+        : `<b style="color:var(--muted)">Jamais appliquée sur Discord</b><i>fiche créée avant la liaison avec les bots — utilisez « Réappliquer »</i>`}</div></div>
       <div style="margin-top:14px">${vignettes}</div>
       <div class="form-actions" style="flex-wrap:wrap">
         <button class="btn ghost" type="button" data-action="open-proof-modal" data-id="${esc(e.id)}">📎 Ajouter une preuve</button>
+        <button class="btn primary" type="button" data-action="blacklist-resync" data-id="${esc(e.id)}">🔁 Réappliquer sur Discord</button>
         <button class="btn danger" type="button" data-action="delete-blacklist" data-id="${esc(e.id)}">Retirer la sanction</button>
         <button class="btn success" type="button" data-action="close-modal">Fermer</button>
-      </div>`, true);
+      </div>
+      <div id="bl-resync-rapport" style="margin-top:10px"></div>`, true);
   }
 
   function ticketsView() {
@@ -2626,6 +2654,9 @@
     if (!ui.activeBotId || ui.route === "gate") renderGate();
     else renderShell();
     applySitePreferences();
+    // Le menu du profil est un calque par-dessus la page, comme une pop-up :
+    // il profite du même gel du décor animé (voir .overlay-open dans le CSS).
+    document.body.classList.toggle("overlay-open", Boolean(ui.menuProfil) || modalRoot.innerHTML !== "");
     setTimeout(scrollChatToBottom, 0);
   }
 
@@ -2789,14 +2820,43 @@
   }
 
   function openBlacklistModal() {
+    const bots = state.bots || [];
+    const options = bots.map(b => `<option value="${esc(b.id)}">${esc(b.name)}${b.agentName ? "" : " — ⚠️ non relié à l'agent"}</option>`).join("");
     openModal("Ajouter à la blacklist", `
       <form data-form="blacklist-add"><div class="form-grid">
         ${inputField("username", "Nom Discord", "", "text", "Exemple : DarkBlade_X", "required")}
         ${inputField("discordId", "Identifiant Discord", "", "text", "17 à 20 chiffres.", "required pattern=\\d{15,22}")}
         ${selectField("severity", "Sévérité", "moyenne", ["faible","moyenne","élevée","critique"])}
-        ${selectField("server", "Serveur concerné", state.servers?.[0]?.name || "Global", ["Global", ...(state.servers || []).map(server=>server.name)])}
-        ${textAreaField("reason", "Motif complet", "", "Décrivez précisément les faits, les avertissements et le contexte.")}
-      </div><div class="form-actions"><button class="btn ghost" type="button" data-action="close-modal">Annuler</button><button class="btn danger" type="submit">Confirmer la sanction</button></div></form>`);
+        <div class="field">
+          <label for="field-portee">Portée de la sanction</label>
+          <select class="input" id="field-portee" name="portee">
+            <option value="global">🌍 Globale — tous mes bots (${bots.length})</option>
+            <option value="bot">🤖 Un seul bot</option>
+          </select>
+          <span class="field-note">Le bot bannit l'utilisateur sur <b>tous ses serveurs</b> et le re-bannit s'il tente de revenir.</span>
+        </div>
+        <div class="field" id="champ-bot" style="display:none">
+          <label for="field-bot">Bot concerné</label>
+          <select class="input" id="field-bot" name="bot">${options || `<option value="">Aucun bot enregistré</option>`}</select>
+        </div>
+      </div>
+      ${textAreaField("reason", "Motif complet", "", "Décrivez précisément les faits, les avertissements et le contexte.")}
+      <div class="field-note" style="margin-top:8px">⚠️ La sanction est appliquée sur Discord immédiatement : message privé à l'utilisateur puis bannissement.</div>
+      <div class="form-actions"><button class="btn ghost" type="button" data-action="close-modal">Annuler</button><button class="btn danger" type="submit">Confirmer la sanction</button></div></form>`);
+    // Le choix du bot n'apparaît que si la portée n'est pas globale.
+    const portee = document.querySelector("#field-portee");
+    portee?.addEventListener("change", () => {
+      const champ = document.querySelector("#champ-bot");
+      if (champ) champ.style.display = portee.value === "bot" ? "" : "none";
+    });
+  }
+
+  // Rapport de diffusion : ce que chaque bot a réellement fait.
+  function rapportDiffusion(diffusion) {
+    if (!Array.isArray(diffusion) || !diffusion.length) return "";
+    return `<div class="bl-diffusion">${diffusion.map(d =>
+      `<div class="acc-row"><span>${d.ok ? "✅" : "❌"} ${esc(d.bot)}</span><span style="color:var(--muted)">${esc(d.message)}</span></div>`
+    ).join("")}</div>`;
   }
 
   function openProofModal(id) {
@@ -3575,12 +3635,32 @@
           openProofModal(target.dataset.id);
           break;
         case "delete-blacklist":
-          if (confirm("Retirer définitivement cette entrée de la blacklist ?")) {
-            await api("blacklist.delete", { id: target.dataset.id });
+          if (confirm("Retirer cette sanction ? L'utilisateur sera DÉBANNI des serveurs des bots concernés.")) {
+            const r = await api("blacklist.delete", { id: target.dataset.id });
+            closeModal();
             render();
-            toast("BLACKLIST", "L'entrée a été retirée.");
+            const ko = (r?.diffusion || []).filter(x => !x.ok);
+            toast("BLACKLIST", ko.length
+              ? `Fiche retirée, mais le déban a échoué sur ${ko.length} bot(s) : ${ko[0].message}`
+              : "Sanction retirée et utilisateur débanni.", ko.length ? "error" : "success");
           }
           break;
+        // 🔁 Réapplique la sanction : bot éteint au moment de l'ajout, ou
+        // fiche créée avant que le site ne sache parler aux bots.
+        case "blacklist-resync": {
+          const boite = document.querySelector("#bl-resync-rapport");
+          if (boite) boite.innerHTML = `<span class="field-note">⏳ Envoi aux bots…</span>`;
+          try {
+            const r = await api("blacklist.resync", { id: target.dataset.id });
+            if (boite) boite.innerHTML = rapportDiffusion(r?.diffusion || []);
+            const ko = (r?.diffusion || []).filter(x => !x.ok);
+            toast("BLACKLIST", ko.length ? `${ko.length} bot(s) en échec.` : "Sanction réappliquée sur Discord.",
+              ko.length ? "error" : "success");
+          } catch (err) {
+            if (boite) boite.innerHTML = `<span class="field-note" style="color:var(--red)">${esc(err.message)}</span>`;
+          }
+          break;
+        }
         case "select-ticket":
           ui.selectedTicketId = target.dataset.ticketId;
           render();
@@ -3718,10 +3798,18 @@
       switch (form.dataset.form) {
         case "blacklist-add": {
           const values = formToObject(form);
-          await api("blacklist.add", values);
+          const r = await api("blacklist.add", values);
           closeModal();
           render();
-          toast("BLACKLIST", `${values.username} a été ajouté à la base globale.`);
+          // On annonce ce qui s'est RÉELLEMENT passé sur Discord, pas juste
+          // « enregistré » : un bot éteint doit se voir.
+          const d = r?.diffusion || [];
+          const ko = d.filter(x => !x.ok);
+          toast(ko.length ? "BLACKLIST PARTIELLE" : "BLACKLIST",
+            ko.length
+              ? `${values.username} : ${d.length - ko.length}/${d.length} bot(s) — ${ko[0].bot} : ${ko[0].message}`
+              : `${values.username} banni sur ${d.length} bot(s).`,
+            ko.length ? "error" : "success");
           break;
         }
         case "proof-upload": {

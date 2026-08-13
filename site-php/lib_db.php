@@ -99,8 +99,18 @@ function db_init(PDO $pdo): void {
     server {$vc(120)} NULL,
     author {$vc(120)} NULL,
     date_ajout {$vc(20)} NULL,
+    portee {$vc(10)} NULL,
+    bots $txt NULL,
+    diffusion $txt NULL,
     ordre INT NULL
   )$fin");
+
+  // Ajout des colonnes de portée sur une base déjà installée : CREATE TABLE
+  // IF NOT EXISTS ne touche pas une table existante, il faut le faire à la main.
+  foreach ([['portee', $vc(10)], ['bots', $txt], ['diffusion', $txt]] as [$col, $type]) {
+    try { $pdo->exec("ALTER TABLE blacklist ADD COLUMN $col $type NULL"); }
+    catch (Throwable $e) { /* colonne déjà là : rien à faire */ }
+  }
 
   $pdo->exec("CREATE TABLE IF NOT EXISTS preuves (
     id $inc,
@@ -182,6 +192,9 @@ function db_charger(PDO $pdo): array {
       'server' => (string) ($r['server'] ?? ''),
       'author' => (string) ($r['author'] ?? ''),
       'date' => (string) ($r['date_ajout'] ?? ''),
+      'portee' => (string) ($r['portee'] ?? '') ?: 'global',
+      'bots' => json_decode((string) ($r['bots'] ?? '[]'), true) ?: [],
+      'diffusion' => json_decode((string) ($r['diffusion'] ?? '[]'), true) ?: [],
       'proofs' => $preuves[$r['id']] ?? [],
     ];
   }
@@ -252,15 +265,17 @@ function db_sauver(PDO $pdo, array $etat): void {
 
     $pdo->exec("DELETE FROM preuves");
     $pdo->exec("DELETE FROM blacklist");
-    $qb = $pdo->prepare("INSERT INTO blacklist (id, discord_id, username, reason, severity, server, author, date_ajout, ordre)
-                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    $qb = $pdo->prepare("INSERT INTO blacklist (id, discord_id, username, reason, severity, server, author, date_ajout, portee, bots, diffusion, ordre)
+                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
     $qp = $pdo->prepare("INSERT INTO preuves (blacklist_id, fichier, ordre) VALUES (?, ?, ?)");
+    $enJson = static fn($v) => json_encode(array_values((array) $v), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     foreach (array_values($etat['blacklist'] ?? []) as $i => $e) {
       if (!is_array($e) || ($e['id'] ?? '') === '') continue;
       $qb->execute([
         (string) $e['id'], (string) ($e['discordId'] ?? ''), (string) ($e['username'] ?? ''),
         (string) ($e['reason'] ?? ''), (string) ($e['severity'] ?? 'moyenne'),
-        (string) ($e['server'] ?? ''), (string) ($e['author'] ?? ''), (string) ($e['date'] ?? ''), $i,
+        (string) ($e['server'] ?? ''), (string) ($e['author'] ?? ''), (string) ($e['date'] ?? ''),
+        (string) ($e['portee'] ?? 'global'), $enJson($e['bots'] ?? []), $enJson($e['diffusion'] ?? []), $i,
       ]);
       foreach (array_values((array) ($e['proofs'] ?? [])) as $j => $f) {
         $qp->execute([(string) $e['id'], (string) $f, $j]);

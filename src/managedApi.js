@@ -83,7 +83,11 @@ function startManagedApi(client, baseDir) {
     police_role_ids: 'j',
     wlrp_role_id: 's',
     verified_role_id: 's',
+    captcha_role_remove: 's',
     autorole_role_ids: 'j',
+    // Captcha : nombre d'erreurs tolérées, puis expulsion
+    captcha_max_essais: 'n',
+    captcha_kick: 'b',
     // Interrupteurs de module
     levels_enabled: 'b',
     antispam_enabled: 'b',
@@ -104,7 +108,10 @@ function startManagedApi(client, baseDir) {
     goodbye_fields: 'b',
     level_image_url: 's',
   };
-  const NUM_LIMITS = { xp_text: [1, 1000], xp_voice: [1, 1000], xp_cooldown: [5, 3600] };
+  const NUM_LIMITS = {
+    xp_text: [1, 1000], xp_voice: [1, 1000], xp_cooldown: [5, 3600],
+    captcha_max_essais: [1, 10],
+  };
   const listWhitelist = db.prepare('SELECT * FROM whitelist_managers WHERE guild_id = ? ORDER BY role_id');
   const listTicketTypes = db.prepare('SELECT * FROM ticket_types WHERE guild_id = ? ORDER BY id');
 
@@ -681,7 +688,10 @@ function startManagedApi(client, baseDir) {
         if (value === '' || value === null || value === undefined) value = null;
         if (CONFIG_KEYS[key] === 'n') {
           value = parseInt(value, 10);
-          const [min, max] = NUM_LIMITS[key];
+          // Sans borne déclarée, on refuse plutôt que de planter sur un
+          // tableau absent (c'est arrivé en ajoutant une clé numérique).
+          const [min, max] = NUM_LIMITS[key] || [];
+          if (min === undefined) return send(500, { error: `Bornes manquantes pour « ${key} ».` });
           if (Number.isNaN(value)) return send(400, { error: 'Valeur numérique attendue.' });
           value = Math.min(max, Math.max(min, value));
         } else if (CONFIG_KEYS[key] === 'b') {
