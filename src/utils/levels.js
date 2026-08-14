@@ -24,16 +24,19 @@ function levelFromXp(xp) {
 }
 
 const upsertStmt = db.prepare(`
-  INSERT INTO levels (guild_id, user_id, text_xp, voice_xp, text_level, voice_level)
-  VALUES (?, ?, 0, 0, 0, 0)
+  INSERT INTO levels (guild_id, user_id, text_xp, voice_xp, text_level, voice_level, xp, level)
+  VALUES (?, ?, 0, 0, 0, 0, 0, 0)
   ON CONFLICT (guild_id, user_id) DO NOTHING
 `);
 const getStmt = db.prepare('SELECT * FROM levels WHERE guild_id = ? AND user_id = ?');
+// 📊 Un seul compteur : l'XP écrite et l'XP vocale alimentent le même niveau.
+// Les colonnes text_xp / voice_xp restent tenues à jour, mais uniquement pour
+// dire d'où vient l'XP — elles ne donnent plus de niveau séparé.
 const updateTextStmt = db.prepare(
-  'UPDATE levels SET text_xp = ?, text_level = ? WHERE guild_id = ? AND user_id = ?'
+  'UPDATE levels SET text_xp = ?, xp = ?, level = ? WHERE guild_id = ? AND user_id = ?'
 );
 const updateVoiceStmt = db.prepare(
-  'UPDATE levels SET voice_xp = ?, voice_level = ? WHERE guild_id = ? AND user_id = ?'
+  'UPDATE levels SET voice_xp = ?, xp = ?, level = ? WHERE guild_id = ? AND user_id = ?'
 );
 
 // Système de niveaux activé sur ce serveur ? (NULL = oui, comportement
@@ -42,19 +45,21 @@ function levelsEnabled(guildId) {
   return getGuildConfig(guildId).levels_enabled !== 0;
 }
 
-// Ajoute de l'XP (type: 'text' | 'voice') et renvoie {leveledUp, newLevel}.
+// Ajoute de l'XP au compteur UNIQUE du membre.
+// `source` ('text' | 'voice') ne sert plus qu'à deux choses : tenir le détail
+// de provenance, et choisir le mot employé dans l'annonce de passage de niveau.
 // Ne fait RIEN si le système de niveaux est désactivé sur le serveur.
-function addXp(guildId, userId, type, amount) {
+function addXp(guildId, userId, source, amount) {
   if (!levelsEnabled(guildId)) return { leveledUp: false, newLevel: 0 };
   upsertStmt.run(guildId, userId);
   const row = getStmt.get(guildId, userId);
-  const xpKey = type === 'voice' ? 'voice_xp' : 'text_xp';
-  const levelKey = type === 'voice' ? 'voice_level' : 'text_level';
-  const newXp = row[xpKey] + amount;
-  const { level: newLevel } = levelFromXp(newXp);
-  if (type === 'voice') updateVoiceStmt.run(newXp, newLevel, guildId, userId);
-  else updateTextStmt.run(newXp, newLevel, guildId, userId);
-  return { leveledUp: newLevel > row[levelKey], newLevel };
+  const totalAvant = row.xp || 0;
+  const totalApres = totalAvant + amount;
+  const { level: newLevel } = levelFromXp(totalApres);
+  const { level: ancienNiveau } = levelFromXp(totalAvant);
+  if (source === 'voice') updateVoiceStmt.run((row.voice_xp || 0) + amount, totalApres, newLevel, guildId, userId);
+  else updateTextStmt.run((row.text_xp || 0) + amount, totalApres, newLevel, guildId, userId);
+  return { leveledUp: newLevel > ancienNiveau, newLevel };
 }
 
 function getLevels(guildId, userId) {
@@ -65,34 +70,33 @@ function getLevels(guildId, userId) {
     voice_xp: 0,
     text_level: 0,
     voice_level: 0,
+    xp: 0,
+    level: 0,
   };
 }
 
-const topTextStmt = db.prepare(
-  'SELECT * FROM levels WHERE guild_id = ? ORDER BY text_xp DESC LIMIT ?'
-);
-const topVoiceStmt = db.prepare(
-  'SELECT * FROM levels WHERE guild_id = ? ORDER BY voice_xp DESC LIMIT ?'
-);
+const topStmt = db.prepare('SELECT * FROM levels WHERE guild_id = ? ORDER BY xp DESC LIMIT ?');
 
-function getLeaderboard(guildId, type, limit = 10) {
-  return type === 'voice' ? topVoiceStmt.all(guildId, limit) : topTextStmt.all(guildId, limit);
+// Classement unique : plus de distinction écrit / vocal.
+function getLeaderboard(guildId, limit = 10) {
+  return topStmt.all(guildId, limit);
 }
 
 // Annonce la montée de niveau UNIQUEMENT dans le salon configuré (/config →
 // Salons → 📈). Sans salon configuré, aucune annonce n'est envoyée — les
 // montées de niveau ne s'affichent plus dans n'importe quel salon.
 // (Le paramètre fallbackChannel est conservé pour compatibilité mais ignoré.)
-async function announceLevelUp(guild, userId, type, newLevel, fallbackChannel = null) {
+async function announceLevelUp(guild, userId, source, newLevel, fallbackChannel = null) {
   try {
     const cfg = getGuildConfig(guild.id);
     if (!cfg.level_channel_id) return;
     const channel = await guild.channels.fetch(cfg.level_channel_id).catch(() => null);
     if (!channel?.isTextBased()) return;
-    const label = type === 'voice' ? 'vocal 🎙️' : 'écrit ✍️';
+    // Un seul niveau : la provenance n'est plus qu'une indication.
+    const origine = source === 'voice' ? 'en vocal 🎙️' : 'en écrivant ✍️';
     const embed = new EmbedBuilder()
       .setColor(COLORS.SUCCESS)
-      .setDescription(`🎉 <@${userId}> passe au **niveau ${newLevel}** en ${label} !`);
+      .setDescription(`🎉 <@${userId}> passe au **niveau ${newLevel}** ! *(${origine})*`);
     await channel.send({ embeds: [embed] });
   } catch {
     // l'annonce ne doit jamais faire planter le flux d'XP

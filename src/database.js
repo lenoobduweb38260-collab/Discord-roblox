@@ -103,6 +103,8 @@ CREATE TABLE IF NOT EXISTS levels (
   voice_xp    INTEGER NOT NULL DEFAULT 0,
   text_level  INTEGER NOT NULL DEFAULT 0,
   voice_level INTEGER NOT NULL DEFAULT 0,
+  xp          INTEGER NOT NULL DEFAULT 0,
+  level       INTEGER NOT NULL DEFAULT 0,
   PRIMARY KEY (guild_id, user_id)
 );
 
@@ -480,6 +482,47 @@ for (const column of [
 try {
   db.exec('ALTER TABLE bot_tickets ADD COLUMN proof TEXT');
 } catch {}
+
+// 📊 Niveaux fusionnés : un seul compteur d'XP au lieu d'un écrit et d'un
+// vocal séparés. Les colonnes text_xp / voice_xp sont conservées (elles
+// disent d'où vient l'XP), mais le niveau se calcule sur le total.
+// La reprise n'a lieu qu'UNE fois : dès que la colonne existe, on n'y touche
+// plus — sinon chaque redémarrage écraserait l'XP gagnée depuis.
+{
+  let nouvelleColonne = false;
+  for (const column of ['xp INTEGER NOT NULL DEFAULT 0', 'level INTEGER NOT NULL DEFAULT 0']) {
+    try {
+      db.exec(`ALTER TABLE levels ADD COLUMN ${column}`);
+      nouvelleColonne = true;
+    } catch {}
+  }
+  if (nouvelleColonne) {
+    try {
+      // Le total des deux compteurs devient l'XP unique. Le niveau qui en
+      // découle est recalculé juste après, à la même courbe.
+      db.exec('UPDATE levels SET xp = COALESCE(text_xp, 0) + COALESCE(voice_xp, 0)');
+      const xpForLevel = (n) => 5 * n * n + 50 * n + 100;
+      const niveauDe = (xp) => {
+        let level = 0;
+        let reste = xp;
+        while (reste >= xpForLevel(level)) {
+          reste -= xpForLevel(level);
+          level++;
+        }
+        return level;
+      };
+      const maj = db.prepare('UPDATE levels SET level = ? WHERE guild_id = ? AND user_id = ?');
+      const tous = db.prepare('SELECT guild_id, user_id, xp FROM levels').all();
+      const lot = db.transaction((lignes) => {
+        for (const l of lignes) maj.run(niveauDe(l.xp || 0), l.guild_id, l.user_id);
+      });
+      lot(tous);
+      if (tous.length) console.log(`📊 Niveaux fusionnés : ${tous.length} membre(s) repris (écrit + vocal → un seul niveau).`);
+    } catch (err) {
+      console.warn(`⚠️ Fusion des niveaux : reprise impossible (${err.message}).`);
+    }
+  }
+}
 
 // Types de tickets : description (option du sélecteur de raison),
 // ping_role_id (rôle mentionné à l'ouverture, sinon le support),

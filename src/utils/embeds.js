@@ -164,12 +164,16 @@ async function sendLog(guild, embed) {
   }
 }
 
-function logEmbed(title, description, color = COLORS.INFO) {
-  return new EmbedBuilder()
+function logEmbed(title, description, color = COLORS.INFO, fields = null) {
+  const embed = new EmbedBuilder()
     .setColor(color)
     .setTitle(title)
     .setDescription(description)
     .setTimestamp();
+  // Champs facultatifs : pour un avant/après, ils séparent proprement les
+  // deux textes là où une citation « >>> » avalerait tout le reste.
+  if (Array.isArray(fields) && fields.length) embed.addFields(fields.slice(0, 25));
+  return embed;
 }
 
 module.exports = {

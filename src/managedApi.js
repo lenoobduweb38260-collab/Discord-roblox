@@ -128,8 +128,9 @@ function startManagedApi(client, baseDir) {
     whitelist: db.prepare('SELECT COUNT(*) AS n FROM whitelist_entries WHERE guild_id = ?'),
     vehicules: db.prepare('SELECT COUNT(*) AS n FROM insured_vehicles WHERE guild_id = ?'),
   };
+  // 📊 Classement sur le compteur UNIQUE (écrit + vocal réunis).
   const topNiveaux = db.prepare(
-    'SELECT user_id, text_xp, text_level FROM levels WHERE guild_id = ? ORDER BY text_xp DESC LIMIT 5'
+    'SELECT user_id, xp, level FROM levels WHERE guild_id = ? ORDER BY xp DESC LIMIT 5'
   );
 
   const server = http.createServer(async (req, res) => {
@@ -202,8 +203,8 @@ function startManagedApi(client, baseDir) {
         }
         const top = topNiveaux.all(guild.id).map((r) => ({
           user: client.users.cache.get(r.user_id)?.username || r.user_id,
-          level: r.text_level,
-          xp: r.text_xp,
+          level: r.level,
+          xp: r.xp,
         }));
         return send(200, {
           serveur: { name: guild.name, membres: guild.memberCount, icon: guild.iconURL({ size: 128 }) },
