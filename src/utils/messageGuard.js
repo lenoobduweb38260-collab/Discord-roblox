@@ -21,9 +21,44 @@ function staffExempt(message, cfg) {
   }
 }
 
+function liste(valeur) {
+  try {
+    const l = JSON.parse(valeur || '[]');
+    return Array.isArray(l) ? l.map(String) : [];
+  } catch {
+    return [];
+  }
+}
+
+// 🔕 Salons et catégories laissés tranquilles par l'anti-spam.
+// Sert aux salons de flood, de commandes, de comptage… là où enchaîner les
+// messages est normal.
+// Un fil hérite de son salon parent, et un salon de sa catégorie : exempter
+// une catégorie exempte tout ce qu'elle contient, fils compris.
+function salonExempte(message, cfg) {
+  const salons = liste(cfg.antispam_exempt_channels);
+  const categories = liste(cfg.antispam_exempt_categories);
+  if (!salons.length && !categories.length) return false;
+
+  const ch = message.channel;
+  const fil = Boolean(ch?.isThread?.());
+  const salonPorteur = fil ? ch.parentId : ch?.id;          // le salon réel
+  const categorie = fil ? ch.parent?.parentId : ch?.parentId;
+
+  if (ch?.id && salons.includes(String(ch.id))) return true;
+  if (salonPorteur && salons.includes(String(salonPorteur))) return true;
+  if (categorie && categories.includes(String(categorie))) return true;
+  return false;
+}
+
 // Renvoie true si le message a été traité (supprimé / auteur sanctionné).
 async function guard(message, cfg) {
   if (staffExempt(message, cfg)) return false;
+  const exempte = salonExempte(message, cfg);
+  // Un salon exempté reste protégé des arnaques et des invitations, sauf si
+  // le serveur a explicitement demandé l'inverse : c'est le cas d'un salon
+  // de partenariats, où poster une invitation Discord est le but.
+  if (exempte && Number(cfg.antispam_exempt_filtre || 0) === 1) return false;
   const content = message.content || '';
 
   // 1) Contenu malveillant
@@ -45,7 +80,9 @@ async function guard(message, cfg) {
     return true;
   }
 
-  // 2) Anti-spam (fréquence)
+  // 2) Anti-spam (fréquence) — c'est ce dont les salons exemptés sont
+  // dispensés : on n'y compte même pas les messages.
+  if (exempte) return false;
   const key = `${message.guild.id}:${message.author.id}`;
   const now = Date.now();
   const arr = (buckets.get(key) || []).filter((t) => now - t < SPAM_WINDOW);

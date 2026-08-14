@@ -562,6 +562,22 @@ const RELEASES = [
     ],
     retrait: [],
   },
+  {
+    id: 'antispam-exemptions-2026-08u',
+    title: 'Anti-spam : des salons laissés tranquilles 🔕',
+    ajout: [
+      '🔕 **Salons épargnés par l\'anti-spam**, à choisir dans une liste (plusieurs possibles) : pour vos salons de flood, de commandes ou de comptage, où enchaîner les messages est normal',
+      '🗂️ **Catégories entières épargnées** : tout ce qu\'elles contiennent l\'est aussi, y compris les fils',
+      '🧵 Un **fil** hérite de son salon : inutile de l\'ajouter à la main',
+      '🤝 Option séparée pour **désactiver aussi le filtre arnaques et invitations** dans ces salons — utile pour un salon de partenariats, où poster une invitation Discord est le but',
+    ],
+    amelioration: [
+      '🛡️ Par défaut, un salon épargné reste protégé des **liens d\'arnaque et des invitations** : seule la limite de fréquence y est levée. Il faut le demander explicitement pour aller plus loin',
+      '📋 L\'interrupteur Anti-spam explique désormais ce qu\'il fait : plus de 5 messages en 7 secondes, et le staff n\'est jamais concerné',
+    ],
+    fix: [],
+    retrait: [],
+  },
 ];
 
 // Découpe une catégorie en champs d'embed (max 1024 caractères par champ).

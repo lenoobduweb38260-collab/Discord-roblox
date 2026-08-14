@@ -91,6 +91,9 @@ function startManagedApi(client, baseDir) {
     // Interrupteurs de module
     levels_enabled: 'b',
     antispam_enabled: 'b',
+    antispam_exempt_channels: 'j',
+    antispam_exempt_categories: 'j',
+    antispam_exempt_filtre: 'b',
     antinuke_enabled: 'b',
     captcha_enabled: 'b',
     interact_enabled: 'b',
@@ -112,6 +115,8 @@ function startManagedApi(client, baseDir) {
     xp_text: [1, 1000], xp_voice: [1, 1000], xp_cooldown: [5, 3600],
     captcha_max_essais: [1, 10],
   };
+  // Nombre maximum d'identifiants par liste (défaut : 10).
+  const LIST_LIMITS = { antispam_exempt_channels: 60, antispam_exempt_categories: 30 };
   const listWhitelist = db.prepare('SELECT * FROM whitelist_managers WHERE guild_id = ? ORDER BY role_id');
   const listTicketTypes = db.prepare('SELECT * FROM ticket_types WHERE guild_id = ? ORDER BY id');
 
@@ -700,7 +705,9 @@ function startManagedApi(client, baseDir) {
           value = String(value).slice(0, 1500);
         } else if (CONFIG_KEYS[key] === 'j' && value !== null) {
           const ids = (Array.isArray(value) ? value : [value]).map((v) => String(v).trim()).filter((v) => /^\d{5,25}$/.test(v));
-          value = ids.length ? JSON.stringify(ids.slice(0, 10)) : null;
+          // 10 suffit pour des rôles ; une liste d'exemptions couvre parfois
+          // tout un serveur, d'où un plafond plus large sur ces clés-là.
+          value = ids.length ? JSON.stringify(ids.slice(0, LIST_LIMITS[key] || 10)) : null;
         }
         setGuildConfig(body.guildId, key, value);
         // Colonnes historiques mono-rôle synchronisées avec les listes (le

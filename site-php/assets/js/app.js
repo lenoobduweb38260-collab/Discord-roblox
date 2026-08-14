@@ -970,29 +970,41 @@
   }
 
   // Liste déroulante de SALONS du serveur.
-  function champSalon(cle, label, aide = "") {
-    const p = srvParams();
-    const valeur = String(p?.config?.[cle] ?? "");
-    const options = (p?.channels || []).map(c =>
-      `<option value="${esc(c.id)}"${c.id === valeur ? " selected" : ""}># ${esc(c.name)}</option>`).join("");
-    return `<div class="field"><label>${label}</label>
-      <select class="select" data-cfg="${esc(cle)}">
-        <option value="">— Aucun —</option>${options}
-      </select>
-      ${aide ? `<span class="field-note">${aide}</span>` : ""}</div>`;
+  // Choix courant d'une clé : une valeur simple, ou une liste JSON quand le
+  // champ accepte plusieurs entrées.
+  function choixCourants(valeur, multiple) {
+    if (!multiple) return [String(valeur ?? "")];
+    try {
+      const l = JSON.parse(valeur || "[]");
+      return Array.isArray(l) ? l.map(String) : (valeur ? [String(valeur)] : []);
+    } catch {
+      return valeur ? [String(valeur)] : [];
+    }
   }
 
-  // Liste déroulante de CATÉGORIES.
-  function champCategorie(cle, label, aide = "") {
+  function champSalon(cle, label, aide = "", multiple = false) {
     const p = srvParams();
-    const valeur = String(p?.config?.[cle] ?? "");
-    const options = (p?.categories || []).map(c =>
-      `<option value="${esc(c.id)}"${c.id === valeur ? " selected" : ""}>${esc(c.name)}</option>`).join("");
+    const choisis = choixCourants(p?.config?.[cle], multiple);
+    const options = (p?.channels || []).map(c =>
+      `<option value="${esc(c.id)}"${choisis.includes(String(c.id)) ? " selected" : ""}># ${esc(c.name)}</option>`).join("");
     return `<div class="field"><label>${label}</label>
-      <select class="select" data-cfg="${esc(cle)}">
-        <option value="">— Aucune —</option>${options}
+      <select class="select" data-cfg="${esc(cle)}"${multiple ? ' multiple size="6" data-multi="1"' : ""}>
+        ${multiple ? "" : '<option value="">— Aucun —</option>'}${options}
       </select>
-      ${aide ? `<span class="field-note">${aide}</span>` : ""}</div>`;
+      <span class="field-note">${multiple ? "Maintenez Ctrl (⌘ sur Mac) pour en choisir plusieurs. " : ""}${aide}</span></div>`;
+  }
+
+  // Liste déroulante de CATÉGORIES — simple, ou à choix multiple.
+  function champCategorie(cle, label, aide = "", multiple = false) {
+    const p = srvParams();
+    const choisis = choixCourants(p?.config?.[cle], multiple);
+    const options = (p?.categories || []).map(c =>
+      `<option value="${esc(c.id)}"${choisis.includes(String(c.id)) ? " selected" : ""}>${esc(c.name)}</option>`).join("");
+    return `<div class="field"><label>${label}</label>
+      <select class="select" data-cfg="${esc(cle)}"${multiple ? ' multiple size="5" data-multi="1"' : ""}>
+        ${multiple ? "" : '<option value="">— Aucune —</option>'}${options}
+      </select>
+      <span class="field-note">${multiple ? "Maintenez Ctrl (⌘ sur Mac) pour en choisir plusieurs. " : ""}${aide}</span></div>`;
   }
 
   // Liste déroulante de RÔLES — simple, ou à choix multiple.
@@ -1208,8 +1220,18 @@
         ${champRole("service_role_id", "🧑‍💼 Rôle « en service »", "Ajouté pendant une prise de service.")}
       </div>
       <div class="mt-16">
-        ${champBascule("antispam_enabled", "Anti-spam", "Sanctionne les envois répétés.")}
+        ${champBascule("antispam_enabled", "Anti-spam", "Sanctionne les envois répétés (plus de 5 messages en 7 secondes) et filtre les arnaques et invitations. Le staff n'est jamais concerné.")}
         ${champBascule("antinuke_enabled", "Anti-nuke", "Bloque les suppressions massives de salons et de rôles.")}
+      </div>
+
+      <div class="builder-hint mt-16">🔕 <b>Salons épargnés par l'anti-spam</b> — pour vos salons de flood, de commandes ou de comptage, où enchaîner les messages est normal. Une <b>catégorie</b> épargne tout ce qu'elle contient, fils compris.</div>
+      <div class="form-grid mt-16">
+        ${champSalon("antispam_exempt_channels", "🔕 Salons épargnés", "Aucune limite de fréquence dans ces salons.", true)}
+        ${champCategorie("antispam_exempt_categories", "🗂️ Catégories épargnées", "Tous les salons de ces catégories sont épargnés.", true)}
+      </div>
+      <div class="mt-16">
+        ${champBascule("antispam_exempt_filtre", "Y désactiver aussi le filtre arnaques et invitations",
+          "⚠️ Par défaut les liens d'arnaque et les invitations Discord restent bloqués même dans les salons épargnés. À n'activer que pour un salon de partenariats, où poster une invitation est le but.")}
       </div>
 
       <div class="builder-hint mt-16">🤖 <b>Captcha de vérification</b> — le bouton n'obéit qu'au membre pour qui il a été publié : personne ne peut se vérifier à sa place.</div>
