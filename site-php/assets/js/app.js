@@ -1487,20 +1487,68 @@
     </div>`;
   }
 
+  // 📥 Import des sanctions prononcées sur Discord.
+  // Lancé tout seul en arrivant sur la page (sans bloquer l'affichage) et
+  // par le bouton. L'appel automatique est espacé : inutile d'interroger
+  // les bots à chaque aller-retour dans le menu.
+  let _importEnCours = false;
+  let _dernierImport = 0;
+  async function importerBlacklistDiscord(manuel = false) {
+    if (_importEnCours) return;
+    if (!manuel && Date.now() - _dernierImport < 60000) return;
+    _importEnCours = true;
+    const boite = () => document.querySelector("#bl-import-rapport");
+    if (manuel && boite()) boite().innerHTML = `<div class="row">⏳ Lecture des sanctions sur vos bots…</div>`;
+    try {
+      const r = await api("blacklist.import", {});
+      _dernierImport = Date.now();
+      const im = r?.import || {};
+      const ko = (im.bots || []).filter(b => !b.ok);
+      const bouge = (im.ajoutees || 0) + (im.completees || 0) + (im.levees || 0);
+      if (bouge) render();
+      const b = boite();
+      if (b && (manuel || ko.length)) {
+        b.innerHTML = `<div class="row" style="flex-direction:column;align-items:flex-start;gap:5px">
+          <b>${im.ajoutees || 0} sanction(s) importée(s) de Discord${im.completees ? `, ${im.completees} complétée(s) avec leur preuve` : ""}${im.levees ? `, ${im.levees} levée(s) sur Discord` : ""}.</b>
+          ${(im.bots || []).map(x => `<span style="color:var(--muted)">${x.ok ? "✅" : "❌"} ${esc(x.bot)} — ${esc(x.message)}</span>`).join("")}
+        </div>`;
+      }
+      if (manuel) {
+        toast("IMPORT", ko.length
+          ? `${ko.length} bot(s) injoignable(s) : ${ko[0].message}`
+          : `${im.ajoutees || 0} sanction(s) importée(s) depuis Discord.`, ko.length ? "error" : "success");
+      }
+    } catch (err) {
+      const b = boite();
+      if (b && manuel) b.innerHTML = `<div class="row" style="color:var(--red)">❌ ${esc(err.message)}</div>`;
+      if (manuel) toast("IMPORT", err.message, "error");
+    } finally {
+      _importEnCours = false;
+    }
+  }
+
   function blacklistView() {
+    // On affiche d'abord ce qu'on a, puis on va voir les bots : la page ne
+    // reste jamais bloquée sur un bot qui met du temps à répondre.
+    if (estEquipeSite()) setTimeout(() => importerBlacklistDiscord(false), 60);
     const query = ui.blacklistQuery.trim().toLowerCase();
     const entries = (state.blacklist || []).filter(item => !query || `${item.username} ${item.discordId} ${item.reason} ${item.server}`.toLowerCase().includes(query));
     return `<div class="content-view">
-      ${pageHead("Staff bot / Sécurité", "Blacklist globale", "Recherchez un utilisateur, consultez le motif et associez des preuves à chaque sanction.", button("Ajouter une entrée", "open-blacklist-modal", "danger"))}
+      ${pageHead("Staff bot / Sécurité", "Blacklist globale", "Les sanctions posées ici partent sur Discord, et celles prononcées sur Discord remontent ici.",
+        button("📥 Importer depuis Discord", "blacklist-import", "ghost") + button("Ajouter une entrée", "open-blacklist-modal", "danger"))}
       <section class="panel"><div class="panel-inner">
         <div class="panel-head"><div><h3>Base de sanctions</h3><p>${entries.length} résultat(s) sur ${state.blacklist?.length || 0} entrées.</p></div><div class="searchbar"><input class="input" id="blacklist-search" value="${esc(ui.blacklistQuery)}" placeholder="Nom, ID Discord, serveur ou motif…"><button class="btn" data-action="blacklist-search">Rechercher</button></div></div>
-        <div class="table-wrap"><table class="data-table"><thead><tr><th>Utilisateur</th><th>Motif</th><th>Sévérité</th><th>Serveur</th><th>Preuves</th><th>Actions</th></tr></thead><tbody>
+        <div id="bl-import-rapport"></div>
+        <div class="table-wrap"><table class="data-table"><thead><tr><th>Utilisateur</th><th>Motif</th><th>Sévérité</th><th>Origine</th><th>Preuves</th><th>Actions</th></tr></thead><tbody>
         ${entries.map(entry => `<tr class="cliquable" data-action="open-sanction" data-id="${esc(entry.id)}" title="Ouvrir la fiche et voir toutes les preuves">
           <td><strong>${esc(entry.username)}</strong><br><span>${esc(entry.discordId)}</span><br><span>${esc(entry.id)} · ${esc(entry.date)}</span></td>
-          <td>${esc(entry.reason)}</td>
+          <td>${esc(entry.reason)}${entry.leveeSurDiscord ? `<br><span class="field-note" style="color:var(--amber,#f3c86a)">⚠️ levée sur Discord</span>` : ""}</td>
           <td><span class="severity ${esc(entry.severity)}">${esc(entry.severity)}</span></td>
-          <td>${esc(entry.server)}<br><span>par ${esc(entry.author)}</span></td>
-          <td><div class="proof-list">${entry.proofs?.length ? entry.proofs.map(proof => `<span class="proof-pill">${esc(proof)}</span>`).join("") : `<span class="field-note">Aucune preuve</span>`}</div></td>
+          <td>${entry.origine === "discord" ? "💬 Discord" : "🖥️ Panel"}<br><span>${esc(entry.server)} · par ${esc(entry.author)}</span></td>
+          <td><div class="proof-list">${
+            (entry.proofs?.length ? entry.proofs.map(proof => `<span class="proof-pill">${esc(proof)}</span>`).join("") : "")
+            + (entry.preuveDiscord ? `<span class="proof-pill" title="${esc(entry.preuveDiscord)}">💬 preuve Discord</span>` : "")
+            || `<span class="field-note">Aucune preuve</span>`}</div></td>
           <td><div class="page-actions">${button("📂 Fiche", "open-sanction", "small", `data-id="${esc(entry.id)}"`)}${button("Preuve", "open-proof-modal", "small", `data-id="${esc(entry.id)}"`)}${button("Retirer", "delete-blacklist", "danger small", `data-id="${esc(entry.id)}"`)}</div></td>
         </tr>`).join("") || `<tr><td colspan="6">${emptyBlock("Aucun résultat", "Aucune entrée ne correspond à cette recherche.")}</td></tr>`}
         </tbody></table></div>
@@ -1554,6 +1602,12 @@
       <div class="acc-row"><span>Portée</span><div><b>${e.portee === "bot" ? "🤖 " + esc(e.server || "un bot") : "🌍 Globale — tous les bots"}</b><i>sanction prononcée par ${esc(e.author || "inconnu")}</i></div></div>
       <div class="acc-row"><span>Date</span><div><b>${esc(e.date || "—")}</b></div></div>
       <div class="acc-row"><span>Preuves</span><div><b>${preuves.length} fichier(s)</b></div></div>
+      <div class="acc-row"><span>Origine</span><div><b>${e.origine === "discord"
+        ? "💬 Prononcée sur Discord"
+        : "🖥️ Prononcée depuis le panel"}</b>${e.leveeSurDiscord
+        ? `<i style="color:var(--amber,#f3c86a)">⚠️ Elle n'est plus active sur le bot : quelqu'un l'a levée sur Discord. La fiche et ses preuves sont conservées.</i>`
+        : ""}</div></div>
+      ${e.preuveDiscord ? `<div class="acc-row"><span>Preuve Discord</span><div><b style="white-space:pre-wrap">${esc(e.preuveDiscord)}</b><i>saisie par le staff au moment de la sanction</i></div></div>` : ""}
       <div class="acc-row"><span>Sur Discord</span><div>${e.diffusion?.length
         ? rapportDiffusion(e.diffusion)
         : `<b style="color:var(--muted)">Jamais appliquée sur Discord</b><i>fiche créée avant la liaison avec les bots — utilisez « Réappliquer »</i>`}</div></div>
@@ -3616,6 +3670,11 @@
           break;
         case "open-blacklist-modal":
           openBlacklistModal();
+          break;
+        // 📥 Rapatrie les sanctions prononcées sur Discord (/blacklist,
+        // tickets du QG) avec leur preuve.
+        case "blacklist-import":
+          await importerBlacklistDiscord(true);
           break;
         case "open-sanction":
           openSanctionModal(target.dataset.id);

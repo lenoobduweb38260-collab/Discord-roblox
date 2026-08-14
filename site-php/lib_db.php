@@ -102,12 +102,16 @@ function db_init(PDO $pdo): void {
     portee {$vc(10)} NULL,
     bots $txt NULL,
     diffusion $txt NULL,
+    origine {$vc(15)} NULL,
+    preuve_discord $txt NULL,
+    levee_discord INT NULL,
     ordre INT NULL
   )$fin");
 
   // Ajout des colonnes de portée sur une base déjà installée : CREATE TABLE
   // IF NOT EXISTS ne touche pas une table existante, il faut le faire à la main.
-  foreach ([['portee', $vc(10)], ['bots', $txt], ['diffusion', $txt]] as [$col, $type]) {
+  foreach ([['portee', $vc(10)], ['bots', $txt], ['diffusion', $txt],
+            ['origine', $vc(15)], ['preuve_discord', $txt], ['levee_discord', 'INT']] as [$col, $type]) {
     try { $pdo->exec("ALTER TABLE blacklist ADD COLUMN $col $type NULL"); }
     catch (Throwable $e) { /* colonne déjà là : rien à faire */ }
   }
@@ -195,6 +199,9 @@ function db_charger(PDO $pdo): array {
       'portee' => (string) ($r['portee'] ?? '') ?: 'global',
       'bots' => json_decode((string) ($r['bots'] ?? '[]'), true) ?: [],
       'diffusion' => json_decode((string) ($r['diffusion'] ?? '[]'), true) ?: [],
+      'origine' => (string) ($r['origine'] ?? '') ?: 'site',
+      'preuveDiscord' => (string) ($r['preuve_discord'] ?? ''),
+      'leveeSurDiscord' => !empty($r['levee_discord']),
       'proofs' => $preuves[$r['id']] ?? [],
     ];
   }
@@ -265,8 +272,8 @@ function db_sauver(PDO $pdo, array $etat): void {
 
     $pdo->exec("DELETE FROM preuves");
     $pdo->exec("DELETE FROM blacklist");
-    $qb = $pdo->prepare("INSERT INTO blacklist (id, discord_id, username, reason, severity, server, author, date_ajout, portee, bots, diffusion, ordre)
-                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    $qb = $pdo->prepare("INSERT INTO blacklist (id, discord_id, username, reason, severity, server, author, date_ajout, portee, bots, diffusion, origine, preuve_discord, levee_discord, ordre)
+                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
     $qp = $pdo->prepare("INSERT INTO preuves (blacklist_id, fichier, ordre) VALUES (?, ?, ?)");
     $enJson = static fn($v) => json_encode(array_values((array) $v), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     foreach (array_values($etat['blacklist'] ?? []) as $i => $e) {
@@ -275,7 +282,8 @@ function db_sauver(PDO $pdo, array $etat): void {
         (string) $e['id'], (string) ($e['discordId'] ?? ''), (string) ($e['username'] ?? ''),
         (string) ($e['reason'] ?? ''), (string) ($e['severity'] ?? 'moyenne'),
         (string) ($e['server'] ?? ''), (string) ($e['author'] ?? ''), (string) ($e['date'] ?? ''),
-        (string) ($e['portee'] ?? 'global'), $enJson($e['bots'] ?? []), $enJson($e['diffusion'] ?? []), $i,
+        (string) ($e['portee'] ?? 'global'), $enJson($e['bots'] ?? []), $enJson($e['diffusion'] ?? []),
+        (string) ($e['origine'] ?? 'site'), (string) ($e['preuveDiscord'] ?? ''), !empty($e['leveeSurDiscord']) ? 1 : 0, $i,
       ]);
       foreach (array_values((array) ($e['proofs'] ?? [])) as $j => $f) {
         $qp->execute([(string) $e['id'], (string) $f, $j]);

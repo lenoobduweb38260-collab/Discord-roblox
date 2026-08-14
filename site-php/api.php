@@ -972,6 +972,125 @@ function blacklist_diffuser(array $cibles, string $sens, string $discordId, stri
     return $rapport;
 }
 
+// ── 📥 Le sens inverse : Discord → panel ──────────────────────────
+// Une blacklist posée SUR DISCORD (commande /blacklist du staff, ou un
+// ticket du QG résolu en blacklist) n'existait que dans le bot. Elle est
+// maintenant rapatriée ici, avec sa preuve, pour que le panel soit la
+// mémoire complète des sanctions — quel que soit l'endroit où elles ont
+// été prononcées.
+function blacklist_importer(array &$state): array {
+    $rapport = ['ajoutees' => 0, 'completees' => 0, 'levees' => 0, 'reactivees' => 0, 'bots' => []];
+    $parId = [];   // discordId → index dans $state['blacklist']
+    foreach ($state['blacklist'] as $i => $e) {
+        $cid = preg_replace('/\D+/', '', (string) ($e['discordId'] ?? ''));
+        if ($cid !== '') $parId[$cid] = $i;
+    }
+    $vusParBot = [];   // botId → [discordId, …] tels que le bot les connaît
+
+    foreach ($state['bots'] ?? [] as $b) {
+        $agent = trim((string) ($b['agentName'] ?? ''));
+        $botId = (string) ($b['id'] ?? '');
+        $botNom = (string) ($b['name'] ?? $botId);
+        if ($agent === '') continue;
+        $base = '/agent/bots/' . rawurlencode($agent) . '/proxy';
+        [$code, $data] = agent_get($base . '/blacklist', 20);
+        if ($code !== 200 || !isset($data['blacklist'])) {
+            $rapport['bots'][] = ['bot' => $botNom, 'ok' => false, 'message' => $code === 0
+                ? 'Bot injoignable — ses sanctions Discord ne sont pas remontées.'
+                : "Le bot a répondu HTTP $code."];
+            continue;
+        }
+        // Les preuves vivent dans l'historique : on retient la plus récente
+        // pour chaque personne (l'historique est déjà trié du plus récent).
+        $preuves = [];
+        [$hc, $hd] = agent_get($base . '/blacklist-historique', 20);
+        if ($hc === 200) {
+            foreach ((array) ($hd['historique'] ?? []) as $h) {
+                $uid = preg_replace('/\D+/', '', (string) ($h['userId'] ?? ''));
+                if ($uid === '' || ($h['action'] ?? '') !== 'blacklist') continue;
+                if (!isset($preuves[$uid]) && trim((string) ($h['proof'] ?? '')) !== '') {
+                    $preuves[$uid] = (string) $h['proof'];
+                }
+            }
+        }
+
+        $vus = [];
+        foreach ((array) $data['blacklist'] as $r) {
+            $cid = preg_replace('/\D+/', '', (string) ($r['userId'] ?? ''));
+            if ($cid === '') continue;
+            $vus[] = $cid;
+            $quand = strtotime((string) ($r['at'] ?? '')) ?: time();
+
+            if (isset($parId[$cid])) {
+                // Déjà au panel : on complète sans rien écraser.
+                $e = &$state['blacklist'][$parId[$cid]];
+                $bots = array_values(array_unique(array_merge((array) ($e['bots'] ?? []), [$botId])));
+                $e['bots'] = $bots;
+                if (($e['reason'] ?? '') === '' && ($r['reason'] ?? '') !== '') $e['reason'] = cleanString((string) $r['reason'], 800);
+                if (($e['preuveDiscord'] ?? '') === '' && isset($preuves[$cid])) {
+                    $e['preuveDiscord'] = cleanString($preuves[$cid], 1000);
+                    $rapport['completees']++;
+                }
+                // Le bot la connaît de nouveau : le drapeau « levée » tombe.
+                // Il faut le COMPTER, sinon rien n'est enregistré et le
+                // drapeau réapparaît au prochain chargement.
+                if (!empty($e['leveeSurDiscord'])) {
+                    unset($e['leveeSurDiscord']);
+                    $rapport['reactivees']++;
+                }
+                unset($e);
+                continue;
+            }
+
+            // Nouvelle fiche, créée depuis Discord. L'identifiant est déduit
+            // de l'ID Discord : resynchroniser ne crée jamais de doublon.
+            $entree = [
+                'id' => 'BL-D-' . $cid,
+                'discordId' => $cid,
+                'username' => cleanString((string) ($r['tag'] ?? '') ?: $cid, 80),
+                'reason' => cleanString((string) ($r['reason'] ?? '') ?: 'Aucun motif précisé sur Discord', 800),
+                'severity' => 'moyenne',
+                'portee' => 'bot',
+                'bots' => [$botId],
+                'server' => $botNom,
+                'author' => 'Discord · ' . (string) ($r['by'] ?? 'staff du bot'),
+                'date' => date('Y-m-d', $quand),
+                'origine' => 'discord',
+                'preuveDiscord' => isset($preuves[$cid]) ? cleanString($preuves[$cid], 1000) : '',
+                'diffusion' => [['bot' => $botNom, 'ok' => true, 'message' => 'Prononcée sur Discord, déjà appliquée.']],
+                'proofs' => [],
+            ];
+            $state['blacklist'][] = $entree;
+            $parId[$cid] = count($state['blacklist']) - 1;
+            $rapport['ajoutees']++;
+        }
+        $vusParBot[$botId] = $vus;
+        $rapport['bots'][] = ['bot' => $botNom, 'ok' => true,
+            'message' => count($vus) . ' sanction(s) active(s) sur ce bot.'];
+    }
+
+    // Levée côté Discord : on le SIGNALE, on ne supprime pas. Une fiche peut
+    // porter des preuves téléversées ici : les effacer sans demander serait
+    // une perte sèche.
+    foreach ($state['blacklist'] as $i => $e) {
+        $cid = preg_replace('/\D+/', '', (string) ($e['discordId'] ?? ''));
+        if ($cid === '' || ($e['origine'] ?? '') !== 'discord') continue;
+        $encore = false;
+        foreach ((array) ($e['bots'] ?? []) as $bid) {
+            if (isset($vusParBot[$bid]) && in_array($cid, $vusParBot[$bid], true)) { $encore = true; break; }
+        }
+        // Seuls les bots réellement interrogés comptent : un bot éteint ne
+        // doit pas faire passer ses sanctions pour levées.
+        $interroge = false;
+        foreach ((array) ($e['bots'] ?? []) as $bid) if (isset($vusParBot[$bid])) $interroge = true;
+        if ($interroge && !$encore && empty($e['leveeSurDiscord'])) {
+            $state['blacklist'][$i]['leveeSurDiscord'] = true;
+            $rapport['levees']++;
+        }
+    }
+    return $rapport;
+}
+
 // Vérifie le droit de toucher à ce serveur, puis renvoie le nom du bot.
 function exiger_serveur(string $guildId): array {
     $etat = loadState();
@@ -1328,6 +1447,7 @@ switch ($action) {
             'server' => $portee === 'global' ? 'Global' : (string) $cibles[0]['nom'],
             'author' => moi_nom(),
             'date' => date('Y-m-d'),
+            'origine' => 'site',
             'proofs' => [],
         ];
 
@@ -1362,6 +1482,16 @@ switch ($action) {
         appendActivity($state, 'blacklist', 'Blacklist retirée', (string) ($removed['username'] ?? $id));
         saveState($state);
         respond(['ok' => true, 'diffusion' => $diffusion, 'state' => $state]);
+
+    // 📥 Rapatrie dans le panel les blacklists prononcées sur Discord.
+    case 'blacklist.import':
+        $rapport = blacklist_importer($state);
+        if ($rapport['ajoutees'] || $rapport['completees'] || $rapport['levees'] || $rapport['reactivees']) {
+            appendActivity($state, 'blacklist', 'Import depuis Discord',
+                $rapport['ajoutees'] . ' ajoutée(s), ' . $rapport['completees'] . ' complétée(s)');
+            saveState($state);
+        }
+        respond(['ok' => true, 'import' => $rapport, 'state' => $state]);
 
     // 🔁 Réapplique une sanction sur Discord : sert quand un bot était éteint
     // au moment de l'ajout, ou pour les fiches créées avant que le site ne

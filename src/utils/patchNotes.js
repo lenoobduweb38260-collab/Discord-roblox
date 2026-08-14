@@ -544,9 +544,13 @@ const RELEASES = [
       '🔢 **Captcha : nombre d\'erreurs tolérées** (3 par défaut) puis **expulsion** — le membre peut revenir et réessayer. L\'expulsion se désactive si vous préférez',
       '🧹 **Captcha : rôle retiré en cas de réussite**, à choisir dans une liste — typiquement « Visiteur », celui qui bloquait l\'accès',
       '🔤 **Un code neuf à chaque tentative**, mêlant toujours lettres ET chiffres',
+      '📥 **Les sanctions prononcées sur Discord remontent dans le panel**, avec la preuve saisie par le staff. Automatique en arrivant sur la page, et un bouton « Importer depuis Discord » pour forcer',
+      '🏷️ Chaque fiche indique son **origine** : 💬 Discord ou 🖥️ Panel',
     ],
     amelioration: [
       '🗑️ Retirer une sanction **débannit** l\'utilisateur des serveurs concernés, au lieu de seulement effacer la fiche',
+      '🔄 **La synchronisation va dans les deux sens** : panel → Discord et Discord → panel. Une sanction levée sur Discord est *signalée* sur sa fiche, jamais supprimée — les preuves téléversées restent. Un bot éteint n\'est pas confondu avec une sanction levée',
+      '🧩 Réimporter ne crée jamais de doublon : l\'identifiant de fiche est déduit de l\'identifiant Discord',
       '⚡ **Les pop-ups du site ne rament plus** : le décor animé du fond est mis en pause tant qu\'une fenêtre est ouverte. Mesuré sur un appareil lent : 850 ms de travail par 3 s → 69 ms',
       '📱 La page derrière une pop-up ne défile plus sous le doigt sur téléphone',
     ],
