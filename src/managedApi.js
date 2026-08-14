@@ -464,6 +464,50 @@ function startManagedApi(client, baseDir) {
         }
       }
 
+      // ----- 🚨 Échantillons anti-scam : mis en commun entre TOUS les bots -----
+      // Un échantillon ajouté sur un bot ne valait que pour lui : chaque bot a
+      // sa propre base. Le site fait maintenant la mise en commun — il lit les
+      // échantillons de chacun et distribue aux autres ceux qui leur manquent.
+      // On échange les EMPREINTES (SHA-256 + dHash), pas les images : rien de
+      // lourd ne circule, et le bot qui reçoit n'a rien à recalculer.
+      if (url.pathname.startsWith('/scam-echantillon')) {
+        const { listGlobalSamples, insertSample, GLOBAL_SCOPE } = require('./utils/scamImages');
+
+        if (req.method === 'GET' && url.pathname === '/scam-echantillons') {
+          return send(200, {
+            echantillons: listGlobalSamples.all(GLOBAL_SCOPE).map((s) => ({
+              id: s.id, nom: s.name, sha256: s.sha256, dhash: s.dhash,
+              parQui: s.added_by, quand: s.added_at,
+            })),
+          });
+        }
+
+        const body = await readBody(req);
+        const sha = String(body.sha256 || '').trim().toLowerCase();
+        if (!/^[0-9a-f]{64}$/.test(sha)) return send(400, { error: 'Empreinte SHA-256 invalide.' });
+        const deja = db.prepare('SELECT * FROM scam_images WHERE guild_id = ? AND sha256 = ?').get(GLOBAL_SCOPE, sha);
+
+        if (url.pathname === '/scam-echantillon-ajouter') {
+          if (deja) return send(200, { ok: true, deja: true, id: deja.id });
+          const dhash = String(body.dhash || '').trim();
+          const r = insertSample.run(
+            GLOBAL_SCOPE,
+            String(body.nom || '').slice(0, 120) || null,
+            sha,
+            /^[01]{64}$/.test(dhash) ? dhash : null,
+            String(body.parQui || 'site').slice(0, 25),
+            String(body.quand || new Date().toISOString()).slice(0, 40)
+          );
+          return send(200, { ok: true, deja: false, id: r.lastInsertRowid });
+        }
+
+        if (url.pathname === '/scam-echantillon-retirer') {
+          if (!deja) return send(200, { ok: true, absent: true });
+          db.prepare('DELETE FROM scam_images WHERE guild_id = ? AND sha256 = ?').run(GLOBAL_SCOPE, sha);
+          return send(200, { ok: true, absent: false });
+        }
+      }
+
       // ----- 🎫 Tickets de bannissement du QG (mode staff du dashboard) -----
       if (url.pathname.startsWith('/qg')) {
         const { hasPerm, applyBlacklist } = require('./utils/botTeam');

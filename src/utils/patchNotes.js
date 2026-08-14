@@ -578,6 +578,24 @@ const RELEASES = [
     fix: [],
     retrait: [],
   },
+  {
+    id: 'niveaux-tickets-logs-2026-08v',
+    title: 'Un seul niveau, tickets relancés et logs plus propres 📊',
+    ajout: [
+      '🔔 **Bouton « Relancer » sur les tickets** : le bot repingue l\'auteur avec un message taquin tiré au hasard (« Je crois que vous êtes passé sous un tunnel 🚇 »). Réservé au staff',
+      '📋 **Réponses types** (`/preset ajouter|modifier|supprimer|liste|apercu|menu`) : écrivez vos messages récurrents une fois, puis envoyez-les dans un ticket depuis une **liste déroulante**. Texte, embed, ou les deux — avec `{membre}`, `{staff}` et `{serveur}` remplacés à l\'envoi',
+      '🚨 **Les échantillons anti-scam sont communs à tous vos bots** : ajouté sur l\'un, il protège tous les autres. Seules les empreintes circulent, jamais les images',
+    ],
+    amelioration: [
+      '📊 **L\'écrit et le vocal ne font plus qu\'un seul niveau.** Vos XP existantes sont additionnées et le niveau recalculé — rien n\'est perdu. `/niveau voir` montre une barre de progression et le détail des deux sources ; `/niveau classement` n\'a plus d\'option à choisir',
+      '📥 **Plus rien à synchroniser à la main** : les sanctions Discord et les échantillons anti-scam remontent au chargement du site, puis toutes les 5 minutes. Rien ne part si l\'onglet est en arrière-plan',
+    ],
+    fix: [
+      '🩹 **Dans les logs, l\'« Après » était collé au texte d\'avant, dans la même citation.** `>>>` ouvre sur Discord une citation qui s\'étend jusqu\'à la fin du message : le titre et le nouveau texte y étaient aspirés. Avant/Après sont maintenant deux champs distincts — de même pour la ligne des pièces jointes d\'un message supprimé',
+      '🔇 **Fin des logs qui ne disent rien** : plus de « Auteur inconnu / Contenu indisponible » pour un message hors cache, et plus aucun log pour une suppression **dans le salon de logs** — effacer un vieux log y créait un nouveau log',
+    ],
+    retrait: [],
+  },
 ];
 
 // Découpe une catégorie en champs d'embed (max 1024 caractères par champ).

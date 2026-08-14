@@ -1091,6 +1091,92 @@ function blacklist_importer(array &$state): array {
     return $rapport;
 }
 
+// ── 🚨 Échantillons anti-scam communs à TOUS les bots ────────────
+// Chaque bot a sa propre base : un échantillon ajouté sur l'un ne valait
+// que pour lui. Le site fait la mise en commun — il lit ce que chacun
+// possède, en fait l'union, puis distribue à chaque bot ce qui lui
+// manque. Seules les EMPREINTES circulent (SHA-256 + dHash), pas les
+// images.
+//
+// Le site retient aussi les empreintes RETIRÉES : sans cela, un
+// échantillon supprimé sur un bot serait aussitôt remis par l'union
+// venant des autres.
+function scam_mettre_en_commun(array &$state): array {
+    $rapport = ['connus' => 0, 'distribues' => 0, 'bots' => []];
+    $retires = array_flip(array_map('strval', (array) ($state['scamRetires'] ?? [])));
+    $union = [];        // sha256 => échantillon
+    $possede = [];      // botId => [sha256 => true]
+    $joignables = [];
+
+    foreach ($state['bots'] ?? [] as $b) {
+        $agent = trim((string) ($b['agentName'] ?? ''));
+        $botId = (string) ($b['id'] ?? '');
+        $botNom = (string) ($b['name'] ?? $botId);
+        if ($agent === '') continue;
+        [$code, $data] = agent_get('/agent/bots/' . rawurlencode($agent) . '/proxy/scam-echantillons', 20);
+        if ($code !== 200 || !isset($data['echantillons'])) {
+            $rapport['bots'][] = ['bot' => $botNom, 'ok' => false, 'message' => $code === 0
+                ? 'Bot injoignable — laissé de côté pour cette fois.'
+                : ($code === 404
+                    ? "Ce bot est trop ancien : mettez-le à jour pour partager les échantillons."
+                    : "Le bot a répondu HTTP $code.")];
+            continue;
+        }
+        $joignables[$botId] = ['agent' => $agent, 'nom' => $botNom];
+        $possede[$botId] = [];
+        foreach ((array) $data['echantillons'] as $e) {
+            $sha = strtolower(trim((string) ($e['sha256'] ?? '')));
+            if (!preg_match('/^[0-9a-f]{64}$/', $sha)) continue;
+            $possede[$botId][$sha] = true;
+            if (isset($retires[$sha])) continue;   // retiré volontairement
+            if (!isset($union[$sha])) {
+                $union[$sha] = [
+                    'sha256' => $sha,
+                    'dhash' => (string) ($e['dhash'] ?? ''),
+                    'nom' => (string) ($e['nom'] ?? ''),
+                    'parQui' => (string) ($e['parQui'] ?? ''),
+                    'quand' => (string) ($e['quand'] ?? ''),
+                ];
+            } elseif (($union[$sha]['dhash'] ?? '') === '' && ($e['dhash'] ?? '') !== '') {
+                // Un bot sans jimp enregistre l'empreinte exacte seule :
+                // on garde l'empreinte visuelle dès qu'un bot l'a calculée.
+                $union[$sha]['dhash'] = (string) $e['dhash'];
+            }
+        }
+    }
+    $rapport['connus'] = count($union);
+
+    // Distribution : chaque bot reçoit ce qui lui manque, et perd ce qui a
+    // été retiré.
+    foreach ($joignables as $botId => $info) {
+        $ajouts = 0; $suppressions = 0; $echecs = 0;
+        foreach ($union as $sha => $e) {
+            if (isset($possede[$botId][$sha])) continue;
+            [$c] = agent_post_json('/agent/bots/' . rawurlencode($info['agent']) . '/proxy/scam-echantillon-ajouter', [
+                'sha256' => $e['sha256'], 'dhash' => $e['dhash'],
+                'nom' => $e['nom'], 'parQui' => $e['parQui'], 'quand' => $e['quand'],
+            ], 20);
+            if ($c === 200) { $ajouts++; $rapport['distribues']++; } else { $echecs++; }
+        }
+        foreach (array_keys($possede[$botId]) as $sha) {
+            if (!isset($retires[$sha])) continue;
+            [$c] = agent_post_json('/agent/bots/' . rawurlencode($info['agent']) . '/proxy/scam-echantillon-retirer',
+                ['sha256' => $sha], 20);
+            if ($c === 200) $suppressions++; else $echecs++;
+        }
+        $morceaux = [];
+        if ($ajouts) $morceaux[] = "$ajouts reçu(s)";
+        if ($suppressions) $morceaux[] = "$suppressions retiré(s)";
+        if ($echecs) $morceaux[] = "$echecs en échec";
+        $rapport['bots'][] = ['bot' => $info['nom'], 'ok' => $echecs === 0,
+            'message' => $morceaux ? implode(', ', $morceaux) . '.' : 'Déjà à jour.'];
+    }
+
+    // Mémoire du site : la liste commune, pour l'afficher sans réinterroger.
+    $state['scamEchantillons'] = array_values($union);
+    return $rapport;
+}
+
 // Vérifie le droit de toucher à ce serveur, puis renvoie le nom du bot.
 function exiger_serveur(string $guildId): array {
     $etat = loadState();
@@ -1483,15 +1569,34 @@ switch ($action) {
         saveState($state);
         respond(['ok' => true, 'diffusion' => $diffusion, 'state' => $state]);
 
-    // 📥 Rapatrie dans le panel les blacklists prononcées sur Discord.
+    // 📥 Rapatrie dans le panel les blacklists prononcées sur Discord, et met
+    // au passage les échantillons anti-scam en commun entre tous les bots.
     case 'blacklist.import':
         $rapport = blacklist_importer($state);
-        if ($rapport['ajoutees'] || $rapport['completees'] || $rapport['levees'] || $rapport['reactivees']) {
+        $avant = json_encode($state['scamEchantillons'] ?? []);
+        $scam = scam_mettre_en_commun($state);
+        $scamBouge = $scam['distribues'] > 0 || json_encode($state['scamEchantillons'] ?? []) !== $avant;
+        if ($rapport['ajoutees'] || $rapport['completees'] || $rapport['levees'] || $rapport['reactivees'] || $scamBouge) {
             appendActivity($state, 'blacklist', 'Import depuis Discord',
                 $rapport['ajoutees'] . ' ajoutée(s), ' . $rapport['completees'] . ' complétée(s)');
             saveState($state);
         }
-        respond(['ok' => true, 'import' => $rapport, 'state' => $state]);
+        respond(['ok' => true, 'import' => $rapport, 'scam' => $scam, 'state' => $state]);
+
+    // 🚨 Retire un échantillon anti-scam de TOUS les bots.
+    case 'scam.retirer':
+        $sha = strtolower(trim((string) ($input['sha256'] ?? '')));
+        if (!preg_match('/^[0-9a-f]{64}$/', $sha)) {
+            respond(['ok' => false, 'error' => 'Empreinte invalide.'], 422);
+        }
+        // Mémorisé comme retiré AVANT la distribution : sinon l'union le
+        // remettrait aussitôt depuis les autres bots.
+        $state['scamRetires'] = array_values(array_unique(array_merge(
+            array_map('strval', (array) ($state['scamRetires'] ?? [])), [$sha]
+        )));
+        $scam = scam_mettre_en_commun($state);
+        saveState($state);
+        respond(['ok' => true, 'scam' => $scam, 'state' => $state]);
 
     // 🔁 Réapplique une sanction sur Discord : sert quand un bot était éteint
     // au moment de l'ajout, ou pour les fiches créées avant que le site ne
