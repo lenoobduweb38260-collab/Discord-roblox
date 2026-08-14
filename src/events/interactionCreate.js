@@ -133,7 +133,11 @@ module.exports = {
     }
 
     // ----- Sélecteur de raison du panneau de tickets (menu déroulant) -----
-    if (interaction.isStringSelectMenu() && interaction.customId === 'tktmenu') {
+    // …et sélecteur des réponses types à l'intérieur d'un ticket.
+    if (
+      interaction.isStringSelectMenu() &&
+      (interaction.customId === 'tktmenu' || interaction.customId.startsWith('tktpreset:'))
+    ) {
       if (!interaction.inGuild()) return;
       return handleTicketButton(interaction);
     }

@@ -193,6 +193,22 @@ CREATE TABLE IF NOT EXISTS tickets (
   closed_by  TEXT
 );
 
+-- 📋 Presets de tickets : réponses toutes prêtes, écrites par le staff, que
+-- le bot envoie dans un ticket depuis une liste déroulante.
+CREATE TABLE IF NOT EXISTS ticket_presets (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  guild_id    TEXT NOT NULL,
+  label       TEXT NOT NULL,
+  emoji       TEXT,
+  description TEXT,
+  content     TEXT,
+  embed_title TEXT,
+  embed_text  TEXT,
+  embed_color TEXT,
+  created_by  TEXT,
+  created_at  TEXT
+);
+
 CREATE TABLE IF NOT EXISTS ticket_panels (
   id         INTEGER PRIMARY KEY AUTOINCREMENT,
   guild_id   TEXT NOT NULL,

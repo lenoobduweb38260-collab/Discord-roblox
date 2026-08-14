@@ -1964,6 +1964,7 @@
     // ⚙️ Configuration
     { id: "cmd.config", cat: "⚙️ Configuration", label: "/config", desc: "Panneau central : rôles, salons, XP, whitelist", g: ["staff", "admin"] },
     { id: "cmd.ticket", cat: "⚙️ Configuration", label: "/ticket", desc: "Tickets : panneau, raisons, ouverture pour un membre", g: ["staff", "admin"] },
+    { id: "cmd.preset", cat: "⚙️ Configuration", label: "/preset", desc: "Réponses types envoyées dans les tickets", g: ["staff", "admin"] },
     { id: "cmd.embed", cat: "⚙️ Configuration", label: "/embed", desc: "Composer un embed envoyé par le bot", g: ["staff", "admin"] },
     { id: "cmd.reseaux", cat: "⚙️ Configuration", label: "/reseaux", desc: "Annonces automatiques des réseaux sociaux", g: ["staff", "admin"] },
     { id: "cmd.staff", cat: "⚙️ Configuration", label: "/arrivee · /depart", desc: "Annonces d'arrivée et de départ de poste", g: ["staff", "admin"] },
@@ -4059,5 +4060,15 @@
     const cfg = siteConfig();
     const delay = cfg.bootScreen === false ? 0 : Math.min(4000, Math.max(0, Number(cfg.bootDuration ?? 650)));
     setTimeout(() => boot.classList.add("is-hidden"), delay);
+    // 📥 Les sanctions prononcées sur Discord sont chargées TOUT DE SUITE,
+    // sans attendre qu'on ouvre la page Blacklist et sans rien cliquer.
+    // En arrière-plan : l'interface est déjà utilisable pendant ce temps.
+    if (estEquipeSite()) setTimeout(() => importerBlacklistDiscord(false), 1200);
+    // …puis on reste à jour tout seul. Onglet caché = on ne fait rien : inutile
+    // d'interroger les bots pendant qu'on regarde ailleurs.
+    setInterval(() => {
+      if (document.hidden || !estEquipeSite()) return;
+      importerBlacklistDiscord(false);
+    }, 5 * 60 * 1000);
   });
 })();

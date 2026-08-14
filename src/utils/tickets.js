@@ -372,13 +372,18 @@ async function provisionTicket(guild, type, owner) {
     )
     .setFooter({ text: 'Utilisez le bouton ci-dessous pour fermer le ticket.' })
     .setTimestamp();
+  const ticketId = result.lastInsertRowid;
   const closeRow = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId(`tktclose:${result.lastInsertRowid}`).setLabel('Fermer le ticket').setEmoji('🔒').setStyle(ButtonStyle.Danger)
+    new ButtonBuilder().setCustomId(`tktclose:${ticketId}`).setLabel('Fermer le ticket').setEmoji('🔒').setStyle(ButtonStyle.Danger),
+    // 🔔 Relance : repingue l'auteur du ticket quand il ne répond plus.
+    new ButtonBuilder().setCustomId(`tktrevive:${ticketId}`).setLabel('Relancer').setEmoji('🔔').setStyle(ButtonStyle.Secondary)
   );
+  // 📋 Réponses types écrites par le staff (/preset), s'il y en a.
+  const presetRow = require('./ticketPresets').menuPresets(guild.id, ticketId);
   await channel.send({
     content: `<@${owner.id}>${roleMentions ? ` ${roleMentions}` : ''}`,
     embeds: [intro],
-    components: [closeRow],
+    components: presetRow ? [closeRow, presetRow] : [closeRow],
   });
   return { channel, num };
 }
@@ -641,6 +646,53 @@ async function resetPanelMenu(interaction) {
   }
 }
 
+// 🔔 Relances taquines : le bot repingue l'auteur d'un ticket resté sans
+// réponse. Plusieurs versions, tirées au hasard, pour ne pas radoter.
+const RELANCES = [
+  'Je crois que vous êtes passé sous un tunnel 🚇',
+  'Allô ? La Terre appelle 🛰️',
+  'Votre ticket prend la poussière 🧹',
+  'On vous a perdu en route ? 🗺️',
+  'Toujours là, ou parti chercher du pain ? 🥖',
+  'Le staff attend, le café refroidit ☕',
+  'Ce ticket fait la sieste depuis un moment 😴',
+  'Un petit signe de vie ? 👋',
+  'Votre connexion a dû tomber dans un ravin 📉',
+  'On ne vous oublie pas… mais vous, si ? 🤔',
+  'Message envoyé depuis un pigeon voyageur 🐦',
+  'Le silence est d\'or, mais là ça devient cher 💰',
+];
+
+async function reviveTicket(interaction, ticketId) {
+  const ticket = getTicket.get(ticketId, interaction.guildId);
+  if (!ticket) {
+    return interaction.reply({ content: '❌ Ce ticket n\'existe plus.', flags: MessageFlags.Ephemeral });
+  }
+  if (ticket.status !== 'ouvert') {
+    return interaction.reply({ content: '🔒 Ce ticket est fermé : inutile de relancer.', flags: MessageFlags.Ephemeral });
+  }
+  const type = ticket.type_id ? getType.get(ticket.type_id, interaction.guildId) : null;
+  if (!canManageTicket(interaction.member, type)) {
+    return interaction.reply({ content: '⛔ Seul le staff peut relancer un ticket.', flags: MessageFlags.Ephemeral });
+  }
+  // Relancer l'auteur en le pinguant soi-même n'aurait aucun intérêt.
+  if (ticket.user_id === interaction.user.id) {
+    return interaction.reply({
+      content: '🙂 C\'est votre propre ticket : la relance sert à réveiller quelqu\'un d\'autre.',
+      flags: MessageFlags.Ephemeral,
+    });
+  }
+  const texte = RELANCES[Math.floor(Math.random() * RELANCES.length)];
+  const embed = new EmbedBuilder()
+    .setColor(COLORS.WARNING)
+    .setTitle('🔔 Petite relance')
+    .setDescription(`${texte}\n\n<@${ticket.user_id}>, le staff attend votre réponse pour avancer sur ce ticket.`)
+    .setFooter({ text: `Relancé par ${interaction.user.username}` })
+    .setTimestamp();
+  await interaction.channel.send({ content: `<@${ticket.user_id}>`, embeds: [embed] }).catch(() => null);
+  return interaction.reply({ content: '🔔 Relance envoyée.', flags: MessageFlags.Ephemeral });
+}
+
 async function handleTicketButton(interaction) {
   try {
     // Sélecteur de raison (menu déroulant) : la valeur choisie = l'ID du type.
@@ -650,11 +702,18 @@ async function handleTicketButton(interaction) {
       await resetPanelMenu(interaction);
       return;
     }
+    // 📋 Réponse type choisie dans un ticket.
+    if (interaction.isStringSelectMenu() && interaction.customId.startsWith('tktpreset:')) {
+      const ticket = getTicket.get(Number(interaction.customId.split(':')[1]), interaction.guildId);
+      const type = ticket?.type_id ? getType.get(ticket.type_id, interaction.guildId) : null;
+      return await require('./ticketPresets').envoyerPreset(interaction, canManageTicket(interaction.member, type));
+    }
     const [prefix, rawId] = interaction.customId.split(':');
     const id = Number(rawId);
     if (prefix === 'tktopen') return await openTicket(interaction, id);
     if (prefix === 'tktclose') return await closeTicket(interaction, id);
     if (prefix === 'tktdel') return await deleteTicket(interaction, id);
+    if (prefix === 'tktrevive') return await reviveTicket(interaction, id);
   } catch (err) {
     console.error('Erreur ticket :', err);
     // Interaction morte (réponse trop tardive ou en double) : inutile — et
