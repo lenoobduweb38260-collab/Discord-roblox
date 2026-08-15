@@ -120,6 +120,19 @@ module.exports = {
     }
 
     if (sub === 'voir') {
+      const V = require('../utils/carteVisuelle');
+      const png = await V.fabriquer(
+        V.planPermis(permit, {
+          serveur: interaction.guild?.name,
+          titulaire: user.username,
+          delivre: new Date(permit.issued_at).toLocaleDateString('fr-FR'),
+        }),
+        { photoUrl: user.displayAvatarURL({ size: 512, extension: 'png' }) }
+      ).catch(() => null);
+      if (png) {
+        const { AttachmentBuilder } = require('discord.js');
+        return interaction.reply({ files: [new AttachmentBuilder(png, { name: 'permis.png' })] });
+      }
       return interaction.reply({ embeds: [buildPermitEmbed(permit, user)] });
     }
 

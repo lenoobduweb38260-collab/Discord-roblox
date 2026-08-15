@@ -160,6 +160,16 @@ module.exports = {
           flags: MessageFlags.Ephemeral,
         });
       }
+      // 🪪 Document dessiné par le bot. Si jimp manque ou échoue, on retombe
+      // sur l'embed classique : la commande répond toujours.
+      const V = require('../utils/carteVisuelle');
+      const png = await V.fabriquer(V.planCarte(card, { serveur: interaction.guild?.name }), {
+        photoUrl: card.photo_url || user.displayAvatarURL({ size: 512, extension: 'png' }),
+      }).catch(() => null);
+      if (png) {
+        const { AttachmentBuilder } = require('discord.js');
+        return interaction.reply({ files: [new AttachmentBuilder(png, { name: 'carte-identite.png' })] });
+      }
       return interaction.reply({ embeds: [buildCardEmbed(card, user)] });
     }
 
