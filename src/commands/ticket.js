@@ -247,7 +247,7 @@ module.exports = {
       const lines = types.map((t) => {
         const roles = supportRoleIds(t).map((id) => `<@&${id}>`).join(' ');
         const blocked = t.enabled === 0 ? ' — 🔒 **bloquée**' : '';
-        return `• ${t.emoji ? `${t.emoji} ` : ''}**${t.label}** — catégorie <#${t.category_id}>${roles ? ` — support ${roles}` : ''}${blocked}`;
+        return `➜ ${t.emoji ? `${t.emoji} ` : ''}**${t.label}** — catégorie <#${t.category_id}>${roles ? ` — support ${roles}` : ''}${blocked}`;
       });
       const nbBlocked = types.filter((t) => t.enabled === 0).length;
       const embed = new EmbedBuilder()

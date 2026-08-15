@@ -93,7 +93,7 @@ module.exports = {
         .setDescription(
           feeds.length
             ? feeds
-                .map((f) => `• ${PLATFORMS[f.platform]?.emoji || '📡'} **${PLATFORMS[f.platform]?.label || f.platform}** — \`${f.handle}\` → <#${f.channel_id}>`)
+                .map((f) => `➜ ${PLATFORMS[f.platform]?.emoji || '📡'} **${PLATFORMS[f.platform]?.label || f.platform}** — \`${f.handle}\` → <#${f.channel_id}>`)
                 .join('\n')
             : '*Aucun réseau suivi — `/reseaux ajouter` pour commencer.*'
         )

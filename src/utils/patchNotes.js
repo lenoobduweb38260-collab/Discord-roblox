@@ -654,7 +654,7 @@ function addChunked(embed, name, value) {
   const bullets = raw
     .map((l) => l.trim())
     .filter(Boolean)
-    .map((l) => (l.startsWith('•') ? l : `• ${l}`));
+    .map((l) => (l.startsWith('➜') ? l : `➜ ${l}`));
   if (!bullets.length) return;
   let buf = [];
   let len = 0;

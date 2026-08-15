@@ -52,7 +52,7 @@ module.exports = {
         return interaction.reply({ content: '📋 Personne n\'est en service actuellement.', flags: MessageFlags.Ephemeral });
       }
       const lines = open.map(
-        (s) => `• <@${s.user_id}> — depuis <t:${Math.floor(new Date(s.start_at).getTime() / 1000)}:R>`
+        (s) => `➜ <@${s.user_id}> — depuis <t:${Math.floor(new Date(s.start_at).getTime() / 1000)}:R>`
       );
       const embed = new EmbedBuilder()
         .setColor(COLORS.INFO)

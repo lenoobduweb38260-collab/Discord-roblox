@@ -74,7 +74,7 @@ module.exports = [
       const sub = interaction.options.getSubcommand();
       if (sub === 'liste') {
         const ids = listImmunity();
-        const lines = ids.length ? ids.map((id) => `• <@${id}> (\`${id}\`)`).join('\n') : '*Aucun utilisateur immunisé (le créateur l\'est toujours automatiquement).*';
+        const lines = ids.length ? ids.map((id) => `➜ <@${id}> (\`${id}\`)`).join('\n') : '*Aucun utilisateur immunisé (le créateur l\'est toujours automatiquement).*';
         return interaction.reply({ content: `🛡️ **Immunités (${ids.length})**\n${lines}`, flags: MessageFlags.Ephemeral });
       }
       const user = interaction.options.getUser('utilisateur');

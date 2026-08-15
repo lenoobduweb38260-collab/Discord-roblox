@@ -189,9 +189,9 @@ module.exports = {
       for (const [roleId, managerIds] of byRole) {
         const authorized = isStaff || managerIds.some((id) => interaction.member.roles.cache.has(id));
         if (isStaff) {
-          lines.push(`• <@&${roleId}> — gérants : ${managerIds.map((id) => `<@&${id}>`).join(', ')}`);
+          lines.push(`➜ <@&${roleId}> — gérants : ${managerIds.map((id) => `<@&${id}>`).join(', ')}`);
         } else if (authorized) {
-          lines.push(`• <@&${roleId}>`);
+          lines.push(`➜ <@&${roleId}>`);
         }
       }
       if (!lines.length) {

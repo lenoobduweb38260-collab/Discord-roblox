@@ -88,7 +88,7 @@ module.exports = {
       const embed = new EmbedBuilder()
         .setColor(0x9146ff)
         .setTitle(`🎴 Collection de ${user.username} (${rows.length})`)
-        .setDescription(rows.length ? rows.map((r) => `• ${r.name}`).join('\n').slice(0, 4000) : '*Aucun personnage réclamé.*');
+        .setDescription(rows.length ? rows.map((r) => `➜ ${r.name}`).join('\n').slice(0, 4000) : '*Aucun personnage réclamé.*');
       return interaction.reply({ embeds: [embed] });
     }
 

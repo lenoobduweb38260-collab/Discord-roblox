@@ -144,7 +144,7 @@ function buildEnterpriseEmbed(ent, headIds = [], employeeIds = []) {
   if (ent.insurance) {
     embed.addFields({
       name: '📋 Types d\'assurance',
-      value: types.length ? types.map((t) => `• ${t}`).join('\n') : '*À définir*',
+      value: types.length ? types.map((t) => `➜ ${t}`).join('\n') : '*À définir*',
       inline: false,
     });
   }

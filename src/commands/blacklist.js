@@ -77,7 +77,7 @@ module.exports = {
           rows.length
             ? rows
                 .slice(0, 30)
-                .map((r) => `• <@${r.user_id}> (\`${r.user_id}\`) — ${r.reason || '*aucune raison*'} — par <@${r.by_id}>`)
+                .map((r) => `➜ <@${r.user_id}> (\`${r.user_id}\`) — ${r.reason || '*aucune raison*'} — par <@${r.by_id}>`)
                 .join('\n') + (rows.length > 30 ? `\n… et ${rows.length - 30} autre(s)` : '')
             : '*Personne n\'est blacklisté.*'
         )
@@ -106,8 +106,8 @@ module.exports = {
       }
       return publicReply(
         `🚫 **${result.tag}** blacklisté.\n` +
-          `• MP ${result.dmOk ? 'envoyé ✅' : 'impossible (MP fermés) ⚠️'}${state('deban_invite') ? ' (avec le serveur de déban)' : ' — ⚠️ aucun serveur de déban configuré'}\n` +
-          `• Banni sur **${result.banned}** serveur(s) — il sera re-banni automatiquement à chaque arrivée.`
+          `➜ MP ${result.dmOk ? 'envoyé ✅' : 'impossible (MP fermés) ⚠️'}${state('deban_invite') ? ' (avec le serveur de déban)' : ' — ⚠️ aucun serveur de déban configuré'}\n` +
+          `➜ Banni sur **${result.banned}** serveur(s) — il sera re-banni automatiquement à chaque arrivée.`
       );
     }
 

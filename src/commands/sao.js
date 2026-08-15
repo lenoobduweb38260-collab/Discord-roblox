@@ -310,9 +310,9 @@ module.exports = {
         .setTitle('😴 Gains AFK récoltés')
         .setDescription(
           `Pendant **${Math.floor(elapsedMin)} min** hors-ligne, ton personnage a farmé :\n` +
-            `• **+${xpGain} XP** d'aventure${levels ? ` (⭐ niveau ${p.level} !)` : ''}\n` +
-            `• **+${colGain} Col**\n` +
-            `• **+${serverXp} XP serveur** (auto)` +
+            `➜ **+${xpGain} XP** d'aventure${levels ? ` (⭐ niveau ${p.level} !)` : ''}\n` +
+            `➜ **+${colGain} Col**\n` +
+            `➜ **+${serverXp} XP serveur** (auto)` +
             badgesText(newBadges) +
             `\n\n💰 Total : ${p.col} Col · ⭐ Niveau ${p.level}`
         );

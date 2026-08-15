@@ -74,7 +74,7 @@ function whitelistSummary(guildId) {
     byRole.get(r.role_id).push(r.manager_role_id);
   }
   return [...byRole.entries()]
-    .map(([roleId, managers]) => `• <@&${roleId}> ← gérants : ${managers.map((m) => `<@&${m}>`).join(', ')}`)
+    .map(([roleId, managers]) => `➜ <@&${roleId}> ← gérants : ${managers.map((m) => `<@&${m}>`).join(', ')}`)
     .join('\n');
 }
 
@@ -428,7 +428,7 @@ function reseauxView(guild) {
     .setDescription(
       (feeds.length
         ? feeds
-            .map((f) => `• ${PLATFORMS[f.platform]?.emoji || '📡'} **${PLATFORMS[f.platform]?.label || f.platform}** — \`${f.handle}\` → <#${f.channel_id}>`)
+            .map((f) => `➜ ${PLATFORMS[f.platform]?.emoji || '📡'} **${PLATFORMS[f.platform]?.label || f.platform}** — \`${f.handle}\` → <#${f.channel_id}>`)
             .join('\n')
         : '*Aucun réseau suivi.*') +
         '\n\nLe bot vérifie **toutes les 5 minutes** et annonce automatiquement les **lives Twitch** ' +
@@ -455,7 +455,7 @@ function ticketsView(guild, selectedId = null) {
           const roles = supportRoleIds(t).map((r) => `<@&${r}>`).join(' ');
           const support = roles ? ` — support ${roles}` : '';
           const blocked = t.enabled === 0 ? ' — 🔒 bloquée' : '';
-          return `• ${t.emoji ? t.emoji + ' ' : ''}**${t.label}** — catégorie « ${cat} »${support}${blocked}`;
+          return `➜ ${t.emoji ? t.emoji + ' ' : ''}**${t.label}** — catégorie « ${cat} »${support}${blocked}`;
         })
         .join('\n')
     : '*Aucun type de ticket configuré*';
