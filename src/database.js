@@ -461,6 +461,12 @@ for (const column of [
   'welcome_image TEXT',        // grande image de fond de l'embed
   'welcome_avatar TEXT',       // 'rond' | 'grand' | 'aucun' — cadre de la photo
   'welcome_title TEXT',        // titre de l'embed
+  // 🎨 Identité visuelle appliquée à TOUS les embeds du bot
+  'embed_style INTEGER',                // 1 = identité active (défaut)
+  'embed_accent TEXT',                  // couleur d'accent (#RRGGBB)
+  'embed_footer INTEGER',               // 1 = pied de page « bot • serveur »
+  'embed_timestamp INTEGER',            // 1 = horodatage automatique
+  'embed_force_color INTEGER',          // 1 = couleur unique, 0 = couleurs par type
   'welcome_style TEXT',                 // 'classique' | 'detaille'
   'welcome_rules_channel_id TEXT',      // salon règlement cité dans l'accueil
   'welcome_help_channel_id TEXT',       // salon d'aide / tickets cité dans l'accueil
@@ -614,6 +620,11 @@ const DEFAULT_CONFIG = {
   welcome_mention: 0,
   autorole_role_ids: null,
   welcome_color: null,
+  embed_style: 1,
+  embed_accent: null,
+  embed_footer: 1,
+  embed_timestamp: 1,
+  embed_force_color: 0,
   welcome_style: null,
   welcome_rules_channel_id: null,
   welcome_help_channel_id: null,

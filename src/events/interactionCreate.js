@@ -13,6 +13,12 @@ const getEmployees = db.prepare('SELECT user_id FROM enterprise_employees WHERE 
 module.exports = {
   name: Events.InteractionCreate,
   async execute(interaction) {
+    // 🎨 On retient le serveur de cette interaction : les routes de réponse
+    // (/interactions/…/callback, /webhooks/…) ne le disent pas, et sans lui
+    // l'identité visuelle par serveur ne s'appliquerait pas aux réponses de
+    // commandes — c'est-à-dire à la plupart des embeds du bot.
+    try { require('../utils/styleEmbeds').noterInteraction(interaction); } catch {}
+
     // ----- Autocomplétion -----
     if (interaction.isAutocomplete()) {
       const command = interaction.client.commands.get(interaction.commandName);

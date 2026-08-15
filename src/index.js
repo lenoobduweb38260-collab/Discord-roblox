@@ -227,6 +227,15 @@ async function start() {
     partials: [Partials.GuildMember, Partials.Message, Partials.Channel],
   });
 
+  // 🎨 Identité visuelle des embeds, posée au seul passage obligé : la couche
+  // REST. Tout ce que le bot envoie — salon, réponse de commande, message
+  // privé, webhook — reçoit la même couleur d'accent et le même pied de page.
+  try {
+    require('./utils/styleEmbeds').installer(client);
+  } catch (err) {
+    console.warn(`⚠️ Identité des embeds non installée : ${err.message}`);
+  }
+
   client.commands = new Collection();
   for (const command of loadCommandFiles()) {
     client.commands.set(command.data.name, command);

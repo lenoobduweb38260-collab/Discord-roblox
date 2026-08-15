@@ -103,6 +103,12 @@ function startManagedApi(client, baseDir) {
     welcome_image: 's',
     welcome_avatar: 's',
     welcome_title: 't',
+    // Identité visuelle des embeds
+    embed_style: 'b',
+    embed_accent: 's',
+    embed_footer: 'b',
+    embed_timestamp: 'b',
+    embed_force_color: 'b',
     welcome_style: 's',
     welcome_rules_channel_id: 's',
     welcome_help_channel_id: 's',

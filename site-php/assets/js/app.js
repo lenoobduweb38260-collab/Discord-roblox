@@ -76,6 +76,7 @@
   const modules = [
     { id: "overview", label: "Vue d'ensemble", desc: "État global, activité et identité du serveur" },
     { id: "rp", label: "Module RP", desc: "Personnages, économie et systèmes de jeu" },
+    { id: "identite", label: "Identité des embeds", desc: "Couleur et signature de TOUS les messages du bot" },
     { id: "arrivals", label: "Arrivées & départs", desc: "Messages et salons d'accueil" },
     { id: "roles", label: "Rôles & sécurité", desc: "Protection, permissions et autorôles" },
     { id: "channels", label: "Salons & logs", desc: "Journalisation complète du serveur" },
@@ -1095,6 +1096,7 @@
     switch (moduleId) {
       case "overview": return overviewModule(server);
       case "rp": return rpModule();
+      case "identite": return identiteModule();
       case "arrivals": return arrivalsModule();
       case "roles": return rolesModule();
       case "channels": return channelsModule();
@@ -1134,6 +1136,63 @@
       ${champBascule("rp_locked", "Verrouiller les modifications RP", "Empêche les changements de cartes et de permis.")}
     </div>`;
     return modulePanel("Module RP", "Personnages, permis, entreprises et rôles métier.", body, "rp");
+  }
+
+  // 🎨 Identité visuelle appliquée à TOUS les embeds du bot.
+  function identiteModule() {
+    const cfg = cfgCourant();
+    const accent = /^#[0-9a-f]{6}$/i.test(cfg.embed_accent || "") ? cfg.embed_accent : "#5865F2";
+    const body = `<div class="builder-hint">🎨 Ces réglages s'appliquent à <b>tout ce que le bot envoie</b> : arrivées, logs, sanctions, tickets, niveaux, réponses de commandes… Un seul endroit, partout à la fois.</div>
+      <div class="mt-16">
+        ${champBascule("embed_style", "Activer l'identité visuelle", "Décochez pour laisser chaque message avec son apparence d'origine.")}
+      </div>
+      <div class="form-grid mt-16">
+        <div class="field"><label>Couleur d'accent</label>
+          <input class="input" type="color" data-cfg="embed_accent" value="${esc(accent)}">
+          <span class="field-note">Barre colorée à gauche de chaque embed.</span></div>
+      </div>
+      <div class="mt-16">
+        ${champBascule("embed_force_color", "Même couleur pour tous les embeds",
+          "⚠️ Désactivé, les couleurs qui portent un sens sont conservées : rouge pour une sanction, vert pour une réussite, orange pour un avertissement. Activé, tout devient votre couleur d'accent.")}
+        ${champBascule("embed_footer", "Signature en pied de page", "« NomDuBot • NomDuServeur », avec l'icône du serveur. Un pied de page déjà écrit par le bot n'est jamais remplacé.")}
+        ${champBascule("embed_timestamp", "Horodatage", "L'heure d'envoi sous chaque embed.")}
+      </div>
+      ${apercuIdentite(cfg)}`;
+    return modulePanel("Identité des embeds", "L'apparence commune à tous les messages du bot.", body, "identite");
+  }
+
+  // Aperçu : trois embeds de nature différente, pour montrer l'effet de
+  // « même couleur pour tous » sur des messages qui ont un sens de couleur.
+  function apercuIdentite(cfg) {
+    const actif = Number(cfg.embed_style ?? 1) === 1;
+    const accent = /^#[0-9a-f]{6}$/i.test(cfg.embed_accent || "") ? cfg.embed_accent : "#5865F2";
+    const force = Number(cfg.embed_force_color ?? 0) === 1;
+    const pied = Number(cfg.embed_footer ?? 1) === 1;
+    const heure = Number(cfg.embed_timestamp ?? 1) === 1;
+    const exemples = [
+      { titre: "📥 Arrivée d'un membre", texte: "Bienvenue à @NouveauMembre !", couleur: null },
+      { titre: "🚫 Sanction appliquée", texte: "@Tricheur a été banni du serveur.", couleur: "#ff5c74" },
+      { titre: "✅ Ticket fermé", texte: "Le ticket n°0042 a été archivé.", couleur: "#2fe38b" },
+    ];
+    return `<div class="apercu mt-16">
+      <span class="apercu-titre">PRÉVISUALISATION — TROIS MESSAGES DE NATURES DIFFÉRENTES</span>
+      ${exemples.map(x => {
+        const c = !actif ? (x.couleur || "#4f545c") : (force ? accent : (x.couleur || accent));
+        return `<div class="dc-msg">
+          <div class="dc-pp"></div>
+          <div class="dc-corps">
+            <div class="dc-nom">Votre bot <span class="dc-tag">APP</span></div>
+            <div class="dc-embed" style="border-left-color:${esc(c)}">
+              <div class="dc-embed-corps">
+                <div class="dc-titre">${esc(x.titre)}</div>
+                <div class="dc-desc">${esc(x.texte)}</div>
+                ${actif && pied ? `<div class="dc-pied">Votre bot • Votre serveur${heure ? " • aujourd'hui à 18:17" : ""}</div>` : ""}
+              </div>
+            </div>
+          </div>
+        </div>`;
+      }).join("")}
+    </div>`;
   }
 
   // 👋 Arrivées & départs : salon, message, et APPARENCE de l'embed.

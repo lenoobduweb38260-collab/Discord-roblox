@@ -613,6 +613,22 @@ const RELEASES = [
     ],
     retrait: [],
   },
+  {
+    id: 'identite-embeds-2026-08x',
+    title: 'Votre identité sur TOUS les embeds 🎨',
+    ajout: [
+      '🎨 **Module « Identité des embeds »** : une couleur d\'accent et une signature appliquées à **tout ce que le bot envoie** — arrivées, logs, sanctions, tickets, niveaux, réponses de commandes. Un seul réglage, partout à la fois',
+      '✍️ **Signature en pied de page** « NomDuBot • NomDuServeur » avec l\'icône du serveur, et horodatage automatique',
+      '👁️ Aperçu montrant **trois messages de natures différentes** côte à côte, pour voir l\'effet avant d\'enregistrer',
+    ],
+    amelioration: [
+      '🎯 **Les couleurs qui portent un sens sont respectées par défaut** : rouge pour une sanction, vert pour une réussite, orange pour un avertissement. Une option « même couleur pour tous » permet de tout uniformiser si vous préférez',
+      '🤝 Un pied de page déjà écrit par le bot (« Page 2/4 », « Relancé par… ») n\'est jamais remplacé',
+      '🔌 Tout est désactivable par serveur, d\'un seul interrupteur',
+    ],
+    fix: [],
+    retrait: [],
+  },
 ];
 
 // Découpe une catégorie en champs d'embed (max 1024 caractères par champ).
