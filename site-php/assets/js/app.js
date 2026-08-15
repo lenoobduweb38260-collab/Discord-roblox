@@ -982,9 +982,18 @@
     }
   }
 
+  // ⚡ Configuration AFFICHÉE dans les champs et l'aperçu : ce qui est
+  // enregistré dans le bot, recouvert par les changements non encore
+  // enregistrés. L'aperçu suit ainsi le moindre réglage.
+  // On ne touche PAS à p.config : c'est lui qui sert de référence pour savoir
+  // ce qui a réellement changé au moment d'enregistrer.
+  function cfgCourant() {
+    return { ...(srvParams()?.config || {}), ...(ui.brouillonModule || {}) };
+  }
+
   function champSalon(cle, label, aide = "", multiple = false) {
     const p = srvParams();
-    const choisis = choixCourants(p?.config?.[cle], multiple);
+    const choisis = choixCourants(cfgCourant()[cle], multiple);
     const options = (p?.channels || []).map(c =>
       `<option value="${esc(c.id)}"${choisis.includes(String(c.id)) ? " selected" : ""}># ${esc(c.name)}</option>`).join("");
     return `<div class="field"><label>${label}</label>
@@ -997,7 +1006,7 @@
   // Liste déroulante de CATÉGORIES — simple, ou à choix multiple.
   function champCategorie(cle, label, aide = "", multiple = false) {
     const p = srvParams();
-    const choisis = choixCourants(p?.config?.[cle], multiple);
+    const choisis = choixCourants(cfgCourant()[cle], multiple);
     const options = (p?.categories || []).map(c =>
       `<option value="${esc(c.id)}"${choisis.includes(String(c.id)) ? " selected" : ""}>${esc(c.name)}</option>`).join("");
     return `<div class="field"><label>${label}</label>
@@ -1010,7 +1019,7 @@
   // Liste déroulante de RÔLES — simple, ou à choix multiple.
   function champRole(cle, label, aide = "", multiple = false) {
     const p = srvParams();
-    let valeur = p?.config?.[cle] ?? "";
+    let valeur = cfgCourant()[cle] ?? "";
     let choisis = [];
     if (multiple) {
       try { choisis = JSON.parse(valeur || "[]").map(String); } catch { choisis = valeur ? [String(valeur)] : []; }
@@ -1029,7 +1038,7 @@
   // Interrupteur enregistré dans le bot.
   function champBascule(cle, label, aide = "") {
     const p = srvParams();
-    const actif = Number(p?.config?.[cle] ?? 0) === 1;
+    const actif = Number(cfgCourant()[cle] ?? 0) === 1;
     return `<div class="row" style="justify-content:flex-start;gap:12px">
       <button type="button" class="toggle ${actif ? "on" : ""}" data-cfg-toggle="${esc(cle)}" aria-label="${esc(label)}"></button>
       <span><b>${label}</b>${aide ? `<i style="display:block;color:var(--muted);font-size:11.5px;font-style:normal">${aide}</i>` : ""}</span>
@@ -1039,7 +1048,7 @@
   // Champ texte enregistré dans le bot.
   function champTexte(cle, label, aide = "", zone = false, placeholder = "") {
     const p = srvParams();
-    const valeur = String(p?.config?.[cle] ?? "");
+    const valeur = String(cfgCourant()[cle] ?? "");
     return `<div class="field full"><label>${label}</label>
       ${zone
         ? `<textarea class="textarea" rows="3" data-cfg="${esc(cle)}" placeholder="${esc(placeholder)}">${esc(valeur)}</textarea>`
@@ -1049,7 +1058,7 @@
 
   function champNombre(cle, label, aide = "", min = 1, max = 10, defaut = "") {
     const p = srvParams();
-    const brut = p?.config?.[cle];
+    const brut = cfgCourant()[cle];
     const valeur = brut === null || brut === undefined || brut === "" ? defaut : brut;
     return `<div class="field"><label>${label}</label>
       <input class="input" type="number" min="${min}" max="${max}" data-cfg="${esc(cle)}" value="${esc(String(valeur))}">
@@ -1130,7 +1139,7 @@
   // 👋 Arrivées & départs : salon, message, et APPARENCE de l'embed.
   function arrivalsModule() {
     const p = srvParams();
-    const cfg = p?.config || {};
+    const cfg = cfgCourant();
     const cadres = [
       { value: "rond", label: "Vignette ronde (en haut à droite)" },
       { value: "grand", label: "Grande image (pleine largeur)" },
@@ -1144,19 +1153,45 @@
       <input class="input" type="color" data-cfg="${cle}" value="${esc(/^#[0-9a-f]{6}$/i.test(cfg[cle] || "") ? cfg[cle] : (cle === "welcome_color" ? "#2ecc71" : "#e74c3c"))}">
       <span class="field-note">Barre colorée à gauche de l'embed.</span></div>`;
 
-    const body = `<div class="builder-hint">👋 Variables utilisables dans les messages : <code>{user}</code> (mention), <code>{user.username}</code>, <code>{server}</code>, <code>{membercount}</code>.</div>
+    const styles = [
+      { value: "classique", label: "Classique — message court + informations en champs" },
+      { value: "detaille", label: "Détaillé — panneau d'accueil complet (règlement, staff, n° de membre)" },
+    ];
+    const choixStyle = `<div class="field"><label>🎨 Style de l'accueil</label>
+      <select class="select" data-cfg="welcome_style">
+        ${styles.map(s => `<option value="${s.value}"${String(cfg.welcome_style || "classique") === s.value ? " selected" : ""}>${s.label}</option>`).join("")}
+      </select>
+      <span class="field-note">Le style détaillé compose le texte tout seul à partir des salons choisis ci-dessous. Un message écrit à la main a toujours la priorité.</span></div>`;
+
+    const body = `<div class="builder-hint">👋 Variables utilisables dans les messages : <code>{user}</code> (mention), <code>{user.username}</code>, <code>{server}</code>, <code>{membercount}</code>, <code>{regles}</code> et <code>{support}</code> (liens vers les salons choisis).</div>
       <h4 class="sous-titre">📥 Arrivées</h4>
       <div class="form-grid">
         ${champSalon("member_channel_id", "Salon des arrivées", "Laissez « Aucun » pour désactiver les messages d'arrivée.")}
+        ${choixStyle}
         ${couleur("welcome_color", "Couleur de l'embed")}
         ${champTexte("welcome_title", "Titre de l'embed", "Vide = « 📥 Arrivée d'un membre ».", false, "Bienvenue sur {server} !")}
         ${choixCadre("welcome_avatar")}
-        ${champTexte("welcome_image", "Image de fond (URL)", "Grande image affichée dans l'embed. Laissez vide pour aucune.", false, "https://…/banniere.png")}
-        ${champTexte("welcome_message", "Message de bienvenue", "", true, "Bienvenue sur {server}, {user} ! 🎉")}
+        ${champSalon("welcome_rules_channel_id", "📌 Salon du règlement", "Cité dans l'accueil détaillé, et disponible via {regles}.")}
+        ${champSalon("welcome_help_channel_id", "💡 Salon d'aide / tickets", "Cité dans l'accueil détaillé, et disponible via {support}.")}
+        ${champTexte("welcome_image", "Image de fond (URL)", "Grande image affichée dans l'embed — sert aussi de fond à la bannière.", false, "https://…/banniere.png")}
+        ${champTexte("welcome_message", "Message de bienvenue", "Laissez vide pour laisser le style choisi composer le texte.", true, "Bienvenue sur {server}, {user} ! 🎉")}
       </div>
       <div class="mt-16">
-        ${champBascule("welcome_fields", "Afficher les informations du membre", "Nom Discord, identifiant, numéro de membre et date de création du compte.")}
+        ${champBascule("welcome_fields", "Afficher les informations du membre", "Nom Discord, identifiant, numéro de membre et date de création du compte. Ignoré en style détaillé : l'information est déjà dans le texte.")}
         ${champBascule("welcome_mention", "Mentionner le membre", "Le ping s'ajoute au-dessus de l'embed.")}
+      </div>
+
+      <div class="builder-hint mt-16">🖼️ <b>Bannière fabriquée par le bot</b> — Discord ne permet pas de changer la police d'un embed : les bannières stylées sont des <b>images</b> générées. Le bot dessine la photo de profil, le pseudo et le numéro de membre sur un fond de votre choix.</div>
+      <div class="mt-16">
+        ${champBascule("welcome_banner", "Générer une bannière d'arrivée", "Elle remplace l'image de l'embed.")}
+      </div>
+      <div class="form-grid mt-16">
+        ${couleur("welcome_banner_color", "Fond de la bannière")}
+      </div>
+      <div class="row mt-16" style="flex-direction:column;align-items:flex-start;gap:5px">
+        <span style="color:var(--muted);font-size:12px">⚠️ La police de la bannière ne sait écrire que l'alphabet latin sans accent.
+        Les pseudos accentués sont convertis (« Émilie » → « Emilie ») et les caractères impossibles à tracer sont retirés,
+        plutôt que d'afficher des carrés « □□□□ » comme le font d'autres bots.</span>
       </div>
       ${apercuArrivee(cfg, "welcome")}
 
@@ -1174,14 +1209,49 @@
   }
 
   // Aperçu façon Discord de l'embed d'arrivée.
+  // Rendu Discord minimal pour les aperçus : gras, italique, souligné, code.
+  // Le texte est ÉCHAPPÉ avant, jamais après — sinon on rouvrirait la porte à
+  // l'injection de HTML par un message de bienvenue.
+  function mdApercu(texte) {
+    return esc(texte)
+      .replace(/\*\*\*(.+?)\*\*\*/g, "<b><i>$1</i></b>")
+      .replace(/\*\*(.+?)\*\*/g, "<b>$1</b>")
+      .replace(/__(.+?)__/g, "<u>$1</u>")
+      .replace(/(^|[^*])\*([^*\n]+?)\*(?!\*)/g, "$1<i>$2</i>")
+      .replace(/`([^`\n]+?)`/g, "<code>$1</code>")
+      .replace(/^### (.+)$/gm, "<b>$1</b>")
+      .replace(/^## (.+)$/gm, "<b>$1</b>");
+  }
+
   function apercuArrivee(cfg, prefixe) {
     const couleur = /^#[0-9a-f]{6}$/i.test(cfg[`${prefixe}_color`] || "") ? cfg[`${prefixe}_color`] : "#2ecc71";
     const titre = cfg[`${prefixe}_title`] || "📥 Arrivée d'un membre";
-    const message = (cfg[`${prefixe}_message`] || "Bienvenue à {user} sur **{server}** ! 🎉")
+    // Le style détaillé compose son texte : l'aperçu doit montrer le même.
+    const nomSalon = (id) => {
+      const c = (srvParams()?.channels || []).find(x => String(x.id) === String(id));
+      return c ? `#${c.name}` : null;
+    };
+    const detaille = prefixe === "welcome" && String(cfg.welcome_style || "classique") === "detaille";
+    const parDefaut = detaille ? (() => {
+      const l = [
+        "Bienvenue sur le serveur **{server}**", "",
+        "Salut {user} ! Content de vous compter parmi nous.", "",
+        "Ce serveur rassemble sa communauté autour de **{server}**, avec des échanges, des annonces et une bonne ambiance entre les membres.",
+      ];
+      const regles = nomSalon(cfg.welcome_rules_channel_id);
+      const aide = nomSalon(cfg.welcome_help_channel_id);
+      if (regles) l.push("", `📌 Avant de commencer, merci de prendre connaissance du ${regles} et d'adopter un comportement respectueux.`);
+      if (aide) l.push("", `💡 Le staff reste disponible ici : ${aide} pour toute question.`);
+      l.push("", "👤 **Membre** : {user.username}", "» **Membre n°{membercount}**");
+      return l.join("\n");
+    })() : "Bienvenue à {user} sur **{server}** ! 🎉";
+    const message = (cfg[`${prefixe}_message`] || parDefaut)
       .replace(/\{user\.username\}/g, "NouveauMembre")
       .replace(/\{user\.mention\}|\{user\}/g, "@NouveauMembre")
       .replace(/\{server\}/g, "Votre serveur")
-      .replace(/\{membercount\}/g, "128");
+      .replace(/\{membercount\}|\{numero\}/g, "128")
+      .replace(/\{regles\}/g, nomSalon(cfg.welcome_rules_channel_id) || "#règlement")
+      .replace(/\{support\}/g, nomSalon(cfg.welcome_help_channel_id) || "#tickets");
     const cadre = cfg[`${prefixe}_avatar`] || "rond";
     const image = String(cfg[`${prefixe}_image`] || "").trim();
     const avatar = `<div class="dc-avatar-mini"></div>`;
@@ -1193,15 +1263,23 @@
           <div class="dc-nom">Votre bot <span class="dc-tag">APP</span></div>
           <div class="dc-embed" style="border-left-color:${esc(couleur)}">
             <div class="dc-embed-corps">
+              ${detaille ? `<div class="dc-auteur">ℹ️ Bienvenue sur Votre serveur !</div>` : ""}
               <div class="dc-titre">${esc(titre)}</div>
-              <div class="dc-desc">${esc(message)}</div>
-              ${Number(cfg[`${prefixe}_fields`] ?? 1) === 1 ? `<div class="dc-champs">
+              <div class="dc-desc">${mdApercu(message)}</div>
+              ${Number(cfg[`${prefixe}_fields`] ?? 1) === 1 && !detaille ? `<div class="dc-champs">
                 <div><b>💬 Nom Discord</b><span>NouveauMembre</span></div>
                 <div><b>🔢 ID Discord</b><span>123456789012345678</span></div>
                 <div><b>👥 Membre n°</b><span>128</span></div>
               </div>` : ""}
-              ${image ? `<img class="dc-image" src="${esc(image)}" alt="" onerror="this.style.display='none'">`
-                : (cadre === "grand" ? `<div class="dc-image dc-image-vide">photo du membre en grand</div>` : "")}
+              ${prefixe === "welcome" && Number(cfg.welcome_banner ?? 0) === 1
+                ? `<div class="dc-banniere" style="background:${esc(/^#[0-9a-f]{6}$/i.test(cfg.welcome_banner_color || "") ? cfg.welcome_banner_color : "#1b1b2f")}">
+                     <div class="dc-ban-pp"></div>
+                     <div class="dc-ban-txt"><b>Bienvenue !</b><strong>NouveauMembre</strong><i>Membre n°128</i></div>
+                     <span class="dc-ban-srv">Votre serveur</span>
+                   </div>`
+                : (image ? `<img class="dc-image" src="${esc(image)}" alt="" onerror="this.style.display='none'">`
+                : (cadre === "grand" ? `<div class="dc-image dc-image-vide">photo du membre en grand</div>` : ""))}
+              ${detaille ? `<div class="dc-pied">Votre bot • Votre serveur</div>` : ""}
             </div>
             ${cadre === "rond" && !image ? `<div class="dc-miniature"></div>` : ""}
             ${image && cadre !== "aucun" ? `<div class="dc-miniature"></div>` : ""}
@@ -1359,6 +1437,7 @@
         p.config[cle] = Array.isArray(valeur) ? JSON.stringify(valeur) : valeur;
       } catch (e) { echecs.push(`${cle} : ${e.message}`); }
     }
+    ui.brouillonModule = {};   // enregistré : le brouillon n'a plus lieu d'être
     render();
     if (echecs.length) toast("ENREGISTREMENT PARTIEL", echecs[0], "error");
     else toast("ENREGISTRÉ DANS LE BOT", `${aEnvoyer.length} réglage(s) appliqué(s) sur Discord.`);
@@ -1499,7 +1578,7 @@
       <div class="dc-embed-corps">
         ${e.auteur ? `<div class="dc-auteur">${e.auteur_icone ? `<img src="${esc(e.auteur_icone)}" alt="" onerror="this.remove()">` : ""}${esc(e.auteur)}</div>` : ""}
         ${e.titre ? `<div class="dc-titre">${esc(e.titre)}</div>` : ""}
-        ${e.description ? `<div class="dc-desc">${esc(e.description)}</div>` : ""}
+        ${e.description ? `<div class="dc-desc">${mdApercu(e.description)}</div>` : ""}
         ${(e.champs || []).length ? `<div class="dc-champs">${(e.champs || []).filter(c => c.nom || c.valeur).map(c =>
           `<div class="${c.aligne ? "aligne" : ""}"><b>${esc(c.nom || "")}</b><span>${esc(c.valeur || "")}</span></div>`).join("")}</div>` : ""}
         ${e.image ? `<img class="dc-image" src="${esc(e.image)}" alt="" onerror="this.style.display='none'">` : ""}
@@ -2967,7 +3046,16 @@
     // Interrupteurs des réglages du bot : bascule immédiate, enregistrée
     // seulement au clic sur « Enregistrer dans le bot ».
     const bascule = event.target.closest("[data-cfg-toggle]");
-    if (bascule) { bascule.classList.toggle("on"); return; }
+    if (bascule) {
+      bascule.classList.toggle("on");
+      // L'aperçu doit suivre l'interrupteur, lui aussi (voir brouillonModule).
+      if (bascule.closest('form[data-form="module-bot"]')) {
+        ui.brouillonModule = ui.brouillonModule || {};
+        ui.brouillonModule[bascule.dataset.cfgToggle] = bascule.classList.contains("on") ? 1 : 0;
+        render();
+      }
+      return;
+    }
     // Cases « aligné » des champs d'embed.
     const aligne = event.target.closest("[data-champ-aligne]");
     if (aligne) { aligne.classList.toggle("on"); return; }
@@ -3006,10 +3094,12 @@
           ui.selectedServerId = target.dataset.serverId;
           storage.setItem("aincrad.server", ui.selectedServerId);
           ui.module = "overview";
+          ui.brouillonModule = {};
           navigate("server");
           break;
         case "select-module":
           ui.module = target.dataset.module || "overview";
+          ui.brouillonModule = {};   // on change de module : brouillon oublié
           render();
           break;
         case "toggle-input": {
@@ -3857,6 +3947,19 @@
       document.querySelectorAll(".db-sqlite").forEach(e => { e.style.display = sqlite ? "" : "none"; });
     }
     if (target.closest("#site-builder-form")) livePreview();
+    // ⚡ Réglages d'un module du bot : on note le changement dans un brouillon
+    // et on reconstruit, pour que l'aperçu suive AVANT l'enregistrement.
+    // Le brouillon est séparé de la config enregistrée : sans ça, comparer
+    // « ancien » et « nouveau » au moment d'enregistrer ne verrait plus rien
+    // changer, et plus rien ne partirait dans le bot.
+    if (target.matches("[data-cfg]") && target.closest('form[data-form="module-bot"]')) {
+      ui.brouillonModule = ui.brouillonModule || {};
+      ui.brouillonModule[target.dataset.cfg] = target.multiple
+        ? JSON.stringify([...target.selectedOptions].map(o => o.value).filter(Boolean))
+        : target.value;
+      render();
+      return;
+    }
     if (target.matches('[data-action="ticket-status"]')) {
       try {
         await api("ticket.status", { ticketId: target.dataset.ticketId, status: target.value });

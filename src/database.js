@@ -461,6 +461,11 @@ for (const column of [
   'welcome_image TEXT',        // grande image de fond de l'embed
   'welcome_avatar TEXT',       // 'rond' | 'grand' | 'aucun' — cadre de la photo
   'welcome_title TEXT',        // titre de l'embed
+  'welcome_style TEXT',                 // 'classique' | 'detaille'
+  'welcome_rules_channel_id TEXT',      // salon règlement cité dans l'accueil
+  'welcome_help_channel_id TEXT',       // salon d'aide / tickets cité dans l'accueil
+  'welcome_banner INTEGER',             // 1 = bannière image générée par le bot
+  'welcome_banner_color TEXT',          // fond de la bannière (#RRGGBB)
   'welcome_fields INTEGER',    // 1 = afficher les champs (nom, ID, n°, création)
   'goodbye_color TEXT',
   'goodbye_image TEXT',
@@ -609,6 +614,11 @@ const DEFAULT_CONFIG = {
   welcome_mention: 0,
   autorole_role_ids: null,
   welcome_color: null,
+  welcome_style: null,
+  welcome_rules_channel_id: null,
+  welcome_help_channel_id: null,
+  welcome_banner: 0,
+  welcome_banner_color: null,
   welcome_image: null,
   welcome_avatar: 'rond',
   welcome_title: null,

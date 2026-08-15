@@ -596,6 +596,23 @@ const RELEASES = [
     ],
     retrait: [],
   },
+  {
+    id: 'accueil-style-banniere-2026-08w',
+    title: 'Un accueil qui a de l\'allure 🎨',
+    ajout: [
+      '🎨 **Style d\'accueil « Détaillé »** : un vrai panneau de bienvenue composé tout seul — présentation du serveur, renvoi vers le règlement et vers le staff, nom du membre et **numéro d\'inscription**, ligne d\'auteur et pied de page',
+      '📌 **Salon du règlement** et **💡 salon d\'aide** à choisir dans une liste : ils sont cités automatiquement, et utilisables partout via `{regles}` et `{support}`',
+      '🖼️ **Bannière fabriquée par le bot** : photo de profil ronde, pseudo, numéro de membre et nom du serveur dessinés sur un fond de votre choix',
+    ],
+    amelioration: [
+      '👁️ **L\'aperçu suit vos réglages en direct**, avant d\'enregistrer : changez le style, un salon ou la couleur, l\'aperçu se met à jour aussitôt',
+      '🔤 L\'aperçu affiche enfin le **gras et l\'italique** au lieu des `**astérisques**`',
+    ],
+    fix: [
+      '🩹 **Les pseudos accentués ou décorés ne sortiront pas en « □□□□ » sur la bannière.** Les polices d\'image ne connaissent que l\'alphabet latin sans accent : « Émilie » devient « Emilie », et un pseudo entièrement intraçable laisse place au nom d\'utilisateur plutôt qu\'à des carrés',
+    ],
+    retrait: [],
+  },
 ];
 
 // Découpe une catégorie en champs d'embed (max 1024 caractères par champ).

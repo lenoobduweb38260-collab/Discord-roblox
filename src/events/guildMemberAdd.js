@@ -73,15 +73,48 @@ module.exports = {
     if (!channel?.isTextBased()) return;
     // Message personnalisé avec variables : {user} (mention), {user.username},
     // {server}, {membercount} — sinon message par défaut.
+    // {regles} et {support} deviennent des liens vers les salons choisis dans
+    // le site : écrire « lisez {regles} » suffit.
+    const salonOu = (id, repli) => (id ? `<#${id}>` : repli);
     const applyVars = (template) =>
       template
         .replace(/\{user\.username\}/g, member.user.username)
         .replace(/\{user\.mention\}|\{user\}/g, `<@${member.id}>`)
         .replace(/\{server\}/g, member.guild.name)
-        .replace(/\{membercount\}/g, String(member.guild.memberCount));
-    const description = cfg.welcome_message?.trim()
-      ? applyVars(cfg.welcome_message)
-      : `Bienvenue à <@${member.id}> sur **${member.guild.name}** ! 🎉`;
+        .replace(/\{membercount\}|\{numero\}/g, String(member.guild.memberCount))
+        .replace(/\{regles\}/g, salonOu(cfg.welcome_rules_channel_id, 'le règlement'))
+        .replace(/\{support\}/g, salonOu(cfg.welcome_help_channel_id, 'le salon d\'aide'));
+
+    // 🎨 Deux mises en forme :
+    //   • « classique » : le message tel qu'il est écrit ;
+    //   • « detaille »  : présentation en sections (accueil, présentation du
+    //     serveur, règlement, staff, fiche du membre), façon panneau d'accueil.
+    const detaille = cfg.welcome_style === 'detaille';
+    let description;
+    if (cfg.welcome_message?.trim()) {
+      description = applyVars(cfg.welcome_message);
+    } else if (detaille) {
+      const morceaux = [
+        `Bienvenue sur le serveur **${member.guild.name}**`,
+        '',
+        `Salut <@${member.id}> ! Content de vous compter parmi nous.`,
+        '',
+        `Ce serveur rassemble sa communauté autour de **${member.guild.name}**, ` +
+          'avec des échanges, des annonces et une bonne ambiance entre les membres.',
+      ];
+      if (cfg.welcome_rules_channel_id) {
+        morceaux.push('', `📌 Avant de commencer, merci de prendre connaissance du <#${cfg.welcome_rules_channel_id}> ` +
+          'et d\'adopter un comportement respectueux.');
+      }
+      if (cfg.welcome_help_channel_id) {
+        morceaux.push('', `💡 Le staff reste disponible ici : <#${cfg.welcome_help_channel_id}> pour toute question.`);
+      }
+      morceaux.push('', `👤 **Membre** : ${member.user.username}`,
+        `» **Membre n°${member.guild.memberCount}**`);
+      description = morceaux.join('\n');
+    } else {
+      description = `Bienvenue à <@${member.id}> sur **${member.guild.name}** ! 🎉`;
+    }
     // Apparence réglée depuis le site : couleur, titre, image de fond,
     // affichage de la photo de profil et des champs d'information.
     const couleur = /^#[0-9a-f]{6}$/i.test(cfg.welcome_color || '') ? cfg.welcome_color : COLORS.SUCCESS;
@@ -99,7 +132,9 @@ module.exports = {
       embed.setImage(cfg.welcome_image.trim());
       if (cfg.welcome_avatar === 'grand') embed.setThumbnail(avatar);
     }
-    if (cfg.welcome_fields !== 0) {
+    // En style détaillé, ces informations sont déjà dans le texte : les
+    // répéter en champs alourdirait l'embed pour rien.
+    if (cfg.welcome_fields !== 0 && !detaille) {
       embed.addFields(
         { name: '💬 Nom Discord', value: member.user.tag, inline: true },
         { name: '🔢 ID Discord', value: `\`${member.id}\``, inline: true },
@@ -111,8 +146,34 @@ module.exports = {
         }
       );
     }
+    if (detaille) {
+      embed.setAuthor({ name: `Bienvenue sur ${member.guild.name} !`, iconURL: member.guild.iconURL({ size: 128 }) || undefined });
+      embed.setFooter({ text: `${member.client.user.username} • ${member.guild.name}` });
+    }
+
+    // 🖼️ Bannière fabriquée par le bot (image, seul moyen d'avoir une vraie
+    // police). Si jimp manque ou échoue, l'embed part quand même.
+    const fichiers = [];
+    if (cfg.welcome_banner === 1) {
+      const png = await require('../utils/welcomeBanner').fabriquer(member, {
+        avatarUrl: avatar,
+        fond: cfg.welcome_banner_color || cfg.welcome_color || '#1b1b2f',
+        fondImage: cfg.welcome_image?.trim() || null,
+        avatarRond: cfg.welcome_avatar !== 'grand',
+      }).catch(() => null);
+      if (png) {
+        const { AttachmentBuilder } = require('discord.js');
+        fichiers.push(new AttachmentBuilder(png, { name: 'bienvenue.png' }));
+        embed.setImage('attachment://bienvenue.png');
+      }
+    }
+
     await channel
-      .send({ content: cfg.welcome_mention ? `<@${member.id}>` : undefined, embeds: [embed] })
+      .send({
+        content: cfg.welcome_mention ? `<@${member.id}>` : undefined,
+        embeds: [embed],
+        files: fichiers.length ? fichiers : undefined,
+      })
       .catch(() => null);
   },
 };
