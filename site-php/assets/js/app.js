@@ -1154,6 +1154,7 @@
       <div class="mt-16">
         ${champBascule("embed_force_color", "Même couleur pour tous les embeds",
           "⚠️ Désactivé, les couleurs qui portent un sens sont conservées : rouge pour une sanction, vert pour une réussite, orange pour un avertissement. Activé, tout devient votre couleur d'accent.")}
+        ${champBascule("embed_author", "Ligne d'identité en haut", "Le nom et l'icône du serveur, au-dessus du titre. Une ligne d'auteur porteuse de sens (« Avis de @membre ») n'est jamais remplacée.")}
         ${champBascule("embed_footer", "Signature en pied de page", "« NomDuBot • NomDuServeur », avec l'icône du serveur. Un pied de page déjà écrit par le bot n'est jamais remplacé.")}
         ${champBascule("embed_timestamp", "Horodatage", "L'heure d'envoi sous chaque embed.")}
       </div>
@@ -1184,6 +1185,7 @@
             <div class="dc-nom">Votre bot <span class="dc-tag">APP</span></div>
             <div class="dc-embed" style="border-left-color:${esc(c)}">
               <div class="dc-embed-corps">
+                ${actif && Number(cfg.embed_author ?? 1) === 1 ? `<div class="dc-auteur">Votre serveur</div>` : ""}
                 <div class="dc-titre">${esc(x.titre)}</div>
                 <div class="dc-desc">${esc(x.texte)}</div>
                 ${actif && pied ? `<div class="dc-pied">Votre bot • Votre serveur${heure ? " • aujourd'hui à 18:17" : ""}</div>` : ""}
@@ -2102,6 +2104,7 @@
     // ⚙️ Configuration
     { id: "cmd.config", cat: "⚙️ Configuration", label: "/config", desc: "Panneau central : rôles, salons, XP, whitelist", g: ["staff", "admin"] },
     { id: "cmd.ticket", cat: "⚙️ Configuration", label: "/ticket", desc: "Tickets : panneau, raisons, ouverture pour un membre", g: ["staff", "admin"] },
+    { id: "cmd.esthetique", cat: "⚙️ Configuration", label: "/esthetique", desc: "Réhabille les anciens messages du bot", g: ["admin"] },
     { id: "cmd.preset", cat: "⚙️ Configuration", label: "/preset", desc: "Réponses types envoyées dans les tickets", g: ["staff", "admin"] },
     { id: "cmd.embed", cat: "⚙️ Configuration", label: "/embed", desc: "Composer un embed envoyé par le bot", g: ["staff", "admin"] },
     { id: "cmd.reseaux", cat: "⚙️ Configuration", label: "/reseaux", desc: "Annonces automatiques des réseaux sociaux", g: ["staff", "admin"] },

@@ -629,6 +629,23 @@ const RELEASES = [
     fix: [],
     retrait: [],
   },
+  {
+    id: 'esthetique-listes-2026-08y',
+    title: 'Une esthétique commune, et rattrapable 🧱',
+    ajout: [
+      '🧱 **Grammaire visuelle partagée** pour les listes du bot : en-tête `◆ 🌟 · **Grade** • 2 membres`, entrées en `➜`, séparateurs entre sections, et *Aucun membre* en italique quand c\'est vide',
+      '🕒 **Pied de page unifié** : « 1972 membres • Mis à jour à 16:07 • Page 1/2 », le même partout',
+      '🎨 **Ligne d\'identité en haut de chaque embed** : nom et icône du serveur, pour que l\'identité soit visible en permanence',
+      '🪄 **`/esthetique appliquer`** : réhabille les messages **déjà envoyés** par le bot avec l\'identité actuelle — au choix sur un salon ou tout le serveur',
+    ],
+    amelioration: [
+      '🛡️ `/esthetique` ne touche QUE l\'habillage : titre, texte, champs, images et boutons restent identiques au caractère près',
+      '🧠 Ce qui porte du sens est préservé : un pied de page « Page 2/4 » ou une ligne « Avis de @membre » ne sont jamais remplacés — seule la signature d\'identité l\'est',
+      '📋 Liste du staff du bot et whitelist reprises dans le nouveau format',
+    ],
+    fix: [],
+    retrait: [],
+  },
 ];
 
 // Découpe une catégorie en champs d'embed (max 1024 caractères par champ).

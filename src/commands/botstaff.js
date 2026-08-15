@@ -78,24 +78,37 @@ module.exports = {
     }
 
     if (sub === 'liste') {
+      const M = require('../utils/miseEnPage');
       const rows = listStaffRows.all();
+      // 🧱 Un bloc par grade : en-tête ◆ avec le nombre, puis les membres
+      // en ➜, et « Aucun membre » en italique quand un grade est vide.
+      const parGrade = new Map();
+      for (const r of rows) {
+        if (!parGrade.has(r.rank)) parGrade.set(r.rank, []);
+        let perms = [];
+        try { perms = JSON.parse(r.perms); } catch {}
+        parGrade.get(r.rank).push(
+          `<@${r.user_id}>${perms.length ? ` — ${perms.map((p) => PERMS[p] || p).join(' · ')}` : ''}`
+        );
+      }
+      const blocs = [...parGrade.entries()].map(([grade, membres]) =>
+        M.bloc(grade, membres, { prefixe: '🛡️', vide: 'Aucun membre' })
+      );
       const embed = new EmbedBuilder()
         .setColor(0x3498db)
         .setTitle('🛡️ Hiérarchie du staff du bot')
         .setDescription(
-          rows.length
-            ? rows
-                .map((r) => {
-                  let perms = [];
-                  try {
-                    perms = JSON.parse(r.perms);
-                  } catch {}
-                  return `• <@${r.user_id}> — **${r.rank}**\n  ${perms.length ? perms.map((p) => PERMS[p] || p).join(' · ') : '*Aucune permission*'}`;
-                })
-                .join('\n')
+          blocs.length
+            ? M.description(blocs)
             : '*Aucun membre — le créateur du bot a toutes les permissions.*'
         )
-        .setFooter({ text: hq() ? 'Salon QG configuré ✅' : 'Salon QG non configuré — /botstaff salon-qg' });
+        .setFooter({
+          text: M.piedDePage({
+            total: rows.length,
+            motTotal: 'membre',
+            extra: hq() ? 'QG configuré ✅' : 'QG non configuré — /botstaff salon-qg',
+          }),
+        });
       return interaction.reply({ embeds: [embed] });
     }
 

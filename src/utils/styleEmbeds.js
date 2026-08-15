@@ -30,6 +30,7 @@ function reglages(guildId) {
     actif: Number(cfg.embed_style ?? 1) === 1,
     accent: versEntier(cfg.embed_accent) ?? versEntier(DEFAUT_ACCENT),
     piedDePage: Number(cfg.embed_footer ?? 1) === 1,
+    ligneAuteur: Number(cfg.embed_author ?? 1) === 1,
     horodatage: Number(cfg.embed_timestamp ?? 1) === 1,
     // Couleur unique partout, ou couleurs par type (rouge = sanction,
     // vert = réussite…) ? Par défaut on garde le sens des couleurs.
@@ -55,6 +56,15 @@ function styliserUn(embed, contexte) {
       embed.footer = { text: morceaux.join(' • ') };
       if (contexte.icone) embed.footer.icon_url = contexte.icone;
     }
+  }
+
+  // Ligne d'auteur : l'identité du serveur, présente en haut de CHAQUE embed.
+  // Comme pour le pied de page, on ne remplace jamais celle que le bot a
+  // écrite lui-même — elle porte souvent le sens du message
+  // (« Avis de @membre », « Bienvenue sur … »).
+  if (r.ligneAuteur && !embed.author?.name && contexte.serveur) {
+    embed.author = { name: contexte.serveur };
+    if (contexte.icone) embed.author.icon_url = contexte.icone;
   }
 
   if (r.horodatage && !embed.timestamp) embed.timestamp = new Date().toISOString();

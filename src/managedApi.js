@@ -107,6 +107,7 @@ function startManagedApi(client, baseDir) {
     embed_style: 'b',
     embed_accent: 's',
     embed_footer: 'b',
+    embed_author: 'b',
     embed_timestamp: 'b',
     embed_force_color: 'b',
     welcome_style: 's',

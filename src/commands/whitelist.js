@@ -235,15 +235,22 @@ module.exports = {
     }
 
     if (sub === 'liste') {
+      const M = require('../utils/miseEnPage');
       const entries = entriesByRole.all(interaction.guildId, role.id);
       const lines = entries
         .slice(0, 30)
-        .map((e) => `• <@${e.user_id}> (whitelisté par <@${e.added_by}>)`);
+        .map((e) => `<@${e.user_id}> *(par <@${e.added_by}>)*`);
       const embed = new EmbedBuilder()
         .setColor(COLORS.INFO)
-        .setTitle(`📋 Whitelist — ${role.name} (${entries.length})`)
-        .setDescription(lines.join('\n') || '*Personne pour le moment*');
-      if (entries.length > 30) embed.setFooter({ text: `… et ${entries.length - 30} autre(s)` });
+        .setTitle('📋 Whitelist')
+        .setDescription(M.bloc(role.name, lines, { prefixe: '💼', compte: entries.length, vide: 'Personne pour le moment' }))
+        .setFooter({
+          text: M.piedDePage({
+            total: entries.length,
+            motTotal: 'whitelisté',
+            extra: entries.length > 30 ? `${entries.length - 30} de plus non affichés` : null,
+          }),
+        });
       return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
     }
 
