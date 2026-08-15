@@ -2104,7 +2104,7 @@
     // ⚙️ Configuration
     { id: "cmd.config", cat: "⚙️ Configuration", label: "/config", desc: "Panneau central : rôles, salons, XP, whitelist", g: ["staff", "admin"] },
     { id: "cmd.ticket", cat: "⚙️ Configuration", label: "/ticket", desc: "Tickets : panneau, raisons, ouverture pour un membre", g: ["staff", "admin"] },
-    { id: "cmd.esthetique", cat: "⚙️ Configuration", label: "/esthetique", desc: "Réhabille les anciens messages du bot", g: ["admin"] },
+    { id: "cmd.esthetique", cat: "🤖 Équipe du bot", label: "/esthetique", desc: "Ré-applique l'esthétique du bot sur tous ses serveurs", g: ["createur"] },
     { id: "cmd.preset", cat: "⚙️ Configuration", label: "/preset", desc: "Réponses types envoyées dans les tickets", g: ["staff", "admin"] },
     { id: "cmd.embed", cat: "⚙️ Configuration", label: "/embed", desc: "Composer un embed envoyé par le bot", g: ["staff", "admin"] },
     { id: "cmd.reseaux", cat: "⚙️ Configuration", label: "/reseaux", desc: "Annonces automatiques des réseaux sociaux", g: ["staff", "admin"] },

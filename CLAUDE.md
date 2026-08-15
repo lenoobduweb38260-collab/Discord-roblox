@@ -83,6 +83,11 @@ tronquer au milieu d'une entrée.
 (couleur, ligne d'identité, signature) sans toucher à leur contenu. À
 proposer après tout changement d'accent.
 
+**Réservée au créateur du bot**, et **sans choix de salon** : l'esthétique
+appartient au bot, pas à un serveur. La commande balaye donc tous les
+serveurs où le bot est présent, en relisant les réglages propres à chacun
+et en laissant tel quel celui qui a coupé l'identité.
+
 Un bot ne peut modifier que **ses propres** messages : ceux des membres ou
 d'un autre bot ne sont pas rattrapables, et la commande le dit.
 
