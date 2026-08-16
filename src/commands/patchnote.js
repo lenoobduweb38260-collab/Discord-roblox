@@ -69,9 +69,9 @@ module.exports = {
             .setDescription('Que publier ? (défaut : dernière version)')
             .setRequired(false)
             .addChoices(
-              { name: 'Dernière version (@here)', value: 'derniere' },
+              { name: 'Dernière version', value: 'derniere' },
               { name: 'En attente (non encore annoncées)', value: 'attente' },
-              { name: 'Récapitulatif complet (@everyone)', value: 'initial' }
+              { name: 'Récapitulatif complet', value: 'initial' }
             )
         )
     ),
@@ -97,7 +97,10 @@ module.exports = {
           : 'ℹ️ Aucune note en attente : toutes les versions du journal ont déjà été annoncées.'
       );
     }
-    return interaction.editReply(`✅ Note « ${res.title} » (${res.mention}) publiée dans **${res.count}** salon(s).`);
+    return interaction.editReply(
+      `✅ Note « ${res.title} » publiée dans **${res.count}** salon(s).\n` +
+        '-# La mention éventuelle dépend du réglage de chaque serveur — aucune par défaut.'
+    );
   },
 
   async handle(interaction) {
@@ -143,8 +146,9 @@ module.exports = {
       if (!cfg.patch_channel_id) continue;
       const channel = await guild.channels.fetch(cfg.patch_channel_id).catch(() => null);
       if (channel?.isTextBased()) {
+        // La mention suit le réglage du serveur : aucune par défaut.
         const ok = await channel
-          .send({ content: '@here', embeds: [embed], allowedMentions: { parse: ['everyone'] } })
+          .send(patch.envoiDe(embed, cfg))
           .then(() => true)
           .catch(() => false);
         if (ok) count++;

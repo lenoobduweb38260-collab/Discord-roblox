@@ -1092,6 +1092,23 @@
     </div>`;
   }
 
+  // 🔔 Qui mentionner ? Les deux mentions spéciales de Discord et la liste des
+  // rôles dans un même menu — c'est la même question, autant la poser une fois.
+  // « Personne » est le premier choix ET le défaut : une annonce du bot ne
+  // justifie pas de faire sonner tout le serveur sans qu'on l'ait demandé.
+  function champMention(cle, label, aide = "") {
+    const p = srvParams();
+    const valeur = String(cfgCourant()[cle] ?? "");
+    const speciales = [["", "— Personne (défaut) —"], ["everyone", "@everyone — tout le serveur"], ["here", "@here — les membres connectés"]];
+    const roles = (p?.roles || []).map(r => [String(r.id), `@ ${r.name}`]);
+    return `<div class="field"><label>${label}</label>
+      <select class="select" data-cfg="${esc(cle)}">
+        ${speciales.map(([v, l]) => `<option value="${esc(v)}"${valeur === v ? " selected" : ""}>${esc(l)}</option>`).join("")}
+        ${roles.length ? `<optgroup label="Rôles du serveur">${roles.map(([v, l]) => `<option value="${esc(v)}"${valeur === v ? " selected" : ""}>${esc(l)}</option>`).join("")}</optgroup>` : ""}
+      </select>
+      ${aide ? `<span class="field-note">${aide}</span>` : ""}</div>`;
+  }
+
   // Liste déroulante enregistrée dans le bot. `choix` = [[valeur, libellé], …]
   function champChoix(cle, label, choix, aide = "", defaut = "") {
     const valeur = String(cfgCourant()[cle] ?? defaut);
@@ -1489,6 +1506,7 @@
         ${champSalon("proof_channel_id", "📎 Salon des preuves", "")}
         ${champSalon("partner_channel_id", "🤝 Salon des partenariats", "")}
         ${champSalon("patch_channel_id", "📝 Salon des notes de mise à jour", "Le bot y publie ses nouveautés.")}
+        ${champMention("patch_mention", "🔔 Mentionner à chaque note", "Aucune mention par défaut : une note de version ne fait sonner personne tant que vous ne l'avez pas demandé.")}
         ${champSalon("update_channel_id", "🔄 Salon des mises à jour techniques", "")}
         ${champSalon("ticket_transcript_channel_id", "🗄️ Salon des transcriptions de tickets", "")}
       </div>`;

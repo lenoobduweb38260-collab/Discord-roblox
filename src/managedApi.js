@@ -76,6 +76,7 @@ function startManagedApi(client, baseDir) {
     // Salons
     goodbye_channel_id: 's',
     patch_channel_id: 's',
+    patch_mention: 's',
     partner_channel_id: 's',
     captcha_channel_id: 's',
     ticket_transcript_channel_id: 's',

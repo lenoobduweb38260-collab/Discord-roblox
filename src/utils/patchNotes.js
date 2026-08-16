@@ -6,9 +6,10 @@
 //
 // Fonctionnement :
 //  • La 1re entrée (id « initial ») récapitule TOUT ce qui a été fait depuis le
-//    début et est annoncée UNE SEULE FOIS avec @everyone.
-//  • Chaque entrée suivante = une version, annoncée avec @here (ses changements
-//    uniquement).
+//    début et n'est annoncée QU'UNE SEULE FOIS.
+//  • Chaque entrée suivante = une version (ses changements uniquement).
+//  • La mention éventuelle (@everyone, @here ou un rôle) est un réglage PAR
+//    SERVEUR — `patch_mention`. Par défaut, aucune mention n'est faite.
 //  • Un marqueur en base (app_state『patch_notes_pos』) mémorise la dernière
 //    entrée déjà publiée : à chaque démarrage, seules les nouvelles sont
 //    envoyées.
@@ -27,7 +28,6 @@ const RELEASES = [
   {
     id: 'initial',
     title: 'Récapitulatif complet — tout ce que le bot propose',
-    everyone: true,
     ajout: [
       '🪪 Cartes d\'identité RP partagées sur tous les serveurs (`/carte`)',
       '🚗 Permis de conduire à points (`/permis`)',
@@ -486,7 +486,6 @@ const RELEASES = [
   {
     id: 'version-2-listes-paginees-2026-08q',
     title: '🎉 Version 2.0 — listes RP paginées',
-    everyone: true,
     ajout: [
       '◀️▶️ **Boutons « Page précédente » et « Page suivante »** de part et d\'autre de la recherche, sur les panneaux **Whitelist RP** et **Blacklist RP**',
       '📄 **39 entrées par page**, et l\'embed change selon la page — la liste complète est enfin consultable, quel que soit le nombre d\'inscrits',
@@ -762,6 +761,24 @@ const RELEASES = [
     fix: [],
     retrait: [],
   },
+  {
+    id: 'mentions-notes-2026-08ag',
+    title: 'Les notes de version ne sonnent plus chez personne 🔕',
+    ajout: [
+      '🔔 **Reglage « Mentionner a chaque note »** sur le site : personne, `@everyone`, `@here`, ou **un role precis** de votre serveur. Les trois choix sont dans le meme menu, avec la liste de vos roles',
+    ],
+    amelioration: [
+      '🔕 **Par defaut, aucune mention.** Une note de version ne justifie pas de faire sonner le telephone de tout le serveur — c\'est le genre de notification qui fait couper le salon. Le silence est desormais le comportement par defaut, et c\'est a vous de demander autre chose',
+      '🛡️ **Sans mention, rien ne peut sonner** : meme un pseudo ou un role cite dans le texte de la note ne notifie personne',
+      '🎯 La mention est decidee **par serveur**, plus par l\'entree du journal : deux serveurs peuvent avoir des reglages differents pour la meme note',
+    ],
+    fix: [
+      '🩹 **Le `@here` etait envoye d\'office** a chaque nouvelle version, et `@everyone` sur le recapitulatif complet — sans qu\'aucun reglage ne permette de l\'eviter',
+    ],
+    retrait: [
+      '➖ Plus aucune mention codee en dur dans le bot',
+    ],
+  },
 ];
 
 // Construit l'embed d'une note à partir d'une entrée { title, ajout, fix,
@@ -849,10 +866,40 @@ function enChamps(blocs) {
 const getPos = db.prepare("SELECT value FROM app_state WHERE key = 'patch_notes_pos'");
 const setPos = db.prepare("INSERT OR REPLACE INTO app_state (key, value) VALUES ('patch_notes_pos', ?)");
 
+// 🔔 Qui prévenir quand une note paraît ?
+//
+// Par défaut : PERSONNE. Une note de version ne justifie pas de faire sonner
+// le téléphone de tout le serveur — c'est le genre de notification qui fait
+// couper le salon, voire quitter. Chaque serveur décide, et le silence est
+// le choix par défaut.
+//
+// `patch_mention` vaut : rien (aucune mention), 'everyone', 'here', ou
+// l'identifiant d'un rôle.
+function mentionDe(cfg) {
+  const v = String(cfg?.patch_mention || '').trim();
+  if (!v || v === 'aucune') return null;
+  // @everyone et @here relèvent tous deux du type « everyone » côté API.
+  if (v === 'everyone') return { content: '@everyone', allowedMentions: { parse: ['everyone'] } };
+  if (v === 'here') return { content: '@here', allowedMentions: { parse: ['everyone'] } };
+  if (/^\d{5,}$/.test(v)) return { content: `<@&${v}>`, allowedMentions: { roles: [v] } };
+  return null;
+}
+
+// Le message à envoyer, mention comprise — ou muet.
+// ⚠️ Sans mention, on pose quand même `allowedMentions: { parse: [] }` :
+// sinon un pseudo ou un rôle cité DANS la note sonnerait chez l'intéressé.
+function envoiDe(embed, cfg) {
+  const m = mentionDe(cfg);
+  return {
+    ...(m ? { content: m.content } : {}),
+    embeds: [embed],
+    allowedMentions: m ? m.allowedMentions : { parse: [] },
+  };
+}
+
 // Publie une note dans le salon patch note de chaque serveur qui en a configuré un.
 async function broadcast(client, entry) {
   const embed = buildEmbed(entry);
-  const mention = entry.everyone ? '@everyone' : '@here';
   let count = 0;
   for (const guild of client.guilds.cache.values()) {
     try {
@@ -861,7 +908,7 @@ async function broadcast(client, entry) {
       const channel = await guild.channels.fetch(cfg.patch_channel_id).catch(() => null);
       if (!channel?.isTextBased()) continue;
       const ok = await channel
-        .send({ content: mention, embeds: [embed], allowedMentions: { parse: ['everyone'] } })
+        .send(envoiDe(embed, cfg))
         .then(() => true)
         .catch(() => false);
       if (ok) count += 1;
@@ -894,7 +941,7 @@ async function start(client) {
 // Publication forcée (commande créateur) :
 //  • 'attente'  → publie les entrées pas encore annoncées (comme au démarrage,
 //                 fait avancer le marqueur : pas de renvoi au prochain reboot)
-//  • 'initial'  → renvoie le récapitulatif complet (@everyone) sans toucher au marqueur
+//  • 'initial'  → renvoie le récapitulatif complet sans toucher au marqueur
 //  • 'derniere' → renvoie la dernière entrée du journal sans toucher au marqueur
 async function forcePublish(client, which = 'derniere') {
   if (which === 'attente') {
@@ -909,7 +956,9 @@ async function forcePublish(client, which = 'derniere') {
   }
   const entry = which === 'initial' ? RELEASES[0] : RELEASES[RELEASES.length - 1];
   const count = await broadcast(client, entry);
-  return { mode: which, title: entry.title, mention: entry.everyone ? '@everyone' : '@here', count };
+  // La mention n'est plus décidée par l'entrée mais par chaque serveur : on
+  // n'en annonce donc aucune ici.
+  return { mode: which, title: entry.title, count };
 }
 
-module.exports = { start, forcePublish, buildEmbed, RELEASES };
+module.exports = { start, forcePublish, buildEmbed, mentionDe, envoiDe, RELEASES };

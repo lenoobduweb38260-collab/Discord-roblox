@@ -448,6 +448,7 @@ for (const column of [
   'level_image_url TEXT',
   'goodbye_channel_id TEXT',
   'patch_channel_id TEXT',
+  'patch_mention TEXT',                 // qui mentionner : vide = personne (défaut), 'everyone', 'here', ou un id de rôle
   'interact_enabled INTEGER',
   'sao_enabled INTEGER',
   'police_role_ids TEXT',
@@ -670,6 +671,7 @@ const DEFAULT_CONFIG = {
   captcha_kick: 1,
   partner_channel_id: null,
   patch_channel_id: null,
+  patch_mention: null,
   interact_enabled: 0,
   sao_enabled: 0,
   levels_enabled: 1,

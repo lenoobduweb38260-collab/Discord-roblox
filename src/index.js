@@ -291,7 +291,8 @@ async function start() {
 
   // Notes de mise à jour automatiques : publie dans chaque salon patch note
   // configuré les versions pas encore annoncées (la 1re fois : récapitulatif
-  // complet avec @everyone ; ensuite : chaque nouvelle version avec @here).
+  // complet ; ensuite : chaque nouvelle version). La mention éventuelle est
+  // un réglage par serveur — aucune par défaut.
   client.once(Events.ClientReady, () => {
     require('./utils/patchNotes')
       .start(client)
