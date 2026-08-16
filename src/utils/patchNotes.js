@@ -677,6 +677,25 @@ const RELEASES = [
     ],
     retrait: [],
   },
+  {
+    id: 'esthetique-anciens-2026-08ab',
+    title: 'Les anciens messages passent au nouveau style 🎨',
+    ajout: [
+      '🎨 `/esthetique appliquer` **reconstruit** desormais les anciens embeds au lieu de simplement les repeindre : les champs deviennent des sections `◆` / `➜`, le filet et la banniere sont poses, la signature refaite. Un vieux message devient rigoureusement identique a un message envoye aujourd\'hui',
+      '🗂️ **Rien n\'est perdu** : le contenu de l\'ancien embed sert de reserve d\'informations — titre, texte, intitule et valeur de chaque champ, liens, images. Seule la forme change',
+    ],
+    amelioration: [
+      '♻️ Les embeds sont refaits **sur place**. Un bot peut reecrire integralement ses propres embeds : supprimer puis republier aurait donne le meme resultat visuel, mais aurait detruit les reactions, les epingles, les reponses accrochees et les liens partages vers ces messages — et remonte de vieux messages en bas des salons',
+      '🕰️ La date affichee reste **celle du message**, pas celle du rehabillage : un message de mars ne se retrouve plus date d\'aujourd\'hui',
+      '📊 Le compte rendu detaille ce qui a ete refait, serveur par serveur',
+    ],
+    fix: [
+      '🩹 **Les vieux filets de 28 signes restaient en place** : le style avait change, le trait trop long non — c\'est ce qui donnait l\'impression de « toujours les vieilles embeds ». Tous les filets, celui du haut comme ceux qui separent les sections, sont remis a la longueur du jour',
+      '🩹 Un message deja au bon format etait **re-modifie a chaque passage** de la commande : la comparaison dependait de l\'ordre des cles JSON, que la reecriture changeait. Le compte « deja au bon format » restait donc a zero',
+      '🩹 La liste des serveurs du compte rendu affichait une **double fleche** `➜ ➜`',
+    ],
+    retrait: [],
+  },
 ];
 
 // Découpe une catégorie en champs d'embed (max 1024 caractères par champ).

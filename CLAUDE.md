@@ -82,9 +82,27 @@ tronquer au milieu d'une entrée.
 
 ## 6. Rattraper l'existant
 
-`/esthetique appliquer` réhabille les messages **déjà envoyés** par le bot
-(couleur, ligne d'identité, signature) sans toucher à leur contenu. À
-proposer après tout changement d'accent.
+`/esthetique appliquer` **reconstruit** les messages **déjà envoyés** par le
+bot : champs refondus en sections, filet, bannière, couleur, ligne d'auteur,
+signature. Le vieil embed sert de réserve d'informations — chaque mot est
+conservé, seule la forme change. Résultat attendu : un ancien message devient
+rigoureusement identique à un message envoyé aujourd'hui. À proposer après
+tout changement d'accent.
+
+La reconstruction se fait **par modification, jamais par suppression suivie
+d'un renvoi**. Un bot peut réécrire intégralement ses propres embeds : le
+résultat visuel est le même, mais republier détruirait les réactions, les
+épingles, les réponses accrochées, les liens partagés vers le message et sa
+date d'origine — et remonterait de vieux messages en bas des salons.
+
+Deux pièges déjà payés, à ne pas refaire :
+- **Filets périmés.** Un message publié à l'époque d'un filet plus long garde
+  son trait tant qu'on ne le normalise pas — c'est ce qui donne l'impression
+  que « rien n'a changé ». Toute ligne faite uniquement de `─` est un filet :
+  la remettre à la longueur du jour.
+- **Ordre des clés JSON.** Effacer une signature périmée puis la réécrire la
+  renvoie en fin d'objet. Comparer les textes JSON bruts conclurait « ça a
+  changé » à chaque passage. Comparer avec des clés triées.
 
 **Réservée au créateur du bot**, et **sans choix de salon** : l'esthétique
 appartient au bot, pas à un serveur. La commande balaye donc tous les

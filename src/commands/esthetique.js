@@ -1,7 +1,7 @@
 const { SlashCommandBuilder, EmbedBuilder, MessageFlags, ChannelType, PermissionFlagsBits } = require('discord.js');
 const { GRADES } = require('../utils/permissions');
 const { isCreator } = require('../utils/botTeam');
-const { reglages, versEntier, DEFAUT_ACCENT } = require('../utils/styleEmbeds');
+const { reglages, versEntier, DEFAUT_ACCENT, styliserUn } = require('../utils/styleEmbeds');
 const M = require('../utils/miseEnPage');
 
 // 🎨 Ré-applique l'identité visuelle aux messages DÉJÀ envoyés par le bot.
@@ -13,8 +13,23 @@ const M = require('../utils/miseEnPage');
 //
 // Réservée au créateur du bot : elle modifie des messages partout à la fois.
 //
-// Elle ne touche QUE l'habillage — couleur, signature, ligne d'auteur,
-// horodatage. Titre, texte, champs, images et boutons ne sont jamais modifiés.
+// Ce qui est REFAIT : couleur, signature, ligne d'auteur, filet, bannière,
+// horodatage, et la refonte des champs en sections.
+// Ce qui est CONSERVÉ : chaque mot écrit dans l'embed — titre, texte, valeurs
+// des champs, liens, images, boutons. L'ancien embed sert de réserve
+// d'informations, le nouveau style vient se poser dessus.
+//
+// ⚠️ Pourquoi on MODIFIE au lieu de supprimer-puis-republier :
+// un bot peut réécrire intégralement ses propres embeds. La modification
+// donne donc exactement le même résultat visuel que la republication, mais
+// elle garde ce qu'une suppression détruirait définitivement :
+//   • les réactions déjà posées par les membres,
+//   • les épingles,
+//   • les liens vers le message (partagés ailleurs, dans des tickets…),
+//   • les réponses accrochées au message,
+//   • la date d'origine, et donc l'ordre de la conversation.
+// Republier, c'est aussi re-notifier tout le monde et remonter de vieux
+// messages en bas du salon. Le résultat serait identique, le coût non.
 
 // Un pied de page fait-il partie de l'identité (donc remplaçable), ou dit-il
 // quelque chose d'utile (« Page 2/4 », « Relancé par X ») qu'il faut garder ?
@@ -26,43 +41,101 @@ function piedDIdentite(texte, nomServeur) {
   return t.includes(' • ') && t.endsWith(nomServeur);
 }
 
+// Remet tous les filets d'un texte à la longueur courante.
+//
+// Sans cela, un message publié à l'époque du filet de 28 signes garderait son
+// trait trop long — celui qui repasse à la ligne sur téléphone. C'est
+// précisément le « c'est encore les vieilles embed » constaté : le style
+// avait changé, le vieux trait était resté.
+//
+// Une ligne faite UNIQUEMENT de « ─ » est un filet, jamais du contenu : on
+// peut la remplacer sans risque.
+function normaliserFilets(texte, filet) {
+  if (typeof texte !== 'string' || !texte) return texte;
+  return texte
+    .split('\n')
+    .map((l) => (/^\s*─{3,}\s*$/.test(l) ? filet : l))
+    .join('\n');
+}
+
+// Comparaison « est-ce vraiment différent ? », insensible à l'ordre des clés.
+//
+// Effacer un pied de page périmé puis le réécrire le renvoie à la fin de
+// l'objet : le texte JSON change alors que l'embed, lui, est identique. Sans
+// cette précaution, chaque passage de la commande ré-éditerait tous les
+// messages du serveur pour rien, et le compte « déjà au bon format » resterait
+// désespérément à zéro.
+function stable(valeur) {
+  if (Array.isArray(valeur)) return `[${valeur.map(stable).join(',')}]`;
+  if (valeur && typeof valeur === 'object') {
+    return `{${Object.keys(valeur).sort().map((k) => `${JSON.stringify(k)}:${stable(valeur[k])}`).join(',')}}`;
+  }
+  return JSON.stringify(valeur);
+}
+
 // Réhabille un embed déjà publié. Renvoie null si rien ne change.
-function rehabiller(json, contexte) {
-  const r = contexte.reglages;
-  const avant = JSON.stringify(json);
-  const e = { ...json };
+//
+// 🔑 Le travail lui-même est fait par styliserUn — EXACTEMENT la fonction qui
+// habille les nouveaux messages. C'est ce qui garantit qu'un vieil embed
+// devient identique à un embed fraîchement envoyé : même filet, mêmes sections
+// à la place des champs, même signature. Deux codes séparés auraient fini par
+// diverger.
+//
+// Le rôle de cette fonction est de PRÉPARER le terrain : styliserUn ne comble
+// que le vide, or un ancien message porte souvent l'ANCIENNE identité. On
+// efface donc ce qui est de l'identité (et rien d'autre) avant de le laisser
+// reconstruire.
+//
+// `dateOrigine` est la date de publication du message. Sans elle, styliserUn
+// daterait d'AUJOURD'HUI un message écrit il y a six mois : l'embed afficherait
+// une heure qui n'a jamais existé. On repose donc la vraie date.
+function rehabiller(json, contexte, dateOrigine = null) {
+  const avant = stable(json);
+  const e = JSON.parse(JSON.stringify(json));
+  const filet = contexte.reglages?.filet || '';
 
-  if (contexte.couleurs === 'uniformiser') e.color = r.accent;
-  else if (e.color === undefined || e.color === null) e.color = r.accent;
+  // Couleur : « uniformiser » impose l'accent, sinon styliserUn ne comblera
+  // que l'absence de couleur.
+  if (contexte.couleurs === 'uniformiser') delete e.color;
 
-  if (r.piedDePage && contexte.serveur) {
-    if (!e.footer?.text || piedDIdentite(e.footer.text, contexte.serveur)) {
-      e.footer = { text: [contexte.bot, contexte.serveur].filter(Boolean).join(' • ') };
-      if (contexte.icone) e.footer.icon_url = contexte.icone;
+  // Signature d'identité périmée → on l'efface pour qu'elle soit réécrite.
+  // Un pied de page qui dit autre chose (« Page 2/4 ») est conservé.
+  if (e.footer?.text && piedDIdentite(e.footer.text, contexte.serveur)) delete e.footer;
+  // Idem pour la ligne d'auteur qui n'est QUE le nom du serveur.
+  if (e.author?.name === contexte.serveur) delete e.author;
+
+  // Filets d'une ancienne longueur → remis à la longueur du jour, aussi bien
+  // celui du haut que ceux qui séparent les sections.
+  if (filet) {
+    if (typeof e.description === 'string') e.description = normaliserFilets(e.description, filet);
+    if (Array.isArray(e.fields)) {
+      for (const champ of e.fields) {
+        if (champ && typeof champ.value === 'string') champ.value = normaliserFilets(champ.value, filet);
+      }
     }
   }
-  // Ligne d'auteur : on ne remplace que celle qui EST l'identité (le nom du
-  // serveur). « Avis de @membre » ou « Bienvenue sur … » sont conservés.
-  if (r.ligneAuteur && contexte.serveur) {
-    if (!e.author?.name || e.author.name === contexte.serveur) {
-      e.author = { name: contexte.serveur };
-      if (contexte.icone) e.author.icon_url = contexte.icone;
-    }
-  }
-  if (r.horodatage && !e.timestamp) e.timestamp = new Date().toISOString();
 
-  return JSON.stringify(e) === avant ? null : e;
+  // La date du message, pas celle du réhabillage. Un serveur qui a coupé
+  // l'horodatage n'en reçoit toujours pas.
+  if (contexte.reglages?.horodatage && !e.timestamp && dateOrigine) {
+    const d = new Date(dateOrigine);
+    if (!Number.isNaN(d.getTime())) e.timestamp = d.toISOString();
+  }
+
+  styliserUn(e, contexte);
+
+  return stable(e) === avant ? null : e;
 }
 
 module.exports = {
   grade: GRADES.EVERYONE, // le contrôle réel est fait dans execute() : créateur uniquement
   data: new SlashCommandBuilder()
     .setName('esthetique')
-    .setDescription('[Créateur] Ré-applique l\'esthétique du bot à tous ses anciens messages')
+    .setDescription('[Créateur] Refait tous les anciens embeds du bot au style actuel')
     .addSubcommand((sub) =>
       sub
         .setName('appliquer')
-        .setDescription('Réhabille les anciens messages du bot sur TOUS ses serveurs')
+        .setDescription('Reconstruit les anciens embeds au style actuel, sur TOUS les serveurs')
         .addIntegerOption((o) =>
           o
             .setName('messages')
@@ -169,7 +242,7 @@ module.exports = {
             let change = false;
             for (const embed of message.embeds) {
               const json = embed.toJSON ? embed.toJSON() : { ...embed.data };
-              const refait = rehabiller(json, contexte);
+              const refait = rehabiller(json, contexte, message.createdAt);
               if (refait) { change = true; nouveaux.push(refait); } else nouveaux.push(json);
             }
             if (!change) { totaux.conformes++; continue; }
@@ -203,31 +276,36 @@ module.exports = {
         `**${totaux.conformes}** déjà au bon format`,
         totaux.echecs ? `**${totaux.echecs}** échec(s) de modification` : null,
       ].filter(Boolean), { prefixe: '📊', compte: totaux.examines, motCompte: 'embed examiné' }),
-      M.bloc('Réglages appliqués', [
+      M.bloc('Ce qui a été refait', [
+        'Champs d\'embed → **sections** ◆ / ➜',
+        'Filet, bannière, signature et ligne d\'auteur **remis à la version du jour**',
         couleurs === 'uniformiser' ? 'Couleurs **uniformisées**' : 'Couleurs porteuses de sens **conservées**',
         `${limite} message(s) examiné(s) au maximum par salon`,
       ], { prefixe: '🎯', compte: null }),
     ];
     // La liste des serveurs peut être longue : on la borne.
-    const pages = M.paginer(lignesServeurs.map((l) => M.entree(l)), { maxParPage: 20, budget: 1500 });
+    // ⚠️ Lignes brutes : c'est M.bloc qui pose la flèche ➜. Les préfixer ici
+    // donnerait « ➜ ➜ Nom ».
+    const pages = M.paginer(lignesServeurs, { maxParPage: 20, budget: 1500 });
     blocs.push(
       M.bloc('Serveurs', pages[0] || [], { prefixe: '🌍', compte: parServeur.length, motCompte: 'serveur', vide: 'Aucun serveur' })
     );
     if (pages.length > 1) blocs.push(`*… et ${lignesServeurs.length - (pages[0]?.length || 0)} serveur(s) de plus.*`);
 
     const embed = new EmbedBuilder()
-      .setTitle('🎨 Esthétique du bot ré-appliquée')
+      .setTitle('🎨 Anciens embeds refaits au style actuel')
       .setDescription(M.borner(M.description(blocs), M.MAX_DESCRIPTION))
       .setFooter({ text: M.piedDePage({ total: totaux.examines, motTotal: 'embed examiné', extra: `en ${secondes} s` }) });
 
     return interaction.editReply({
       embeds: [embed],
       content: totaux.retouches
-        ? null
-        : 'ℹ️ Rien à changer : les messages examinés portent déjà l\'identité actuelle. Les messages **écrits par des membres** ou par **un autre bot** ne peuvent pas être modifiés — Discord ne l\'autorise pas.',
+        ? '♻️ Les embeds ont été **reconstruits sur place** : réactions, épingles, réponses et liens vers les messages sont conservés — une suppression suivie d\'un renvoi les aurait tous perdus.'
+        : 'ℹ️ Rien à changer : les messages examinés portent déjà le style actuel. Les messages **écrits par des membres** ou par **un autre bot** ne peuvent pas être refaits — Discord ne laisse un bot modifier que ses propres messages.',
     });
   },
   // Exporté pour les tests.
   rehabiller,
   piedDIdentite,
+  normaliserFilets,
 };
