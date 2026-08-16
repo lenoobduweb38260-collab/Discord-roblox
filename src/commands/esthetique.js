@@ -243,27 +243,29 @@ module.exports = {
     const parServeur = [];
     const debut = Date.now();
     let dernierPoint = 0;
-    let interrompu = false;
 
     // ⏳ Un jeton d'interaction Discord vit 15 minutes : passé ce délai, le bot
     // ne peut plus modifier sa réponse.
     //
-    // Cette limite ne contraint QUE la réponse, pas le travail. On arrêtait
-    // donc le balayage à 13 minutes pour pouvoir encore afficher le compte
-    // rendu — au prix d'un balayage tronqué et d'un décompte anxiogène à
-    // l'écran. C'est l'inverse du bon arbitrage : un serveur fourni mérite
-    // d'être balayé en entier.
-    //
-    // Le balayage va donc jusqu'au bout, et le compte rendu arrive en message
-    // privé s'il est trop tard pour modifier la réponse. Plus de décompte.
+    // Cette limite ne contraint QUE l'affichage. Le balayage, lui, va jusqu'au
+    // bout : sa fin, c'est d'avoir fait ce qu'on lui a demandé, pas une
+    // échéance au chronomètre. Le travail est fini par nature — serveurs ×
+    // salons × messages — donc aucune borne de temps ne peut que le tronquer.
     const JETON = 14 * 60 * 1000;
     const jetonVivant = () => Date.now() - debut < JETON;
-
-    // Garde-fou de dernier recours : un balayage ne doit pas tourner
-    // indéfiniment si l'API se met à répondre au ralenti. Une heure est très
-    // au-delà de tout balayage normal — c'est un filet, pas une échéance.
-    const GARDE_FOU = 60 * 60 * 1000;
-    const tempsEcoule = () => Date.now() - debut > GARDE_FOU;
+    // Quand l'affichage expire, on prévient UNE fois en privé que ça continue :
+    // vingt minutes d'écran figé passeraient pour une commande plantée.
+    let relaisEnvoye = false;
+    const prevenirQueCaContinue = async () => {
+      if (relaisEnvoye || jetonVivant()) return;
+      relaisEnvoye = true;
+      await interaction.user
+        .send(
+          '⏳ Le balayage de `/esthetique` **continue** : il a dépassé la durée de vie de la réponse de la commande.\n' +
+          '-# Je t\'envoie le compte rendu ici dès qu\'il est terminé — rien n\'est interrompu.'
+        )
+        .catch(() => null);
+    };
 
     // Compte rendu d'avancement, tant que la réponse peut être modifiée.
     // Appelé à chaque salon et non plus seulement après une modification :
@@ -285,7 +287,7 @@ module.exports = {
     };
 
     for (const guild of interaction.client.guilds.cache.values()) {
-      if (tempsEcoule()) { interrompu = true; break; }
+      await prevenirQueCaContinue();
       // Un serveur en échec ne doit pas emporter tout le balayage avec lui.
       try {
         const r = reglages(guild.id);
@@ -320,7 +322,7 @@ module.exports = {
         );
 
         for (const salon of salons) {
-          if (tempsEcoule()) { interrompu = true; break; }
+          await prevenirQueCaContinue();
           const droits = salon.permissionsFor(moi);
           if (!droits?.has(PermissionFlagsBits.ViewChannel) || !droits?.has(PermissionFlagsBits.ReadMessageHistory)) {
             ignoresServeur++;
@@ -331,7 +333,6 @@ module.exports = {
           let restants = limite;
           let avant = null;
           while (restants > 0) {
-            if (tempsEcoule()) { interrompu = true; break; }
             const lot = await salon.messages
               .fetch({ limit: Math.min(100, restants), ...(avant ? { before: avant } : {}) })
               .catch(() => null);
@@ -341,7 +342,6 @@ module.exports = {
             await avancement(guild.name, salon.name);
 
             for (const message of lot.values()) {
-              if (tempsEcoule()) { interrompu = true; break; }
               // Un bot ne peut modifier QUE ses propres messages.
               if (message.author.id !== interaction.client.user.id) continue;
               if (!message.embeds?.length) continue;
@@ -394,10 +394,13 @@ module.exports = {
       } catch (err) {
         parServeur.push({ nom: guild.name, ignore: `échec : ${String(err.message || err).slice(0, 80)}` });
       }
-      if (interrompu) break;
     }
 
     const secondes = Math.round((Date.now() - debut) / 1000);
+    // Un balayage complet peut durer longtemps : « en 4271 s » ne se lit pas.
+    const duree = secondes < 60
+      ? `en ${secondes} s`
+      : `en ${Math.floor(secondes / 60)} min ${String(secondes % 60).padStart(2, '0')} s`;
     const lignesServeurs = parServeur.map((s) =>
       s.ignore
         ? `**${s.nom}** — *${s.ignore}*`
@@ -436,14 +439,6 @@ module.exports = {
       ], { prefixe: '🃏', compte: null }));
     }
 
-    if (interrompu) {
-      blocs.push(M.bloc('Balayage interrompu', [
-        'Arrêté après **une heure** : c\'est un garde-fou, pas une échéance normale — l\'API répondait probablement au ralenti',
-        'Les serveurs listés ci-dessous ont été traités ; relancez la commande pour continuer',
-        'Astuce : réduisez l\'option **messages** pour aller plus vite par salon',
-      ], { prefixe: '⏳', compte: null }));
-    }
-
     // La liste des serveurs peut être longue : on la borne.
     // ⚠️ Lignes brutes : c'est M.bloc qui pose la flèche ➜. Les préfixer ici
     // donnerait « ➜ ➜ Nom ».
@@ -454,9 +449,9 @@ module.exports = {
     if (pages.length > 1) blocs.push(`*… et ${lignesServeurs.length - (pages[0]?.length || 0)} serveur(s) de plus.*`);
 
     const embed = new EmbedBuilder()
-      .setTitle(interrompu ? '⏳ Balayage interrompu — résultat partiel' : '🎨 Anciens embeds refaits au style actuel')
+      .setTitle('🎨 Anciens embeds refaits au style actuel')
       .setDescription(M.borner(M.description(blocs), M.MAX_DESCRIPTION))
-      .setFooter({ text: M.piedDePage({ total: totaux.examines, motTotal: 'embed examiné', extra: `en ${secondes} s` }) });
+      .setFooter({ text: M.piedDePage({ total: totaux.examines, motTotal: 'embed examiné', extra: duree }) });
 
     let entete;
     if (mode !== 'recreer' && totaux.aRecreer) {

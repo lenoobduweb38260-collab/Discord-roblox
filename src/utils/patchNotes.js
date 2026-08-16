@@ -823,11 +823,14 @@ const RELEASES = [
       '🏁 **Le balayage va jusqu\'au bout**, quel que soit le nombre de salons. Il s\'arretait a 13 minutes pour pouvoir encore afficher son compte rendu — la reponse d\'une commande Discord expirant au bout de 15 minutes. Mais cette limite ne contraint que l\'AFFICHAGE, pas le travail',
       '📬 **Le compte rendu arrive en message prive** si le balayage a dure plus longtemps que la reponse. La destination est annoncee des le lancement, pour ne pas laisser croire a une commande plantee',
       '⏱️ **Plus de decompte a l\'ecran** : il affichait le temps restant avant un arret qui n\'a plus lieu d\'etre. C\'est le temps ecoule qui s\'affiche desormais, avec le serveur et le salon en cours',
-      '🛟 Un garde-fou d\'une heure reste en place — c\'est un filet contre une API au ralenti, pas une echeance',
+      '🏁 **Aucune echeance, plus du tout.** La fin de mission du bot, c\'est d\'avoir fait ce qu\'on lui a demande. Le travail est fini par nature — serveurs × salons × messages — donc toute borne de temps ne pouvait que le tronquer',
+      '📨 Si le balayage depasse la duree de la reponse, un message prive previent que **ca continue**, puis le compte rendu arrive a la fin. Vingt minutes d\'ecran fige passeraient pour une commande plantee',
+      '🕰️ Une longue duree s\'affiche en minutes : « en 71 min 12 s » plutot que « en 4272 s »',
     ],
     fix: [],
     retrait: [
       '➖ L\'arret automatique a 13 minutes, qui tronquait les gros balayages',
+      '➖ Le garde-fou d\'une heure, qui abandonnait le travail en cours',
     ],
   },
 ];
