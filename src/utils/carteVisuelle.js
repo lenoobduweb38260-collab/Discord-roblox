@@ -65,7 +65,7 @@ function planDocument(type, donnees = {}) {
 
   const textes = [
     { texte: assainirTexte(donnees.serveur) || 'SERVEUR RP', taille: 16, x: MARGE, y: 22, ton: 'bandeau' },
-    { texte: theme.titre, taille: 32, x: MARGE, y: 44, ton: 'bandeau' },
+    { texte: donnees.titre || theme.titre, taille: 32, x: MARGE, y: 44, ton: 'bandeau' },
   ];
 
   // Deux colonnes de champs, empilées.
@@ -105,19 +105,30 @@ function planDocument(type, donnees = {}) {
   };
 }
 
+// Le document imprimé porte le nom du jeu du serveur : sur Arma ce n'est pas
+// une carte d'identité mais un livret matricule. Le gabarit, lui, ne change
+// pas — seuls les intitulés sont réécrits.
+//
+// ⚠️ Ces textes partent dans une image, pas dans un message : les polices de
+// jimp n'ont pas d'accents. On retire donc les accents ici, comme le reste du
+// fichier le fait déjà.
+const sansAccent = (t) => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
 // Champs d'une carte d'identité RP.
 function planCarte(card, extra = {}) {
+  const T = extra.theme || null;
   return planDocument('identite', {
     serveur: extra.serveur,
+    titre: T ? `${sansAccent(T.carte.titre).toUpperCase()} RP` : undefined,
     numero: card.card_id ? `N° ${card.card_id}` : '',
     champs: [
       ['Nom', card.rp_nom],
       ['Prenom', card.rp_prenom],
       ['Ne(e) le', card.date_naissance],
-      ['A', card.lieu_naissance],
+      [T ? sansAccent(T.carte.lieu) : 'A', card.lieu_naissance],
       ['Sexe', card.sexe],
-      ['Nationalite', card.nationalite],
-      ['Pseudo Roblox', card.pseudo_roblox],
+      [T ? sansAccent(T.carte.nationalite) : 'Nationalite', card.nationalite],
+      [T ? sansAccent(T.compte.label) : 'Pseudo Roblox', card.pseudo_roblox],
       ['Identifiant Discord', card.user_id],
     ],
   });
@@ -126,13 +137,15 @@ function planCarte(card, extra = {}) {
 // Champs d'un permis RP.
 function planPermis(permit, extra = {}) {
   const valide = permit.valid === 1;
+  const T = extra.theme || null;
   return planDocument('permis', {
     serveur: extra.serveur,
+    titre: T ? `${sansAccent(T.permis.titre).toUpperCase()} RP` : undefined,
     numero: permit.permit_number ? `N° ${permit.permit_number}` : '',
     champs: [
-      ['Titulaire', extra.titulaire || ''],
+      [T ? sansAccent(T.permis.titulaire) : 'Titulaire', extra.titulaire || ''],
       ['Statut', valide ? 'VALIDE' : 'INVALIDE'],
-      ['Points', `${permit.points}/12`],
+      [T ? sansAccent(T.permis.points) : 'Points', `${permit.points}/12`],
       ['Delivre le', extra.delivre || ''],
       ['Categories', extra.categories || 'B'],
       ['Autorite', extra.serveur || ''],

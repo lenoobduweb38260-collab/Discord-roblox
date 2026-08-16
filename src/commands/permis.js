@@ -2,6 +2,7 @@ const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 const { db, RP_SCOPE } = require('../database');
 const { generatePermitNumber } = require('../utils/ids');
 const { buildPermitEmbed, sendLog, logEmbed, COLORS } = require('../utils/embeds');
+const { themeDe } = require('../utils/rpThemes');
 const { GRADES, getGrade, isPolice } = require('../utils/permissions');
 
 const getPermit = db.prepare('SELECT * FROM permits WHERE guild_id = ? AND user_id = ?');
@@ -123,6 +124,7 @@ module.exports = {
       const V = require('../utils/carteVisuelle');
       const png = await V.fabriquer(
         V.planPermis(permit, {
+          theme: themeDe(interaction.guildId),
           serveur: interaction.guild?.name,
           titulaire: user.username,
           delivre: new Date(permit.issued_at).toLocaleDateString('fr-FR'),

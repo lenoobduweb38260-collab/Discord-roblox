@@ -1029,6 +1029,30 @@ const RELEASES = [
     ],
     retrait: [],
   },
+  {
+    id: 'niveaux-recompenses-jeux-2026-08aw',
+    title: 'Recompenses de niveau, et le RP parle la langue de votre jeu 🎖️',
+    ajout: [
+      '🏅 **Recompenses de niveau configurables** : un role donne en atteignant un palier. **Aucune par defaut** — le bot ne distribue rien de lui-meme. Cela se regle dans `/config` → 📈 XP & niveaux',
+      '🧱 **Cumul ou remplacement** : les roles s\'ajoutent les uns aux autres (defaut), ou le palier atteint remplace le precedent si vous preferez une seule couleur a la fois',
+      '📋 **`/niveau recompenses`** montre les paliers du serveur et coche ceux que vous avez deja debloques',
+      '🎮 **Le Module RP s\'adapte a votre jeu** : Roblox, **FiveM**, **Garry\'s Mod**, **Red Dead Redemption** et **Arma**. Le choix se fait dans `/config` → 🎭 Module RP',
+      '🎖️ Sur **Arma**, la carte d\'identite devient un **livret matricule**, le permis une **habilitation operationnelle** et l\'entreprise une **unite**. Sur **Red Dead**, un **registre de citoyen** et une **autorisation de port d\'arme** — il n\'y avait pas d\'automobile en 1899. Sur **Gmod**, une **fiche citoyenne** et une **licence de port d\'arme**. Sur **FiveM**, une **carte de resident** delivree par la mairie de Los Santos',
+    ],
+    amelioration: [
+      '⚡ **Une minute de vocal rapporte autant qu\'un message ecrit.** Le vocal etait reste a la moitie de l\'ecrit ; un seul systeme de niveaux et deux baremes, cela revenait a dire que le vocal compte moins. Il n\'y a plus qu\'**un seul reglage de gain**',
+      '🔁 **Les roles de rattrapage** : un membre absent pendant que vous configurez les recompenses, ou qui prend trois niveaux d\'un coup, recoit TOUS les paliers qu\'il a atteints',
+      '🩺 `/config` **dit pourquoi** une recompense ne partirait pas : role supprime, role au-dessus du mien, role gere par une integration',
+      '📴 `/niveau` previent quand le systeme est desactive, au lieu d\'afficher des niveaux figes que plus rien ne fait monter',
+      '🎨 **Le document imprime suit le jeu** : l\'image de la carte porte le bon titre et les bons intitules',
+      '🔄 **Changer de jeu ne perd aucune fiche** : seuls les mots changent, et on peut revenir en arriere',
+    ],
+    fix: [
+      '🛡️ **Une suppression d\'un message du bot etait totalement muette.** Le journal ignorait les messages de bot : un panneau de tickets ou une liste RP disparaissait sans que rien n\'indique quand, ni par qui. C\'est desormais journalise, **avec le nom de la personne** (permission « Voir le journal d\'audit » requise)',
+      '🔁 **Et le panneau revient** : un panneau de tickets ou une liste RP supprime est **republie automatiquement**, sa reference remise a jour. L\'effacer ne le fait donc plus disparaitre',
+    ],
+    retrait: [],
+  },
 ];
 
 // Construit l'embed d'une note à partir d'une entrée { title, ajout, fix,

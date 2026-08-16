@@ -18,6 +18,9 @@ const { GRADES, getGrade, staffRoleIds, adminRoleIds, policeRoleIds } = require(
 const { supportRoleIds } = require('./tickets');
 const { isCreator } = require('./botTeam');
 const { mettreAJour } = require('./reponse');
+const { diagnostiquerRecompenses, definirRecompense, effacerRecompense } = require('./levels');
+const { themeParCle, listeThemes, CLES } = require('./rpThemes');
+const M = require('./miseEnPage');
 
 // Panneau central de configuration : /config ouvre une vue d'ensemble avec un
 // menu de catégories ; chaque catégorie se règle via des sélecteurs de rôles,
@@ -314,18 +317,43 @@ function libelleMention(valeur) {
 function xpView(guild) {
   const cfg = getGuildConfig(guild.id);
   const enabled = cfg.levels_enabled !== 0; // NULL = activé (historique)
+  // 📊 Un seul système de niveaux, donc un seul gain : une minute de vocal
+  // vaut un message écrit. Les deux réglages restent en base, mais on les
+  // pilote ensemble — deux barèmes reviendraient à dire que le vocal compte
+  // moins, ce que la fusion des niveaux avait justement arrêté de dire.
+  const memeGain = Number(cfg.xp_text) === Number(cfg.xp_voice);
+  const cumul = Number(cfg.level_rewards_stack ?? 1) !== 0;
+  const paliers = diagnostiquerRecompenses(guild);
+  const listeRecompenses = paliers.length
+    ? paliers.map((p) => `${M.FLECHE} Niveau **${p.level}** → ${p.nom ? `<@&${p.roleId}>` : `\`${p.roleId}\``}`
+        + (p.souci ? ` — ⚠️ *${p.souci}*` : '')).join('\n')
+    : '*Aucune récompense — le bot ne donne aucun rôle de lui-même.*';
+
   const embed = new EmbedBuilder()
     .setColor(COLORS.INFO)
     .setTitle('📈 Configuration — XP & niveaux')
     .addFields(
       { name: '📊 Système de niveaux', value: enabled ? '🟢 **Activé**' : '🔴 **Désactivé**', inline: true },
-      { name: '✍️ XP texte', value: `**${cfg.xp_text}** XP/message`, inline: true },
-      { name: '🎙️ XP vocal', value: `**${cfg.xp_voice}** XP/minute`, inline: true },
+      {
+        name: '⚡ Gain d\'XP',
+        value: memeGain
+          ? `**${cfg.xp_text}** par message · **${cfg.xp_voice}** par minute de vocal`
+          : `✍️ **${cfg.xp_text}**/message · 🎙️ **${cfg.xp_voice}**/minute`,
+        inline: true,
+      },
       { name: '⏱️ Cooldown texte', value: `**${cfg.xp_cooldown}** secondes`, inline: true },
-      { name: '📢 Salon des annonces', value: cfg.level_channel_id ? `<#${cfg.level_channel_id}>` : '*Non configuré — aucune annonce*', inline: true }
+      { name: '📢 Salon des annonces', value: cfg.level_channel_id ? `<#${cfg.level_channel_id}>` : '*Non configuré — aucune annonce*', inline: true },
+      { name: '🏅 Récompenses de niveau', value: M.borner(listeRecompenses, M.MAX_CHAMP), inline: false },
+      {
+        name: cumul ? '🧱 Les rôles s\'ajoutent' : '🔄 Un seul rôle à la fois',
+        value: cumul
+          ? 'Chaque palier atteint s\'ajoute aux précédents.'
+          : 'Le palier atteint remplace le précédent.',
+        inline: false,
+      }
     )
     .setDescription(
-      'Cliquez sur **Modifier** pour changer les valeurs.\n' +
+      'Une minute passée en vocal rapporte autant qu\'un message écrit : il n\'y a qu\'**un seul niveau**.\n' +
         '📢 Les montées de niveau ne s\'annoncent QUE dans le salon configuré (⚙️ Salons → 📈).'
     );
   const row = new ActionRowBuilder().addComponents(
@@ -336,7 +364,15 @@ function xpView(guild) {
       .setEmoji(enabled ? '🔴' : '🟢')
       .setStyle(enabled ? ButtonStyle.Danger : ButtonStyle.Success)
   );
-  return { embeds: [embed], components: [row, backRow()] };
+  const row2 = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('cfgrec').setLabel('🏅 Ajouter une récompense').setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId('cfgrecdel').setLabel('🗑 Retirer une récompense').setStyle(ButtonStyle.Danger)
+      .setDisabled(paliers.length === 0),
+    new ButtonBuilder().setCustomId('cfgreccumul')
+      .setLabel(cumul ? '🔄 Un seul rôle à la fois' : '🧱 Cumuler les rôles')
+      .setStyle(ButtonStyle.Secondary)
+  );
+  return { embeds: [embed], components: [row, row2, backRow()] };
 }
 
 // ----- Catégorie : Sécurité (anti-spam, anti-nuke, captcha) -----
@@ -443,9 +479,27 @@ function rpView(guild) {
       `État : ${saoOn ? '🟢 **Activé**' : '🔴 **Désactivé**'}\n` +
       '`/sao` : jeu d\'aventure (100 étages d\'Aincrad) — badges, XP auto, gains AFK. Désactivé par défaut.',
   });
+  // 🎮 Le jeu décide du vocabulaire : sur Arma, « carte d'identité » devient
+  // « livret matricule ». Un joueur qui lit le mauvais mot comprend que le
+  // bot n'a pas été pensé pour son serveur.
+  const T = themeParCle(cfg.rp_jeu);
+  embed.addFields({
+    name: '🎮 Jeu du serveur',
+    value: `${T.emoji} **${T.label}**\n`
+      + `${M.FLECHE} ${T.carte.emoji} ${T.carte.titre} · ${T.permis.emoji} ${T.permis.titre} · ${T.entreprise.emoji} ${T.entreprise.titre}\n`
+      + '-# Change les mots du Module RP. Aucune fiche n\'est perdue : on peut revenir en arrière.',
+  });
   const row = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('cfgrpon').setLabel('Activer le Module RP').setEmoji('🟢').setStyle(ButtonStyle.Success).setDisabled(enabled || locked),
     new ButtonBuilder().setCustomId('cfgrpoff').setLabel('Désactiver le RP').setEmoji('🔴').setStyle(ButtonStyle.Danger).setDisabled(!enabled || locked)
+  );
+  const rowJeu = new ActionRowBuilder().addComponents(
+    new StringSelectMenuBuilder()
+      .setCustomId('cfgrpjeu')
+      .setPlaceholder(`🎮 Jeu du serveur — actuellement ${T.label}`)
+      .addOptions(listeThemes().map((j) => ({
+        label: j.label, value: j.cle, emoji: j.emoji, default: j.cle === T.cle,
+      })))
   );
   const rowInteract = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('cfginton').setLabel('Activer les Interactions').setEmoji('🎮').setStyle(ButtonStyle.Success).setDisabled(interactOn),
@@ -455,7 +509,7 @@ function rpView(guild) {
     new ButtonBuilder().setCustomId('cfgsaoon').setLabel('Activer l\'Aventure SAO').setEmoji('⚔️').setStyle(ButtonStyle.Success).setDisabled(saoOn),
     new ButtonBuilder().setCustomId('cfgsaooff').setLabel('Désactiver').setEmoji('🔴').setStyle(ButtonStyle.Danger).setDisabled(!saoOn)
   );
-  return { embeds: [embed], components: [row, rowInteract, rowSao, backRow()] };
+  return { embeds: [embed], components: [row, rowJeu, rowInteract, rowSao, backRow()] };
 }
 
 // ----- Catégorie : réseaux sociaux (annonces lives / nouvelles vidéos) -----
@@ -680,9 +734,40 @@ function xpModal(cfg) {
     .setCustomId('cfgxpmodal')
     .setTitle('📈 Réglages XP')
     .addComponents(
-      field('xp_text', 'XP par message (1 à 1000)', cfg.xp_text),
-      field('xp_voice', 'XP par minute en vocal (1 à 1000)', cfg.xp_voice),
+      // Un seul champ : le gain vaut pour un message écrit ET pour une minute
+      // de vocal. Deux champs invitaient à les régler différemment, ce qui
+      // recréait deux systèmes de niveaux dans un seul compteur.
+      field('xp_gain', 'XP par message et par minute de vocal (1 à 1000)', cfg.xp_text),
       field('xp_cooldown', 'Cooldown XP texte en secondes (5 à 3600)', cfg.xp_cooldown)
+    );
+}
+
+// 🏅 Ajouter une récompense : le palier et le rôle, en une fois.
+function rewardModal() {
+  return new ModalBuilder()
+    .setCustomId('cfgrecmodal')
+    .setTitle('🏅 Récompense de niveau')
+    .addComponents(
+      new ActionRowBuilder().addComponents(
+        new TextInputBuilder().setCustomId('level').setLabel('Niveau à atteindre (1 à 500)')
+          .setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(3).setPlaceholder('10')
+      ),
+      new ActionRowBuilder().addComponents(
+        new TextInputBuilder().setCustomId('role').setLabel('Rôle à donner (nom ou identifiant)')
+          .setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(100).setPlaceholder('Membre actif')
+      )
+    );
+}
+
+function rewardDeleteModal() {
+  return new ModalBuilder()
+    .setCustomId('cfgrecdelmodal')
+    .setTitle('🗑 Retirer une récompense')
+    .addComponents(
+      new ActionRowBuilder().addComponents(
+        new TextInputBuilder().setCustomId('level').setLabel('Niveau de la récompense à retirer')
+          .setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(3)
+      )
     );
 }
 
@@ -846,6 +931,29 @@ async function handleConfigInteraction(interaction) {
         interaction.guild,
         logEmbed('🎮 Module Interactions', `Interactions ${enable ? 'activées' : 'désactivées'} par <@${interaction.user.id}>.`, enable ? COLORS.SUCCESS : COLORS.DANGER)
       );
+      return;
+    }
+
+    // 🎮 Jeu du serveur (vocabulaire du Module RP).
+    if (id === 'cfgrpjeu') {
+      const choix = CLES.includes(interaction.values?.[0]) ? interaction.values[0] : 'roblox';
+      setGuildConfig(interaction.guildId, 'rp_jeu', choix);
+      await mettreAJour(interaction, rpView(interaction.guild));
+      const T = themeParCle(choix);
+      await sendLog(interaction.guild, logEmbed('🎮 Jeu du serveur',
+        `Module RP réglé sur ${T.emoji} **${T.label}** par <@${interaction.user.id}>.\n`
+        + `-# La ${T.carte.titre.toLowerCase()} remplace les anciens intitulés. Aucune fiche n'est perdue.`,
+        COLORS.INFO));
+      return;
+    }
+
+    // 🏅 Récompenses de niveau : ajouter, retirer, cumuler ou remplacer.
+    if (id === 'cfgrec') return await interaction.showModal(rewardModal());
+    if (id === 'cfgrecdel') return await interaction.showModal(rewardDeleteModal());
+    if (id === 'cfgreccumul') {
+      const cumul = Number(getGuildConfig(interaction.guildId).level_rewards_stack ?? 1) !== 0;
+      setGuildConfig(interaction.guildId, 'level_rewards_stack', cumul ? 0 : 1);
+      await mettreAJour(interaction, xpView(interaction.guild));
       return;
     }
 
@@ -1047,16 +1155,84 @@ async function handleConfigInteraction(interaction) {
       return await interaction.showModal(xpModal(getGuildConfig(interaction.guildId)));
     }
 
+    if (id === 'cfgrecmodal' || id === 'cfgrecdelmodal') {
+      const niveau = parseInt(interaction.fields.getTextInputValue('level'), 10);
+      if (Number.isNaN(niveau) || niveau < 1 || niveau > 500) {
+        return await interaction.reply({
+          content: '❌ Le niveau doit être un nombre entre **1** et **500**.',
+          flags: MessageFlags.Ephemeral,
+        });
+      }
+
+      if (id === 'cfgrecdelmodal') {
+        const retire = effacerRecompense(interaction.guildId, niveau);
+        if (!retire) {
+          return await interaction.reply({
+            content: `❌ Aucune récompense n'est configurée pour le **niveau ${niveau}**.`,
+            flags: MessageFlags.Ephemeral,
+          });
+        }
+        // ⚠️ Le rôle déjà donné n'est PAS repris : des membres l'ont, et le
+        // leur retirer sans prévenir serait pire que de laisser la trace
+        // d'un palier supprimé.
+        if (interaction.isFromMessage()) await mettreAJour(interaction, xpView(interaction.guild));
+        else await interaction.reply({ content: `🗑 Récompense du niveau **${niveau}** retirée.`, flags: MessageFlags.Ephemeral });
+        await sendLog(interaction.guild, logEmbed('🏅 Récompense de niveau',
+          `Palier **${niveau}** retiré par <@${interaction.user.id}>.\n-# Les membres qui avaient déjà le rôle le gardent.`,
+          COLORS.WARNING));
+        return;
+      }
+
+      // Le rôle est accepté par identifiant, par mention, ou par nom exact —
+      // un modal n'a pas de liste déroulante, autant reconnaître les trois.
+      const brut = interaction.fields.getTextInputValue('role').trim();
+      const parId = /^<@&(\d{15,25})>$/.exec(brut)?.[1] || (/^\d{15,25}$/.test(brut) ? brut : null);
+      const role = parId
+        ? interaction.guild.roles.cache.get(parId)
+        : interaction.guild.roles.cache.find((r) => r.name.toLowerCase() === brut.toLowerCase());
+      if (!role) {
+        return await interaction.reply({
+          content: `❌ Rôle introuvable : « ${brut} ».\n`
+            + '➜ Collez son **identifiant**, sa **mention** (`@Rôle`), ou son **nom exact**.',
+          flags: MessageFlags.Ephemeral,
+        });
+      }
+      // Un rôle qu'on ne peut pas donner ne sert à rien : le dire ici évite
+      // de chercher longtemps pourquoi personne ne reçoit sa récompense.
+      const moi = interaction.guild.members.me;
+      if (role.managed) {
+        return await interaction.reply({
+          content: `❌ **${role.name}** est géré par une intégration : il ne s'attribue pas à la main.`,
+          flags: MessageFlags.Ephemeral,
+        });
+      }
+      if (moi && role.position >= moi.roles.highest.position) {
+        return await interaction.reply({
+          content: `❌ **${role.name}** est au-dessus de mon rôle : je ne pourrai pas le donner.\n`
+            + '➜ Remontez mon rôle au-dessus dans **Paramètres du serveur → Rôles**, puis réessayez.',
+          flags: MessageFlags.Ephemeral,
+        });
+      }
+
+      definirRecompense(interaction.guildId, niveau, role.id);
+      if (interaction.isFromMessage()) await mettreAJour(interaction, xpView(interaction.guild));
+      else await interaction.reply({ content: `🏅 Niveau **${niveau}** → **${role.name}**.`, flags: MessageFlags.Ephemeral });
+      await sendLog(interaction.guild, logEmbed('🏅 Récompense de niveau',
+        `Niveau **${niveau}** → <@&${role.id}>\nPar <@${interaction.user.id}>`, COLORS.SUCCESS));
+      return;
+    }
+
     if (id === 'cfgxpmodal') {
       const read = (name, min, max) => {
         const value = parseInt(interaction.fields.getTextInputValue(name), 10);
         if (Number.isNaN(value)) return null;
         return Math.min(max, Math.max(min, value));
       };
-      const xpText = read('xp_text', 1, 1000);
-      const xpVoice = read('xp_voice', 1, 1000);
+      const gain = read('xp_gain', 1, 1000);
+      const xpText = gain;
+      const xpVoice = gain; // même gain : un seul système de niveaux
       const cooldown = read('xp_cooldown', 5, 3600);
-      if (xpText === null || xpVoice === null || cooldown === null) {
+      if (gain === null || cooldown === null) {
         return await interaction.reply({
           content: '❌ Valeurs invalides : entrez uniquement des nombres.',
           flags: MessageFlags.Ephemeral,
@@ -1071,7 +1247,7 @@ async function handleConfigInteraction(interaction) {
         interaction.guild,
         logEmbed(
           '⚙️ Configuration modifiée',
-          `XP : texte **${xpText}**/message, vocal **${xpVoice}**/min, cooldown **${cooldown}** s\nPar <@${interaction.user.id}>`,
+          `XP : **${gain}** par message et par minute de vocal, cooldown **${cooldown}** s\nPar <@${interaction.user.id}>`,
           COLORS.INFO
         )
       );

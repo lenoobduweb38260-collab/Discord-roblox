@@ -25,8 +25,11 @@ CREATE TABLE IF NOT EXISTS guild_config (
   update_channel_id  TEXT,
   rp_enabled         INTEGER NOT NULL DEFAULT 0,
   rp_locked          INTEGER NOT NULL DEFAULT 0,
+  -- 📊 Un seul systeme de niveaux, donc un seul gain : une minute passee en
+  -- vocal vaut un message ecrit. Deux valeurs differentes revenaient a dire
+  -- que le vocal compte moins, ce qui n'a plus de sens depuis la fusion.
   xp_text            INTEGER NOT NULL DEFAULT 20,
-  xp_voice           INTEGER NOT NULL DEFAULT 10,
+  xp_voice           INTEGER NOT NULL DEFAULT 20,
   xp_cooldown        INTEGER NOT NULL DEFAULT 60
 );
 
@@ -435,6 +438,17 @@ CREATE TABLE IF NOT EXISTS composed_messages (
   PRIMARY KEY (channel_id, message_id)
 );
 
+-- 🏅 Recompenses de niveau : un role donne en atteignant un palier.
+-- Aucune ligne par defaut — un serveur qui n'en veut pas n'en a aucune, et
+-- le bot ne distribue donc rien de lui-meme.
+CREATE TABLE IF NOT EXISTS level_rewards (
+  guild_id   TEXT NOT NULL,
+  level      INTEGER NOT NULL,
+  role_id    TEXT NOT NULL,
+  created_at TEXT,
+  PRIMARY KEY (guild_id, level)
+);
+
 -- 🎭 Rôles au clic / à la réaction posés sur un message composé.
 -- La colonne mode vaut 'bouton' ou 'reaction' ; emoji ne sert qu'au second.
 CREATE TABLE IF NOT EXISTS role_actions (
@@ -486,6 +500,12 @@ for (const column of [
   'wlrp_role_id TEXT',
   'ticket_transcript_channel_id TEXT',
   'levels_enabled INTEGER', // NULL = activé (comportement historique)
+  // 🏅 Récompenses de niveau : les rôles s'ajoutent (1, défaut) ou le palier
+  // atteint REMPLACE le précédent (0, une seule couleur à la fois).
+  'level_rewards_stack INTEGER',
+  // 🎮 Jeu du serveur : change le vocabulaire du Module RP (carte d'identité,
+  // permis, entreprise). NULL = roblox, le jeu d'origine du bot.
+  'rp_jeu TEXT',
   // 🎭 Rôles automatiques à l'arrivée (liste JSON d'identifiants de rôles)
   'autorole_role_ids TEXT',
   // 👋 Apparence des messages d'arrivée / de départ, réglée depuis le site
@@ -556,6 +576,29 @@ for (const colonne of ['claimed_by TEXT', 'claimed_at TEXT']) {
   try {
     db.exec(`ALTER TABLE tickets ADD COLUMN ${colonne}`);
   } catch {}
+}
+
+// 📊 Le vocal rapporte autant que l'écrit.
+//
+// La fusion des niveaux a laissé un reste : le gain vocal était resté à la
+// moitié du gain écrit (10 contre 20). Un seul système de niveaux et deux
+// barèmes, cela revenait à dire qu'une heure de vocal vaut moins qu'une
+// heure de discussion — ce que la fusion avait précisément arrêté de dire.
+//
+// La reprise n'a lieu qu'UNE fois, et seulement pour les serveurs restés sur
+// l'ancien défaut : un serveur qui a délibérément choisi ses valeurs les
+// garde.
+{
+  try {
+    const fait = db.prepare("SELECT value FROM app_state WHERE key = 'xp_vocal_aligne'").get();
+    if (!fait) {
+      const r = db.prepare('UPDATE guild_config SET xp_voice = xp_text WHERE xp_voice = 10 AND xp_text = 20').run();
+      db.prepare("INSERT OR REPLACE INTO app_state (key, value) VALUES ('xp_vocal_aligne', '1')").run();
+      if (r.changes) console.log(`📊 XP vocal aligné sur l'écrit pour ${r.changes} serveur(s).`);
+    }
+  } catch (err) {
+    console.warn(`⚠️ Alignement de l'XP vocal impossible (${err.message}).`);
+  }
 }
 
 // 📊 Niveaux fusionnés : un seul compteur d'XP au lieu d'un écrit et d'un
@@ -714,9 +757,11 @@ const DEFAULT_CONFIG = {
   interact_enabled: 0,
   sao_enabled: 0,
   levels_enabled: 1,
+  level_rewards_stack: 1,
+  rp_jeu: 'roblox',
   level_image_url: null,
   xp_text: 20,
-  xp_voice: 10,
+  xp_voice: 20,
   xp_cooldown: 60,
 };
 

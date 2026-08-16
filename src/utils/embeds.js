@@ -1,5 +1,6 @@
 const { EmbedBuilder } = require('discord.js');
 const { getGuildConfig, db } = require('../database');
+const { themeDe } = require('./rpThemes');
 
 // Entreprises (portée globale) où la personne est patron ou employé — sert à
 // afficher son/ses métier(s) sur la carte d'identité.
@@ -10,13 +11,14 @@ const employeeEnterprisesOf = db.prepare(
   'SELECT e.name FROM enterprises e JOIN enterprise_employees emp ON emp.enterprise_id = e.id WHERE emp.user_id = ? ORDER BY e.name COLLATE NOCASE'
 );
 
-function enterprisesSummary(userId) {
+function enterprisesSummary(userId, theme = null) {
   try {
+    const T = theme || themeDe(null);
     const heads = headEnterprisesOf.all(userId).map((r) => r.name);
     const emps = employeeEnterprisesOf.all(userId).map((r) => r.name);
     const parts = [];
-    for (const name of heads) parts.push(`👑 **${name}** (patron)`);
-    for (const name of emps) if (!heads.includes(name)) parts.push(`👥 **${name}** (employé)`);
+    for (const name of heads) parts.push(`👑 **${name}** (${T.entreprise.patron})`);
+    for (const name of emps) if (!heads.includes(name)) parts.push(`👥 **${name}** (${T.entreprise.membre})`);
     return parts.length ? parts.join('\n') : null;
   } catch {
     return null;
@@ -80,72 +82,78 @@ function discordTs(iso, style = 'F') {
   return `<t:${Math.floor(new Date(iso).getTime() / 1000)}:${style}>`;
 }
 
-function buildCardEmbed(card, user) {
+// 🎮 Le vocabulaire suit le jeu du serveur : sur Arma la carte d'identité
+// devient un livret matricule, sur Red Dead un registre de citoyen. Seuls les
+// mots changent — les données, elles, sont les mêmes partout.
+function buildCardEmbed(card, user, guildId = null) {
+  const T = themeDe(guildId ?? card.guild_id);
   const embed = new EmbedBuilder()
     .setColor(COLORS.PRIMARY)
-    .setTitle("🪪 Carte d'identité")
+    .setTitle(`${T.carte.emoji} ${T.carte.titre}`)
     .addFields(
-      { name: '🆔 ID de la carte', value: `\`${card.card_id}\``, inline: false },
+      { name: `🆔 ${T.carte.numero}`, value: `\`${card.card_id}\``, inline: false },
       { name: '👤 Nom RP', value: card.rp_nom, inline: true },
       { name: 'Prénom RP', value: card.rp_prenom, inline: true },
       { name: '⚧ Sexe', value: card.sexe, inline: true },
-      { name: '📍 Lieu de naissance', value: card.lieu_naissance, inline: true },
+      { name: `📍 ${T.carte.lieu}`, value: card.lieu_naissance, inline: true },
       { name: '🎂 Date de naissance', value: card.date_naissance, inline: true },
-      { name: '🌍 Nationalité', value: card.nationalite, inline: true },
-      { name: '🎮 Pseudo Roblox', value: card.pseudo_roblox, inline: true },
+      { name: `🌍 ${T.carte.nationalite}`, value: card.nationalite, inline: true },
+      { name: `${T.compte.emoji} ${T.compte.label}`, value: card.pseudo_roblox, inline: true },
       { name: '💬 Pseudo Discord', value: card.pseudo_discord, inline: true },
       { name: '🔢 ID Discord', value: `\`${card.user_id}\``, inline: true },
-      { name: '📖 Background', value: card.background || '*Aucun*', inline: false },
+      { name: `📖 ${T.carte.histoire}`, value: card.background || '*Aucun*', inline: false },
     )
-    .setFooter({ text: `Carte créée le ${frDateTime(card.created_at)}` });
-  const jobs = enterprisesSummary(card.user_id);
-  if (jobs) embed.addFields({ name: '🏢 Entreprise(s) / métier', value: jobs.slice(0, 1024), inline: false });
+    .setFooter({ text: T.carte.pied(frDateTime(card.created_at)) });
+  const jobs = enterprisesSummary(card.user_id, T);
+  if (jobs) embed.addFields({ name: `${T.entreprise.emoji} ${T.entreprise.titre}(s)`, value: jobs.slice(0, 1024), inline: false });
   if (user) embed.setThumbnail(user.displayAvatarURL({ size: 256 }));
   if (card.photo_url) embed.setImage(card.photo_url);
   return embed;
 }
 
-function buildPermitEmbed(permit, user) {
+function buildPermitEmbed(permit, user, guildId = null) {
+  const T = themeDe(guildId ?? permit.guild_id);
   const valid = permit.valid === 1;
   const embed = new EmbedBuilder()
     .setColor(valid ? COLORS.SUCCESS : COLORS.DANGER)
-    .setTitle('🚗 Permis de conduire')
+    .setTitle(`${T.permis.emoji} ${T.permis.titre}`)
     .addFields(
       { name: '📛 Statut', value: valid ? '✅ Valide' : '❌ Invalide', inline: true },
-      { name: '🔢 Numéro', value: `\`${permit.permit_number}\``, inline: true },
-      { name: '⭐ Points', value: `**${permit.points}**/12`, inline: true },
-      { name: '👤 Titulaire', value: `<@${permit.user_id}>`, inline: true },
+      { name: `🔢 ${T.permis.numero}`, value: `\`${permit.permit_number}\``, inline: true },
+      { name: `⭐ ${T.permis.points}`, value: `**${permit.points}**/12`, inline: true },
+      { name: `👤 ${T.permis.titulaire}`, value: `<@${permit.user_id}>`, inline: true },
       {
-        name: '📅 Délivré le',
+        name: `📅 ${T.permis.delivre}`,
         value: `${frDateTime(permit.issued_at)} (${discordTs(permit.issued_at, 'R')})`,
         inline: true,
       },
     )
-    .setFooter({ text: 'Permis délivré par les services de l\'État RP' });
+    .setFooter({ text: T.permis.pied });
   if (user) embed.setThumbnail(user.displayAvatarURL({ size: 256 }));
   return embed;
 }
 
-function buildEnterpriseEmbed(ent, headIds = [], employeeIds = []) {
+function buildEnterpriseEmbed(ent, headIds = [], employeeIds = [], guildId = null) {
+  const T = themeDe(guildId ?? ent.guild_id);
   const types = JSON.parse(ent.insurance_types || '[]');
   const embed = new EmbedBuilder()
     .setColor(COLORS.INFO)
-    .setTitle(`🏢 ${ent.name}`)
+    .setTitle(`${T.entreprise.emoji} ${ent.name}`)
     .addFields(
       { name: '📝 Description', value: ent.description || '*Aucune*', inline: false },
       {
-        name: '👑 Direction',
+        name: `👑 ${T.entreprise.direction}`,
         value: headIds.length ? headIds.map((id) => `<@${id}>`).join(', ') : '*Aucune*',
         inline: true,
       },
       {
-        name: '👥 Employés',
+        name: `👥 ${T.entreprise.membres}`,
         value: employeeIds.length ? employeeIds.map((id) => `<@${id}>`).join(', ') : '*Aucun*',
         inline: true,
       },
       { name: '🛡️ Assurance', value: ent.insurance ? '✅ Oui' : '❌ Non', inline: true },
     )
-    .setFooter({ text: `Entreprise n°${ent.id} • Créée le ${frDateTime(ent.created_at)}` });
+    .setFooter({ text: `${T.entreprise.titre} n°${ent.id} • Créée le ${frDateTime(ent.created_at)}` });
   if (ent.insurance) {
     embed.addFields({
       name: '📋 Types d\'assurance',

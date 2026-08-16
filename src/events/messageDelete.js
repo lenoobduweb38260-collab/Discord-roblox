@@ -3,6 +3,7 @@ const { sendLog, logEmbed, COLORS } = require('../utils/embeds');
 const { getGuildConfig } = require('../database');
 const { record } = require('../utils/snipe');
 const { sauvegarder } = require('../utils/piecesJointes');
+const { quiAEfface, reconnaitre, republier } = require('../utils/messagesDuBot');
 const M = require('../utils/miseEnPage');
 
 // Log des messages supprimés (contenu disponible si le message était en cache).
@@ -18,6 +19,18 @@ const M = require('../utils/miseEnPage');
 module.exports = {
   name: Events.MessageDelete,
   async execute(message) {
+    // 🛡️ Un message DU BOT vient d'être effacé.
+    //
+    // Discord ne permet pas de l'interdire : « Gérer les messages » autorise
+    // à supprimer n'importe quel message d'un salon, bot compris, et aucun
+    // réglage côté bot ne prime dessus. Ce qu'on peut faire, c'est le NOMMER
+    // — jusqu'ici la suppression était totalement muette, puisque le journal
+    // ignorait les messages de bot — et REPUBLIER ce qui doit rester en
+    // place. Effacer un panneau ne le fait donc plus disparaître.
+    if (message.author?.id && message.client?.user?.id === message.author.id) {
+      return protegerMessageDuBot(message);
+    }
+
     if (!message.guild) return;
     if (message.author?.bot) return;
 
@@ -83,3 +96,51 @@ module.exports = {
     await sendLog(message.guild, embed, fichiers);
   },
 };
+
+// 🛡️ Suppression d'un message du bot : on la trace, et on remet en place ce
+// qui doit l'être.
+//
+// ⚠️ Ne jamais lever ici : cet événement arrive pour CHAQUE message effacé du
+// serveur. Une exception y couperait aussi le journal des suppressions
+// ordinaires.
+async function protegerMessageDuBot(message) {
+  try {
+    // Message privé : personne d'autre que le bot ne peut y supprimer ses
+    // messages. Si cela arrive quand même, c'est que le bot lui-même l'a
+    // fait — on n'alerte donc pas le serveur, mais on garde une trace.
+    if (!message.guild) {
+      console.warn(`ℹ️ Message du bot supprimé en privé (salon ${message.channelId}).`);
+      return;
+    }
+
+    const quoi = reconnaitre(message);
+    // Un message ordinaire du bot (réponse de commande, animation, annonce)
+    // n'a pas à remplir le journal quand il disparaît. Seuls les messages
+    // qui STRUCTURENT le serveur méritent une alerte.
+    if (!quoi.genre) return;
+
+    // Le journal d'audit met une seconde à se remplir : sans cette attente,
+    // on chercherait l'auteur avant que Discord ne l'ait écrit.
+    await new Promise((r) => setTimeout(r, 1200));
+    const auteur = await quiAEfface(message.guild, message.channelId);
+    const remis = quoi.republiable ? await republier(message) : null;
+
+    const lignes = [
+      `Un **${quoi.genre}** a été supprimé dans <#${message.channelId}>.`,
+      auteur ? `👤 Par <@${auteur.id}> (\`${auteur.id}\`)` : '👤 Auteur inconnu — je n\'ai pas accès au journal d\'audit.',
+      remis || '⚠️ Il n\'a **pas** pu être republié : republiez-le à la main.',
+    ];
+    if (!auteur) {
+      lignes.push('-# Donnez-moi la permission « Voir le journal d\'audit » pour savoir qui efface mes messages.');
+    }
+
+    await sendLog(
+      message.guild,
+      logEmbed('🛡️ Message du bot supprimé', M.description([
+        M.bloc('Ce qui s\'est passé', lignes, { prefixe: '🗑️', compte: null }),
+      ]), remis ? COLORS.WARNING : COLORS.DANGER)
+    );
+  } catch (err) {
+    console.warn(`⚠️ Protection des messages du bot : ${err.message}`);
+  }
+}

@@ -1,5 +1,5 @@
 const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
-const { getLevels, getLeaderboard, levelFromXp } = require('../utils/levels');
+const { getLevels, getLeaderboard, levelFromXp, recompensesDe, levelsEnabled } = require('../utils/levels');
 const { getGuildConfig, setGuildConfig } = require('../database');
 const { COLORS } = require('../utils/embeds');
 const { GRADES, getGrade } = require('../utils/permissions');
@@ -17,6 +17,8 @@ module.exports = {
     )
     .addSubcommand((sub) => sub.setName('classement').setDescription('Top 10 du serveur'))
     .addSubcommand((sub) =>
+      sub.setName('recompenses').setDescription('Les rôles à débloquer par niveau sur ce serveur'))
+    .addSubcommand((sub) =>
       sub
         .setName('image')
         .setDescription('[Staff] Image de fond des cartes de niveau (vide = retirer)')
@@ -26,6 +28,44 @@ module.exports = {
   async execute(interaction) {
     const sub = interaction.options.getSubcommand();
     const cfg = getGuildConfig(interaction.guildId);
+
+    // 📊 Système coupé : on le dit, plutôt que d'afficher des niveaux figés
+    // que plus rien ne fait monter.
+    if (!levelsEnabled(interaction.guildId) && sub !== 'image') {
+      return interaction.reply({
+        content: '📴 Le système de niveaux est **désactivé** sur ce serveur.\n'
+          + '➜ Un staff peut le réactiver via `/config` → 📈 XP & niveaux.',
+        flags: MessageFlags.Ephemeral,
+      });
+    }
+
+    if (sub === 'recompenses') {
+      const paliers = recompensesDe(interaction.guildId);
+      const M = require('../utils/miseEnPage');
+      const mien = getLevels(interaction.guildId, interaction.user.id);
+      const embed = new EmbedBuilder()
+        .setColor(COLORS.INFO)
+        .setTitle('🏅 Récompenses de niveau')
+        .setDescription(
+          paliers.length
+            ? M.description([
+              M.bloc('Paliers', paliers.map((p) => {
+                // Un ✅ dit d'un coup d'œil ce qui est déjà acquis : la liste
+                // sert à se situer, pas seulement à lire un barème.
+                const acquis = (mien.level || 0) >= p.level;
+                return `Niveau **${p.level}** → <@&${p.role_id}>${acquis ? ' ✅' : ''}`;
+              }), { prefixe: '🏅', compte: null }),
+            ])
+            : '*Aucune récompense n\'est configurée sur ce serveur.*\n'
+              + '-# Un staff peut en ajouter via `/config` → 📈 XP & niveaux.'
+        )
+        .setFooter({
+          text: paliers.length
+            ? `Vous êtes niveau ${mien.level || 0} • ${paliers.filter((p) => (mien.level || 0) >= p.level).length}/${paliers.length} débloqué(s)`
+            : 'Aucune récompense configurée',
+        });
+      return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+    }
 
     if (sub === 'image') {
       if (getGrade(interaction.member, cfg) < GRADES.STAFF) {
