@@ -748,6 +748,20 @@ const RELEASES = [
     fix: [],
     retrait: [],
   },
+  {
+    id: 'entete-panneau-2026-08af',
+    title: 'Un vrai en-tete de panneau 🔠',
+    ajout: [
+      '🔠 **Le titre ouvre la carte, en grand.** Il passe en titre de niveau 1 : un en-tete large et lisible, comme sur un vrai panneau, au lieu d\'un titre noye dans le texte',
+      '🎛️ Reglage **Taille du titre** sur le site : « grand » (defaut) ou « moyen » pour rester discret',
+    ],
+    amelioration: [
+      '🧹 **Le nom du serveur ne s\'affiche plus deux fois.** Il etait ecrit en haut de carte ET dans la signature en bas : la meme information repetee, qui ecrasait le titre. Seule la signature reste. Une ligne porteuse de sens (« Avis de @membre ») est evidemment conservee',
+      '👀 L\'apercu du site montre les deux reglages en direct',
+    ],
+    fix: [],
+    retrait: [],
+  },
 ];
 
 // Construit l'embed d'une note à partir d'une entrée { title, ajout, fix,

@@ -13,11 +13,17 @@ aucun filet, aucune mise en page ne l'enlève.
 |---|---|
 | barre colorée à gauche | rien, sauf `embed_bordure = accent` |
 | `─────` dessiné à la main | vrai séparateur tracé par Discord |
-| `title` | `## Titre` |
+| `title` | `# Titre` — en grand, il ouvre la carte |
 | `author` / `footer` | `-# sous-texte` |
 | `thumbnail` | accessoire d'une section |
 | `image` | galerie |
 | `timestamp` | `<t:…:f>`, à l'heure de chaque lecteur |
+
+La tête de carte suit la référence : **rien au-dessus du titre**. Comme
+l'identité écrit déjà `NomDuBot • NomDuServeur` en pied, une ligne d'auteur
+qui répète le nom du serveur ne dirait la même chose qu'une deuxième fois tout
+en écrasant le titre — elle est donc retirée. Une ligne d'auteur porteuse de
+sens (`Avis de @membre`) est conservée.
 
 Trois règles à ne jamais enfreindre :
 

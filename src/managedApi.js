@@ -113,6 +113,7 @@ function startManagedApi(client, baseDir) {
     embed_fusion: 'b',
     embed_cartes: 'b',
     embed_bordure: 's',
+    embed_titre: 's',
     embed_banniere: 's',
     embed_timestamp: 'b',
     embed_force_color: 'b',

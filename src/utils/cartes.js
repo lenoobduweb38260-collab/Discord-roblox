@@ -99,16 +99,30 @@ const uneLigne = (s) => String(s).replace(/\s*\n\s*/g, ' · ').trim();
 //
 // Renvoie null si l'embed ne se prête pas à la conversion : l'appelant garde
 // alors l'embed d'origine plutôt que d'envoyer quelque chose d'incomplet.
-function enCarte(embed, { bordure = 'aucune' } = {}) {
+function enCarte(embed, { bordure = 'aucune', titre: niveauTitre = 'grand' } = {}) {
   if (!embed || typeof embed !== 'object') return null;
   const dedans = [];
 
-  // ── Tête de carte : ligne d'auteur en sous-texte, puis le titre ──
+  // ── Tête de carte ──
+  //
+  // Le titre ouvre la carte, en grand. `#` plutôt que `##` : c'est ce qui
+  // donne l'en-tête large et lisible d'un vrai panneau, au lieu d'un titre
+  // d'embed noyé dans le texte.
+  const diese = niveauTitre === 'moyen' ? '##' : '#';
   const tete = [];
-  if (embed.author?.name) tete.push(`-# ${uneLigne(embed.author.name)}`);
+
+  // La ligne d'auteur ne se justifie QUE si elle dit autre chose que la
+  // signature. Par défaut, l'identité écrit « CARRE RP (18+) » en haut et
+  // « Carre RP • CARRE RP (18+) » en bas : la même information deux fois,
+  // qui écrase le titre et alourdit la carte. Une ligne porteuse de sens
+  // (« Avis de @membre ») est en revanche conservée.
+  const auteur = uneLigne(embed.author?.name || '');
+  const signature = uneLigne(embed.footer?.text || '');
+  if (auteur && !(signature && signature.includes(auteur))) tete.push(`-# ${auteur}`);
+
   if (embed.title) {
     const titre = uneLigne(embed.title);
-    tete.push(embed.url ? `## [${titre}](${embed.url})` : `## ${titre}`);
+    tete.push(embed.url ? `${diese} [${titre}](${embed.url})` : `${diese} ${titre}`);
   }
 
   // Une vignette devient l'accessoire de la section de tête : l'image se pose

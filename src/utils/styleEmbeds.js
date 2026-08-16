@@ -91,6 +91,9 @@ function reglages(guildId) {
     // 'aucune' → pas de barre du tout ; 'accent' → on la garde, à la couleur
     // du serveur, pour qui la préfère.
     bordure: String(cfg.embed_bordure || 'aucune') === 'accent' ? 'accent' : 'aucune',
+    // Taille du titre en tête de carte : « grand » (#) donne l'en-tête large
+    // d'un vrai panneau, « moyen » (##) reste discret.
+    titre: String(cfg.embed_titre || 'grand') === 'moyen' ? 'moyen' : 'grand',
   };
 }
 
@@ -299,7 +302,7 @@ function preparerCartes(client, options) {
   // autocomplétion n'a pas d'embeds — la garde suffit à les écarter.
   const estInteraction = Array.isArray(body?.data?.embeds);
   const cible = estInteraction ? body.data : body;
-  const converti = convertirCorps(cible, { bordure: r.bordure });
+  const converti = convertirCorps(cible, { bordure: r.bordure, titre: r.titre });
   if (!converti) return null;
 
   const origine = JSON.parse(JSON.stringify(body));

@@ -1211,6 +1211,10 @@
           ["aucune", "Aucune — carte nette (défaut)"],
           ["accent", "La garder, à la couleur du message"],
         ], "N'a d'effet que si « Cartes sans bordure » est activé : un embed classique a toujours sa barre.", "aucune")}
+        ${champChoix("embed_titre", "🔠 Taille du titre", [
+          ["grand", "Grand — en-tête de panneau (défaut)"],
+          ["moyen", "Moyen — plus discret"],
+        ], "Le grand titre ouvre la carte comme un vrai panneau, au lieu d'un titre noyé dans le texte.", "grand")}
         ${champNombre("embed_filet_taille", "📏 Longueur du filet", "Sans effet en mode carte : Discord y trace de vrais séparateurs. Ne sert qu'aux embeds classiques — trop long, la ligne passe à la ligne sur téléphone.", 6, 30, 16)}
         ${champTexte("embed_banniere", "🖼️ Bannière de bas de carte (URL)", "Image large affichée en bas de chaque embed, comme une signature visuelle. Laissez vide pour aucune. Un embed qui a déjà son image la garde.", false, "https://…/support.png")}
       </div>
@@ -1232,6 +1236,12 @@
     const cartes = actif && Number(cfg.embed_cartes ?? 1) === 1;
     const barre = String(cfg.embed_bordure || "aucune") === "accent";
     const sansBarre = cartes && !barre;
+    // Titre en grand : c'est lui qui donne l'en-tête de panneau.
+    const grandTitre = cartes && String(cfg.embed_titre || "grand") !== "moyen";
+    // En mode carte, la ligne d'auteur n'est affichée que si elle dit autre
+    // chose que la signature — sinon la même information apparaîtrait deux
+    // fois et écraserait le titre.
+    const auteurVisible = actif && Number(cfg.embed_author ?? 1) === 1 && !(cartes && pied);
     const champs = [["👤 Nom RP", "Durand"], ["🌍 Nationalité", "Française"]];
     const exemples = [
       { titre: "📥 Arrivée d'un membre", texte: "Bienvenue à @NouveauMembre !", couleur: null, champs },
@@ -1248,8 +1258,8 @@
             <div class="dc-nom">Votre bot <span class="dc-tag">APP</span></div>
             <div class="dc-embed${sansBarre ? " dc-carte" : ""}"${sansBarre ? "" : ` style="border-left-color:${esc(c)}"`}>
               <div class="dc-embed-corps">
-                ${actif && Number(cfg.embed_author ?? 1) === 1 ? `<div class="dc-auteur">Votre serveur</div>` : ""}
-                <div class="dc-titre">${esc(x.titre)}</div>
+                ${auteurVisible ? `<div class="dc-auteur">Votre serveur</div>` : ""}
+                <div class="dc-titre${grandTitre ? " dc-titre-grand" : ""}">${esc(x.titre)}</div>
                 ${actif && Number(cfg.embed_ligne ?? 1) === 1 ? `<div class="dc-filet"></div>` : ""}
                 <div class="dc-desc">${esc(x.texte)}${actif && fusion && x.champs
                   ? x.champs.map(([n, v]) => cartes
