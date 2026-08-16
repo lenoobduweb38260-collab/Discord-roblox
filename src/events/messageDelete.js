@@ -2,8 +2,16 @@ const { Events } = require('discord.js');
 const { sendLog, logEmbed, COLORS } = require('../utils/embeds');
 const { getGuildConfig } = require('../database');
 const { record } = require('../utils/snipe');
+const { sauvegarder } = require('../utils/piecesJointes');
+const M = require('../utils/miseEnPage');
 
 // Log des messages supprimés (contenu disponible si le message était en cache).
+//
+// 📎 La pièce jointe est RÉCUPÉRÉE puis RENVOYÉE avec le journal. Noter son
+// lien ne servirait à rien : une URL de pièce jointe Discord est signée et
+// meurt avec son message. Quelques minutes après la suppression, le journal
+// n'afficherait plus qu'un lien mort — c'est-à-dire la preuve disparue au
+// moment précis où on en aurait besoin.
 module.exports = {
   name: Events.MessageDelete,
   async execute(message) {
@@ -36,26 +44,34 @@ module.exports = {
         : null,
     });
 
-    const author = message.author ? `<@${message.author.id}> (\`${message.author.id}\`)` : '*Auteur inconnu*';
-    let content = message.content || '*Contenu indisponible (message non mis en cache)*';
-    if (content.length > 1000) content = `${content.slice(0, 1000)}…`;
-    const attachments = message.attachments?.size
-      ? [...message.attachments.values()].map((a) => a.name).join(', ')
-      : '';
+    // ⏱️ D'abord la pièce jointe, tant que son lien vit encore.
+    const { fichiers, resume, apercu } = await sauvegarder(message.attachments);
+
+    const auteur = message.author ? `<@${message.author.id}> (\`${message.author.id}\`)` : '*Auteur inconnu*';
+    const contenu = message.content
+      ? M.borner(message.content, 1000)
+      : '*Contenu indisponible (message non mis en cache)*';
 
     // Le contenu est un CHAMP : avec « >>> » dans la description, la ligne
     // des pièces jointes se retrouvait aspirée dans la citation.
-    const fields = [{ name: '📄 Contenu', value: content.slice(0, 1024), inline: false }];
-    if (attachments) fields.push({ name: '📎 Pièces jointes', value: attachments.slice(0, 1024), inline: false });
+    const champs = [{ name: '📄 Contenu', value: M.borner(contenu, M.MAX_CHAMP), inline: false }];
+    if (resume) champs.push({ name: '📎 Pièce(s) jointe(s)', value: M.borner(resume, M.MAX_CHAMP), inline: false });
 
-    await sendLog(
-      message.guild,
-      logEmbed(
-        '🗑️ Message supprimé',
-        `**Auteur :** ${author}\n**Salon :** <#${message.channelId}>`,
-        COLORS.DANGER,
-        fields
-      )
+    const embed = logEmbed(
+      '🗑️ Message supprimé',
+      M.description([
+        M.bloc('Auteur', [auteur], { prefixe: '👤', compte: null }),
+        M.bloc('Salon', [`<#${message.channelId}>`], { prefixe: '📍', compte: null }),
+      ]),
+      COLORS.DANGER,
+      champs
     );
+
+    // La première image reprend sa place : affichée en grand, comme dans le
+    // message d'origine. `attachment://` désigne le fichier renvoyé juste
+    // au-dessus — pas une URL qui pourrait expirer.
+    if (apercu) embed.setImage(apercu);
+
+    await sendLog(message.guild, embed, fichiers);
   },
 };

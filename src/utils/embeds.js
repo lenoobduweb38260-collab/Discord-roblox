@@ -158,12 +158,24 @@ function buildEnterpriseEmbed(ent, headIds = [], employeeIds = []) {
 }
 
 // Journal de sécurité : toute action staff est tracée dans le salon de logs configuré.
-async function sendLog(guild, embed) {
+// `fichiers` : pièces jointes à renvoyer avec le journal — l'image d'un
+// message supprimé, par exemple. Sans elles, le journal ne garderait qu'un
+// lien qui meurt avec le message.
+async function sendLog(guild, embed, fichiers = null) {
   try {
     const cfg = getGuildConfig(guild.id);
     if (!cfg.log_channel_id) return;
     const channel = await guild.channels.fetch(cfg.log_channel_id).catch(() => null);
-    if (channel?.isTextBased()) await channel.send({ embeds: [embed] });
+    if (!channel?.isTextBased()) return;
+    const corps = { embeds: [embed] };
+    if (Array.isArray(fichiers) && fichiers.length) corps.files = fichiers;
+    await channel.send(corps).catch(async (err) => {
+      // Un fichier refusé (trop lourd pour ce serveur, format bloqué) ne doit
+      // pas emporter le journal : on renvoie le texte seul.
+      if (!corps.files) throw err;
+      console.warn(`⚠️ Journal : pièces jointes non renvoyées — ${err.message}`);
+      await channel.send({ embeds: [embed] }).catch(() => null);
+    });
   } catch {
     // le log ne doit jamais faire échouer la commande
   }

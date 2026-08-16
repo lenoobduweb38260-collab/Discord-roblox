@@ -941,6 +941,22 @@ const RELEASES = [
     fix: [],
     retrait: [],
   },
+  {
+    id: 'logs-pieces-jointes-2026-08ar',
+    title: 'Les images supprimees sont conservees 📎',
+    ajout: [
+      '📎 **La piece jointe d\'un message supprime est desormais RECUPEREE et RENVOYEE avec le journal.** L\'image reste visible, en grand, exactement comme dans le message d\'origine',
+      '🖼️ Nom et taille de chaque fichier sont indiques, avec ce qui a pu etre conserve ou non',
+    ],
+    amelioration: [
+      '⚠️ **Noter l\'URL ne servait a rien** : un lien de piece jointe Discord est signe et meurt avec son message. Quelques minutes apres la suppression, le journal n\'affichait plus qu\'un lien mort — la preuve disparue au moment precis ou l\'on en aurait besoin',
+      '🛟 **Trois garde-fous** : un plafond de 8 Mo (limite de televersement d\'un bot), un delai de 6 secondes pour ne pas retarder le journal, et jamais d\'echec silencieux — un fichier perdu est ecrit noir sur blanc',
+      '📦 Jusqu\'a 10 fichiers par message, comme Discord l\'autorise ; au-dela, le nombre restant est indique au lieu d\'etre passe sous silence',
+      '🧱 Le journal de suppression passe aussi a la grammaire du bot : sections `◆` pour l\'auteur et le salon',
+    ],
+    fix: [],
+    retrait: [],
+  },
 ];
 
 // Construit l'embed d'une note à partir d'une entrée { title, ajout, fix,
