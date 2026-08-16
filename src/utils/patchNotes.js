@@ -660,6 +660,23 @@ const RELEASES = [
     fix: [],
     retrait: [],
   },
+  {
+    id: 'embeds-sections-2026-08aa',
+    title: 'Fini la grille de champs de Discord 🧱',
+    ajout: [
+      '🧱 **Les champs d\'embed deviennent des sections** : au lieu de la grille de petites etiquettes grises de Discord, chaque information s\'affiche en `◆ **Intitule**` puis `➜ valeur`, separee par un filet. C\'est ce qui restait de « Discord de base » — ca s\'applique a TOUS les embeds, meme ceux que personne ne reconstruit',
+      '📏 **Longueur du filet reglable** (6 a 30 signes)',
+    ],
+    amelioration: [
+      '🛟 Rien n\'est jamais perdu : si le tout ne tient pas dans une description, les champs sont conserves tels quels',
+      '💬 Une valeur deja mise en forme (citation, liste) garde sa forme au lieu de recevoir une fleche en double',
+    ],
+    fix: [
+      '🩹 **Le filet sous le titre debordait sur telephone** : a 28 signes il repassait a la ligne et affichait deux traits l\'un sous l\'autre. Ramene a 16, et le meme exces corrige sur le separateur des listes',
+      '🩹 Sur le site, les interrupteurs des reglages **actifs par defaut** s\'affichaient eteints : ils mentaient sur l\'etat reel du bot, et le premier clic les eteignait pour de bon',
+    ],
+    retrait: [],
+  },
 ];
 
 // Découpe une catégorie en champs d'embed (max 1024 caractères par champ).

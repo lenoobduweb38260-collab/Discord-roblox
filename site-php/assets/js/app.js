@@ -1037,11 +1037,14 @@
   }
 
   // Interrupteur enregistré dans le bot.
-  function champBascule(cle, label, aide = "") {
+  // `defaut` : valeur du bot quand le réglage n'a jamais été touché.
+  // Sans lui, un réglage ACTIF par défaut s'affichait éteint — l'interrupteur
+  // mentait sur l'état réel, et le premier clic l'éteignait vraiment.
+  function champBascule(cle, label, aide = "", defaut = 0) {
     const p = srvParams();
-    const actif = Number(cfgCourant()[cle] ?? 0) === 1;
+    const actif = Number(cfgCourant()[cle] ?? defaut) === 1;
     return `<div class="row" style="justify-content:flex-start;gap:12px">
-      <button type="button" class="toggle ${actif ? "on" : ""}" data-cfg-toggle="${esc(cle)}" aria-label="${esc(label)}"></button>
+      <button type="button" class="toggle ${actif ? "on" : ""}" data-cfg-toggle="${esc(cle)}" data-defaut="${defaut}" aria-label="${esc(label)}"></button>
       <span><b>${label}</b>${aide ? `<i style="display:block;color:var(--muted);font-size:11.5px;font-style:normal">${aide}</i>` : ""}</span>
     </div>`;
   }
@@ -1144,7 +1147,7 @@
     const accent = /^#[0-9a-f]{6}$/i.test(cfg.embed_accent || "") ? cfg.embed_accent : "#5865F2";
     const body = `<div class="builder-hint">🎨 Ces réglages s'appliquent à <b>tout ce que le bot envoie</b> : arrivées, logs, sanctions, tickets, niveaux, réponses de commandes… Un seul endroit, partout à la fois.</div>
       <div class="mt-16">
-        ${champBascule("embed_style", "Activer l'identité visuelle", "Décochez pour laisser chaque message avec son apparence d'origine.")}
+        ${champBascule("embed_style", "Activer l'identité visuelle", "Décochez pour laisser chaque message avec son apparence d'origine.", 1)}
       </div>
       <div class="form-grid mt-16">
         <div class="field"><label>Couleur d'accent</label>
@@ -1154,10 +1157,11 @@
       <div class="mt-16">
         ${champBascule("embed_force_color", "Même couleur pour tous les embeds",
           "⚠️ Désactivé, les couleurs qui portent un sens sont conservées : rouge pour une sanction, vert pour une réussite, orange pour un avertissement. Activé, tout devient votre couleur d'accent.")}
-        ${champBascule("embed_author", "Ligne d'identité en haut", "Le nom et l'icône du serveur, au-dessus du titre. Une ligne d'auteur porteuse de sens (« Avis de @membre ») n'est jamais remplacée.")}
-        ${champBascule("embed_footer", "Signature en pied de page", "« NomDuBot • NomDuServeur », avec l'icône du serveur. Un pied de page déjà écrit par le bot n'est jamais remplacé.")}
-        ${champBascule("embed_ligne", "Filet sous le titre", "La fine ligne qui sépare le titre du texte — c'est elle qui donne l'allure « carte » au lieu d'un embed brut.")}
-        ${champBascule("embed_timestamp", "Horodatage", "L'heure d'envoi sous chaque embed.")}
+        ${champBascule("embed_author", "Ligne d'identité en haut", "Le nom et l'icône du serveur, au-dessus du titre. Une ligne d'auteur porteuse de sens (« Avis de @membre ») n'est jamais remplacée.", 1)}
+        ${champBascule("embed_footer", "Signature en pied de page", "« NomDuBot • NomDuServeur », avec l'icône du serveur. Un pied de page déjà écrit par le bot n'est jamais remplacé.", 1)}
+        ${champBascule("embed_fusion", "Sections au lieu de la grille de champs", "⭐ C'est ce réglage qui retire l'aspect « Discord de base » : les champs deviennent des sections ◆ / ➜ dans le texte.", 1)}
+        ${champBascule("embed_ligne", "Filet sous le titre", "La fine ligne qui sépare le titre du texte — c'est elle qui donne l'allure « carte » au lieu d'un embed brut.", 1)}
+        ${champBascule("embed_timestamp", "Horodatage", "L'heure d'envoi sous chaque embed.", 1)}
       </div>
       <div class="form-grid mt-16">
         ${champNombre("embed_filet_taille", "📏 Longueur du filet", "Court volontairement : trop long, la ligne passe à la ligne sur téléphone et fait deux traits.", 6, 30, 16)}
@@ -1175,8 +1179,10 @@
     const force = Number(cfg.embed_force_color ?? 0) === 1;
     const pied = Number(cfg.embed_footer ?? 1) === 1;
     const heure = Number(cfg.embed_timestamp ?? 1) === 1;
+    const fusion = Number(cfg.embed_fusion ?? 1) === 1;
+    const champs = [["👤 Nom RP", "Durand"], ["🌍 Nationalité", "Française"]];
     const exemples = [
-      { titre: "📥 Arrivée d'un membre", texte: "Bienvenue à @NouveauMembre !", couleur: null },
+      { titre: "📥 Arrivée d'un membre", texte: "Bienvenue à @NouveauMembre !", couleur: null, champs },
       { titre: "🚫 Sanction appliquée", texte: "@Tricheur a été banni du serveur.", couleur: "#ff5c74" },
       { titre: "✅ Ticket fermé", texte: "Le ticket n°0042 a été archivé.", couleur: "#2fe38b" },
     ];
@@ -1193,7 +1199,9 @@
                 ${actif && Number(cfg.embed_author ?? 1) === 1 ? `<div class="dc-auteur">Votre serveur</div>` : ""}
                 <div class="dc-titre">${esc(x.titre)}</div>
                 ${actif && Number(cfg.embed_ligne ?? 1) === 1 ? `<div class="dc-filet"></div>` : ""}
-                <div class="dc-desc">${esc(x.texte)}</div>
+                <div class="dc-desc">${esc(x.texte)}${actif && fusion && x.champs
+                  ? x.champs.map(([n, v]) => `\n${"─".repeat(16)}\n◆ ${n}\n➜ ${v}`).join("") : ""}</div>
+                ${x.champs && !(actif && fusion) ? `<div class="dc-champs">${x.champs.map(([n, v]) => `<div><b>${esc(n)}</b><span>${esc(v)}</span></div>`).join("")}</div>` : ""}
                 ${actif && /^https?:\/\//.test(String(cfg.embed_banniere || "").trim())
                   ? `<img class="dc-image" src="${esc(String(cfg.embed_banniere).trim())}" alt="" onerror="this.style.display='none'">` : ""}
                 ${actif && pied ? `<div class="dc-pied">Votre bot • Votre serveur${heure ? " • aujourd'hui à 18:17" : ""}</div>` : ""}
@@ -1496,7 +1504,10 @@
     form.querySelectorAll("[data-cfg-toggle]").forEach(b => {
       const cle = b.dataset.cfgToggle;
       const valeur = b.classList.contains("on") ? 1 : 0;
-      if (Number(p.config[cle] ?? 0) !== valeur) aEnvoyer.push({ cle, valeur });
+      // Comparaison à l'état RÉELLEMENT affiché : sans le défaut, un réglage
+      // actif par défaut aurait paru « changé » à chaque enregistrement.
+      const defaut = b.dataset.defaut === undefined ? 0 : Number(b.dataset.defaut);
+      if (Number(p.config[cle] ?? defaut) !== valeur) aEnvoyer.push({ cle, valeur });
     });
     if (!aEnvoyer.length) { toast("RIEN À ENREGISTRER", "Aucun réglage n'a changé."); return; }
     const echecs = [];

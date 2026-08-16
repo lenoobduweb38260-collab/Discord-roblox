@@ -17,6 +17,7 @@ message privé, webhook. Rien à faire dans le code d'une nouvelle commande.
 | Horodatage | l'heure d'envoi |
 | Filet | une ligne fine sous le titre (`embed_ligne`) |
 | Bannière | image large en bas de carte (`embed_banniere`) |
+| Champs | refondus en sections `◆` / `➜` (`embed_fusion`) — la grille de champs de Discord n'appartient PAS à la DA |
 
 **Ne jamais écraser ce qui porte du sens.** Une couleur posée volontairement
 (rouge = sanction, vert = réussite), un pied de page utile (`Page 2/4`,

@@ -46,6 +46,7 @@ function reglages(guildId) {
     couleurUnique: Number(cfg.embed_force_color ?? 0) === 1,
     ligne: Number(cfg.embed_ligne ?? 1) === 1,
     filet: filetDe(cfg.embed_filet_taille ?? FILET_DEFAUT),
+    fusion: Number(cfg.embed_fusion ?? 1) === 1,
     banniere: /^https?:\/\/\S+$/i.test(String(cfg.embed_banniere || '').trim())
       ? String(cfg.embed_banniere).trim()
       : null,
@@ -79,6 +80,47 @@ function styliserUn(embed, contexte) {
   if (r.ligneAuteur && !embed.author?.name && contexte.serveur) {
     embed.author = { name: contexte.serveur };
     if (contexte.icone) embed.author.icon_url = contexte.icone;
+  }
+
+  // ── Champs → sections ────────────────────────────────────────────
+  // C'est CE point qui donne l'air « Discord de base » : la grille de petites
+  // étiquettes grises produite par les champs d'embed. La direction
+  // artistique demandée n'a pas cette grille — elle a des sections, avec un
+  // en-tête ◆ et des lignes ➜.
+  //
+  // On refond donc les champs en sections de description, ici, pour TOUS les
+  // embeds du bot d'un coup : y compris ceux qu'aucune commande ne
+  // reconstruira jamais.
+  //
+  // Rien n'est jamais perdu : si le tout ne tient pas dans une description
+  // (4096 signes), on laisse les champs tels quels.
+  if (r.fusion && Array.isArray(embed.fields) && embed.fields.length) {
+    const sections = embed.fields
+      .filter((f) => f && (f.name || f.value))
+      .map((f) => {
+        const titre = String(f.name || '').trim().replace(/\s*:\s*$/, '');
+        const valeur = String(f.value || '').trim();
+        const lignes = [];
+        if (titre) lignes.push(`◆ **${titre}**`);
+        if (valeur) {
+          // Une valeur déjà mise en forme (citation, liste, sections) garde
+          // sa forme ; une valeur simple reçoit la flèche.
+          const deja = /^\s*(>|➜|◆|\*|-|\d+\.)/.test(valeur) || valeur.includes('\n');
+          lignes.push(deja ? valeur : `➜ ${valeur}`);
+        }
+        return lignes.join('\n');
+      })
+      .filter(Boolean);
+
+    if (sections.length) {
+      const base = typeof embed.description === 'string' && embed.description.trim() ? embed.description : '';
+      const corps = [base, ...sections].filter(Boolean).join(`\n${r.filet}\n`);
+      // Le filet éventuel s'ajoutera ensuite : on garde de la marge.
+      if (corps.length + r.filet.length + 2 <= 4096) {
+        embed.description = corps;
+        delete embed.fields;
+      }
+    }
   }
 
   // ── Filet sous le titre ──────────────────────────────────────────
