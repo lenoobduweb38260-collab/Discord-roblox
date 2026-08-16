@@ -50,9 +50,26 @@ Trois règles à ne jamais enfreindre :
 
   Conséquence à ne jamais oublier : `deferReply` **crée déjà le message**.
   Répondre ensuite par `editReply` donne donc forcément un embed à l'ancienne,
-  barre colorée comprise. Toute commande qui diffère sa réponse doit passer
-  par `repondre()` (`src/utils/reponse.js`), qui referme le message d'attente
-  et envoie le contenu en `followUp` — un envoi, donc converti.
+  barre colorée comprise.
+
+  **La parade n'est pas d'envoyer un second message — c'est de ne pas
+  différer.** Deux mécaniques ont été essayées et retirées, toutes deux pires
+  que la barre colorée qu'elles évitaient :
+
+  - refermer l'attente par une ligne puis envoyer en `followUp` → on lisait
+    « ✅ Terminé. » avant même le résultat, et si le `followUp` échouait il ne
+    restait QUE cette ligne ;
+  - envoyer puis **effacer** l'attente → le client Discord rattache un
+    `followUp` à la réponse d'origine : effacer celle-ci faisait disparaître
+    les deux. Le message s'affichait puis s'effaçait sous les yeux.
+
+  Règle : **une interaction, un seul message.** `repondre()`
+  (`src/utils/reponse.js`) répond par `reply()` tant que rien n'est parti, et
+  par `editReply()` sinon. Une commande qui veut sa carte utilise
+  `repondreVite(interaction, travail)` : le travail est lancé tout de suite et
+  la réponse n'est différée qu'à la dernière seconde, seulement s'il dépasse
+  le délai. Le travail n'est joué qu'une fois — ses compteurs et ses badges ne
+  sont donc jamais comptés deux fois.
 
   | Appel | Route | Converti ? |
   |---|---|---|

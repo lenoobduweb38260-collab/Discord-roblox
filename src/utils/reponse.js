@@ -3,12 +3,12 @@ const { reglages, guildeDe } = require('./styleEmbeds');
 const { styliserUn } = require('./identite');
 const C = require('./cartes');
 
-// 📮 Répondre à une interaction SANS retomber sur l'ancien style d'embed.
+// 📮 Répondre à une interaction sans laisser de trace parasite.
 //
-// Le problème, invisible tant qu'on ne regarde pas la couche réseau :
+// Le point de départ, invisible tant qu'on ne regarde pas la couche réseau :
 //
-//   interaction.reply()      → POST   /interactions/…/callback     ✅ converti
-//   interaction.followUp()   → POST   /webhooks/…                  ✅ converti
+//   interaction.reply()      → POST   /interactions/…/callback       ✅ carte
+//   interaction.followUp()   → POST   /webhooks/…                    ✅ carte
 //   interaction.editReply()  → PATCH  /webhooks/…/messages/@original ❌ jamais
 //
 // Discord fige la famille de composants d'un message à sa CRÉATION. Or
@@ -16,23 +16,35 @@ const C = require('./cartes');
 // ce qui arrive ensuite par `editReply` ne peut donc être qu'un embed
 // classique, barre colorée comprise.
 //
-// Résultat : chaque commande qui diffère sa réponse — c'est-à-dire toutes
-// celles qui travaillent plus de trois secondes — rendait un embed à
-// l'ancienne, alors même que le reste du bot envoyait des cartes.
+// ⚠️ Deux parades ont été essayées, et TOUTES DEUX étaient pires que le mal :
 //
-// La parade : envoyer le vrai contenu en `followUp` — qui est un envoi, donc
-// converti — puis EFFACER le message d'attente.
+//   1. Refermer le message d'attente par une ligne de texte, puis envoyer le
+//      contenu en `followUp`. On lisait « ✅ Terminé. » avant même de voir le
+//      résultat — et quand le `followUp` échouait, il ne restait QUE cette
+//      ligne, sans rien pour la justifier.
+//   2. Envoyer le contenu, puis EFFACER le message d'attente. Le client
+//      Discord rattache un `followUp` à la réponse d'origine : effacer
+//      celle-ci fait disparaître les deux à l'écran. Le message s'affichait,
+//      puis s'effaçait sous les yeux.
 //
-// ⚠️ Dans cet ordre, et jamais l'inverse. Effacer d'abord ne laisserait plus
-// rien à quoi revenir si l'envoi échouait.
+// La leçon des deux : **une interaction, un seul message**. Un second message
+// est un second point de rupture, et il n'y a rien à nettoyer quand on n'a
+// rien laissé traîner.
 //
-// L'effacer, et non y écrire « ✅ Terminé. » comme on le faisait : cette ligne
-// n'apprenait rien à personne et s'intercalait entre la commande et son
-// résultat. Sur un `/interact pat`, on lisait « Terminé. » avant même de voir
-// l'animation — la seule chose qu'on attendait.
+// D'où la règle d'aujourd'hui :
+//
+//   • pas encore répondu → `reply()`, qui est un envoi : c'est une carte ;
+//   • déjà différé       → `editReply()`, embed classique, un seul message.
+//
+// Une commande qui veut sa carte ne doit donc PAS différer sa réponse. C'est
+// à sa portée : `repondreVite` ci-dessous ne diffère qu'à la dernière seconde,
+// et seulement si le travail dépasse le délai que Discord accorde.
+
+// Conservé pour les cas où la suppression de l'attente est refusée : mieux
+// vaut une ligne discrète qu'un « réfléchit… » figé pour toujours.
 const CLOTURE = '-# ✅ Terminé.';
 
-// Cette réponse peut-elle devenir une carte ?
+// Cette réponse pourrait-elle devenir une carte ?
 function cartesActives(interaction) {
   try {
     const guild = interaction.guild || guildeDe(interaction.client, `/channels/${interaction.channelId}`);
@@ -43,52 +55,54 @@ function cartesActives(interaction) {
   }
 }
 
-// 🎴 Répond en garantissant le style du jour.
+// 🎴 Répond, en une seule fois.
 //
 // Renvoie le message envoyé, ou null si même le repli a échoué. Ne lève
 // jamais : une réponse dans l'ancien style vaut infiniment mieux qu'aucune
 // réponse — c'est la règle du projet, ici comme sur la couche réseau.
 async function repondre(interaction, payload) {
-  const aDesEmbeds = Array.isArray(payload?.embeds) && payload.embeds.length > 0;
-
-  // Pas encore répondu : `reply` est un envoi, donc déjà converti.
+  // Pas encore répondu : `reply` est un envoi, donc déjà converti en carte.
   if (!interaction.deferred && !interaction.replied) {
     return interaction.reply(payload).catch(() => null);
   }
-
-  // Rien à convertir, ou conversion inutile : la modification suffit.
-  if (!aDesEmbeds || !cartesActives(interaction)) {
-    return interaction.editReply(payload).catch(() => null);
-  }
-
-  // Le vrai contenu d'abord, en envoi — donc en carte.
-  const suite = { ...payload };
-  if (interaction.ephemeral) suite.flags = (suite.flags || 0) | MessageFlags.Ephemeral;
-
-  const envoye = await interaction.followUp(suite).catch(() => null);
-  if (envoye) {
-    // Le résultat est affiché : le message d'attente n'a plus de raison
-    // d'exister. On l'efface plutôt que d'y écrire quelque chose.
-    //
-    // `try` et non `.catch` seul : cette fonction ne doit JAMAIS lever, et
-    // une réponse dépourvue de `deleteReply` lèverait avant le `.catch`.
-    let efface = false;
-    try { efface = await interaction.deleteReply().then(() => true, () => false); } catch { efface = false; }
-    if (!efface) {
-      // Suppression refusée (message déjà retiré, droits) : mieux vaut une
-      // ligne discrète qu'un « réfléchit… » figé pour toujours.
-      await interaction.editReply({ content: CLOTURE, embeds: [], components: [] }).catch(() => null);
-    }
-    return envoye;
-  }
-
-  // Repli : le followUp a échoué (jeton expiré, droits…). On remet tout dans
-  // la réponse, à l'ancienne. Moins beau, mais l'utilisateur voit son
-  // résultat — et le message d'attente n'a pas été effacé pour rien.
+  // Déjà différé : le message existe, il ne changera plus de famille. On le
+  // remplit, et c'est tout — un second message ferait plus de mal que la
+  // barre colorée qu'il éviterait.
   return interaction.editReply(payload).catch(() => null);
 }
 
-module.exports = { repondre, cartesActives, CLOTURE };
+// ⏱️ Répondre vite quand on peut, différer quand il le faut.
+//
+// Discord laisse 3 secondes pour accuser réception d'une commande. Différer
+// systématiquement « au cas où » coûte la carte à TOUTES les réponses ; ne
+// jamais différer casse la commande dès que le réseau traîne.
+//
+// On lance donc le travail, et on ne diffère qu'au dernier moment — si le
+// travail n'a pas fini à temps. Dans le cas courant (quelques centaines de
+// millisecondes) la réponse part en carte, en un seul message.
+//
+// `travail` est une promesse ou une fonction qui en renvoie une, et qui donne
+// le payload à afficher. Elle n'est appelée qu'UNE fois : ses effets de bord
+// (compteurs, badges) ne sont donc jamais joués deux fois.
+const MARGE = 2200;
+
+async function repondreVite(interaction, travail, { marge = MARGE } = {}) {
+  let differe = null;
+  const minuteur = setTimeout(() => {
+    differe = interaction.deferReply().catch(() => null);
+  }, marge);
+
+  let payload = null;
+  try {
+    payload = await (typeof travail === 'function' ? travail() : travail);
+  } finally {
+    clearTimeout(minuteur);
+  }
+  if (differe) await differe;
+  return repondre(interaction, payload);
+}
+
+module.exports = { repondre, repondreVite, cartesActives, CLOTURE, MARGE };
 
 
 // ══════════════════════════════════════════════════════════════════

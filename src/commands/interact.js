@@ -10,7 +10,7 @@ const {
 } = require('discord.js');
 const { db } = require('../database');
 const { GRADES } = require('../utils/permissions');
-const { repondre } = require('../utils/reponse');
+const { repondreVite } = require('../utils/reponse');
 
 // Interactions façon Nekotina : GIF anime, compteur par duo, boutons
 // « Rendre » / « Rejeter », badges par paliers envoyés en MP, et textes
@@ -376,13 +376,20 @@ module.exports = {
       return interaction.reply({ content: L.otherBot, flags: MessageFlags.Ephemeral });
     }
 
-    await interaction.deferReply();
     // Pas de boutons si la cible est le bot lui-même (il accepte toujours 😊).
     const withButtons = target.id !== interaction.client.user.id;
-    const payload = await buildInteractionMessage(interaction, actionKey, interaction.user, target, withButtons, lang);
-    if (!withButtons) payload.content = L.botAccept;
-    // Carte et non embed : editReply seul ne serait jamais converti.
-    await repondre(interaction, payload);
+
+    // ⏱️ On ne diffère PAS d'emblée : un message différé est créé avant qu'on
+    // sache quoi y mettre, et un message créé ne change plus de famille — la
+    // réponse serait forcément un embed à l'ancienne. Le GIF arrive en
+    // général en quelques centaines de millisecondes, largement dans les 3
+    // secondes que Discord accorde. `repondreVite` ne diffère qu'à la
+    // dernière seconde, et seulement si la recherche traîne.
+    await repondreVite(interaction, async () => {
+      const payload = await buildInteractionMessage(interaction, actionKey, interaction.user, target, withButtons, lang);
+      if (!withButtons) payload.content = L.botAccept;
+      return payload;
+    });
   },
 
   // Boutons « Rendre » / « Rejeter » — réservés à la personne visée, dans SA langue.

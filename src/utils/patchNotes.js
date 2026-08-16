@@ -1014,6 +1014,21 @@ const RELEASES = [
     ],
     retrait: [],
   },
+  {
+    id: 'un-seul-message-2026-08av',
+    title: 'Une interaction, un seul message 📮',
+    ajout: [],
+    amelioration: [
+      '⚡ **`/interact` repond directement** au lieu d\'afficher « reflechit… » : le GIF arrive en general en quelques centaines de millisecondes, largement dans le delai que Discord accorde. La reponse part donc en carte, en un seul message. Si la recherche traine, la commande differe au dernier moment — le message part alors dans l\'ancien style, mais il part',
+      '🧮 Les compteurs et les badges ne sont joues qu\'une fois, meme quand la commande a du differer',
+    ],
+    fix: [
+      '🩹 **Le message s\'affichait puis s\'effacait sous les yeux.** Pour eviter la barre coloree d\'une reponse differee, le bot envoyait le resultat a cote puis effacait le message d\'attente. Mais le client Discord rattache ce second message a la reponse d\'origine : effacer celle-ci faisait disparaitre les deux',
+      '🩹 **Et avant cela, « ✅ Termine. » s\'affichait a la place du resultat.** Meme cause : le message d\'attente etait referme par une ligne de texte, et quand l\'envoi du resultat echouait, il ne restait que cette ligne',
+      '🧭 **La regle qui en sort** : jamais deux messages pour une interaction. Un second message est un second point de rupture, et il n\'y a rien a nettoyer quand on n\'a rien laisse trainer. Les deux impasses sont ecrites noir sur blanc dans le code, pour qu\'on n\'y revienne pas',
+    ],
+    retrait: [],
+  },
 ];
 
 // Construit l'embed d'une note à partir d'une entrée { title, ajout, fix,
