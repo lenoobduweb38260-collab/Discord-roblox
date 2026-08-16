@@ -765,7 +765,8 @@ const RELEASES = [
     id: 'mentions-notes-2026-08ag',
     title: 'Les notes de version ne sonnent plus chez personne 🔕',
     ajout: [
-      '🔔 **Reglage « Mentionner a chaque note »** sur le site : personne, `@everyone`, `@here`, ou **un role precis** de votre serveur. Les trois choix sont dans le meme menu, avec la liste de vos roles',
+      '🔔 **Reglage « Mentionner a chaque note »** : personne, `@everyone`, `@here`, ou **un role precis** de votre serveur',
+      '⚙️ Disponible **dans `/config` → Salons → 📝 Salon des patch notes** ET sur le site : le reglage etait sur le site uniquement, donc invisible pour qui configure depuis Discord',
     ],
     amelioration: [
       '🔕 **Par defaut, aucune mention.** Une note de version ne justifie pas de faire sonner le telephone de tout le serveur — c\'est le genre de notification qui fait couper le salon. Le silence est desormais le comportement par defaut, et c\'est a vous de demander autre chose',

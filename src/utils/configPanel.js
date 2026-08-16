@@ -241,8 +241,10 @@ function salonsView(guild, selectedCol = null) {
       Object.entries(CHANNEL_COLUMNS)
         .map(([col, label]) => `${label} : ${show(cfg[col], 'channel')}`)
         .join('\n') +
+        `\n\n🔔 Mention des patch notes : ${libelleMention(cfg.patch_mention)}` +
         '\n\n1️⃣ Choisissez le réglage, 2️⃣ puis le salon.' +
-        '\n\n📦 *Sans salon de mises à jour configuré, le bot crée automatiquement **#shadow-logs**, visible uniquement du staff, et y publie les annonces.*'
+        '\n\n📦 *Sans salon de mises à jour configuré, le bot crée automatiquement **#shadow-logs**, visible uniquement du staff, et y publie les annonces.*' +
+        '\n🔔 *Choisissez 📝 **Salon des patch notes** ci-dessous pour régler qui est mentionné. Par défaut : personne.*'
     );
   const picker = new StringSelectMenuBuilder()
     .setCustomId('cfgchansel')
@@ -266,8 +268,45 @@ function salonsView(guild, selectedCol = null) {
     if (cfg[selectedCol]) menu.setDefaultChannels(cfg[selectedCol]);
     components.push(new ActionRowBuilder().addComponents(menu));
   }
+
+  // 🔔 Qui mentionner quand une note de version paraît ?
+  // Les contrôles n'apparaissent que sur le réglage concerné, pour ne pas
+  // encombrer la vue — et parce qu'une vue Discord ne tient que 5 rangées.
+  if (selectedCol === 'patch_channel_id') {
+    const actuelle = String(cfg.patch_mention || '');
+    components.push(
+      new ActionRowBuilder().addComponents(
+        new StringSelectMenuBuilder()
+          .setCustomId('cfgpatchmention')
+          .setPlaceholder('3️⃣ Qui mentionner à chaque note ?')
+          .addOptions([
+            { label: 'Personne (défaut)', value: 'aucune', emoji: '🔕', description: 'Aucune notification', default: !actuelle || actuelle === 'aucune' },
+            { label: '@everyone', value: 'everyone', emoji: '📢', description: 'Tout le serveur', default: actuelle === 'everyone' },
+            { label: '@here', value: 'here', emoji: '👋', description: 'Les membres connectés', default: actuelle === 'here' },
+          ])
+      )
+    );
+    const roleMenu = new RoleSelectMenuBuilder()
+      .setCustomId('cfgpatchrole')
+      .setPlaceholder('… ou un rôle précis')
+      .setMinValues(0)
+      .setMaxValues(1);
+    if (/^\d{5,}$/.test(actuelle) && guild.roles.cache.has(actuelle)) roleMenu.setDefaultRoles(actuelle);
+    components.push(new ActionRowBuilder().addComponents(roleMenu));
+  }
+
   components.push(backRow());
   return { embeds: [embed], components };
+}
+
+// Comment dire, en clair, ce que vaut le réglage de mention.
+function libelleMention(valeur) {
+  const v = String(valeur || '').trim();
+  if (!v || v === 'aucune') return '🔕 **Personne** *(défaut)*';
+  if (v === 'everyone') return '📢 **@everyone**';
+  if (v === 'here') return '👋 **@here**';
+  if (/^\d{5,}$/.test(v)) return `<@&${v}>`;
+  return '🔕 **Personne** *(défaut)*';
 }
 
 // ----- Catégorie : XP -----
@@ -963,6 +1002,31 @@ async function handleConfigInteraction(interaction) {
 
     if (id === 'cfgchansel') {
       return await interaction.update(salonsView(interaction.guild, interaction.values[0]));
+    }
+
+    // 🔔 Mention des patch notes : « personne » (défaut), @everyone, @here…
+    if (id === 'cfgpatchmention') {
+      const choix = interaction.values[0];
+      const valeur = choix === 'aucune' ? null : choix;
+      setGuildConfig(interaction.guildId, 'patch_mention', valeur);
+      await interaction.update(salonsView(interaction.guild, 'patch_channel_id'));
+      await sendLog(
+        interaction.guild,
+        logEmbed('⚙️ Configuration modifiée', `🔔 Mention des patch notes → ${libelleMention(valeur)}\nPar <@${interaction.user.id}>`, COLORS.INFO)
+      );
+      return;
+    }
+
+    // … ou un rôle précis. Vider la sélection revient à ne mentionner personne.
+    if (id === 'cfgpatchrole') {
+      const roleId = interaction.values[0] || null;
+      setGuildConfig(interaction.guildId, 'patch_mention', roleId);
+      await interaction.update(salonsView(interaction.guild, 'patch_channel_id'));
+      await sendLog(
+        interaction.guild,
+        logEmbed('⚙️ Configuration modifiée', `🔔 Mention des patch notes → ${libelleMention(roleId)}\nPar <@${interaction.user.id}>`, COLORS.INFO)
+      );
+      return;
     }
 
     if (id.startsWith('cfgchan:')) {
