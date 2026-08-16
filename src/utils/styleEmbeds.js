@@ -160,7 +160,7 @@ function preparerCartes(client, options) {
   // autocomplétion n'a pas d'embeds — la garde suffit à les écarter.
   const estInteraction = Array.isArray(body?.data?.embeds);
   const cible = estInteraction ? body.data : body;
-  const converti = convertirCorps(cible, { bordure: r.bordure, titre: r.titre });
+  const converti = convertirCorps(cible, { bordure: r.bordure, titre: r.titre, serveur: guild?.name || null });
   if (!converti) return null;
 
   const origine = JSON.parse(JSON.stringify(body));

@@ -40,8 +40,13 @@ function entree(texte) {
 }
 
 // Un bloc complet : en-tête + entrées, ou mention en italique si vide.
+// ⚠️ `compte: null` doit VRAIMENT retirer le compte. Avec `??`, un null était
+// remplacé par le nombre d'entrées : toutes les sections qui demandaient à ne
+// pas être comptées affichaient quand même « • 2 membres » — y compris le
+// compte rendu de /esthetique, où ça ne voulait rien dire.
 function bloc(titre, entrees, options = {}) {
-  const lignes = [entete(titre, { ...options, compte: options.compte ?? entrees.length })];
+  const compte = Object.prototype.hasOwnProperty.call(options, 'compte') ? options.compte : entrees.length;
+  const lignes = [entete(titre, { ...options, compte })];
   if (!entrees.length) lignes.push(`*${options.vide || 'Aucun membre'}*`);
   else lignes.push(...entrees.map((e) => entree(e)));
   return lignes.join('\n');
@@ -79,11 +84,14 @@ function heure(date = new Date()) {
 }
 
 // Pied de page unifié : « 1972 membres • Mis à jour à 16:07 • Page 1/2 »
-function piedDePage({ total = null, motTotal = 'membre', page = null, pages = null, extra = null } = {}) {
+// `heure: false` quand la carte porte déjà un horodatage natif : celui-ci
+// s'affiche à l'heure de chaque lecteur, et le répéter en texte serait dire
+// deux fois la même chose — moins bien la seconde.
+function piedDePage({ total = null, motTotal = 'membre', page = null, pages = null, extra = null, heure: avecHeure = true } = {}) {
   const morceaux = [];
   if (total !== null) morceaux.push(pluriel(total, motTotal));
   if (extra) morceaux.push(extra);
-  morceaux.push(`Mis à jour à ${heure()}`);
+  if (avecHeure) morceaux.push(`Mis à jour à ${heure()}`);
   if (page !== null && pages !== null && pages > 1) morceaux.push(`Page ${page}/${pages}`);
   return morceaux.join(' • ');
 }

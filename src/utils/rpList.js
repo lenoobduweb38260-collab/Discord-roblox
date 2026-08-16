@@ -9,6 +9,8 @@ const {
   MessageFlags,
 } = require('discord.js');
 const { db } = require('../database');
+const M = require('./miseEnPage');
+const { reglages } = require('./styleEmbeds');
 
 // Listes RP partagées : Blacklist RP (kind « blrp ») et Whitelist RP (« wlrp »).
 // Même structure : un embed « panneau » posté dans un salon, trié par ordre
@@ -17,8 +19,16 @@ const { db } = require('../database');
 
 const TABLES = { blrp: 'blacklist_rp', wlrp: 'whitelist_rp' };
 const META = {
-  blrp: { title: '🚫 Blacklist RP', color: 0xe74c3c, empty: 'Aucune blacklist RP pour le moment.' },
-  wlrp: { title: '✅ Whitelist RP', color: 0x2ecc71, empty: 'Aucune whitelist RP pour le moment.' },
+  blrp: {
+    title: '🚫 Blacklist RP', color: 0xe74c3c, emoji: '🚫',
+    libelle: 'Joueurs blacklistés', mot: 'joueur',
+    empty: 'Aucune blacklist RP pour le moment.',
+  },
+  wlrp: {
+    title: '✅ Whitelist RP', color: 0x2ecc71, emoji: '✅',
+    libelle: 'Joueurs whitelistés', mot: 'joueur',
+    empty: 'Aucune whitelist RP pour le moment.',
+  },
 };
 
 function prep(kind) {
@@ -45,11 +55,15 @@ const setBoard = db.prepare(
     'ON CONFLICT(guild_id, kind) DO UPDATE SET channel_id = excluded.channel_id, message_id = excluded.message_id'
 );
 
-function entryLine(r, i) {
-  return (
-    `**${i + 1}.** 🎮 **${r.roblox_name || '?'}** · <@${r.user_id}> (\`${r.user_id}\`)` +
-    `${r.discord_tag ? ` — ${r.discord_tag}` : ''}${r.reason ? `\n   📄 ${r.reason}` : ''}`
-  );
+// Une entrée de liste, dans la grammaire du projet : ➜ et jamais un numéro.
+// L'identifiant brut disparaît de la ligne — la mention le porte déjà, et il
+// prenait à lui seul un cinquième de la largeur sur téléphone. La raison,
+// quand il y en a une, passe en sous-texte : elle éclaire sans encombrer.
+function entryLine(r) {
+  const tete = `**${r.roblox_name || '?'}** · <@${r.user_id}>`;
+  const tag = r.discord_tag ? ` — ${r.discord_tag}` : '';
+  const raison = r.reason ? `\n-# 📄 ${r.reason}` : '';
+  return `${M.entree(tete + tag)}${raison}`;
 }
 
 // ----- 📄 Pagination -----
@@ -78,8 +92,8 @@ function construirePages(rows) {
   const pages = [];
   let courante = [];
   let taille = 0;
-  rows.forEach((r, i) => {
-    const ligne = entryLine(r, i);
+  rows.forEach((r) => {
+    const ligne = entryLine(r);
     const cout = ligne.length + 2; // + le saut de ligne double
     // Nouvelle page si on atteint 39 entrées, ou si celle-ci ne tient plus.
     if (courante.length >= PAR_PAGE || (courante.length && taille + cout > BUDGET)) {
@@ -102,15 +116,33 @@ function renderEmbed(kind, guildId, filter, page = 0) {
   const pages = construirePages(rows);
   const total = pages.length;
   const num = Math.min(Math.max(0, Number(page) || 0), total - 1);
+  const debut = pages.slice(0, num).reduce((n, p) => n + p.length, 0) + 1;
+
   const embed = new EmbedBuilder()
     .setColor(meta.color)
-    .setTitle(`${meta.title}${q ? ' — recherche' : ''} (${rows.length})`)
+    .setTitle(`${meta.title}${q ? ' — recherche' : ''}`)
     .setTimestamp();
-  embed.setDescription(pages[num].join('\n\n') || `*${q ? 'Aucun résultat.' : meta.empty}*`);
-  if (total > 1) {
-    const debut = pages.slice(0, num).reduce((n, p) => n + p.length, 0) + 1;
-    embed.setFooter({ text: `Page ${num + 1}/${total} — entrées ${debut} à ${debut + pages[num].length - 1} sur ${rows.length}` });
-  }
+
+  // Les entrées portent déjà leur ➜ : on les assemble sous un en-tête ◆ qui
+  // dit ce qu'on regarde et combien il y en a.
+  const entete = q
+    ? M.entete(`Résultats pour « ${filter.trim()} »`, { prefixe: '🔎', compte: rows.length, motCompte: 'entrée' })
+    : M.entete(meta.libelle, { prefixe: meta.emoji, compte: rows.length, motCompte: meta.mot });
+  const corps = pages[num].length ? pages[num].join('\n') : `*${q ? 'Aucun résultat.' : meta.empty}*`;
+  embed.setDescription(M.borner([entete, corps].join('\n'), M.MAX_DESCRIPTION));
+
+  // Pied de page unifié : compte, heure, page — toujours dans cet ordre.
+  embed.setFooter({
+    text: M.piedDePage({
+      total: rows.length,
+      motTotal: meta.mot,
+      page: num + 1,
+      pages: total,
+      extra: total > 1 ? `entrées ${debut} à ${debut + pages[num].length - 1}` : null,
+      // L'horodatage de la carte dit déjà quand la liste a été rafraîchie.
+      heure: false,
+    }),
+  });
   return embed;
 }
 
@@ -153,13 +185,25 @@ function searchRow(kind, guildId, filter = '', page = 0) {
 }
 
 // Publie (ou remplace) le panneau dans un salon et mémorise sa référence.
+// Un ENVOI est converti en carte par la couche réseau : le panneau naît donc
+// sans barre colorée.
 async function postBoard(kind, channel, guildId) {
   const msg = await channel.send({ embeds: [renderEmbed(kind, guildId)], components: [searchRow(kind, guildId)] });
   setBoard.run(guildId, kind, channel.id, msg.id);
   return msg;
 }
 
-// Réédite le panneau existant (après chaque ajout/retrait).
+// Met à jour le panneau après chaque ajout/retrait.
+//
+// ⚠️ Discord fige la famille de composants d'un message à sa création : un
+// panneau publié à l'époque des embeds ne deviendra JAMAIS une carte par
+// modification. C'est ce qui laissait la barre verte sur la liste Whitelist
+// alors que tout le reste du bot était passé aux cartes.
+//
+// On modifie donc quand c'est possible — cela garde le panneau à sa place
+// dans le salon — et on le republie une seule fois s'il est resté un embed
+// alors que le serveur est passé aux cartes. Après cette bascule, les
+// modifications suivantes reprennent normalement.
 async function refreshBoard(client, kind, guildId) {
   const board = getBoard.get(guildId, kind);
   if (!board) return;
@@ -168,9 +212,23 @@ async function refreshBoard(client, kind, guildId) {
     if (!channel?.isTextBased()) return;
     const msg = await channel.messages.fetch(board.message_id).catch(() => null);
     if (!msg) return;
+
     // Le panneau revient toujours à la première page après une modification :
     // le nombre de pages a pu changer.
-    await msg.edit({ embeds: [renderEmbed(kind, guildId)], components: [searchRow(kind, guildId)] });
+    const contenu = { embeds: [renderEmbed(kind, guildId)], components: [searchRow(kind, guildId)] };
+
+    // Panneau resté en embed alors que le serveur veut des cartes → une
+    // republication, et une seule : c'est le seul chemin possible.
+    const r = reglages(guildId);
+    if (r.actif && r.cartes && msg.embeds?.length) {
+      const neuf = await postBoard(kind, channel, guildId).catch(() => null);
+      if (neuf) {
+        await msg.delete().catch(() => null);
+        return;
+      }
+    }
+
+    await msg.edit(contenu);
   } catch {
     /* le panneau a pu être supprimé : on ignore */
   }

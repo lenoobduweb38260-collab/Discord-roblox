@@ -16,6 +16,8 @@ const { db, getGuildConfig } = require('../database');
 const { COLORS, sendLog, logEmbed } = require('./embeds');
 const { GRADES, getGrade } = require('./permissions');
 const balises = require('./balises');
+const M = require('./miseEnPage');
+const { reglages } = require('./styleEmbeds');
 
 const listTypes = db.prepare('SELECT * FROM ticket_types WHERE guild_id = ? ORDER BY id');
 const getType = db.prepare('SELECT * FROM ticket_types WHERE id = ? AND guild_id = ?');
@@ -60,6 +62,10 @@ const insertPanel = db.prepare(
 );
 const lastPanel = db.prepare('SELECT * FROM ticket_panels WHERE guild_id = ? ORDER BY id DESC LIMIT 1');
 const updatePanelOptions = db.prepare('UPDATE ticket_panels SET options = ? WHERE id = ?');
+// Quand un panneau doit être republié pour devenir une carte, sa référence
+// change : sans cette mise à jour, la commande « modifier » viserait un
+// message supprimé.
+const updatePanelMessage = db.prepare('UPDATE ticket_panels SET channel_id = ?, message_id = ? WHERE id = ?');
 
 function parseColor(value) {
   if (!value) return null;
@@ -300,13 +306,33 @@ async function finishPanel(interaction) {
       flags: MessageFlags.Ephemeral,
     });
   }
-  try {
-    await message.edit(payload);
-  } catch (err) {
-    return interaction.reply({ content: `❌ Modification impossible : ${err.message}`, flags: MessageFlags.Ephemeral });
+  // ⚠️ Discord fige la famille de composants d'un message à sa création : un
+  // panneau publié à l'époque des embeds ne deviendra JAMAIS une carte par
+  // modification. On le republie donc UNE fois — c'est le seul chemin — puis
+  // les modifications suivantes reprennent normalement.
+  const r = reglages(interaction.guildId);
+  let republie = false;
+  if (r.actif && r.cartes && message.embeds?.length) {
+    const neuf = await channel.send(payload).catch(() => null);
+    if (neuf) {
+      await message.delete().catch(() => null);
+      updatePanelMessage.run(channel.id, neuf.id, panel.id);
+      republie = true;
+    }
+  }
+  if (!republie) {
+    try {
+      await message.edit(payload);
+    } catch (err) {
+      return interaction.reply({ content: `❌ Modification impossible : ${err.message}`, flags: MessageFlags.Ephemeral });
+    }
   }
   updatePanelOptions.run(JSON.stringify(merged), panel.id);
-  await interaction.reply({ content: `✅ Panneau mis à jour dans <#${panel.channel_id}>.`, flags: MessageFlags.Ephemeral });
+  await interaction.reply({
+    content: `✅ Panneau mis à jour dans <#${panel.channel_id}>.` +
+      (republie ? '\n-# 🃏 Republié pour passer en carte sans bordure : un embed déjà envoyé ne peut pas le devenir.' : ''),
+    flags: MessageFlags.Ephemeral,
+  });
   await sendLog(interaction.guild, logEmbed('🎫 Panneau modifié', `Panneau dans <#${panel.channel_id}> mis à jour par <@${interaction.user.id}>.`, COLORS.INFO));
 }
 
@@ -366,14 +392,23 @@ async function provisionTicket(guild, type, owner) {
   });
   const result = insertTicket.run(guild.id, type.id, channel.id, owner.id, new Date().toISOString());
   const roleMentions = roleIds.map((id) => `<@&${id}>`).join(' ');
+  // Grammaire du projet : une phrase d'accueil, puis une section ◆ qui dit
+  // qui répond. Pas de pied de page : « Utilisez le bouton ci-dessous »
+  // répétait le libellé du bouton juste en dessous, et prenait la place de la
+  // signature du bot.
   const intro = new EmbedBuilder()
     .setColor(COLORS.PRIMARY)
     .setTitle(`🎫 Ticket ${type.emoji ? `${type.emoji} ` : ''}${type.label} — n°${num}`)
     .setDescription(
-      `Bonjour <@${owner.id}> ! Décrivez votre demande, ` +
-        `${roleMentions ? `l'équipe ${roleMentions}` : 'le staff'} vous répondra dès que possible.`
+      M.description([
+        `Bonjour <@${owner.id}> ! Décrivez votre demande le plus précisément possible.`,
+        M.bloc(
+          roleMentions ? 'Qui vous répond' : 'Prise en charge',
+          roleMentions ? [roleMentions] : ['Le staff vous répondra dès que possible'],
+          { prefixe: '👥', compte: null, vide: 'Le staff vous répondra dès que possible' }
+        ),
+      ])
     )
-    .setFooter({ text: 'Utilisez le bouton ci-dessous pour fermer le ticket.' })
     .setTimestamp();
   const ticketId = result.lastInsertRowid;
   const closeRow = new ActionRowBuilder().addComponents(

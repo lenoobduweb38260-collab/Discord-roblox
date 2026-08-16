@@ -143,7 +143,7 @@ function rehabiller(json, contexte, dateOrigine = null) {
 async function recreerEnCarte(message, embeds, r) {
   const corps = convertirCorps(
     { content: message.content || '', embeds, components: message.components?.map((c) => (c.toJSON ? c.toJSON() : c)) || [] },
-    { bordure: r.bordure, titre: r.titre }
+    { bordure: r.bordure, titre: r.titre, serveur: message.guild?.name || null }
   );
   if (!corps) return null;
 

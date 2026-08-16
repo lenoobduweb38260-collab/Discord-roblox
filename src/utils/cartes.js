@@ -99,7 +99,7 @@ const uneLigne = (s) => String(s).replace(/\s*\n\s*/g, ' · ').trim();
 //
 // Renvoie null si l'embed ne se prête pas à la conversion : l'appelant garde
 // alors l'embed d'origine plutôt que d'envoyer quelque chose d'incomplet.
-function enCarte(embed, { bordure = 'aucune', titre: niveauTitre = 'grand' } = {}) {
+function enCarte(embed, { bordure = 'aucune', titre: niveauTitre = 'grand', serveur = null } = {}) {
   if (!embed || typeof embed !== 'object') return null;
   const dedans = [];
 
@@ -118,7 +118,12 @@ function enCarte(embed, { bordure = 'aucune', titre: niveauTitre = 'grand' } = {
   // (« Avis de @membre ») est en revanche conservée.
   const auteur = uneLigne(embed.author?.name || '');
   const signature = uneLigne(embed.footer?.text || '');
-  if (auteur && !(signature && signature.includes(auteur))) tete.push(`-# ${auteur}`);
+  // Écartée dans deux cas : quand la signature la répète déjà, et quand elle
+  // n'est QUE le nom du serveur — c'est alors de l'identité, pas du sens, et
+  // elle écrase le titre pour ne rien dire de neuf.
+  const identiteSeule = serveur && auteur === uneLigne(serveur);
+  const repetee = signature && signature.includes(auteur);
+  if (auteur && !repetee && !identiteSeule) tete.push(`-# ${auteur}`);
 
   if (embed.title) {
     const titre = uneLigne(embed.title);

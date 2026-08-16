@@ -846,6 +846,24 @@ const RELEASES = [
     ],
     retrait: [],
   },
+  {
+    id: 'listes-rp-tickets-2026-08al',
+    title: 'Les listes RP et les tickets rejoignent la refonte 📋',
+    ajout: [],
+    amelioration: [
+      '📋 **Les listes Whitelist et Blacklist RP passent a la grammaire du bot** : entrees marquees `➜` au lieu d\'une numerotation, en-tete de section `◆` avec le compte, pied de page unifie. Le pseudo Roblox est mis en avant, la raison passe en sous-texte',
+      '🧹 **L\'identifiant brut disparait des lignes** : la mention le portait deja, et il occupait a lui seul un cinquieme de la largeur sur telephone',
+      '🎫 **L\'embed d\'ouverture d\'un ticket** suit la meme grammaire : une phrase d\'accueil, puis une section `◆` qui dit qui repond',
+      '♻️ **Les panneaux se reparent tout seuls.** Un panneau publie a l\'epoque des embeds ne peut pas devenir une carte par modification — Discord fige la famille de composants a la creation. A la premiere modification, il est donc republie UNE fois, puis tout reprend normalement. Vaut pour les listes RP comme pour les panneaux de tickets',
+      '🕰️ L\'heure de mise a jour n\'est plus ecrite deux fois : la carte porte deja un horodatage, affiche a l\'heure de chaque lecteur',
+    ],
+    fix: [
+      '🩹 **Le nom du serveur s\'affichait au-dessus du titre** des listes alors qu\'il n\'ajoutait rien : c\'est de l\'identite, pas du sens, et il ecrasait le titre',
+      '🩹 **`compte: null` etait ignore** : les sections qui demandaient a ne pas etre comptees affichaient quand meme « • 2 membres ». Le compte rendu de `/esthetique` en souffrait aussi',
+      '🩹 Le pied de page « Utilisez le bouton ci-dessous pour fermer le ticket » repetait le libelle du bouton juste en dessous, et prenait la place de la signature',
+    ],
+    retrait: [],
+  },
 ];
 
 // Construit l'embed d'une note à partir d'une entrée { title, ajout, fix,
