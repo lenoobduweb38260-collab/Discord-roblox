@@ -4,6 +4,36 @@ const { isCreator } = require('../utils/botTeam');
 const { reglages, versEntier, DEFAUT_ACCENT, styliserUn } = require('../utils/styleEmbeds');
 const { convertirCorps } = require('../utils/cartes');
 const { repondre } = require('../utils/reponse');
+const { etatCartes } = require('../utils/styleEmbeds');
+const { db } = require('../database');
+
+// 🕰️ Mémoire du dernier passage : sans elle, « où en est le bot ? » n'aurait
+// pour réponse que « relancez la commande et regardez ».
+// ⚠️ Préparées à la DEMANDE, pas au chargement du fichier. Une requête
+// préparée au niveau racine qui échoue empêche le module de se charger — et
+// c'est la commande ENTIÈRE qui disparaîtrait, pour une simple trace de
+// confort. La mémoire du dernier passage ne vaut pas ce risque.
+let _lire = null;
+let _ecrire = null;
+
+function dernierPassage() {
+  try {
+    _lire ||= db.prepare("SELECT value FROM app_state WHERE key = 'esthetique_dernier'");
+    const row = _lire.get();
+    return row ? JSON.parse(row.value) : null;
+  } catch {
+    return null;
+  }
+}
+
+function noterPassage(resume) {
+  try {
+    _ecrire ||= db.prepare("INSERT OR REPLACE INTO app_state (key, value) VALUES ('esthetique_dernier', ?)");
+    _ecrire.run(JSON.stringify(resume));
+  } catch {
+    // La trace est un confort : son échec ne doit pas faire échouer la commande.
+  }
+}
 const M = require('../utils/miseEnPage');
 
 // 🎨 Ré-applique l'identité visuelle aux messages DÉJÀ envoyés par le bot.
@@ -129,6 +159,103 @@ function rehabiller(json, contexte, dateOrigine = null) {
   return stable(e) === avant ? null : e;
 }
 
+
+// ══════════════════════════════════════════════════════════════════
+// 🩺 /esthetique status — où en est le bot, sans rien modifier
+// ══════════════════════════════════════════════════════════════════
+//
+// Trois questions auxquelles rien ne répondait :
+//   • Discord accepte-t-il encore les cartes ? Après trois refus le bot
+//     repasse aux embeds SILENCIEUSEMENT — on chercherait longtemps pourquoi
+//     la barre colorée est revenue partout.
+//   • Quels réglages sont réellement en vigueur, serveur par serveur ?
+//   • Qu'a fait le dernier passage de la commande, et quand ?
+
+// Une ligne par serveur : ce qui est actif, en clair.
+function ligneServeur(guild) {
+  const r = reglages(guild.id);
+  if (!r.actif) return `**${guild.name}** — 🔴 identité désactivée`;
+  const bouts = [
+    r.cartes ? (r.bordure === 'accent' ? '🃏 cartes · barre accent' : '🃏 cartes sans bordure') : '📦 embeds classiques',
+    `titre ${r.titre}`,
+    `accent \`#${(r.accent ?? 0).toString(16).padStart(6, '0')}\``,
+  ];
+  if (!r.fusion) bouts.push('⚠️ grille de champs');
+  if (!r.ligne) bouts.push('sans filet');
+  if (r.couleurUnique) bouts.push('couleur unique');
+  if (r.banniere) bouts.push('bannière');
+  return `**${guild.name}** — ${bouts.join(' · ')}`;
+}
+
+async function etatEsthetique(interaction) {
+  const guilds = [...interaction.client.guilds.cache.values()];
+  const etat = etatCartes();
+  const dernier = dernierPassage();
+
+  // 🃏 Les cartes partent-elles vraiment ?
+  const cartes = etat.abandonnees
+    ? [
+        `🔴 **Abandonnées** après ${etat.refus} refus de Discord`,
+        'Tout repart en **embed classique**, barre colorée comprise',
+        'Redémarrez le bot pour réessayer — et vérifiez que sa bibliothèque est à jour',
+      ]
+    : [
+        `🟢 **Acceptées** — ${etat.refus} refus sur ${etat.max} tolérés`,
+        etat.refus ? '⚠️ Des refus ont eu lieu : surveillez' : 'Aucun refus depuis le démarrage',
+      ];
+
+  // 🌍 Les serveurs, et ce qui y est actif.
+  const lignes = guilds.map(ligneServeur);
+  const actifs = guilds.filter((g) => reglages(g.id).actif).length;
+  const enCartes = guilds.filter((g) => { const r = reglages(g.id); return r.actif && r.cartes; }).length;
+
+  // 🕰️ Le dernier passage.
+  const quand = (iso) => {
+    const d = new Date(iso);
+    return Number.isNaN(d.getTime()) ? 'date inconnue' : `<t:${Math.floor(d.getTime() / 1000)}:R>`;
+  };
+  const passage = dernier
+    ? [
+        `${quand(dernier.quand)} par <@${dernier.par}>`,
+        `Mode **${dernier.mode === 'recreer' ? 'recréer' : 'modifier'}** · couleurs **${dernier.couleurs}**`,
+        `**${dernier.retouches}** refait(s) · **${dernier.conformes}** déjà conformes · **${dernier.examines}** examiné(s)`,
+        dernier.recrees ? `**${dernier.recrees}** recréé(s) en carte` : null,
+        dernier.echecs ? `**${dernier.echecs}** échec(s)` : null,
+      ].filter(Boolean)
+    : ['*Jamais lancée depuis cette version*'];
+
+  const blocs = [
+    M.bloc('Cartes sans bordure', cartes, { prefixe: '🃏', compte: null }),
+    M.bloc('Dernier passage de la commande', passage, { prefixe: '🕰️', compte: null }),
+    M.bloc('Serveurs', lignes, {
+      prefixe: '🌍',
+      compte: guilds.length,
+      motCompte: 'serveur',
+      vide: 'Le bot n\'est sur aucun serveur',
+    }),
+    M.bloc('Résumé', [
+      `**${actifs}/${guilds.length}** serveur(s) avec l'identité active`,
+      `**${enCartes}/${guilds.length}** en cartes sans bordure`,
+    ], { prefixe: '📊', compte: null }),
+  ];
+
+  // ⚠️ Le point le plus utile : ce qui reste à faire, et pourquoi.
+  if (dernier?.aRecreer) {
+    blocs.push(M.bloc('Reste à convertir', [
+      `**${dernier.aRecreer}** message(s) gardaient leur barre colorée au dernier passage`,
+      'Un embed déjà envoyé ne peut pas devenir une carte : `/esthetique appliquer mode:Recréer`',
+      'À savoir : la recréation perd réactions, réponses accrochées, liens et date d\'origine',
+    ], { prefixe: '⚠️', compte: null }));
+  }
+
+  const embed = new EmbedBuilder()
+    .setTitle('🩺 État de l\'esthétique du bot')
+    .setDescription(M.borner(M.description(blocs), M.MAX_DESCRIPTION))
+    .setFooter({ text: M.piedDePage({ total: guilds.length, motTotal: 'serveur', heure: false }) });
+
+  return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+}
+
 // ♻️ Republie un message sous forme de carte sans bordure, puis efface
 // l'ancien.
 //
@@ -203,6 +330,9 @@ module.exports = {
               { name: 'Recréer en cartes sans bordure — perd réactions et liens', value: 'recreer' }
             )
         )
+    )
+    .addSubcommand((sub) =>
+      sub.setName('status').setDescription('Où en est l\'esthétique du bot : réglages, cartes, dernier passage')
     ),
 
   async execute(interaction) {
@@ -214,6 +344,8 @@ module.exports = {
         flags: MessageFlags.Ephemeral,
       });
     }
+
+    if (interaction.options.getSubcommand() === 'status') return etatEsthetique(interaction);
 
     const limite = interaction.options.getInteger('messages') || 100;
     const couleurs = interaction.options.getString('couleurs') || 'garder';
@@ -436,7 +568,7 @@ module.exports = {
         `**${totaux.aRecreer}** message(s) restent des embeds : ils gardent leur barre verticale colorée`,
         'Discord **fige** la famille de composants d\'un message à sa création — aucune modification ne transforme un embed en carte',
         'Pour les convertir : `/esthetique appliquer mode:Recréer`',
-        '➜ à savoir : la recréation **perd** réactions, réponses accrochées, liens partagés et date d\'origine',
+        'À savoir : la recréation **perd** réactions, réponses accrochées, liens partagés et date d\'origine',
       ], { prefixe: '🃏', compte: null }));
     }
 
@@ -471,6 +603,20 @@ module.exports = {
     // l'attend. Sinon — balayage long — on l'envoie en privé : c'est ce qui
     // permet au balayage d'aller jusqu'au bout au lieu de s'arrêter avant
     // l'expiration du jeton.
+    noterPassage({
+      quand: new Date().toISOString(),
+      par: interaction.user.id,
+      mode, couleurs, limite,
+      examines: totaux.examines,
+      retouches: totaux.retouches,
+      recrees: totaux.recrees,
+      conformes: totaux.conformes,
+      echecs: totaux.echecs,
+      aRecreer: totaux.aRecreer,
+      serveurs: parServeur.length,
+      secondes,
+    });
+
     const rendu = { embeds: [embed], content: entete };
     if (jetonVivant()) {
       // ⚠️ `repondre` et non `editReply` : une MODIFICATION n'est jamais

@@ -35,8 +35,14 @@ function entete(titre, { prefixe = '', compte = null, motCompte = 'membre' } = {
 }
 
 // Une entrée de liste : ➜ texte
+//
+// Idempotente : un texte qui porte DÉJÀ sa flèche ressort tel quel. Sans
+// cela, passer une ligne déjà préfixée à `bloc()` donnait « ➜ ➜ texte » —
+// c'est arrivé trois fois, dans la liste des serveurs puis dans deux
+// sections de /esthetique. Autant rendre l'erreur impossible.
 function entree(texte) {
-  return `${FLECHE} ${texte}`;
+  const t = String(texte ?? '');
+  return t.trimStart().startsWith(FLECHE) ? t : `${FLECHE} ${t}`;
 }
 
 // Un bloc complet : en-tête + entrées, ou mention en italique si vide.

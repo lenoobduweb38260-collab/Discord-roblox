@@ -882,6 +882,24 @@ const RELEASES = [
     fix: [],
     retrait: [],
   },
+  {
+    id: 'esthetique-status-2026-08an',
+    title: 'Savoir ou en est l\'esthetique : `/esthetique status` 🩺',
+    ajout: [
+      '🩺 **Nouvelle sous-commande `/esthetique status`** : elle ne modifie rien, elle raconte ou en est le bot',
+      '🃏 **Discord accepte-t-il encore les cartes ?** C\'etait un angle mort complet : apres trois refus le bot repasse aux embeds classiques SILENCIEUSEMENT. On aurait cherche longtemps pourquoi la barre coloree etait revenue partout',
+      '🌍 **Les reglages reellement en vigueur, serveur par serveur** : cartes ou embeds, barre ou pas, taille de titre, accent, et ce qui est desactive',
+      '🕰️ **Le dernier passage de la commande** : quand, par qui, dans quel mode, et ce qu\'il a fait',
+      '⚠️ **Ce qui reste a convertir** : combien de messages gardaient leur barre coloree, et la commande exacte pour les passer en cartes',
+    ],
+    amelioration: [
+      '🛡️ La memoire du dernier passage est un confort : si la base bronche, la commande fonctionne quand meme au lieu de disparaitre',
+    ],
+    fix: [
+      '🩹 **Double fleche `➜ ➜`** dans deux sections de `/esthetique`. Plutot que de la corriger une troisieme fois, `entree()` est devenue idempotente : un texte qui porte deja sa fleche ressort tel quel, et l\'erreur est desormais impossible',
+    ],
+    retrait: [],
+  },
 ];
 
 // Construit l'embed d'une note à partir d'une entrée { title, ajout, fix,

@@ -174,6 +174,16 @@ function preparerCartes(client, options) {
 // (réseau, 403, 429, 5xx) se propage normalement — rejouer y serait faux.
 const refusDeCartes = (err) => Number(err?.status) === 400;
 
+// 🩺 Où en est la conversion en cartes ?
+//
+// Ce compteur est le seul endroit où l'on saurait que Discord refuse les
+// cartes : après trois refus le bot cesse d'insister et repasse en embeds
+// classiques — silencieusement. Sans moyen de le lire, on chercherait
+// longtemps pourquoi « la barre colorée est revenue partout ».
+function etatCartes() {
+  return { refus: _refusCartes, max: REFUS_MAX, abandonnees: _refusCartes >= REFUS_MAX };
+}
+
 // Branche l'identité sur la couche REST du client. Idempotent.
 function installer(client) {
   const rest = client?.rest;
@@ -213,5 +223,5 @@ function installer(client) {
 module.exports = {
   installer, appliquer, styliserUn, reglages, versEntier, guildeDe, listesDEmbeds, noterInteraction,
   couleurNeutre, COULEURS_NEUTRES, DEFAUT_ACCENT, FILET, filetDe, FILET_DEFAUT,
-  preparerCartes, routeDEnvoi, refusDeCartes, DRAPEAU_V2,
+  preparerCartes, routeDEnvoi, refusDeCartes, etatCartes, DRAPEAU_V2,
 };
