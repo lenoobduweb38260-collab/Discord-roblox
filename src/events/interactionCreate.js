@@ -11,6 +11,54 @@ const setInsuranceTypes = db.prepare('UPDATE enterprises SET insurance_types = ?
 const getHeads = db.prepare('SELECT user_id FROM enterprise_heads WHERE enterprise_id = ?');
 const getEmployees = db.prepare('SELECT user_id FROM enterprise_employees WHERE enterprise_id = ?');
 
+// ⚠️ « Échec de l'interaction » : ce que Discord affiche quand PERSONNE ne
+// répond dans les trois secondes. Rien n'apparaît côté bot — aucune erreur,
+// aucun journal — puisque, précisément, aucun code n'a répondu.
+//
+// Trois façons d'y arriver, et elles se ressemblent toutes à la lecture :
+//
+//   1. un identifiant de composant qu'aucune branche ne reconnaît ;
+//   2. une garde qui sort sans rien dire (`if (!interaction.inGuild()) return`) ;
+//   3. une exception dans un gestionnaire.
+//
+// Les commandes slash étaient protégées des trois. Les boutons, menus et
+// modaux ne l'étaient d'aucune : la moindre garde silencieuse laissait le
+// membre devant un échec rouge. C'est la cause de la plupart des « ça
+// marche pas » sur les panneaux.
+//
+// D'où le filet ci-dessous. L'aiguillage dit maintenant s'il a traité
+// l'interaction ; ce qui passe au travers, ou lève, reçoit une réponse claire.
+// Et dans tous les cas l'interaction est ACCUSÉE avant qu'on n'en sorte.
+
+// Marqueur de « personne n'a reconnu ce composant ». Un symbole, et non
+// `false` : un gestionnaire a le droit de renvoyer `false` pour ses propres
+// raisons, et l'aiguillage le prendrait pour un défaut de route.
+const NON_ROUTE = Symbol('composant non routé');
+
+// Accuse réception sans rien changer à l'écran. `deferUpdate` n'existe que
+// pour ce qui vient d'un message : un modal ouvert depuis une commande n'a
+// pas de message à mettre à jour, il lui faut une vraie réponse.
+async function accuserReception(interaction, message = null) {
+  if (interaction.replied || interaction.deferred) {
+    if (!message) return null;
+    return interaction.followUp({ content: message, flags: MessageFlags.Ephemeral }).catch(() => null);
+  }
+  if (message) {
+    return interaction.reply({ content: message, flags: MessageFlags.Ephemeral }).catch(() => null);
+  }
+  const depuisUnMessage = interaction.isMessageComponent?.()
+    || (interaction.isModalSubmit?.() && interaction.isFromMessage?.());
+  if (depuisUnMessage) return interaction.deferUpdate().catch(() => null);
+  return interaction.deferReply({ flags: MessageFlags.Ephemeral }).catch(() => null);
+}
+
+// Un panneau du bot copié dans un message privé, ou un bouton cliqué depuis
+// la liste des messages épinglés d'un autre contexte. La plupart des
+// gestionnaires ont besoin d'un serveur : ils sortaient sans un mot, et le
+// clic finissait en « Échec de l'interaction ».
+const horsServeur = (interaction) =>
+  accuserReception(interaction, '⛔ Ce bouton ne fonctionne que sur un serveur, pas en message privé.');
+
 module.exports = {
   name: Events.InteractionCreate,
   async execute(interaction) {
@@ -33,6 +81,35 @@ module.exports = {
       return;
     }
 
+    // Les commandes slash gardent leur chemin : elles ont déjà leur filet.
+    if (interaction.isChatInputCommand()) return module.exports.commande(interaction);
+
+    // Boutons, menus et modaux : aiguillage sous filet.
+    try {
+      const traite = await module.exports.aiguiller(interaction);
+      if (traite === NON_ROUTE) {
+        // Un composant venu d'une version précédente du bot, ou d'un panneau
+        // republié depuis. Le dire vaut mieux qu'un échec rouge sans cause.
+        console.warn(`⚠️ Composant non routé : « ${interaction.customId} »`);
+        await accuserReception(
+          interaction,
+          '⏳ Ce bouton vient d\'une version précédente du bot et n\'est plus relié à rien.\n'
+          + '➜ Relancez la commande, ou demandez au staff de republier le panneau.'
+        );
+        return;
+      }
+    } catch (err) {
+      console.error(`Erreur composant « ${interaction.customId} » :`, err);
+      await accuserReception(interaction, '❌ Cette action a échoué. Réessayez ; si cela recommence, prévenez le staff.');
+      return;
+    }
+    // Filet ultime : un gestionnaire qui sort sans répondre laisserait
+    // « Échec de l'interaction » à l'écran.
+    await accuserReception(interaction);
+  },
+
+  // Renvoie NON_ROUTE si aucune branche ne reconnaît ce composant.
+  async aiguiller(interaction) {
     // ----- Réponse IA supervisée (interactions en MP du créateur) -----
     if (
       (interaction.isButton() || interaction.isStringSelectMenu()) &&
@@ -46,7 +123,7 @@ module.exports = {
       (interaction.isButton() || interaction.isChannelSelectMenu() || interaction.isRoleSelectMenu?.() || interaction.isModalSubmit()) &&
       (interaction.customId?.startsWith('emb:') || interaction.customId?.startsWith('embm:'))
     ) {
-      if (!interaction.inGuild()) return;
+      if (!interaction.inGuild()) return horsServeur(interaction);
       return require('../utils/embedComposer').handle(interaction);
     }
 
@@ -54,8 +131,14 @@ module.exports = {
     // L'identifiant porte le rôle : rien à relire en base, donc rien à perdre
     // si le bot redémarre ou si le panneau est republié.
     if (interaction.isButton() && interaction.customId?.startsWith('rr:')) {
-      if (!interaction.inGuild()) return;
+      if (!interaction.inGuild()) return horsServeur(interaction);
       return require('../utils/rolesAuClic').handleButton(interaction);
+    }
+
+    // ----- Menu déroulant de rôles (constructeur de messages du site) -----
+    if (interaction.isStringSelectMenu() && interaction.customId?.startsWith('rrm')) {
+      if (!interaction.inGuild()) return horsServeur(interaction);
+      return require('../utils/rolesAuClic').handleMenu(interaction);
     }
 
     // ----- Boutons des interactions Nekotina (/interact) — serveurs ET MP -----
@@ -73,7 +156,7 @@ module.exports = {
 
     // ----- Boutons du QG des tickets de l'équipe du bot (bans + reports) -----
     if (interaction.isButton() && interaction.customId.startsWith('btk:')) {
-      if (!interaction.inGuild()) return;
+      if (!interaction.inGuild()) return horsServeur(interaction);
       try {
         return await require('../utils/botTickets').handleButton(interaction);
       } catch (err) {
@@ -86,7 +169,7 @@ module.exports = {
 
     // ----- Boutons du système de tickets -----
     if (interaction.isButton() && interaction.customId.startsWith('tkt')) {
-      if (!interaction.inGuild()) return;
+      if (!interaction.inGuild()) return horsServeur(interaction);
       return handleTicketButton(interaction);
     }
 
@@ -95,7 +178,7 @@ module.exports = {
       (interaction.isStringSelectMenu() && interaction.customId === 'tktpansel') ||
       (interaction.isModalSubmit() && interaction.customId === 'tktpanmodal')
     ) {
-      if (!interaction.inGuild()) return;
+      if (!interaction.inGuild()) return horsServeur(interaction);
       return require('../utils/tickets').handlePanelBuilder(interaction);
     }
 
@@ -105,7 +188,7 @@ module.exports = {
       (interaction.isButton() && interaction.customId.startsWith('rprppage:')) ||
       (interaction.isModalSubmit() && interaction.customId.startsWith('rprpmodal:'))
     ) {
-      if (!interaction.inGuild()) return;
+      if (!interaction.inGuild()) return horsServeur(interaction);
       return require('../utils/rpList').handleSearchInteraction(interaction);
     }
 
@@ -117,25 +200,25 @@ module.exports = {
       (interaction.isButton() && interaction.customId.startsWith('captcha:verify')) ||
       (interaction.isModalSubmit() && interaction.customId === 'captcha:check')
     ) {
-      if (!interaction.inGuild()) return;
+      if (!interaction.inGuild()) return horsServeur(interaction);
       return require('../utils/captcha').handle(interaction);
     }
 
     // ----- Partenariats : bouton de validation staff -----
     if (interaction.isButton() && interaction.customId.startsWith('partner:')) {
-      if (!interaction.inGuild()) return;
+      if (!interaction.inGuild()) return horsServeur(interaction);
       return require('../commands/partenariat').handleButton(interaction);
     }
 
     // ----- Vgache : bouton « Réclamer » -----
     if (interaction.isButton() && interaction.customId.startsWith('vg:claim:')) {
-      if (!interaction.inGuild()) return;
+      if (!interaction.inGuild()) return horsServeur(interaction);
       return require('../commands/vgache').handleButton(interaction);
     }
 
     // ----- Aventure SAO : boutons de combat / chasse / forge -----
     if (interaction.isButton() && interaction.customId.startsWith('sao:')) {
-      if (!interaction.inGuild()) return;
+      if (!interaction.inGuild()) return horsServeur(interaction);
       return require('../commands/sao').handleButton(interaction);
     }
 
@@ -158,7 +241,7 @@ module.exports = {
       (interaction.isUserSelectMenu?.() &&
         (interaction.customId.startsWith('tktadd:') || interaction.customId.startsWith('tktrem:')))
     ) {
-      if (!interaction.inGuild()) return;
+      if (!interaction.inGuild()) return horsServeur(interaction);
       return handleTicketButton(interaction);
     }
 
@@ -167,7 +250,7 @@ module.exports = {
       (interaction.isChannelSelectMenu?.() || interaction.isStringSelectMenu()) &&
       /^esth(salon|msg):/.test(interaction.customId || '')
     ) {
-      if (!interaction.inGuild()) return;
+      if (!interaction.inGuild()) return horsServeur(interaction);
       return require('../commands/esthetique').handleComposant(interaction);
     }
 
@@ -176,13 +259,13 @@ module.exports = {
       (interaction.isButton() || interaction.isAnySelectMenu() || interaction.isModalSubmit()) &&
       interaction.customId?.startsWith('cfg')
     ) {
-      if (!interaction.inGuild()) return;
+      if (!interaction.inGuild()) return horsServeur(interaction);
       return handleConfigInteraction(interaction);
     }
 
     // ----- Menu de sélection des types d'assurance (création/modif d'entreprise) -----
     if (interaction.isStringSelectMenu() && interaction.customId.startsWith('entassur:')) {
-      if (!interaction.inGuild()) return;
+      if (!interaction.inGuild()) return horsServeur(interaction);
       const grade = getGrade(interaction.member);
       if (grade < GRADES.STAFF) {
         return interaction.reply({
@@ -219,9 +302,12 @@ module.exports = {
       return;
     }
 
-    // ----- Commandes slash -----
-    if (!interaction.isChatInputCommand()) return;
+    // Aucune branche n'a reconnu ce composant.
+    return NON_ROUTE;
+  },
 
+  // ----- Commandes slash -----
+  async commande(interaction) {
     const command = interaction.client.commands.get(interaction.commandName);
     if (!command) return;
 

@@ -215,6 +215,13 @@ function startManagedApi(client, baseDir) {
           channels: [...g.channels.cache.filter((c) => c.isTextBased() && !c.isThread()).values()]
             .map((c) => ({ id: c.id, name: c.name }))
             .sort((a, b) => a.name.localeCompare(b.name)),
+          // 🎭 Les rôles attribuables. On écarte @everyone (que personne ne
+          // « reçoit ») et les rôles gérés par une intégration, qu'un bot ne
+          // peut pas donner : les proposer ne mènerait qu'à un refus.
+          roles: [...g.roles.cache.values()]
+            .filter((r) => r.id !== g.id && !r.managed)
+            .sort((a, b) => b.position - a.position)
+            .map((r) => ({ id: r.id, name: r.name, couleur: r.hexColor })),
         }));
         return send(200, {
           bot: { tag: client.user.tag, avatar: client.user.displayAvatarURL({ size: 64 }), clientId: client.user.id },
@@ -980,9 +987,21 @@ function startManagedApi(client, baseDir) {
               // Un bouton-lien ne déclenche rien côté bot : Discord l'ouvre.
               try { bouton.setStyle(ButtonStyle.Link).setURL(String(b.lien).trim()); }
               catch { continue; }
-            } else {
+            } else if (/^\d{15,25}$/.test(String(b.role || '').trim())) {
+              // 🎭 Bouton qui donne un rôle. L'identifiant du composant PORTE
+              // le rôle : le clic est traité sans rien relire en base, donc
+              // sans rien à perdre si le bot redémarre.
               bouton.setStyle(STYLES[b.style] || ButtonStyle.Secondary)
-                .setCustomId(`site:${String(b.action || 'rien').slice(0, 80)}`);
+                .setCustomId(`rr:${String(b.role).trim()}`);
+            } else {
+              // ⛔ Ni lien, ni rôle : ce bouton ne ferait RIEN. Publié, il
+              // affichait « Échec de l'interaction » à chaque clic — Discord
+              // marque en rouge tout composant qui reste sans réponse. Mieux
+              // vaut refuser l'envoi et le dire.
+              return send(400, {
+                error: `Le bouton « ${String(b.label).slice(0, 40)} » ne fait rien : donnez-lui un lien à ouvrir, `
+                  + 'ou un rôle à attribuer. Un bouton sans action affiche « Échec de l\'interaction » à chaque clic.',
+              });
             }
             if (String(b.emoji || '').trim()) { try { bouton.setEmoji(String(b.emoji).trim()); } catch {} }
             row.addComponents(bouton);
@@ -991,12 +1010,23 @@ function startManagedApi(client, baseDir) {
         }
         const options = (Array.isArray(body.selecteur) ? body.selecteur : []).filter((o) => String(o.label || '').trim());
         if (options.length && rows.length < 5) {
+          // Même règle que pour les boutons : une option qui ne mène à rien
+          // laisse le menu sans réponse, donc en échec.
+          const sansRole = options.find((o) => !/^\d{15,25}$/.test(String(o.role || '').trim()));
+          if (sansRole) {
+            return send(400, {
+              error: `L'option « ${String(sansRole.label).slice(0, 40)} » du menu ne fait rien : choisissez le rôle `
+                + 'qu\'elle doit donner. Une option sans action affiche « Échec de l\'interaction ».',
+            });
+          }
           const menu = new StringSelectMenuBuilder()
-            .setCustomId(`site:menu:${Date.now()}`)
+            .setCustomId('rrm:1')
             .setPlaceholder(String(body.selecteurTexte || 'Faites un choix…').slice(0, 150))
-            .addOptions(options.slice(0, 25).map((o, i) => ({
+            .setMinValues(0)
+            .setMaxValues(Math.min(options.length, 25))
+            .addOptions(options.slice(0, 25).map((o) => ({
               label: String(o.label).slice(0, 100),
-              value: String(o.valeur || `option-${i}`).slice(0, 100),
+              value: String(o.role).trim(),
               description: String(o.description || '').slice(0, 100) || undefined,
               emoji: String(o.emoji || '').trim() || undefined,
             })));

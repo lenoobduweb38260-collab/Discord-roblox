@@ -1547,10 +1547,12 @@
       label: l.querySelector("[data-btn-label]")?.value || "",
       style: l.querySelector("[data-btn-style]")?.value || "secondaire",
       lien: l.querySelector("[data-btn-lien]")?.value || "",
+      role: l.querySelector("[data-btn-role]")?.value || "",
     }));
     m.selecteur = [...document.querySelectorAll("[data-option]")].map(l => ({
       label: l.querySelector("[data-opt-label]")?.value || "",
       description: l.querySelector("[data-opt-desc]")?.value || "",
+      role: l.querySelector("[data-opt-role]")?.value || "",
     }));
     return m;
   }
@@ -1688,11 +1690,21 @@
         <select class="select" data-btn-style style="max-width:110px">
           ${styles.map(([v, l]) => `<option value="${v}"${b.style === v ? " selected" : ""}>${l}</option>`).join("")}
         </select>
-        <input class="input" data-btn-lien value="${esc(b.lien || "")}" placeholder="Lien (facultatif)" style="max-width:210px">
+        <input class="input" data-btn-lien value="${esc(b.lien || "")}" placeholder="Lien (facultatif)" style="max-width:190px">
+        <select class="select" data-btn-role style="max-width:170px">${optionsRoles(b.role)}</select>
         <button type="button" class="btn danger small" data-action="msg-bouton-suppr" data-index="${i}">🗑</button>
       </div>`).join("")}
-      <span class="field-note" style="display:block;margin-top:8px">Un bouton avec un lien ouvre une page. Sans lien, il ne déclenche encore aucune action côté bot.</span>
+      <span class="field-note" style="display:block;margin-top:8px">Un bouton <b>ouvre un lien</b> ou <b>donne un rôle</b> (un clic le donne, un second le retire).
+      Sans l'un ni l'autre il ne ferait rien : Discord afficherait « Échec de l'interaction » à chaque clic, et l'envoi est donc refusé.</span>
     </div>`;
+  }
+
+  // Les rôles du serveur en cours, pour les boutons et le menu du
+  // constructeur de messages. Même source que les autres champs de rôle.
+  function optionsRoles(choisi) {
+    const roles = srvParams()?.roles || [];
+    return `<option value="">— Aucun rôle —</option>` + roles.map(r =>
+      `<option value="${esc(r.id)}"${String(r.id) === String(choisi || "") ? " selected" : ""}>@ ${esc(r.name)}</option>`).join("");
   }
 
   function editeurSelecteur(m) {
@@ -1703,8 +1715,11 @@
       ${m.selecteur.map((o, i) => `<div class="row" data-option="${i}" style="gap:8px">
         <input class="input" data-opt-label value="${esc(o.label || "")}" placeholder="Intitulé" style="max-width:190px">
         <input class="input" data-opt-desc value="${esc(o.description || "")}" placeholder="Description (facultatif)">
+        <select class="select" data-opt-role style="max-width:170px">${optionsRoles(o.role)}</select>
         <button type="button" class="btn danger small" data-action="msg-option-suppr" data-index="${i}">🗑</button>
       </div>`).join("")}
+      <span class="field-note" style="display:block;margin-top:8px">Chaque option donne le rôle choisi. Décocher une option le retire :
+      le menu affiche donc l'état des rôles, comme des cases à cocher.</span>
     </div>`;
   }
 
@@ -3979,7 +3994,7 @@
         }
         case "msg-bouton-add":
           lireBrouillon();
-          brouillon().boutons.push({ label: "", style: "secondaire", lien: "" });
+          brouillon().boutons.push({ label: "", style: "secondaire", lien: "", role: "" });
           render();
           break;
         case "msg-bouton-suppr":
@@ -3989,7 +4004,7 @@
           break;
         case "msg-option-add":
           lireBrouillon();
-          brouillon().selecteur.push({ label: "", description: "" });
+          brouillon().selecteur.push({ label: "", description: "", role: "" });
           render();
           break;
         case "msg-option-suppr":

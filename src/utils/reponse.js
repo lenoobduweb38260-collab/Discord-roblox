@@ -20,12 +20,16 @@ const C = require('./cartes');
 // celles qui travaillent plus de trois secondes — rendait un embed à
 // l'ancienne, alors même que le reste du bot envoyait des cartes.
 //
-// La parade est simple : refermer le message d'attente avec une ligne de
-// texte, et envoyer le vrai contenu en `followUp`, qui est un envoi et donc
-// converti.
-
-// Le message d'attente doit être refermé : laissé tel quel, il resterait
-// affiché « réfléchit… » à côté de la réponse.
+// La parade : envoyer le vrai contenu en `followUp` — qui est un envoi, donc
+// converti — puis EFFACER le message d'attente.
+//
+// ⚠️ Dans cet ordre, et jamais l'inverse. Effacer d'abord ne laisserait plus
+// rien à quoi revenir si l'envoi échouait.
+//
+// L'effacer, et non y écrire « ✅ Terminé. » comme on le faisait : cette ligne
+// n'apprenait rien à personne et s'intercalait entre la commande et son
+// résultat. Sur un `/interact pat`, on lisait « Terminé. » avant même de voir
+// l'animation — la seule chose qu'on attendait.
 const CLOTURE = '-# ✅ Terminé.';
 
 // Cette réponse peut-elle devenir une carte ?
@@ -57,24 +61,30 @@ async function repondre(interaction, payload) {
     return interaction.editReply(payload).catch(() => null);
   }
 
-  // ⚠️ On referme d'abord le message d'attente, SANS embed : sinon il
-  // afficherait la version ancienne à côté de la carte.
-  const cloture = typeof payload.content === 'string' && payload.content.trim()
-    ? payload.content
-    : CLOTURE;
-  await interaction.editReply({ content: cloture, embeds: [], components: [] }).catch(() => null);
-
-  // Puis le vrai contenu, en envoi — donc en carte.
+  // Le vrai contenu d'abord, en envoi — donc en carte.
   const suite = { ...payload };
-  delete suite.content; // déjà affiché par la clôture, inutile de le répéter
   if (interaction.ephemeral) suite.flags = (suite.flags || 0) | MessageFlags.Ephemeral;
 
   const envoye = await interaction.followUp(suite).catch(() => null);
-  if (envoye) return envoye;
+  if (envoye) {
+    // Le résultat est affiché : le message d'attente n'a plus de raison
+    // d'exister. On l'efface plutôt que d'y écrire quelque chose.
+    //
+    // `try` et non `.catch` seul : cette fonction ne doit JAMAIS lever, et
+    // une réponse dépourvue de `deleteReply` lèverait avant le `.catch`.
+    let efface = false;
+    try { efface = await interaction.deleteReply().then(() => true, () => false); } catch { efface = false; }
+    if (!efface) {
+      // Suppression refusée (message déjà retiré, droits) : mieux vaut une
+      // ligne discrète qu'un « réfléchit… » figé pour toujours.
+      await interaction.editReply({ content: CLOTURE, embeds: [], components: [] }).catch(() => null);
+    }
+    return envoye;
+  }
 
   // Repli : le followUp a échoué (jeton expiré, droits…). On remet tout dans
   // la réponse, à l'ancienne. Moins beau, mais l'utilisateur voit son
-  // résultat.
+  // résultat — et le message d'attente n'a pas été effacé pour rien.
   return interaction.editReply(payload).catch(() => null);
 }
 

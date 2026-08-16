@@ -136,6 +136,30 @@ async function handleButton(interaction) {
   return interaction.reply({ content: r.message, flags: MessageFlags.Ephemeral }).catch(() => null);
 }
 
+// Menu déroulant de rôles (« rrm ») : chaque option porte l'identifiant du
+// rôle qu'elle donne. Les rôles choisis sont ajoutés, ceux qu'on déselectionne
+// sont retirés — le menu montre donc l'état, comme une case à cocher.
+async function handleMenu(interaction) {
+  if (!interaction.guild) return null;
+  const membre = interaction.member ?? (await interaction.guild.members.fetch(interaction.user.id).catch(() => null));
+  if (!membre) return null;
+
+  const proposes = (interaction.component?.options || []).map((o) => String(o.value));
+  const choisis = new Set(interaction.values.map(String));
+  const lignes = [];
+
+  for (const roleId of proposes.length ? proposes : [...choisis]) {
+    const veut = choisis.has(roleId);
+    const a = membre.roles.cache.has(roleId);
+    if (veut === a) continue; // rien à faire pour celui-là
+    const r = await basculer(interaction.guild, membre, roleId);
+    lignes.push(r.message);
+  }
+
+  const contenu = lignes.length ? lignes.join('\n') : '➖ Aucun changement : vous aviez déjà exactement ces rôles.';
+  return interaction.reply({ content: contenu, flags: MessageFlags.Ephemeral }).catch(() => null);
+}
+
 // Réaction ajoutée ou retirée. `ajout` dit laquelle : ajouter la réaction
 // donne le rôle, la retirer l'enlève — c'est ce que les membres attendent
 // d'un panneau à réactions, et c'est l'inverse d'une bascule.
@@ -172,5 +196,5 @@ async function handleReaction(reaction, utilisateur, ajout) {
 
 module.exports = {
   MAX_ROLES, enregistrer, rolesDe, oublier, rangeeBoutons, poserReactions,
-  basculer, handleButton, handleReaction, cleEmoji,
+  basculer, handleButton, handleMenu, handleReaction, cleEmoji,
 };

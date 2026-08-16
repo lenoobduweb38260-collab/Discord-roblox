@@ -994,6 +994,26 @@ const RELEASES = [
     ],
     retrait: [],
   },
+  {
+    id: 'echec-interaction-2026-08au',
+    title: 'Fin des « Echec de l\'interaction » 🛑',
+    ajout: [
+      '🎭 **Les boutons du constructeur de messages du site donnent un role.** Choisissez-le dans la liste a cote du bouton ; un clic le donne, un second le retire',
+      '📋 **Le menu deroulant aussi** : chaque option porte un role, et decocher une option la retire. Le menu affiche donc l\'etat des roles, comme des cases a cocher',
+      '🛡️ **Un filet sous tous les boutons et menus du bot.** Un composant qu\'aucun code ne reconnait, une garde silencieuse ou une erreur imprevue recoivent desormais une reponse claire au lieu du rectangle rouge',
+    ],
+    amelioration: [
+      '🔇 **Le message « ✅ Termine. » a disparu.** Il s\'intercalait entre la commande et son resultat : sur un `/interact pat` on lisait « Termine » avant meme de voir l\'animation. Le message d\'attente est maintenant efface, pas rempli',
+      '💬 Un bouton venu d\'une version precedente du bot le dit et explique quoi faire, au lieu d\'echouer sans raison visible',
+      '📓 Ces cas sont desormais traces cote bot : ils etaient jusqu\'ici totalement invisibles, puisque aucun code ne s\'executait',
+    ],
+    fix: [
+      '🩹 **Les boutons publies depuis le site ne fonctionnaient pas du tout.** Un bouton sans lien partait avec un identifiant qu\'aucun code n\'ecoutait : chaque clic donnait « Echec de l\'interaction ». Le site le disait a demi-mot (« il ne declenche encore aucune action »), mais publiait quand meme. Un bouton sans lien ni role est desormais refuse a l\'envoi, avec la raison',
+      '🩹 **Les boutons, menus et modaux n\'avaient aucune protection contre les erreurs**, la ou les commandes en avaient une depuis toujours. La moindre exception, ou la moindre sortie discrete (« ce bouton n\'est pas pour vous »), laissait le membre devant un echec rouge',
+      '🩹 Un bouton du bot clique en message prive echouait sans un mot ; il explique maintenant qu\'il lui faut un serveur',
+    ],
+    retrait: [],
+  },
 ];
 
 // Construit l'embed d'une note à partir d'une entrée { title, ajout, fix,
