@@ -1060,6 +1060,38 @@
       ${aide ? `<span class="field-note">${aide}</span>` : ""}</div>`;
   }
 
+
+  // 🏷️ Aide au balisage : rappelée partout où l'on écrit du texte libre.
+  // Un balisage qu'on ne connaît pas ne sert à rien, donc il s'affiche là où
+  // on écrit, pas dans une documentation à part.
+  const BALISES = [
+    ["&&", "une barre de séparation"],
+    ["&& Titre", "une barre puis un titre de section ◆"],
+    ["&&&", "une barre avec plus d'air autour"],
+    ["&> Texte", "une entrée de liste ➜"],
+    ["\\n", "un retour à la ligne"],
+  ];
+  function aideBalises() {
+    return `<div class="balises">
+      <span class="balises-titre">🏷️ MISE EN FORME — tapez ceci en début de ligne</span>
+      <div class="balises-liste">
+        ${BALISES.map(([b, r]) => `<div><code>${esc(b)}</code><span>${esc(r)}</span></div>`).join("")}
+      </div>
+      <div class="balises-ex">
+        <div><b>Vous écrivez</b><pre>Bienvenue !
+&& Pour commencer
+&> Lis le règlement
+&> Choisis tes rôles</pre></div>
+        <div><b>Le bot affiche</b><pre>Bienvenue !
+────────────────
+◆ <b>Pour commencer</b>
+➜ Lis le règlement
+➜ Choisis tes rôles</pre></div>
+      </div>
+      <span class="field-note">Une balise n'est lue qu'en début de ligne, et jamais dans un bloc de code — votre <code>if (a &amp;&amp; b)</code> reste intact.</span>
+    </div>`;
+  }
+
   // Liste déroulante enregistrée dans le bot. `choix` = [[valeur, libellé], …]
   function champChoix(cle, label, choix, aide = "", defaut = "") {
     const valeur = String(cfgCourant()[cle] ?? defaut);
@@ -1274,6 +1306,7 @@
         ${champSalon("welcome_help_channel_id", "💡 Salon d'aide / tickets", "Cité dans l'accueil détaillé, et disponible via {support}.")}
         ${champTexte("welcome_image", "Image de fond (URL)", "Grande image affichée dans l'embed — sert aussi de fond à la bannière.", false, "https://…/banniere.png")}
         ${champTexte("welcome_message", "Message de bienvenue", "Laissez vide pour laisser le style choisi composer le texte.", true, "Bienvenue sur {server}, {user} ! 🎉")}
+        ${aideBalises()}
       </div>
       <div class="mt-16">
         ${champBascule("welcome_fields", "Afficher les informations du membre", "Nom Discord, identifiant, numéro de membre et date de création du compte. Ignoré en style détaillé : l'information est déjà dans le texte.")}
@@ -1302,6 +1335,7 @@
         ${choixCadre("goodbye_avatar")}
         ${champTexte("goodbye_image", "Image de fond (URL)", "", false, "https://…/aurevoir.png")}
         ${champTexte("goodbye_message", "Message de départ", "", true, "{user.username} nous a quittés.")}
+        ${aideBalises()}
       </div>
       <div class="mt-16">${champBascule("goodbye_fields", "Afficher les informations du membre", "")}</div>`;
     return modulePanel("Arrivées & départs", "Salon, message et apparence complète de l'embed.", body, "arrivals");

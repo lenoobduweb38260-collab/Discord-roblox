@@ -1,6 +1,7 @@
 const { Events, EmbedBuilder } = require('discord.js');
 const { getGuildConfig } = require('../database');
 const { COLORS } = require('../utils/embeds');
+const balises = require('../utils/balises');
 
 const ts = (date, style = 'F') => `<t:${Math.floor(date.getTime() / 1000)}:${style}>`;
 
@@ -17,8 +18,11 @@ module.exports = {
     if (!channel?.isTextBased()) return;
 
     const joinedAt = member.joinedAt; // peut être inconnu si le membre n'était pas en cache
+    // Les balises d'abord : « && » devient une barre, « &> » une entrée de
+    // liste. Un pseudo contenant « && » ne doit pas être pris pour une balise,
+    // d'où l'ordre — balises, PUIS variables.
     const applyVars = (template) =>
-      template
+      balises.appliquer(template)
         .replace(/\{user\.username\}/g, member.user.username)
         .replace(/\{user\.mention\}|\{user\}/g, `<@${member.id}>`)
         .replace(/\{server\}/g, member.guild.name)

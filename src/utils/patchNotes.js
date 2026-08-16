@@ -731,6 +731,23 @@ const RELEASES = [
     fix: [],
     retrait: [],
   },
+  {
+    id: 'balises-barres-2026-08ae',
+    title: 'Tapez « && », le bot trace une barre 🏷️',
+    ajout: [
+      '🏷️ **Une mise en forme qui tient en quatre signes.** En debut de ligne : `&&` trace une barre, `&& Titre` trace une barre puis un titre de section ◆, `&>` fait une entree de liste ➜, `&&&` aere davantage. Plus besoin de connaitre la grammaire du bot pour ecrire un beau message',
+      '📐 **La barre est un vrai separateur** quand les cartes sont actives : Discord la trace lui-meme, sur toute la largeur, au lieu d\'une suite de tirets qui cassait sur telephone',
+      '📖 **Le rappel est la ou vous ecrivez** : encart avec exemple avant/apres sur le site, ligne de rappel dans l\'editeur d\'embed, et mention dans les options de `/preset`',
+    ],
+    amelioration: [
+      '🧩 Actif partout ou l\'on ecrit du texte : message d\'arrivee, message de depart, panneau de tickets, reponses types, editeur d\'embed',
+      '🛡️ **Votre code reste intact** : une balise n\'est lue qu\'en debut de ligne et jamais dans un bloc de code, donc un `if (a && b)` dans une reponse type n\'est pas coupe en deux',
+      '🧹 Une barre qui ne separe rien — en tete, en queue, ou deux d\'affilee — est retiree automatiquement',
+      '👤 Les balises sont appliquees avant les variables : un pseudo contenant « && » ne devient pas une barre au milieu du message',
+    ],
+    fix: [],
+    retrait: [],
+  },
 ];
 
 // Construit l'embed d'une note à partir d'une entrée { title, ajout, fix,

@@ -6,6 +6,7 @@ const {
 } = require('discord.js');
 const { db } = require('../database');
 const { COLORS } = require('./embeds');
+const balises = require('./balises');
 
 // 📋 Presets de tickets — des réponses toutes prêtes.
 // Le staff les écrit une fois (/preset ajouter), puis les envoie dans un
@@ -31,7 +32,10 @@ const MAX = 25; // limite d'options d'un menu déroulant Discord
 // Un preset peut être du texte simple, un embed, ou les deux.
 function payloadDe(preset, contexte = {}) {
   const remplacer = (t) =>
-    String(t || '')
+    // Les balises d'abord, les mentions ensuite : un nom de membre pourrait
+    // contenir « && » et deviendrait alors une barre au milieu du texte.
+    balises
+      .appliquer(String(t || ''))
       .replaceAll('{membre}', contexte.membre ? `<@${contexte.membre}>` : '')
       .replaceAll('{staff}', contexte.staff ? `<@${contexte.staff}>` : '')
       .replaceAll('{serveur}', contexte.serveur || '');

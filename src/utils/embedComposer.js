@@ -10,6 +10,7 @@ const {
   ChannelType,
   MessageFlags,
 } = require('discord.js');
+const balises = require('./balises');
 
 // Éditeur d'embed/message avec APERÇU EN DIRECT : le message affiché dans
 // l'éditeur (éphémère) est exactement celui qui sera envoyé. À chaque
@@ -23,7 +24,9 @@ function parseColor(v) {
   const m = String(v || '').trim().match(/^#?([0-9a-fA-F]{6})$/);
   return m ? parseInt(m[1], 16) : null;
 }
-const nl = (s) => (s ? String(s).replace(/\\n/g, '\n') : s);
+// Tout texte écrit par un membre passe par les balises : « && » devient une
+// barre, « &> » une entrée de liste. Un texte sans balise ressort identique.
+const nl = (s) => (s ? balises.appliquer(s) : s);
 
 // Construit le payload réel (contenu + embed) à partir de l'état.
 function render(state) {
@@ -72,7 +75,11 @@ function controls(id, state) {
 function editorPayload(id, state) {
   const preview = render(state);
   const { rows } = controls(id, state);
-  const header = `🔎 **Aperçu en direct** — voici exactement ce qui sera envoyé${state.targetChannelId ? ` dans <#${state.targetChannelId}>` : ''} :`;
+  // Le rappel des balises est là où l'on écrit : une mise en forme qu'on ne
+  // connaît pas ne sert à personne.
+  const header =
+    `🔎 **Aperçu en direct** — voici exactement ce qui sera envoyé${state.targetChannelId ? ` dans <#${state.targetChannelId}>` : ''} :\n` +
+    '-# 🏷️ En début de ligne : `&&` une barre · `&& Titre` une section · `&>` une entrée · `\\n` un saut de ligne';
   return {
     content: `${header}\n${preview.content || ''}`.slice(0, 2000),
     embeds: preview.embeds,

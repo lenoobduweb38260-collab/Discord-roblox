@@ -71,6 +71,33 @@ n'y touchait pas.
 prend la place de la signature. Un pied de page ne s'écrit que s'il ajoute une
 information : une page, un auteur, une date, un compte.
 
+## 1 bis. Balises — le texte libre écrit par les membres
+
+`src/utils/balises.js`. Partout où quelqu'un écrit du texte (message
+d'accueil, de départ, panneau de tickets, réponse type, éditeur d'embed), le
+texte passe par `balises.appliquer()`.
+
+| Tapé en début de ligne | Résultat |
+|---|---|
+| `&&` | une barre |
+| `&& Titre` | une barre puis `◆ **Titre**` |
+| `&&&` | une barre avec plus d'air |
+| `&> Texte` | `➜ Texte` |
+| `\n` | un retour à la ligne |
+
+La barre écrite est le **même filet** que celui de l'identité : en mode carte,
+`cartes.js` le reconnaît et le remplace par un séparateur natif. Une seule
+mécanique, les deux rendus.
+
+Trois règles à ne pas casser :
+
+- **Début de ligne uniquement**, et jamais dans un bloc de code ` ``` `. Sinon
+  un `if (a && b)` dans une réponse type serait coupé en deux.
+- **Les balises AVANT les variables.** Un pseudo contenant `&&` ne doit pas
+  devenir une barre.
+- **Aucune barre qui ne sépare rien** : en tête, en queue ou en double, elle
+  est retirée.
+
 ## 2. Grammaire des listes
 
 Utiliser `src/utils/miseEnPage.js` — ne pas réinventer la mise en forme.

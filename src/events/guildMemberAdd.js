@@ -1,6 +1,7 @@
 const { Events, EmbedBuilder } = require('discord.js');
 const { db, getGuildConfig } = require('../database');
 const { sendLog, logEmbed, COLORS } = require('../utils/embeds');
+const balises = require('../utils/balises');
 
 const getGlobalBan = db.prepare('SELECT * FROM global_bans WHERE user_id = ?');
 
@@ -76,8 +77,11 @@ module.exports = {
     // {regles} et {support} deviennent des liens vers les salons choisis dans
     // le site : écrire « lisez {regles} » suffit.
     const salonOu = (id, repli) => (id ? `<#${id}>` : repli);
+    // Les balises d'abord : « && » devient une barre, « &> » une entrée de
+    // liste. Un pseudo contenant « && » ne doit pas être pris pour une balise,
+    // d'où l'ordre — balises, PUIS variables.
     const applyVars = (template) =>
-      template
+      balises.appliquer(template)
         .replace(/\{user\.username\}/g, member.user.username)
         .replace(/\{user\.mention\}|\{user\}/g, `<@${member.id}>`)
         .replace(/\{server\}/g, member.guild.name)

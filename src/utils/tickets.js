@@ -15,6 +15,7 @@ const {
 const { db, getGuildConfig } = require('../database');
 const { COLORS, sendLog, logEmbed } = require('./embeds');
 const { GRADES, getGrade } = require('./permissions');
+const balises = require('./balises');
 
 const listTypes = db.prepare('SELECT * FROM ticket_types WHERE guild_id = ? ORDER BY id');
 const getType = db.prepare('SELECT * FROM ticket_types WHERE id = ? AND guild_id = ?');
@@ -89,7 +90,9 @@ function safeEmoji(raw) {
   return null;
 }
 
-const nl = (s) => (s ? String(s).replace(/\\n/g, '\n') : s);
+// Le panneau de tickets est écrit par le staff : il passe par les balises,
+// comme tout texte libre du bot.
+const nl = (s) => (s ? balises.appliquer(s) : s);
 
 // Construit le message du panneau (message basique OU embed personnalisable)
 // avec un bouton par type de ticket configuré.
