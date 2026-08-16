@@ -221,8 +221,18 @@ module.exports = {
     // parce que Discord fige la famille de composants à la création.
     const mode = interaction.options.getString('mode') === 'recreer' ? 'recreer' : 'modifier';
 
-    // Le travail dépasse largement les 3 s de Discord : on accuse réception.
+    // Le travail dépasse largement les 3 s de Discord : on accuse réception,
+    // en disant tout de suite où le compte rendu arrivera. Un balayage de
+    // plusieurs dizaines de salons peut dépasser la durée de vie de la
+    // réponse, et un écran muet passerait pour une commande plantée.
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+    await interaction
+      .editReply({
+        content:
+          '⏳ Balayage lancé sur **tous les serveurs** du bot.\n' +
+          '-# Le compte rendu s\'affichera ici, ou en message privé si le balayage dure plus que la réponse de la commande.',
+      })
+      .catch(() => null);
 
     const totaux = {
       examines: 0, retouches: 0, conformes: 0, echecs: 0, salonsIgnores: 0, recrees: 0,
@@ -235,31 +245,41 @@ module.exports = {
     let dernierPoint = 0;
     let interrompu = false;
 
-    // ⏳ Un jeton d'interaction Discord vit 15 minutes. Passé ce délai,
-    // editReply échoue — et comme l'échec est avalé, le message resterait sur
-    // « chargement » DÉFINITIVEMENT, sans jamais afficher le moindre résultat.
-    // C'est exactement ce qui se produisait sur un serveur un peu fourni :
-    // 100 messages par salon, 250 ms par modification, quelques dizaines de
-    // salons, et le compte est bon.
-    // On s'arrête donc AVANT, et on rend compte de ce qui a été fait.
-    const BUDGET = 13 * 60 * 1000;
-    const tempsEcoule = () => Date.now() - debut > BUDGET;
+    // ⏳ Un jeton d'interaction Discord vit 15 minutes : passé ce délai, le bot
+    // ne peut plus modifier sa réponse.
+    //
+    // Cette limite ne contraint QUE la réponse, pas le travail. On arrêtait
+    // donc le balayage à 13 minutes pour pouvoir encore afficher le compte
+    // rendu — au prix d'un balayage tronqué et d'un décompte anxiogène à
+    // l'écran. C'est l'inverse du bon arbitrage : un serveur fourni mérite
+    // d'être balayé en entier.
+    //
+    // Le balayage va donc jusqu'au bout, et le compte rendu arrive en message
+    // privé s'il est trop tard pour modifier la réponse. Plus de décompte.
+    const JETON = 14 * 60 * 1000;
+    const jetonVivant = () => Date.now() - debut < JETON;
 
-    // Compte rendu d'avancement. Appelé souvent — à chaque salon, à chaque
-    // lot de messages, à chaque modification — et non plus seulement quand
-    // un message change : sur un serveur où le bot a peu écrit, l'écran
-    // restait muet pendant tout le balayage.
+    // Garde-fou de dernier recours : un balayage ne doit pas tourner
+    // indéfiniment si l'API se met à répondre au ralenti. Une heure est très
+    // au-delà de tout balayage normal — c'est un filet, pas une échéance.
+    const GARDE_FOU = 60 * 60 * 1000;
+    const tempsEcoule = () => Date.now() - debut > GARDE_FOU;
+
+    // Compte rendu d'avancement, tant que la réponse peut être modifiée.
+    // Appelé à chaque salon et non plus seulement après une modification :
+    // sur un serveur où le bot a peu écrit, l'écran restait muet.
     const avancement = async (serveurEnCours, salonEnCours = null) => {
+      if (!jetonVivant()) return;
       if (Date.now() - dernierPoint < 5000) return;
       dernierPoint = Date.now();
-      const restant = Math.max(0, Math.round((BUDGET - (Date.now() - debut)) / 1000));
+      const ecoule = Math.round((Date.now() - debut) / 1000);
       await interaction
         .editReply({
           content:
             `⏳ **${serveurEnCours}**${salonEnCours ? ` · #${salonEnCours}` : ''} en cours…\n` +
             `${totaux.retouches} refait(s) · ${totaux.examines} embed(s) examiné(s) · ` +
             `${parServeur.length}/${interaction.client.guilds.cache.size} serveur(s)\n` +
-            `-# ${Math.floor(restant / 60)} min ${restant % 60} s avant l'arrêt automatique`,
+            `-# ${Math.floor(ecoule / 60)} min ${ecoule % 60} s écoulées · le compte rendu arrivera en message privé si l'affichage expire`,
         })
         .catch(() => null);
     };
@@ -418,7 +438,7 @@ module.exports = {
 
     if (interrompu) {
       blocs.push(M.bloc('Balayage interrompu', [
-        'Arrêté à **13 minutes** : au-delà, Discord invalide la réponse et ce compte rendu ne pourrait plus s\'afficher',
+        'Arrêté après **une heure** : c\'est un garde-fou, pas une échéance normale — l\'API répondait probablement au ralenti',
         'Les serveurs listés ci-dessous ont été traités ; relancez la commande pour continuer',
         'Astuce : réduisez l\'option **messages** pour aller plus vite par salon',
       ], { prefixe: '⏳', compte: null }));
@@ -449,16 +469,25 @@ module.exports = {
       entete = 'ℹ️ Rien à changer : les messages examinés portent déjà le style actuel. Ceux écrits par **un membre** ou **un autre bot** ne sont pas modifiables — Discord ne l\'autorise pas.';
     }
 
-    // ⚠️ Si le jeton a malgré tout expiré, editReply lève. Sans ce filet, la
-    // commande resterait sur « chargement » sans jamais rien afficher — c'est
-    // précisément le symptôme qu'on corrige ici.
-    return interaction.editReply({ embeds: [embed], content: entete }).catch(async () => {
-      console.warn('⚠️ /esthetique : réponse expirée, compte rendu envoyé en message privé.');
-      await interaction.user
-        .send({ content: `${entete}\n-# (la réponse de la commande avait expiré)`, embeds: [embed] })
-        .catch(() => null);
-      return null;
-    });
+    // 📬 Livraison du compte rendu.
+    //
+    // Si la réponse est encore modifiable, on l'affiche là où l'utilisateur
+    // l'attend. Sinon — balayage long — on l'envoie en privé : c'est ce qui
+    // permet au balayage d'aller jusqu'au bout au lieu de s'arrêter avant
+    // l'expiration du jeton.
+    const rendu = { embeds: [embed], content: entete };
+    if (jetonVivant()) {
+      const affiche = await interaction.editReply(rendu).then(() => true).catch(() => false);
+      if (affiche) return null;
+    }
+    const prive = await interaction.user
+      .send({ ...rendu, content: `${entete}\n-# Envoyé en privé : le balayage a duré plus longtemps que la réponse de la commande.` })
+      .then(() => true)
+      .catch(() => false);
+    if (!prive) {
+      console.warn('⚠️ /esthetique : compte rendu non remis (réponse expirée et messages privés fermés).');
+    }
+    return null;
   },
   // Exporté pour les tests.
   rehabiller,

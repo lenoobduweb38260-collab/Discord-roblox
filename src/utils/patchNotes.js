@@ -815,6 +815,21 @@ const RELEASES = [
     ],
     retrait: [],
   },
+  {
+    id: 'esthetique-sans-decompte-2026-08aj',
+    title: 'Plus de decompte sur /esthetique ⏱️',
+    ajout: [],
+    amelioration: [
+      '🏁 **Le balayage va jusqu\'au bout**, quel que soit le nombre de salons. Il s\'arretait a 13 minutes pour pouvoir encore afficher son compte rendu — la reponse d\'une commande Discord expirant au bout de 15 minutes. Mais cette limite ne contraint que l\'AFFICHAGE, pas le travail',
+      '📬 **Le compte rendu arrive en message prive** si le balayage a dure plus longtemps que la reponse. La destination est annoncee des le lancement, pour ne pas laisser croire a une commande plantee',
+      '⏱️ **Plus de decompte a l\'ecran** : il affichait le temps restant avant un arret qui n\'a plus lieu d\'etre. C\'est le temps ecoule qui s\'affiche desormais, avec le serveur et le salon en cours',
+      '🛟 Un garde-fou d\'une heure reste en place — c\'est un filet contre une API au ralenti, pas une echeance',
+    ],
+    fix: [],
+    retrait: [
+      '➖ L\'arret automatique a 13 minutes, qui tronquait les gros balayages',
+    ],
+  },
 ];
 
 // Construit l'embed d'une note à partir d'une entrée { title, ajout, fix,
