@@ -223,8 +223,15 @@ async function start() {
       GatewayIntentBits.MessageContent,
       GatewayIntentBits.GuildVoiceStates,
       GatewayIntentBits.GuildModeration,
+      // 🎭 Rôles à la réaction : sans cet intent, réagir à un panneau ne
+      // déclenche rien du tout. Il ne demande aucune autorisation
+      // privilégiée sur le portail développeur.
+      GatewayIntentBits.GuildMessageReactions,
     ],
-    partials: [Partials.GuildMember, Partials.Message, Partials.Channel],
+    // Reaction et User : un panneau publié avant le dernier redémarrage n'est
+    // pas en cache. Sans ces partiels, Discord n'envoie tout simplement pas
+    // l'événement — le panneau semblerait mort sans la moindre erreur.
+    partials: [Partials.GuildMember, Partials.Message, Partials.Channel, Partials.Reaction, Partials.User],
   });
 
   // 🎨 Identité visuelle des embeds, posée au seul passage obligé : la couche

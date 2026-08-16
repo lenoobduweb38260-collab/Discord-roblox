@@ -2524,7 +2524,7 @@
     { id: "cmd.ticket", cat: "⚙️ Configuration", label: "/ticket", desc: "Tickets : panneau, raisons, ouverture pour un membre", g: ["staff", "admin"] },
     { id: "cmd.esthetique", cat: "🤖 Équipe du bot", label: "/esthetique", desc: "Ré-applique l'esthétique du bot sur tous ses serveurs", g: ["createur"] },
     { id: "cmd.preset", cat: "⚙️ Configuration", label: "/preset", desc: "Réponses types envoyées dans les tickets", g: ["staff", "admin"] },
-    { id: "cmd.embed", cat: "⚙️ Configuration", label: "/embed", desc: "Composer un embed envoyé par le bot", g: ["staff", "admin"] },
+    { id: "cmd.embed", cat: "⚙️ Configuration", label: "/embed", desc: "Composer, modifier et poser des rôles au clic sur un message du bot", g: ["staff", "admin"] },
     { id: "cmd.reseaux", cat: "⚙️ Configuration", label: "/reseaux", desc: "Annonces automatiques des réseaux sociaux", g: ["staff", "admin"] },
     { id: "cmd.staff", cat: "⚙️ Configuration", label: "/arrivee · /depart", desc: "Annonces d'arrivée et de départ de poste", g: ["staff", "admin"] },
     { id: "cmd.partenariat", cat: "⚙️ Configuration", label: "/partenariat", desc: "Proposer et publier des partenariats", g: ["membre", "staff", "admin"] },

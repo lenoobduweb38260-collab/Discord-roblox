@@ -43,11 +43,19 @@ module.exports = {
 
     // ----- Éditeur d'embed avec aperçu en direct (/embed, patch notes…) -----
     if (
-      (interaction.isButton() || interaction.isChannelSelectMenu() || interaction.isModalSubmit()) &&
+      (interaction.isButton() || interaction.isChannelSelectMenu() || interaction.isRoleSelectMenu?.() || interaction.isModalSubmit()) &&
       (interaction.customId?.startsWith('emb:') || interaction.customId?.startsWith('embm:'))
     ) {
       if (!interaction.inGuild()) return;
       return require('../utils/embedComposer').handle(interaction);
+    }
+
+    // ----- Rôle au clic posé sur un message composé (/embed) -----
+    // L'identifiant porte le rôle : rien à relire en base, donc rien à perdre
+    // si le bot redémarre ou si le panneau est republié.
+    if (interaction.isButton() && interaction.customId?.startsWith('rr:')) {
+      if (!interaction.inGuild()) return;
+      return require('../utils/rolesAuClic').handleButton(interaction);
     }
 
     // ----- Boutons des interactions Nekotina (/interact) — serveurs ET MP -----

@@ -975,6 +975,25 @@ const RELEASES = [
     fix: [],
     retrait: [],
   },
+  {
+    id: 'embed-roles-modifier-2026-08at',
+    title: 'Roles au clic, messages modifiables, apercu qui ne ment plus 🎭',
+    ajout: [
+      '🎭 **Des roles au clic sur vos messages.** Dans `/embed`, choisissez jusqu\'a 5 roles : un bouton par role apparait sous la carte. Un clic donne le role, un second le retire, et le membre recoit la confirmation pour lui seul',
+      '✋ **Ou a la reaction**, pour qui prefere la facon historique : un bouton bascule entre les deux modes. Le bot pose les emojis lui-meme ; reagir donne le role, retirer sa reaction le rend',
+      '✏️ **`/embed modifier`** : rouvrez un message DEJA publie dans le meme editeur et corrigez-le. Le message garde ses reactions, ses reponses accrochees, ses epingles, les liens partages vers lui et sa date — republier detruisait tout cela',
+      '🧠 **Le texte source est memorise** a l\'envoi : rouvrir un message rend les `&&` et `&>` tels qu\'ils ont ete tapes, pas leur rendu. Sans cela chaque passage dans l\'editeur aurait abime un peu le message',
+      '✂️ **Un texte trop long part en plusieurs cartes** au lieu de retomber dans l\'ancien style. La coupe se fait entre deux blocs — jamais au milieu d\'une regle',
+    ],
+    amelioration: [
+      '📊 **Un compteur de signes** dans l\'editeur : on voit venir la limite au lieu de la decouvrir a l\'envoi',
+      '💬 Chaque refus dit quoi faire : role au-dessus du mien, role supprime, permission manquante, emoji absent en mode reaction',
+    ],
+    fix: [
+      '🩹 **L\'apercu de `/embed` montrait l\'ancien embed — barre coloree comprise — des que le texte devenait long.** Le decor de l\'editeur (ligne d\'explication, selecteurs, boutons) compte dans le budget d\'une carte : un reglement qui tenait une fois envoye depassait DANS l\'editeur, et l\'apercu mentait exactement sur ce qu\'il devait montrer. Le decor cede desormais la place au contenu',
+    ],
+    retrait: [],
+  },
 ];
 
 // Construit l'embed d'une note à partir d'une entrée { title, ajout, fix,

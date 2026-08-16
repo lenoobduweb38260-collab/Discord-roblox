@@ -418,6 +418,37 @@ CREATE TABLE IF NOT EXISTS criminal_records (
   by_id    TEXT NOT NULL,
   at       TEXT NOT NULL
 );
+
+-- 📝 Messages composés avec /embed : on garde le TEXTE SOURCE, celui qui a été
+-- tapé, pas le rendu. Un rendu ne se remonte pas : « ➜ » peut avoir été écrit
+-- à la main ou produit par « &> », et le filet tracé par la carte n'existe
+-- plus comme texte. Sans la source, /embed modifier repartirait d'une
+-- approximation et abîmerait le message à chaque passage.
+CREATE TABLE IF NOT EXISTS composed_messages (
+  guild_id   TEXT NOT NULL,
+  channel_id TEXT NOT NULL,
+  message_id TEXT NOT NULL,
+  author_id  TEXT,
+  state      TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT,
+  PRIMARY KEY (channel_id, message_id)
+);
+
+-- 🎭 Rôles au clic / à la réaction posés sur un message composé.
+-- La colonne mode vaut 'bouton' ou 'reaction' ; emoji ne sert qu'au second.
+CREATE TABLE IF NOT EXISTS role_actions (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  guild_id   TEXT NOT NULL,
+  channel_id TEXT NOT NULL,
+  message_id TEXT NOT NULL,
+  role_id    TEXT NOT NULL,
+  mode       TEXT NOT NULL,
+  emoji      TEXT,
+  label      TEXT,
+  position   INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_role_actions_msg ON role_actions (message_id);
 `);
 
 // Migration : ajoute les colonnes manquantes aux bases créées avant leur
