@@ -300,14 +300,25 @@ module.exports = {
       if (!rows.length) {
         return interaction.reply({ content: '❌ Aucune entreprise sur ce serveur.', flags: MessageFlags.Ephemeral });
       }
-      const lines = rows.map((e) => {
-        const types = JSON.parse(e.insurance_types || '[]');
-        return `🏢 **${e.name}** — assurance : ${e.insurance ? `✅ (${types.join(', ') || 'types à définir'})` : '❌'}`;
-      });
+      const M = require('../utils/miseEnPage');
+      // Deux sections : celles qui assurent, et les autres. Plus lisible
+      // qu'une longue liste où chaque ligne répète « assurance : ❌ ».
+      const assureurs = [];
+      const autres = [];
+      for (const e of rows) {
+        let types = [];
+        try { types = JSON.parse(e.insurance_types || '[]'); } catch {}
+        if (e.insurance) assureurs.push(`**${e.name}** — ${types.join(', ') || '*types à définir*'}`);
+        else autres.push(`**${e.name}**`);
+      }
       const embed = new EmbedBuilder()
         .setColor(COLORS.INFO)
-        .setTitle(`🏙️ Entreprises (${rows.length})`)
-        .setDescription(lines.join('\n'));
+        .setTitle('🏙️ Entreprises')
+        .setDescription(M.borner(M.description([
+          M.bloc('Assurance proposée', assureurs, { prefixe: '🛡️', motCompte: 'entreprise', vide: 'Aucune pour le moment' }),
+          M.bloc('Sans assurance', autres, { prefixe: '🏢', motCompte: 'entreprise', vide: 'Aucune' }),
+        ]), M.MAX_DESCRIPTION))
+        .setFooter({ text: M.piedDePage({ total: rows.length, motTotal: 'entreprise' }) });
       return interaction.reply({ embeds: [embed] });
     }
 

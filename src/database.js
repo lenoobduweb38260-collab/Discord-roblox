@@ -467,6 +467,7 @@ for (const column of [
   'embed_footer INTEGER',               // 1 = pied de page « bot • serveur »
   'embed_author INTEGER',               // 1 = ligne d'auteur avec l'icône du serveur
   'embed_ligne INTEGER',                // 1 = filet sous le titre
+  'embed_filet_taille INTEGER',         // longueur du filet (6 à 30, défaut 16)
   'embed_banniere TEXT',                // bannière large en bas de chaque embed
   'embed_timestamp INTEGER',            // 1 = horodatage automatique
   'embed_force_color INTEGER',          // 1 = couleur unique, 0 = couleurs par type
@@ -628,6 +629,7 @@ const DEFAULT_CONFIG = {
   embed_footer: 1,
   embed_author: 1,
   embed_ligne: 1,
+  embed_filet_taille: 16,
   embed_banniere: null,
   embed_timestamp: 1,
   embed_force_color: 0,

@@ -1160,6 +1160,7 @@
         ${champBascule("embed_timestamp", "Horodatage", "L'heure d'envoi sous chaque embed.")}
       </div>
       <div class="form-grid mt-16">
+        ${champNombre("embed_filet_taille", "📏 Longueur du filet", "Court volontairement : trop long, la ligne passe à la ligne sur téléphone et fait deux traits.", 6, 30, 16)}
         ${champTexte("embed_banniere", "🖼️ Bannière de bas de carte (URL)", "Image large affichée en bas de chaque embed, comme une signature visuelle. Laissez vide pour aucune. Un embed qui a déjà son image la garde.", false, "https://…/support.png")}
       </div>
       ${apercuIdentite(cfg)}`;

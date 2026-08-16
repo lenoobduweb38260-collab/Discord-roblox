@@ -14,7 +14,9 @@
 
 const PUCE = '◆';
 const FLECHE = '➜';
-const SEPARATEUR = '─'.repeat(28);
+// ⚠️ 16 signes, pas davantage : au-delà, la ligne repasse à la ligne sur
+// téléphone et donne deux traits superposés au lieu d'un filet net.
+const SEPARATEUR = '─'.repeat(16);
 
 // Limites Discord, à ne jamais dépasser.
 const MAX_DESCRIPTION = 4096;

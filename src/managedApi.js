@@ -109,6 +109,7 @@ function startManagedApi(client, baseDir) {
     embed_footer: 'b',
     embed_author: 'b',
     embed_ligne: 'b',
+    embed_filet_taille: 'n',
     embed_banniere: 's',
     embed_timestamp: 'b',
     embed_force_color: 'b',
@@ -128,6 +129,7 @@ function startManagedApi(client, baseDir) {
   const NUM_LIMITS = {
     xp_text: [1, 1000], xp_voice: [1, 1000], xp_cooldown: [5, 3600],
     captcha_max_essais: [1, 10],
+    embed_filet_taille: [6, 30],
   };
   // Nombre maximum d'identifiants par liste (défaut : 10).
   const LIST_LIMITS = { antispam_exempt_channels: 60, antispam_exempt_categories: 30 };

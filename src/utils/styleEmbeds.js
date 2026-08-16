@@ -12,8 +12,15 @@ const { getGuildConfig } = require('../database');
 // empêcherait le bot d'envoyer quoi que ce soit.
 
 const DEFAUT_ACCENT = '#5865F2';
-// Filet posé sous le titre. 28 signes = la largeur d'un embed sur téléphone.
-const FILET = '─'.repeat(28);
+// Filet posé sous le titre.
+// ⚠️ Leçon apprise : à 28 signes, la ligne DÉBORDE et repasse à la ligne sur
+// téléphone — deux traits l'un sous l'autre, l'effet inverse de celui voulu.
+// Discord n'offre pas de vrai trait horizontal : la largeur dépend de la
+// taille de police du lecteur, donc on reste volontairement court. Mieux vaut
+// un filet un peu plus étroit que l'embed qu'un filet cassé en deux.
+const FILET_DEFAUT = 16;
+const filetDe = (n) => '─'.repeat(Math.max(6, Math.min(30, Number(n) || FILET_DEFAUT)));
+const FILET = filetDe(FILET_DEFAUT);
 
 function versEntier(couleur) {
   const v = String(couleur || '').trim().replace(/^#/, '');
@@ -38,6 +45,7 @@ function reglages(guildId) {
     // vert = réussite…) ? Par défaut on garde le sens des couleurs.
     couleurUnique: Number(cfg.embed_force_color ?? 0) === 1,
     ligne: Number(cfg.embed_ligne ?? 1) === 1,
+    filet: filetDe(cfg.embed_filet_taille ?? FILET_DEFAUT),
     banniere: /^https?:\/\/\S+$/i.test(String(cfg.embed_banniere || '').trim())
       ? String(cfg.embed_banniere).trim()
       : null,
@@ -80,8 +88,9 @@ function styliserUn(embed, contexte) {
   // caractères de filet. 28 signes correspondent à la largeur d'un embed sur
   // téléphone — au-delà, la ligne passerait à la ligne et ferait un pâté.
   if (r.ligne && embed.title && typeof embed.description === 'string' && embed.description) {
-    if (!embed.description.startsWith(FILET)) {
-      const candidat = `${FILET}\n${embed.description}`;
+    // On reconnaît un filet déjà présent, quelle que soit sa longueur.
+    if (!/^─{6,}\n/.test(embed.description)) {
+      const candidat = `${r.filet}\n${embed.description}`;
       // On n'ajoute le filet que s'il reste de la place : mieux vaut pas de
       // ligne qu'une description tronquée par Discord.
       if (candidat.length <= 4096) embed.description = candidat;
@@ -185,4 +194,4 @@ function installer(client) {
   return true;
 }
 
-module.exports = { installer, appliquer, styliserUn, reglages, versEntier, guildeDe, listesDEmbeds, noterInteraction, DEFAUT_ACCENT, FILET };
+module.exports = { installer, appliquer, styliserUn, reglages, versEntier, guildeDe, listesDEmbeds, noterInteraction, DEFAUT_ACCENT, FILET, filetDe, FILET_DEFAUT };
