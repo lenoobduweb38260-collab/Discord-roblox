@@ -3,6 +3,7 @@ const { GRADES } = require('../utils/permissions');
 const { isCreator } = require('../utils/botTeam');
 const { reglages, versEntier, DEFAUT_ACCENT, styliserUn } = require('../utils/styleEmbeds');
 const { convertirCorps } = require('../utils/cartes');
+const { repondre } = require('../utils/reponse');
 const M = require('../utils/miseEnPage');
 
 // 🎨 Ré-applique l'identité visuelle aux messages DÉJÀ envoyés par le bot.
@@ -472,7 +473,10 @@ module.exports = {
     // l'expiration du jeton.
     const rendu = { embeds: [embed], content: entete };
     if (jetonVivant()) {
-      const affiche = await interaction.editReply(rendu).then(() => true).catch(() => false);
+      // ⚠️ `repondre` et non `editReply` : une MODIFICATION n'est jamais
+      // convertie en carte, et le compte rendu de la commande qui refait
+      // l'esthétique serait parti dans l'ancien style.
+      const affiche = await repondre(interaction, rendu);
       if (affiche) return null;
     }
     const prive = await interaction.user

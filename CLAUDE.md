@@ -46,7 +46,22 @@ Trois règles à ne jamais enfreindre :
 - **Seuls les ENVOIS sont convertis, jamais les modifications.** Discord fige
   la famille de composants d'un message à sa création : un embed ne devient
   pas une carte par `edit()`. Pour l'existant, `/esthetique appliquer
-  mode:recréer` republie — et perd réactions, réponses, liens et date.
+  mode:recréer` républie — et perd réactions, réponses, liens et date.
+
+  Conséquence à ne jamais oublier : `deferReply` **crée déjà le message**.
+  Répondre ensuite par `editReply` donne donc forcément un embed à l'ancienne,
+  barre colorée comprise. Toute commande qui diffère sa réponse doit passer
+  par `repondre()` (`src/utils/reponse.js`), qui referme le message d'attente
+  et envoie le contenu en `followUp` — un envoi, donc converti.
+
+  | Appel | Route | Converti ? |
+  |---|---|---|
+  | `reply()` | POST `/interactions/…/callback` | ✅ |
+  | `followUp()` | POST `/webhooks/…` | ✅ |
+  | `editReply()` | PATCH `/webhooks/…/@original` | ❌ jamais |
+
+  La seule exception légitime est un aperçu qui se rafraîchit en boucle
+  (l'éditeur d'IA) : le convertir enverrait un message par frappe.
 - **Toujours un repli.** Si l'API refuse (code 400), on rejoue la requête
   d'origine. Un message dans l'ancien style vaut infiniment mieux qu'aucun
   message. Après trois refus, on cesse d'insister.

@@ -2,6 +2,7 @@ const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js'
 const { COLORS } = require('../utils/embeds');
 const { GRADES } = require('../utils/permissions');
 const music = require('../utils/music');
+const { repondre } = require('../utils/reponse');
 
 const UNAVAILABLE =
   '❌ Le module musique n\'est pas disponible sur cet hébergement (dépendances audio absentes). ' +
@@ -35,7 +36,9 @@ module.exports = {
           .setColor(COLORS.SUCCESS)
           .setTitle(position === 1 ? '▶️ Lecture' : '➕ Ajouté à la file')
           .setDescription(`**${song.title}**${position > 1 ? `\nPosition dans la file : ${position}` : ''}`);
-        return interaction.editReply({ embeds: [embed] });
+        // repondre : sans elle, la réponse partirait en embed classique —
+        // editReply est une MODIFICATION, jamais convertie en carte.
+        return repondre(interaction, { embeds: [embed] });
       }
       if (sub === 'skip') return interaction.reply({ content: music.skip(interaction.guildId) ? '⏭️ Morceau passé.' : '❌ Rien en lecture.' });
       if (sub === 'stop') return interaction.reply({ content: music.stop(interaction.guildId) ? '⏹️ Arrêté, à bientôt !' : '❌ Rien en lecture.' });

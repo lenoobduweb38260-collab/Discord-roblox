@@ -2,6 +2,7 @@ const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js'
 const { db, RP_SCOPE } = require('../database');
 const { COLORS } = require('../utils/embeds');
 const { GRADES, getGrade } = require('../utils/permissions');
+const { repondre } = require('../utils/reponse');
 
 // /temps : un gérant consulte les temps de service des membres de SA faction.
 // Une faction est soit une entreprise (patrons = gérants), soit un rôle métier
@@ -169,6 +170,7 @@ module.exports = {
         text: `${rows.length} membre(s) · cumul 7 jours : ${formatDuration(totalWeek)} · 🟢 = en service actuellement`,
       });
     if (rows.length > 25) embed.setDescription(lines.join('\n') + `\n… et ${rows.length - 25} autre(s)`);
-    return interaction.editReply({ embeds: [embed] });
+    // Carte et non embed : editReply seul ne serait jamais converti.
+    return repondre(interaction, { embeds: [embed] });
   },
 };

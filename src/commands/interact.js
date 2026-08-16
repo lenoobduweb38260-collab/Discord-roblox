@@ -10,6 +10,7 @@ const {
 } = require('discord.js');
 const { db } = require('../database');
 const { GRADES } = require('../utils/permissions');
+const { repondre } = require('../utils/reponse');
 
 // Interactions façon Nekotina : GIF anime, compteur par duo, boutons
 // « Rendre » / « Rejeter », badges par paliers envoyés en MP, et textes
@@ -380,7 +381,8 @@ module.exports = {
     const withButtons = target.id !== interaction.client.user.id;
     const payload = await buildInteractionMessage(interaction, actionKey, interaction.user, target, withButtons, lang);
     if (!withButtons) payload.content = L.botAccept;
-    await interaction.editReply(payload);
+    // Carte et non embed : editReply seul ne serait jamais converti.
+    await repondre(interaction, payload);
   },
 
   // Boutons « Rendre » / « Rejeter » — réservés à la personne visée, dans SA langue.

@@ -195,6 +195,10 @@ async function handle(interaction) {
   } catch (err) {
     return interaction.followUp({ content: `❌ Régénération impossible : ${err.message}`, flags: MessageFlags.Ephemeral }).catch(() => null);
   }
+  // ⚠️ Volontairement une MODIFICATION, donc un embed classique et non une
+  // carte : cet aperçu se rafraîchit à chaque réglage. Le convertir
+  // enverrait un nouveau message à chaque changement au lieu de mettre à
+  // jour celui-ci. Ici, l'ancien style est le bon choix.
   await interaction.editReply({ embeds: [buildEmbed(state)], components: buildComponents(id, state) });
 }
 

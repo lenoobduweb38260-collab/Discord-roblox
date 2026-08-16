@@ -833,6 +833,19 @@ const RELEASES = [
       '➖ Le garde-fou d\'une heure, qui abandonnait le travail en cours',
     ],
   },
+  {
+    id: 'reponses-differees-2026-08ak',
+    title: 'Les commandes lentes rendaient encore de vieux embeds 🩹',
+    ajout: [],
+    amelioration: [
+      '🃏 **Le compte rendu de `/esthetique` est enfin une carte**, comme tout le reste — c\'etait le comble pour la commande qui refait l\'esthetique',
+    ],
+    fix: [
+      '🩹 **Toute commande qui travaille plus de 3 secondes rendait un embed a l\'ancienne**, barre coloree comprise. La raison etait invisible sans regarder la couche reseau : `deferReply` cree deja le message (« reflechit… »), et Discord fige la famille de composants d\'un message a sa creation. Tout ce qui arrivait ensuite par modification ne pouvait donc plus etre une carte',
+      '🩹 Corrige sur `/esthetique`, `/musique`, `/temps` et les interactions RP : le message d\'attente est referme, et le contenu part en envoi — donc en carte',
+    ],
+    retrait: [],
+  },
 ];
 
 // Construit l'embed d'une note à partir d'une entrée { title, ajout, fix,
