@@ -924,6 +924,23 @@ const RELEASES = [
     fix: [],
     retrait: [],
   },
+  {
+    id: 'esthetique-un-message-2026-08aq',
+    title: 'Refaire UN message precis : `/esthetique message` 🎯',
+    ajout: [
+      '🎯 **Nouvelle sous-commande `/esthetique message`** : plus besoin de balayer tous les serveurs pour reprendre un seul panneau',
+      '🔗 **Par lien** : clic droit sur le message → « Copier le lien » → collez-le dans l\'option `lien`. La paire « salon-message » du bouton « Copier l\'ID » marche aussi',
+      '📋 **Par selection** : sans lien, le bot demande le salon puis propose les messages — **uniquement les siens**, avec leur titre et leur date de publication',
+      '🎛️ Les options **mode** et **couleurs** de `appliquer` sont disponibles ici aussi',
+    ],
+    amelioration: [
+      '🚫 **Les messages intouchables ne sont pas proposes** : ceux d\'un membre, ceux d\'un autre bot, et ceux deja en carte. Proposer un choix qui ne peut que refuser n\'aide personne',
+      '💬 **Chaque refus dit pourquoi et quoi faire** : message d\'un autre auteur, deja converti, identite desactivee, lien mal copie, salon hors de portee',
+      '🔁 Le lien du message traite est rappele dans la reponse : un clic pour verifier le resultat',
+    ],
+    fix: [],
+    retrait: [],
+  },
 ];
 
 // Construit l'embed d'une note à partir d'une entrée { title, ajout, fix,

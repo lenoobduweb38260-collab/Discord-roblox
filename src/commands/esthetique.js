@@ -1,9 +1,12 @@
-const { SlashCommandBuilder, EmbedBuilder, MessageFlags, ChannelType, PermissionFlagsBits } = require('discord.js');
+const {
+  SlashCommandBuilder, EmbedBuilder, MessageFlags, ChannelType, PermissionFlagsBits,
+  ActionRowBuilder, ChannelSelectMenuBuilder, StringSelectMenuBuilder,
+} = require('discord.js');
 const { GRADES } = require('../utils/permissions');
 const { isCreator } = require('../utils/botTeam');
 const { reglages, versEntier, DEFAUT_ACCENT, styliserUn } = require('../utils/styleEmbeds');
-const { convertirCorps } = require('../utils/cartes');
-const { repondre } = require('../utils/reponse');
+const { convertirCorps, DRAPEAU_V2 } = require('../utils/cartes');
+const { repondre, mettreAJour } = require('../utils/reponse');
 const { etatCartes } = require('../utils/styleEmbeds');
 const { db } = require('../database');
 
@@ -256,6 +259,226 @@ async function etatEsthetique(interaction) {
   return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
 }
 
+
+// ══════════════════════════════════════════════════════════════════
+// 🎯 /esthetique message — refaire UN message précis
+// ══════════════════════════════════════════════════════════════════
+//
+// Deux entrées, parce qu'aucune ne suffit seule :
+//   • le LIEN, quand on sait exactement quel message reprendre (clic droit →
+//     « Copier le lien du message ») ;
+//   • la SÉLECTION, quand on ne l'a pas sous la main : on choisit un salon,
+//     puis le message dans une liste qui n'affiche que ceux du bot.
+
+// Reconnaît un message à partir de ce qu'on peut copier depuis Discord :
+// le lien complet, ou la paire « salon-message » du bouton « Copier l'ID ».
+function lireLien(brut) {
+  const t = String(brut || '').trim();
+  const lien = /(?:^|\/)channels\/(\d+|@me)\/(\d+)\/(\d+)/.exec(t);
+  if (lien) return { guildId: lien[1] === '@me' ? null : lien[1], salonId: lien[2], messageId: lien[3] };
+  const paire = /^(\d{17,20})[-\s]+(\d{17,20})$/.exec(t);
+  if (paire) return { guildId: null, salonId: paire[1], messageId: paire[2] };
+  return null;
+}
+
+// Un libellé lisible pour la liste déroulante : le titre de la carte, sinon
+// le début du texte. Discord limite à 100 signes.
+function libelleMessage(message) {
+  const e = message.embeds?.[0];
+  const brut =
+    e?.title ||
+    e?.description?.split('\n').find((l) => l.trim() && !/^[\s─#>-]*$/.test(l)) ||
+    message.content ||
+    'Message sans titre';
+  const propre = String(brut).replace(/[*_`~#>]/g, '').replace(/\s+/g, ' ').trim();
+  return propre.slice(0, 90) || 'Message sans titre';
+}
+
+// Le travail lui-même, commun aux deux entrées.
+async function refaireUnMessage(interaction, message, { mode, couleurs }) {
+  if (message.author.id !== interaction.client.user.id) {
+    return {
+      ok: false,
+      texte:
+        '⛔ Ce message n\'a pas été écrit par le bot.\n' +
+        '-# Discord ne laisse un bot modifier que ses propres messages — ceux d\'un membre ou d\'un autre bot sont hors de portée.',
+    };
+  }
+  if (!message.embeds?.length) {
+    const dejaCarte = Number(message.flags?.bitfield ?? 0) & DRAPEAU_V2;
+    return {
+      ok: false,
+      texte: dejaCarte
+        ? '✅ Ce message est **déjà une carte** : il n\'y a rien à refaire.'
+        : 'ℹ️ Ce message ne contient aucun embed — il n\'y a pas d\'habillage à reprendre.',
+    };
+  }
+
+  const guild = message.guild;
+  const r = reglages(guild.id);
+  if (!r.actif) return { ok: false, texte: '⚠️ L\'identité visuelle est **désactivée** sur ce serveur : rien ne serait appliqué.' };
+
+  const contexte = {
+    reglages: { ...r, accent: r.accent ?? versEntier(DEFAUT_ACCENT) },
+    bot: interaction.client.user.username,
+    serveur: guild.name,
+    icone: guild.iconURL({ size: 64 }) || null,
+    couleurs,
+  };
+
+  const nouveaux = [];
+  let change = false;
+  for (const embed of message.embeds) {
+    const json = embed.toJSON ? embed.toJSON() : { ...embed.data };
+    const refait = rehabiller(json, contexte, message.createdAt);
+    if (refait) { change = true; nouveaux.push(refait); } else nouveaux.push(json);
+  }
+
+  if (mode === 'recreer' && r.cartes) {
+    const recree = await recreerEnCarte(message, nouveaux, r);
+    if (recree === true) {
+      return { ok: true, texte: '♻️ Message **recréé en carte**.\n-# Réactions, réponses accrochées et liens vers l\'ancien message sont perdus — c\'était le prix de la conversion.' };
+    }
+    if (recree === false) {
+      return { ok: false, texte: '❌ Recréation impossible : vérifiez que le bot peut **écrire** et **supprimer** dans ce salon.' };
+    }
+    // null → non convertible : on retombe sur la modification.
+  }
+
+  if (!change) {
+    return {
+      ok: true,
+      texte:
+        r.cartes && mode !== 'recreer'
+          ? 'ℹ️ Ce message porte déjà le style actuel.\n-# Il garde sa barre colorée car un embed déjà envoyé ne peut pas devenir une carte : utilisez **mode : Recréer**.'
+          : 'ℹ️ Ce message porte déjà le style actuel.',
+    };
+  }
+
+  const ok = await message.edit({ embeds: nouveaux }).then(() => true).catch(() => false);
+  if (!ok) return { ok: false, texte: '❌ Modification refusée par Discord — le message a peut-être été supprimé entre-temps.' };
+  return {
+    ok: true,
+    texte:
+      '✅ Message **refait sur place** : réactions, épingles et liens conservés.' +
+      (r.cartes ? '\n-# Il garde sa barre colorée : seul **mode : Recréer** peut en faire une carte.' : ''),
+  };
+}
+
+// Point d'entrée de la sous-commande.
+async function unMessage(interaction) {
+  const mode = interaction.options.getString('mode') === 'recreer' ? 'recreer' : 'modifier';
+  const couleurs = interaction.options.getString('couleurs') || 'garder';
+  const lien = interaction.options.getString('lien');
+
+  // ── Entrée 1 : un lien ──
+  if (lien) {
+    const cible = lireLien(lien);
+    if (!cible) {
+      return interaction.reply({
+        content:
+          '❌ Lien non reconnu.\n' +
+          '-# Clic droit sur le message → **Copier le lien du message**. Format attendu : `https://discord.com/channels/…/…/…`',
+        flags: MessageFlags.Ephemeral,
+      });
+    }
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+    const salon = await interaction.client.channels.fetch(cible.salonId).catch(() => null);
+    if (!salon?.isTextBased?.()) {
+      return interaction.editReply('❌ Salon introuvable, ou le bot n\'y a pas accès.');
+    }
+    const message = await salon.messages.fetch(cible.messageId).catch(() => null);
+    if (!message) return interaction.editReply('❌ Message introuvable : supprimé, ou hors de portée du bot.');
+    const res = await refaireUnMessage(interaction, message, { mode, couleurs });
+    return interaction.editReply(`${res.texte}\n-# ${message.url}`);
+  }
+
+  // ── Entrée 2 : la sélection ──
+  return interaction.reply({
+    content:
+      '🎯 **Dans quel salon se trouve le message ?**\n' +
+      `-# Mode **${mode === 'recreer' ? 'recréer' : 'modifier'}** · couleurs **${couleurs}**. Seuls les messages du bot seront proposés.`,
+    components: [
+      new ActionRowBuilder().addComponents(
+        new ChannelSelectMenuBuilder()
+          .setCustomId(`esthsalon:${mode}:${couleurs}`)
+          .setPlaceholder('Choisissez un salon…')
+          .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement)
+          .setMinValues(1)
+          .setMaxValues(1)
+      ),
+    ],
+    flags: MessageFlags.Ephemeral,
+  });
+}
+
+// Salon choisi → on propose les messages du bot qui ont un embed.
+async function choisirMessage(interaction, mode, couleurs) {
+  const salonId = interaction.values[0];
+  const salon = await interaction.client.channels.fetch(salonId).catch(() => null);
+  if (!salon?.isTextBased?.()) {
+    return mettreAJour(interaction, { content: '❌ Salon illisible pour le bot.', components: [] });
+  }
+
+  const lot = await salon.messages.fetch({ limit: 100 }).catch(() => null);
+  // Uniquement les siens, et uniquement ceux qui ont quelque chose à refaire :
+  // proposer un message intouchable ne mènerait qu'à un refus.
+  const candidats = [...(lot?.values() || [])]
+    .filter((m) => m.author.id === interaction.client.user.id && m.embeds?.length)
+    .slice(0, 25);
+
+  if (!candidats.length) {
+    return mettreAJour(interaction, {
+      content:
+        `ℹ️ Aucun message du bot avec un embed dans <#${salonId}> (100 derniers messages).\n` +
+        '-# Les messages déjà en carte n\'apparaissent pas : ils n\'ont rien à refaire.',
+      components: [],
+    });
+  }
+
+  return mettreAJour(interaction, {
+    content:
+      `🎯 **Quel message refaire dans <#${salonId}> ?**\n` +
+      `-# ${candidats.length} message(s) du bot · mode **${mode === 'recreer' ? 'recréer' : 'modifier'}**`,
+    components: [
+      new ActionRowBuilder().addComponents(
+        new StringSelectMenuBuilder()
+          .setCustomId(`esthmsg:${mode}:${couleurs}`)
+          .setPlaceholder('Choisissez le message…')
+          .addOptions(
+            candidats.map((m) => ({
+              label: libelleMessage(m),
+              value: `${m.channelId}-${m.id}`,
+              description: `Publié le ${m.createdAt.toLocaleDateString('fr-FR')} à ${m.createdAt.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`,
+            }))
+          )
+      ),
+    ],
+  });
+}
+
+// Message choisi → on le refait.
+async function appliquerAUnMessage(interaction, mode, couleurs) {
+  const [salonId, messageId] = String(interaction.values[0]).split('-');
+  const salon = await interaction.client.channels.fetch(salonId).catch(() => null);
+  const message = salon?.isTextBased?.() ? await salon.messages.fetch(messageId).catch(() => null) : null;
+  if (!message) {
+    return mettreAJour(interaction, { content: '❌ Message introuvable : il a pu être supprimé entre-temps.', components: [] });
+  }
+  const res = await refaireUnMessage(interaction, message, { mode, couleurs });
+  return mettreAJour(interaction, { content: `${res.texte}\n-# ${message.url}`, components: [] });
+}
+
+// Aiguillage des composants de la sous-commande.
+async function handleComposant(interaction) {
+  const [prefixe, mode, couleurs] = interaction.customId.split(':');
+  if (!(await isCreator(interaction.client, interaction.user.id))) {
+    return interaction.reply({ content: '⛔ Réservé au créateur du bot.', flags: MessageFlags.Ephemeral });
+  }
+  if (prefixe === 'esthsalon') return choisirMessage(interaction, mode, couleurs);
+  if (prefixe === 'esthmsg') return appliquerAUnMessage(interaction, mode, couleurs);
+}
+
 // ♻️ Republie un message sous forme de carte sans bordure, puis efface
 // l'ancien.
 //
@@ -354,6 +577,37 @@ module.exports = {
     )
     .addSubcommand((sub) =>
       sub.setName('status').setDescription('Où en est l\'esthétique du bot : réglages, cartes, dernier passage')
+    )
+    .addSubcommand((sub) =>
+      sub
+        .setName('message')
+        .setDescription('Refaire UN message précis, par lien ou par sélection')
+        .addStringOption((o) =>
+          o
+            .setName('lien')
+            .setDescription('Lien du message (clic droit → Copier le lien). Vide = choisir dans une liste')
+            .setRequired(false)
+        )
+        .addStringOption((o) =>
+          o
+            .setName('mode')
+            .setDescription('Comment traiter ce message ?')
+            .setRequired(false)
+            .addChoices(
+              { name: 'Modifier sur place — garde réactions, épingles et liens', value: 'modifier' },
+              { name: 'Recréer en carte sans bordure — perd réactions et liens', value: 'recreer' }
+            )
+        )
+        .addStringOption((o) =>
+          o
+            .setName('couleurs')
+            .setDescription('Que faire de la couleur existante ?')
+            .setRequired(false)
+            .addChoices(
+              { name: 'Garder celle qui a un sens (rouge = sanction…)', value: 'garder' },
+              { name: 'Uniformiser sur la couleur d\'accent', value: 'uniformiser' }
+            )
+        )
     ),
 
   async execute(interaction) {
@@ -366,7 +620,9 @@ module.exports = {
       });
     }
 
-    if (interaction.options.getSubcommand() === 'status') return etatEsthetique(interaction);
+    const sousCommande = interaction.options.getSubcommand();
+    if (sousCommande === 'status') return etatEsthetique(interaction);
+    if (sousCommande === 'message') return unMessage(interaction);
 
     const limite = interaction.options.getInteger('messages') || 100;
     const couleurs = interaction.options.getString('couleurs') || 'garder';
@@ -659,4 +915,7 @@ module.exports = {
   rehabiller,
   piedDIdentite,
   normaliserFilets,
+  lireLien,
+  libelleMessage,
+  handleComposant,
 };

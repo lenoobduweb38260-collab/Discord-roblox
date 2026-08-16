@@ -154,6 +154,15 @@ module.exports = {
       return handleTicketButton(interaction);
     }
 
+    // ----- /esthetique message : choix du salon puis du message -----
+    if (
+      (interaction.isChannelSelectMenu?.() || interaction.isStringSelectMenu()) &&
+      /^esth(salon|msg):/.test(interaction.customId || '')
+    ) {
+      if (!interaction.inGuild()) return;
+      return require('../commands/esthetique').handleComposant(interaction);
+    }
+
     // ----- Panneau central de configuration (/config) -----
     if (
       (interaction.isButton() || interaction.isAnySelectMenu() || interaction.isModalSubmit()) &&
