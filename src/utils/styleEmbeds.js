@@ -12,6 +12,8 @@ const { getGuildConfig } = require('../database');
 // empêcherait le bot d'envoyer quoi que ce soit.
 
 const DEFAUT_ACCENT = '#5865F2';
+// Filet posé sous le titre. 28 signes = la largeur d'un embed sur téléphone.
+const FILET = '─'.repeat(28);
 
 function versEntier(couleur) {
   const v = String(couleur || '').trim().replace(/^#/, '');
@@ -35,6 +37,10 @@ function reglages(guildId) {
     // Couleur unique partout, ou couleurs par type (rouge = sanction,
     // vert = réussite…) ? Par défaut on garde le sens des couleurs.
     couleurUnique: Number(cfg.embed_force_color ?? 0) === 1,
+    ligne: Number(cfg.embed_ligne ?? 1) === 1,
+    banniere: /^https?:\/\/\S+$/i.test(String(cfg.embed_banniere || '').trim())
+      ? String(cfg.embed_banniere).trim()
+      : null,
   };
 }
 
@@ -65,6 +71,28 @@ function styliserUn(embed, contexte) {
   if (r.ligneAuteur && !embed.author?.name && contexte.serveur) {
     embed.author = { name: contexte.serveur };
     if (contexte.icone) embed.author.icon_url = contexte.icone;
+  }
+
+  // ── Filet sous le titre ──────────────────────────────────────────
+  // C'est LUI qui fait la différence entre un embed brut de Discord et une
+  // carte soignée : une ligne fine qui sépare le titre du corps.
+  // Discord n'a pas de « trait horizontal » : on le dessine avec des
+  // caractères de filet. 28 signes correspondent à la largeur d'un embed sur
+  // téléphone — au-delà, la ligne passerait à la ligne et ferait un pâté.
+  if (r.ligne && embed.title && typeof embed.description === 'string' && embed.description) {
+    if (!embed.description.startsWith(FILET)) {
+      const candidat = `${FILET}\n${embed.description}`;
+      // On n'ajoute le filet que s'il reste de la place : mieux vaut pas de
+      // ligne qu'une description tronquée par Discord.
+      if (candidat.length <= 4096) embed.description = candidat;
+    }
+  }
+
+  // ── Bannière de bas de carte ─────────────────────────────────────
+  // L'image large qui termine les embeds (« SUPPORT — CARRÉ RP »). Posée
+  // seulement si l'embed n'a pas déjà une image à lui.
+  if (r.banniere && !embed.image?.url) {
+    embed.image = { url: r.banniere };
   }
 
   if (r.horodatage && !embed.timestamp) embed.timestamp = new Date().toISOString();
@@ -157,4 +185,4 @@ function installer(client) {
   return true;
 }
 
-module.exports = { installer, appliquer, styliserUn, reglages, versEntier, guildeDe, listesDEmbeds, noterInteraction, DEFAUT_ACCENT };
+module.exports = { installer, appliquer, styliserUn, reglages, versEntier, guildeDe, listesDEmbeds, noterInteraction, DEFAUT_ACCENT, FILET };

@@ -1156,7 +1156,11 @@
           "⚠️ Désactivé, les couleurs qui portent un sens sont conservées : rouge pour une sanction, vert pour une réussite, orange pour un avertissement. Activé, tout devient votre couleur d'accent.")}
         ${champBascule("embed_author", "Ligne d'identité en haut", "Le nom et l'icône du serveur, au-dessus du titre. Une ligne d'auteur porteuse de sens (« Avis de @membre ») n'est jamais remplacée.")}
         ${champBascule("embed_footer", "Signature en pied de page", "« NomDuBot • NomDuServeur », avec l'icône du serveur. Un pied de page déjà écrit par le bot n'est jamais remplacé.")}
+        ${champBascule("embed_ligne", "Filet sous le titre", "La fine ligne qui sépare le titre du texte — c'est elle qui donne l'allure « carte » au lieu d'un embed brut.")}
         ${champBascule("embed_timestamp", "Horodatage", "L'heure d'envoi sous chaque embed.")}
+      </div>
+      <div class="form-grid mt-16">
+        ${champTexte("embed_banniere", "🖼️ Bannière de bas de carte (URL)", "Image large affichée en bas de chaque embed, comme une signature visuelle. Laissez vide pour aucune. Un embed qui a déjà son image la garde.", false, "https://…/support.png")}
       </div>
       ${apercuIdentite(cfg)}`;
     return modulePanel("Identité des embeds", "L'apparence commune à tous les messages du bot.", body, "identite");
@@ -1187,7 +1191,10 @@
               <div class="dc-embed-corps">
                 ${actif && Number(cfg.embed_author ?? 1) === 1 ? `<div class="dc-auteur">Votre serveur</div>` : ""}
                 <div class="dc-titre">${esc(x.titre)}</div>
+                ${actif && Number(cfg.embed_ligne ?? 1) === 1 ? `<div class="dc-filet"></div>` : ""}
                 <div class="dc-desc">${esc(x.texte)}</div>
+                ${actif && /^https?:\/\//.test(String(cfg.embed_banniere || "").trim())
+                  ? `<img class="dc-image" src="${esc(String(cfg.embed_banniere).trim())}" alt="" onerror="this.style.display='none'">` : ""}
                 ${actif && pied ? `<div class="dc-pied">Votre bot • Votre serveur${heure ? " • aujourd'hui à 18:17" : ""}</div>` : ""}
               </div>
             </div>

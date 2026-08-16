@@ -15,6 +15,8 @@ message privé, webhook. Rien à faire dans le code d'une nouvelle commande.
 | Ligne d'auteur | nom + icône du serveur |
 | Pied de page | `NomDuBot • NomDuServeur` + icône |
 | Horodatage | l'heure d'envoi |
+| Filet | une ligne fine sous le titre (`embed_ligne`) |
+| Bannière | image large en bas de carte (`embed_banniere`) |
 
 **Ne jamais écraser ce qui porte du sens.** Une couleur posée volontairement
 (rouge = sanction, vert = réussite), un pied de page utile (`Page 2/4`,

@@ -646,6 +646,20 @@ const RELEASES = [
     fix: [],
     retrait: [],
   },
+  {
+    id: 'embeds-carte-2026-08z',
+    title: 'Des embeds qui ne ressemblent plus a ceux de Discord 🖼️',
+    ajout: [
+      '📏 **Filet sous le titre** sur chaque embed : la fine ligne qui separe le titre du texte, celle qui donne l\'allure « carte » au lieu d\'un bloc brut',
+      '🖼️ **Banniere de bas de carte** : une image large qui termine chaque embed, comme une signature visuelle. Un embed qui a deja son image la garde',
+    ],
+    amelioration: [
+      '🎛️ Les deux se reglent depuis le site, avec un apercu de trois messages cote a cote — plus besoin de s\'occuper des couleurs message par message',
+      '🛟 Le filet n\'est pose que s\'il reste de la place : jamais au prix d\'un texte tronque',
+    ],
+    fix: [],
+    retrait: [],
+  },
 ];
 
 // Découpe une catégorie en champs d'embed (max 1024 caractères par champ).

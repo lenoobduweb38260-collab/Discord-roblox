@@ -108,6 +108,8 @@ function startManagedApi(client, baseDir) {
     embed_accent: 's',
     embed_footer: 'b',
     embed_author: 'b',
+    embed_ligne: 'b',
+    embed_banniere: 's',
     embed_timestamp: 'b',
     embed_force_color: 'b',
     welcome_style: 's',
