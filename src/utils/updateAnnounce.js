@@ -124,8 +124,7 @@ async function checkReadyUpdate(client) {
           '• Sinon, elle sera installée automatiquement au **prochain redémarrage** du bot.\n\n' +
           '_Ce message disparaîtra automatiquement une fois la mise à jour installée._'
       )
-      .setTimestamp()
-      .setFooter({ text: 'Annonce automatique de mise à jour' });
+      .setTimestamp();
     const sent = await broadcast(client, embed, { track: true });
     setState.run('update_ready_msgs', JSON.stringify(sent));
     console.log(`📦 Mise à jour ${latest} annoncée au staff de chaque serveur.`);
@@ -147,8 +146,7 @@ async function announceInstalled(client) {
     .setColor(0x2ecc71)
     .setTitle('✅ Mise à jour installée')
     .setDescription(`Le bot vient d'être mis à jour : **${last} → ${current}**. Tout est en ligne !`)
-    .setTimestamp()
-    .setFooter({ text: 'Annonce automatique de mise à jour' });
+    .setTimestamp();
   await broadcast(client, embed);
   console.log(`✅ Installation de ${current} annoncée au staff de chaque serveur.`);
 }

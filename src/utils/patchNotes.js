@@ -18,6 +18,7 @@
 
 const { EmbedBuilder } = require('discord.js');
 const { db, getGuildConfig } = require('../database');
+const M = require('./miseEnPage');
 
 const IMMEDIATE = '⚡ **Ces changements prennent effet immédiatement.**';
 
@@ -696,48 +697,104 @@ const RELEASES = [
     ],
     retrait: [],
   },
+  {
+    id: 'da-couleurs-neutres-2026-08ac',
+    title: 'Cette note est la premiere a porter le nouveau style 🎨',
+    ajout: [
+      '🎨 **La note de mise a jour passe a la direction artistique** : sections `◆` / `➜` au lieu de la grille de champs grise, filet entre les rubriques, accent du serveur, signature du bot. C\'est le message que vous voyez le plus souvent : c\'etait a lui de montrer l\'exemple',
+    ],
+    amelioration: [
+      '🎯 **Une couleur neutre n\'est plus prise pour un choix.** Le bleu de Discord, le bleu « info », les gris de carte, le noir et le blanc etaient poses faute de mieux — mais l\'identite les voyait comme des decisions et n\'y touchait pas. Resultat : l\'accent du serveur n\'apparaissait presque jamais. Ces couleurs sont desormais traitees comme du vide, et **34 embeds** prennent enfin les couleurs du serveur',
+      '🔴 **Ce qui a un sens reste intact** : rouge pour une sanction, vert pour une reussite, jaune pour une alerte, or pour une recompense. **80 embeds** gardent leur couleur',
+      '♻️ `/esthetique appliquer` rattrape aussi les anciens messages restes au bleu de Discord',
+    ],
+    fix: [
+      '🩹 **Les pieds de page decoratifs prenaient la place de la signature** : « Note de mise a jour du bot » sous un titre « Note de mise a jour », « Annonce automatique de mise a jour » sous « Mise a jour prete ». Ils ne disaient rien de neuf et empechaient « NomDuBot • NomDuServeur » de se poser',
+    ],
+    retrait: [],
+  },
 ];
-
-// Découpe une catégorie en champs d'embed (max 1024 caractères par champ).
-function addChunked(embed, name, value) {
-  const raw = Array.isArray(value) ? value.slice() : String(value || '').split('\n');
-  const bullets = raw
-    .map((l) => l.trim())
-    .filter(Boolean)
-    .map((l) => (l.startsWith('➜') ? l : `➜ ${l}`));
-  if (!bullets.length) return;
-  let buf = [];
-  let len = 0;
-  let part = 0;
-  const flush = () => {
-    if (!buf.length) return;
-    embed.addFields({ name: part === 0 ? name : `${name} (suite)`, value: buf.join('\n').slice(0, 1024) });
-    buf = [];
-    len = 0;
-    part += 1;
-  };
-  for (const b of bullets) {
-    if (len + b.length + 1 > 1000) flush();
-    buf.push(b);
-    len += b.length + 1;
-  }
-  flush();
-}
 
 // Construit l'embed d'une note à partir d'une entrée { title, ajout, fix,
 // amelioration, retrait }. Chaque catégorie accepte un tableau OU un texte.
+// La note de mise à jour est le message que les membres voient le plus
+// souvent : c'est donc elle qui doit porter la direction artistique en
+// premier, pas en dernier.
+//
+// Trois choses volontairement ABSENTES ici :
+//  • aucune couleur — l'accent du serveur s'applique tout seul ;
+//  • aucun pied de page décoratif — « Note de mise à jour du bot » ne disait
+//    rien que le titre ne dise déjà, et il empêchait la signature
+//    « NomDuBot • NomDuServeur » de se poser ;
+//  • aucun champ d'embed — la grille grise de Discord est remplacée par les
+//    sections ◆ / ➜.
+const RUBRIQUES = [
+  { cle: 'ajout', titre: 'Ajout', prefixe: '🆕' },
+  { cle: 'fix', titre: 'Correction', prefixe: '🔧', mot: 'correction' },
+  { cle: 'amelioration', titre: 'Amélioration', prefixe: '✨', mot: 'amélioration' },
+  { cle: 'retrait', titre: 'Retrait', prefixe: '➖', mot: 'retrait' },
+];
+
+function lignesDe(valeur) {
+  const brut = Array.isArray(valeur) ? valeur.slice() : String(valeur || '').split('\n');
+  return brut.map((l) => String(l).trim().replace(/^➜\s*/, '')).filter(Boolean);
+}
+
 function buildEmbed(entry) {
+  const blocs = [IMMEDIATE];
+  for (const r of RUBRIQUES) {
+    const lignes = lignesDe(entry[r.cle]);
+    // Une rubrique vide n'a pas à occuper de place : on ne l'affiche pas.
+    if (!lignes.length) continue;
+    blocs.push(M.bloc(r.titre, lignes, { prefixe: r.prefixe, motCompte: r.mot || 'ajout' }));
+  }
+
+  // Une note de version peut être longue. `paginer` coupe ENTRE deux
+  // rubriques, jamais au milieu de l'une d'elles.
+  const pages = M.paginer(blocs, { maxParPage: 99 });
+
   const embed = new EmbedBuilder()
-    .setColor(0x5865f2)
     .setTitle(`📝 ${entry.title || 'Note de mise à jour'}`)
-    .setDescription(IMMEDIATE)
-    .setTimestamp();
-  addChunked(embed, '🆕 Ajout', entry.ajout);
-  addChunked(embed, '🔧 Fix', entry.fix);
-  addChunked(embed, '✨ Amélioration', entry.amelioration);
-  addChunked(embed, '➖ Retrait', entry.retrait);
-  embed.setFooter({ text: 'Note de mise à jour du bot' });
+    .setDescription(M.borner(M.description(pages[0] || [IMMEDIATE]), M.MAX_DESCRIPTION));
+
+  // Rien ne doit disparaître d'une note de version : ce qui n'a pas tenu dans
+  // la description repasse en champs. Moins beau, mais complet — et ce cas ne
+  // se produit que pour une version exceptionnellement fournie.
+  for (const page of pages.slice(1)) {
+    for (const champ of enChamps(page)) {
+      if (embed.data.fields?.length >= 25) return embed;
+      embed.addFields(champ);
+    }
+  }
+
   return embed;
+}
+
+// Transforme des blocs en champs d'embed, en respectant la limite de 1024
+// signes par valeur et sans jamais couper une ligne en deux.
+function enChamps(blocs) {
+  const champs = [];
+  for (const b of blocs) {
+    const [entete, ...lignes] = b.split('\n');
+    const nom = M.borner(entete.replace(/[*◆·]/g, '').trim(), 256) || 'Suite';
+    let tampon = [];
+    let taille = 0;
+    let part = 0;
+    const vider = () => {
+      if (!tampon.length) return;
+      champs.push({ name: part === 0 ? nom : `${nom} (suite)`, value: tampon.join('\n') });
+      tampon = [];
+      taille = 0;
+      part += 1;
+    };
+    for (const l of lignes) {
+      if (taille + l.length + 1 > M.MAX_CHAMP) vider();
+      tampon.push(l);
+      taille += l.length + 1;
+    }
+    vider();
+  }
+  return champs;
 }
 
 const getPos = db.prepare("SELECT value FROM app_state WHERE key = 'patch_notes_pos'");

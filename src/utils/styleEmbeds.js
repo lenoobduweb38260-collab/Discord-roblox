@@ -27,6 +27,39 @@ function versEntier(couleur) {
   return /^[0-9a-f]{6}$/i.test(v) ? parseInt(v, 16) : null;
 }
 
+// 🎨 Couleurs qui ne veulent rien dire.
+//
+// C'est LE point qui faisait que « tout le monde utilise encore les vieilles
+// embeds ». La direction artistique dit de ne jamais écraser une couleur
+// porteuse de sens — rouge = sanction, vert = réussite. Mais la moitié des
+// embeds du bot ne portaient pas une couleur *choisie* : ils portaient une
+// couleur *par défaut*, le bleu de Discord, posé faute de mieux. L'identité
+// voyait une couleur et n'y touchait pas, si bien que l'accent du serveur
+// n'apparaissait jamais — la patch note en était l'exemple le plus visible.
+//
+// Ces valeurs-là ne sont donc pas des décisions : ce sont des absences de
+// décision. On les traite comme du vide, et l'accent du serveur prend la place.
+//
+// Rien d'autre n'entre dans cette liste : une couleur absente d'ici est
+// considérée comme voulue, et reste intacte.
+const COULEURS_NEUTRES = new Set([
+  0x5865f2, // « blurple » de Discord — la couleur de la marque, pas la nôtre
+  0x3498db, // bleu générique « info »
+  0x2b2d31, // gris des cartes Discord (thème sombre)
+  0x2f3136, // idem, ancienne nuance
+  0x23272a, // idem, plus foncé
+  0x36393f, // idem, fond de salon
+  0x000000, // noir : quasi toujours un « je n'ai pas choisi »
+  0xffffff, // blanc : idem
+]);
+
+function couleurNeutre(valeur) {
+  if (valeur === undefined || valeur === null) return true;
+  const n = typeof valeur === 'number' ? valeur : versEntier(valeur);
+  if (n === null || Number.isNaN(n)) return true;
+  return COULEURS_NEUTRES.has(n);
+}
+
 // Réglages d'identité pour un serveur (valeurs par défaut si non configuré).
 function reglages(guildId) {
   let cfg = {};
@@ -58,9 +91,10 @@ function styliserUn(embed, contexte) {
   if (!embed || typeof embed !== 'object') return embed;
   const r = contexte.reglages;
 
-  // Couleur : soit on impose l'accent partout, soit on ne comble que le vide.
-  if (r.couleurUnique) embed.color = r.accent;
-  else if (embed.color === undefined || embed.color === null) embed.color = r.accent;
+  // Couleur : soit on impose l'accent partout, soit on comble le vide — et
+  // une couleur neutre (le bleu de Discord, un gris de fond) EST du vide :
+  // personne ne l'a choisie pour ce qu'elle dit.
+  if (r.couleurUnique || couleurNeutre(embed.color)) embed.color = r.accent;
 
   // Pied de page : « NomDuBot • NomDuServeur », avec l'icône du serveur.
   // On ne touche pas à un pied de page déjà écrit : il dit souvent quelque
@@ -236,4 +270,7 @@ function installer(client) {
   return true;
 }
 
-module.exports = { installer, appliquer, styliserUn, reglages, versEntier, guildeDe, listesDEmbeds, noterInteraction, DEFAUT_ACCENT, FILET, filetDe, FILET_DEFAUT };
+module.exports = {
+  installer, appliquer, styliserUn, reglages, versEntier, guildeDe, listesDEmbeds, noterInteraction,
+  couleurNeutre, COULEURS_NEUTRES, DEFAUT_ACCENT, FILET, filetDe, FILET_DEFAUT,
+};

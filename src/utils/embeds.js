@@ -23,6 +23,11 @@ function enterprisesSummary(userId) {
   }
 }
 
+// 🎨 PRIMARY et INFO ne sont PAS des choix esthétiques : ce sont des « je n'ai
+// rien à dire de particulier ». styleEmbeds les reconnaît comme neutres et
+// pose l'accent du serveur à la place — c'est ce qui fait qu'un embed sans
+// intention prend les couleurs du serveur au lieu du bleu de Discord.
+// SUCCESS / DANGER / WARNING, eux, portent un sens et ne sont jamais écrasés.
 const COLORS = {
   PRIMARY: 0x5865f2,
   SUCCESS: 0x57f287,

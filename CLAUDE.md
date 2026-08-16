@@ -24,6 +24,22 @@ message privé, webhook. Rien à faire dans le code d'une nouvelle commande.
 `Relancé par X`) et une ligne d'auteur parlante (`Avis de @membre`) sont
 conservés tels quels. L'identité ne comble que le vide.
 
+**Mais une couleur neutre EST du vide.** Le bleu de Discord (`0x5865f2`), le
+bleu « info » (`0x3498db`), les gris de carte, le noir et le blanc ne sont pas
+des décisions : ce sont des valeurs posées faute de mieux. `styleEmbeds` les
+reconnaît (`COULEURS_NEUTRES`) et pose l'accent du serveur à la place.
+`COLORS.PRIMARY` et `COLORS.INFO` sont dans ce cas ; `SUCCESS`, `DANGER` et
+`WARNING` portent un sens et ne bougent jamais.
+
+C'est ce point, et lui seul, qui faisait que « tout le monde utilise encore
+les vieilles embeds » : l'identité voyait une couleur, la croyait choisie, et
+n'y touchait pas.
+
+**Un pied de page décoratif est pire que pas de pied de page.** `Note de mise
+à jour du bot` sous un titre `📝 Note de mise à jour` ne dit rien de neuf et
+prend la place de la signature. Un pied de page ne s'écrit que s'il ajoute une
+information : une page, un auteur, une date, un compte.
+
 ## 2. Grammaire des listes
 
 Utiliser `src/utils/miseEnPage.js` — ne pas réinventer la mise en forme.
