@@ -50,6 +50,23 @@ function prep(kind) {
 const STMTS = { blrp: prep('blrp'), wlrp: prep('wlrp') };
 
 const getBoard = db.prepare('SELECT * FROM rp_boards WHERE guild_id = ? AND kind = ?');
+const boardParMessage = db.prepare('SELECT * FROM rp_boards WHERE guild_id = ? AND message_id = ?');
+const deplacerBoard = db.prepare('UPDATE rp_boards SET channel_id = ?, message_id = ? WHERE guild_id = ? AND message_id = ?');
+
+// 🔗 Un panneau republié ailleurs reste LE panneau.
+//
+// Sans cela, /esthetique mode:recréer laisserait la table pointer vers un
+// message supprimé : la liste cesserait de se mettre à jour à chaque ajout ou
+// retrait, sans le moindre message d'erreur.
+function reenregistrerPanneau(guildId, ancienMessageId, salonId, nouveauMessageId) {
+  try {
+    if (!boardParMessage.get(guildId, ancienMessageId)) return false;
+    deplacerBoard.run(salonId, nouveauMessageId, guildId, ancienMessageId);
+    return true;
+  } catch {
+    return false;
+  }
+}
 const setBoard = db.prepare(
   'INSERT INTO rp_boards (guild_id, kind, channel_id, message_id) VALUES (?, ?, ?, ?) ' +
     'ON CONFLICT(guild_id, kind) DO UPDATE SET channel_id = excluded.channel_id, message_id = excluded.message_id'
@@ -297,5 +314,6 @@ module.exports = {
   renderEmbed,
   postBoard,
   refreshBoard,
+  reenregistrerPanneau,
   handleSearchInteraction,
 };

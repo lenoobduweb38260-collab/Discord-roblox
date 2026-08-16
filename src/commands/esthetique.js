@@ -290,7 +290,28 @@ async function recreerEnCarte(message, embeds, r) {
     await envoye.delete().catch(() => null);
     return false;
   }
+
+  // 🔗 Le message vient de changer d'identifiant. S'il servait de panneau —
+  // tickets, Whitelist ou Blacklist RP — la table qui le référence doit
+  // suivre. Sans cela, le panneau deviendrait un simple message décoratif :
+  // la liste cesserait de se mettre à jour, « modifier » ne le trouverait
+  // plus, et RIEN ne le signalerait.
+  suivreLesPanneaux(message, envoye);
   return true;
+}
+
+// Réécrit les références d'un panneau republié. Chaque module sait
+// reconnaître les siens et ignore ce qui ne le concerne pas.
+function suivreLesPanneaux(ancien, neuf) {
+  const guildId = ancien.guild?.id || ancien.guildId;
+  if (!guildId) return;
+  for (const module of ['../utils/tickets', '../utils/rpList']) {
+    try {
+      require(module).reenregistrerPanneau?.(guildId, ancien.id, neuf.channel.id, neuf.id);
+    } catch {
+      // Un module absent ou en échec ne doit pas interrompre le balayage.
+    }
+  }
 }
 
 module.exports = {

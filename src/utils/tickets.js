@@ -173,6 +173,23 @@ function buildPanelPayload(guildId, options = {}) {
 const listPanels = db.prepare('SELECT * FROM ticket_panels WHERE guild_id = ? ORDER BY id DESC');
 const getPanelById = db.prepare('SELECT * FROM ticket_panels WHERE id = ? AND guild_id = ?');
 const getPanelByMessage = db.prepare('SELECT * FROM ticket_panels WHERE guild_id = ? AND message_id = ?');
+const deplacerPanneau = db.prepare('UPDATE ticket_panels SET channel_id = ?, message_id = ? WHERE guild_id = ? AND message_id = ?');
+
+// 🔗 Un panneau republié ailleurs garde son rôle de panneau.
+//
+// /esthetique mode:recréer supprime le message et en renvoie un neuf. Sans
+// cette réécriture, la table pointerait vers un message effacé : « modifier »
+// répondrait « panneau introuvable », et le panneau deviendrait un simple
+// message décoratif. Le défaut serait silencieux — le pire genre.
+function reenregistrerPanneau(guildId, ancienMessageId, salonId, nouveauMessageId) {
+  try {
+    if (!getPanelByMessage.get(guildId, ancienMessageId)) return false;
+    deplacerPanneau.run(salonId, nouveauMessageId, guildId, ancienMessageId);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 // Mémoire temporaire entre la commande, la sélection et le modal.
 const pendingPanels = new Map(); // `${guildId}:${userId}` → { action, channelId, panelId, opts, existing }
@@ -1019,6 +1036,7 @@ module.exports = {
   lastPanel,
   updatePanelOptions,
   buildPanelPayload,
+  reenregistrerPanneau,
   parseColor,
   safeEmoji,
   setTypeEnabled,

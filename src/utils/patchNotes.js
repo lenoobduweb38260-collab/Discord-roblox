@@ -912,6 +912,18 @@ const RELEASES = [
     ],
     retrait: [],
   },
+  {
+    id: 'panneaux-recrees-2026-08ap',
+    title: 'Convertir un panneau ne le casse plus 🔗',
+    ajout: [],
+    amelioration: [
+      '🔗 **Un panneau republie reste un panneau.** `/esthetique appliquer mode:Recreer` supprime le message et en renvoie un neuf : les tables qui referencent les panneaux de tickets et les listes Whitelist / Blacklist RP suivent desormais le nouvel identifiant',
+      '🩹 Sans cela, la liste Whitelist aurait cesse de se mettre a jour a chaque ajout, et « /ticket panneau modifier » aurait repondu « panneau introuvable » — **sans le moindre message d\'erreur** au moment de la conversion',
+      '♻️ Rappel : les panneaux se reparent aussi tout seuls. La liste RP se republie au prochain ajout ou retrait, le panneau de tickets a la prochaine modification. Aucun besoin de les recreer a la main',
+    ],
+    fix: [],
+    retrait: [],
+  },
 ];
 
 // Construit l'embed d'une note à partir d'une entrée { title, ajout, fix,
