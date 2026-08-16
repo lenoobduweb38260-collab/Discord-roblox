@@ -469,6 +469,8 @@ for (const column of [
   'embed_ligne INTEGER',                // 1 = filet sous le titre
   'embed_filet_taille INTEGER',         // longueur du filet (6 à 30, défaut 16)
   'embed_fusion INTEGER',               // 1 = champs refondus en sections (défaut)
+  'embed_cartes INTEGER',               // 1 = cartes sans bordure au lieu d'embeds (défaut)
+  'embed_bordure TEXT',                 // 'aucune' (défaut) | 'accent' : la barre colorée de gauche
   'embed_banniere TEXT',                // bannière large en bas de chaque embed
   'embed_timestamp INTEGER',            // 1 = horodatage automatique
   'embed_force_color INTEGER',          // 1 = couleur unique, 0 = couleurs par type
@@ -632,6 +634,8 @@ const DEFAULT_CONFIG = {
   embed_ligne: 1,
   embed_filet_taille: 16,
   embed_fusion: 1,
+  embed_cartes: 1,
+  embed_bordure: null,
   embed_banniere: null,
   embed_timestamp: 1,
   embed_force_color: 0,

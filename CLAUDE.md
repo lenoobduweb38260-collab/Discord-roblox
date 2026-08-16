@@ -1,5 +1,36 @@
 # Direction artistique — à respecter pour TOUT nouvel embed
 
+## 0. On n'envoie plus d'embeds : on envoie des cartes
+
+Un embed Discord traîne toujours une barre verticale colorée collée à son bord
+gauche. Elle n'est pas réglable : elle **est** le composant. Aucune couleur,
+aucun filet, aucune mise en page ne l'enlève.
+
+`src/utils/cartes.js` convertit donc chaque embed en **conteneur de composants**
+(« Components V2 ») au moment de l'envoi, sur la couche réseau :
+
+| Embed | Carte |
+|---|---|
+| barre colorée à gauche | rien, sauf `embed_bordure = accent` |
+| `─────` dessiné à la main | vrai séparateur tracé par Discord |
+| `title` | `## Titre` |
+| `author` / `footer` | `-# sous-texte` |
+| `thumbnail` | accessoire d'une section |
+| `image` | galerie |
+| `timestamp` | `<t:…:f>`, à l'heure de chaque lecteur |
+
+Trois règles à ne jamais enfreindre :
+
+- **Seuls les ENVOIS sont convertis, jamais les modifications.** Discord fige
+  la famille de composants d'un message à sa création : un embed ne devient
+  pas une carte par `edit()`. Pour l'existant, `/esthetique appliquer
+  mode:recréer` republie — et perd réactions, réponses, liens et date.
+- **Toujours un repli.** Si l'API refuse (code 400), on rejoue la requête
+  d'origine. Un message dans l'ancien style vaut infiniment mieux qu'aucun
+  message. Après trois refus, on cesse d'insister.
+- **Jamais de troncature silencieuse.** Au-delà de 4000 signes de texte ou 40
+  composants, on renonce à convertir et on garde l'embed complet.
+
 Cette DA est la règle du projet. Tout ajout, toute commande, tout message
 du bot la suit — sans exception et sans qu'on ait à le redemander.
 

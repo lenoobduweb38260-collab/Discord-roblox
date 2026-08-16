@@ -713,6 +713,24 @@ const RELEASES = [
     ],
     retrait: [],
   },
+  {
+    id: 'cartes-sans-bordure-2026-08ad',
+    title: 'Fini la barre de couleur a gauche des messages 🃏',
+    ajout: [
+      '🃏 **Les messages ne sont plus des embeds mais des cartes.** La barre verticale coloree collee au bord gauche de chaque embed n\'est pas un reglage : elle fait partie du composant. La seule facon de s\'en debarrasser etait de ne plus envoyer d\'embed du tout — c\'est desormais le cas',
+      '📏 **De vrais separateurs.** Nos « ───── » etaient dessines a la main : leur largeur dependait de la taille de police du lecteur, d\'ou les traits casses en deux sur telephone. Discord trace maintenant lui-meme le filet, a la largeur exacte de la carte',
+      '🕰️ **L\'heure s\'affiche dans le fuseau de chaque lecteur**, plus dans celui du serveur',
+      '🎛️ Deux reglages sur le site : **Cartes sans bordure** (actif par defaut) et **Barre coloree a gauche** pour ceux qui la preferent, avec apercu en direct',
+      '♻️ `/esthetique appliquer` recoit une option **mode** : « recreer » republie les anciens messages en cartes',
+    ],
+    amelioration: [
+      '🛟 **Si Discord refuse une carte, le message part quand meme** dans l\'ancien style : jamais de message perdu. Apres trois refus, le bot cesse d\'insister',
+      '🗂️ **Aucune troncature silencieuse** : une carte trop longue (plus de 4000 signes ou 40 composants) n\'est pas convertie, l\'embed complet est envoye tel quel',
+      '🔘 Les boutons et menus deja presents sont conserves, au meme endroit',
+    ],
+    fix: [],
+    retrait: [],
+  },
 ];
 
 // Construit l'embed d'une note à partir d'une entrée { title, ajout, fix,

@@ -1060,6 +1060,16 @@
       ${aide ? `<span class="field-note">${aide}</span>` : ""}</div>`;
   }
 
+  // Liste déroulante enregistrée dans le bot. `choix` = [[valeur, libellé], …]
+  function champChoix(cle, label, choix, aide = "", defaut = "") {
+    const valeur = String(cfgCourant()[cle] ?? defaut);
+    return `<div class="field"><label>${label}</label>
+      <select class="select" data-cfg="${esc(cle)}">
+        ${choix.map(([v, l]) => `<option value="${esc(v)}"${valeur === v ? " selected" : ""}>${esc(l)}</option>`).join("")}
+      </select>
+      ${aide ? `<span class="field-note">${aide}</span>` : ""}</div>`;
+  }
+
   function champNombre(cle, label, aide = "", min = 1, max = 10, defaut = "") {
     const p = srvParams();
     const brut = cfgCourant()[cle];
@@ -1159,12 +1169,17 @@
           "⚠️ Désactivé, les couleurs qui portent un sens sont conservées : rouge pour une sanction, vert pour une réussite, orange pour un avertissement. Activé, tout devient votre couleur d'accent.")}
         ${champBascule("embed_author", "Ligne d'identité en haut", "Le nom et l'icône du serveur, au-dessus du titre. Une ligne d'auteur porteuse de sens (« Avis de @membre ») n'est jamais remplacée.", 1)}
         ${champBascule("embed_footer", "Signature en pied de page", "« NomDuBot • NomDuServeur », avec l'icône du serveur. Un pied de page déjà écrit par le bot n'est jamais remplacé.", 1)}
+        ${champBascule("embed_cartes", "Cartes sans bordure (recommandé)", "⭐⭐ Le message n'est plus un embed mais une carte. C'est la SEULE façon de supprimer la barre verticale colorée que Discord colle au bord gauche de chaque embed — elle n'est pas réglable autrement. Les séparateurs deviennent de vrais traits tracés par Discord, à la largeur exacte de la carte. Ne s'applique qu'aux nouveaux messages : pour les anciens, voir /esthetique appliquer mode:recréer.", 1)}
         ${champBascule("embed_fusion", "Sections au lieu de la grille de champs", "⭐ C'est ce réglage qui retire l'aspect « Discord de base » : les champs deviennent des sections ◆ / ➜ dans le texte.", 1)}
         ${champBascule("embed_ligne", "Filet sous le titre", "La fine ligne qui sépare le titre du texte — c'est elle qui donne l'allure « carte » au lieu d'un embed brut.", 1)}
         ${champBascule("embed_timestamp", "Horodatage", "L'heure d'envoi sous chaque embed.", 1)}
       </div>
       <div class="form-grid mt-16">
-        ${champNombre("embed_filet_taille", "📏 Longueur du filet", "Court volontairement : trop long, la ligne passe à la ligne sur téléphone et fait deux traits.", 6, 30, 16)}
+        ${champChoix("embed_bordure", "🎨 Barre colorée à gauche", [
+          ["aucune", "Aucune — carte nette (défaut)"],
+          ["accent", "La garder, à la couleur du message"],
+        ], "N'a d'effet que si « Cartes sans bordure » est activé : un embed classique a toujours sa barre.", "aucune")}
+        ${champNombre("embed_filet_taille", "📏 Longueur du filet", "Sans effet en mode carte : Discord y trace de vrais séparateurs. Ne sert qu'aux embeds classiques — trop long, la ligne passe à la ligne sur téléphone.", 6, 30, 16)}
         ${champTexte("embed_banniere", "🖼️ Bannière de bas de carte (URL)", "Image large affichée en bas de chaque embed, comme une signature visuelle. Laissez vide pour aucune. Un embed qui a déjà son image la garde.", false, "https://…/support.png")}
       </div>
       ${apercuIdentite(cfg)}`;
@@ -1180,6 +1195,11 @@
     const pied = Number(cfg.embed_footer ?? 1) === 1;
     const heure = Number(cfg.embed_timestamp ?? 1) === 1;
     const fusion = Number(cfg.embed_fusion ?? 1) === 1;
+    // Mode carte : pas de barre à gauche, et de vrais séparateurs à la place
+    // des « ───── » qu'on dessinait faute de mieux.
+    const cartes = actif && Number(cfg.embed_cartes ?? 1) === 1;
+    const barre = String(cfg.embed_bordure || "aucune") === "accent";
+    const sansBarre = cartes && !barre;
     const champs = [["👤 Nom RP", "Durand"], ["🌍 Nationalité", "Française"]];
     const exemples = [
       { titre: "📥 Arrivée d'un membre", texte: "Bienvenue à @NouveauMembre !", couleur: null, champs },
@@ -1194,13 +1214,15 @@
           <div class="dc-pp"></div>
           <div class="dc-corps">
             <div class="dc-nom">Votre bot <span class="dc-tag">APP</span></div>
-            <div class="dc-embed" style="border-left-color:${esc(c)}">
+            <div class="dc-embed${sansBarre ? " dc-carte" : ""}"${sansBarre ? "" : ` style="border-left-color:${esc(c)}"`}>
               <div class="dc-embed-corps">
                 ${actif && Number(cfg.embed_author ?? 1) === 1 ? `<div class="dc-auteur">Votre serveur</div>` : ""}
                 <div class="dc-titre">${esc(x.titre)}</div>
                 ${actif && Number(cfg.embed_ligne ?? 1) === 1 ? `<div class="dc-filet"></div>` : ""}
                 <div class="dc-desc">${esc(x.texte)}${actif && fusion && x.champs
-                  ? x.champs.map(([n, v]) => `\n${"─".repeat(16)}\n◆ ${n}\n➜ ${v}`).join("") : ""}</div>
+                  ? x.champs.map(([n, v]) => cartes
+                      ? `</div><div class="dc-sep"></div><div class="dc-desc">◆ ${esc(n)}\n➜ ${esc(v)}`
+                      : `\n${"─".repeat(16)}\n◆ ${n}\n➜ ${v}`).join("") : ""}</div>
                 ${x.champs && !(actif && fusion) ? `<div class="dc-champs">${x.champs.map(([n, v]) => `<div><b>${esc(n)}</b><span>${esc(v)}</span></div>`).join("")}</div>` : ""}
                 ${actif && /^https?:\/\//.test(String(cfg.embed_banniere || "").trim())
                   ? `<img class="dc-image" src="${esc(String(cfg.embed_banniere).trim())}" alt="" onerror="this.style.display='none'">` : ""}

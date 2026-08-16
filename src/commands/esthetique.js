@@ -2,6 +2,7 @@ const { SlashCommandBuilder, EmbedBuilder, MessageFlags, ChannelType, Permission
 const { GRADES } = require('../utils/permissions');
 const { isCreator } = require('../utils/botTeam');
 const { reglages, versEntier, DEFAUT_ACCENT, styliserUn } = require('../utils/styleEmbeds');
+const { convertirCorps } = require('../utils/cartes');
 const M = require('../utils/miseEnPage');
 
 // 🎨 Ré-applique l'identité visuelle aux messages DÉJÀ envoyés par le bot.
@@ -127,6 +128,43 @@ function rehabiller(json, contexte, dateOrigine = null) {
   return stable(e) === avant ? null : e;
 }
 
+// ♻️ Republie un message sous forme de carte sans bordure, puis efface
+// l'ancien.
+//
+// C'est le SEUL moyen de convertir un message déjà envoyé : Discord fige à la
+// création la famille de composants d'un message. Un embed ne devient pas une
+// carte par simple modification, quelles que soient les permissions.
+//
+// Renvoie :
+//   • true  → recréé
+//   • false → tentative échouée (l'ancien message est laissé intact)
+//   • null  → non convertible ; à l'appelant de retomber sur la modification
+async function recreerEnCarte(message, embeds, r) {
+  const corps = convertirCorps(
+    { content: message.content || '', embeds, components: message.components?.map((c) => (c.toJSON ? c.toJSON() : c)) || [] },
+    { bordure: r.bordure }
+  );
+  if (!corps) return null;
+
+  // Republier ne doit RE-NOTIFIER personne : le message d'origine a déjà
+  // sonné chez tout le monde à l'époque.
+  corps.allowed_mentions = { parse: [] };
+
+  const envoye = await message.channel.send(corps).catch(() => null);
+  if (!envoye) return null;
+
+  // L'épingle est la seule chose récupérable : on la repose.
+  if (message.pinned) await envoye.pin().catch(() => null);
+
+  const efface = await message.delete().then(() => true).catch(() => false);
+  if (!efface) {
+    // On ne laisse pas deux exemplaires du même message dans le salon.
+    await envoye.delete().catch(() => null);
+    return false;
+  }
+  return true;
+}
+
 module.exports = {
   grade: GRADES.EVERYONE, // le contrôle réel est fait dans execute() : créateur uniquement
   data: new SlashCommandBuilder()
@@ -154,6 +192,16 @@ module.exports = {
               { name: 'Tout uniformiser sur la couleur d\'accent', value: 'uniformiser' }
             )
         )
+        .addStringOption((o) =>
+          o
+            .setName('mode')
+            .setDescription('Comment traiter les anciens messages ?')
+            .setRequired(false)
+            .addChoices(
+              { name: 'Modifier sur place — garde réactions, épingles et liens', value: 'modifier' },
+              { name: 'Recréer en cartes sans bordure — perd réactions et liens', value: 'recreer' }
+            )
+        )
     ),
 
   async execute(interaction) {
@@ -168,11 +216,15 @@ module.exports = {
 
     const limite = interaction.options.getInteger('messages') || 100;
     const couleurs = interaction.options.getString('couleurs') || 'garder';
+    // « modifier » garde tout mais laisse l'embed en embed ; « recréer » est
+    // le seul moyen d'obtenir une carte sans bordure sur un ancien message,
+    // parce que Discord fige la famille de composants à la création.
+    const mode = interaction.options.getString('mode') === 'recreer' ? 'recreer' : 'modifier';
 
     // Le travail dépasse largement les 3 s de Discord : on accuse réception.
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
-    const totaux = { examines: 0, retouches: 0, conformes: 0, echecs: 0, salonsIgnores: 0 };
+    const totaux = { examines: 0, retouches: 0, conformes: 0, echecs: 0, salonsIgnores: 0, recrees: 0 };
     const parServeur = [];
     const debut = Date.now();
     let dernierPoint = 0;
@@ -245,6 +297,27 @@ module.exports = {
               const refait = rehabiller(json, contexte, message.createdAt);
               if (refait) { change = true; nouveaux.push(refait); } else nouveaux.push(json);
             }
+
+            // ── Recréation en carte sans bordure ──
+            // Seul chemin possible vers une carte pour un message déjà envoyé.
+            // Ce qui est perdu est perdu : réactions, réponses accrochées,
+            // liens partagés, date et place dans la conversation.
+            if (mode === 'recreer' && r.cartes) {
+              const recree = await recreerEnCarte(message, nouveaux, r);
+              if (recree === null) {
+                // Non convertible (trop long, droits manquants) : on retombe
+                // sur la modification, qui reste un progrès.
+              } else if (recree) {
+                totaux.recrees++; totaux.retouches++; retouchesServeur++;
+                await new Promise((res) => setTimeout(res, 400));
+                await avancement(guild.name);
+                continue;
+              } else {
+                totaux.echecs++;
+                continue;
+              }
+            }
+
             if (!change) { totaux.conformes++; continue; }
 
             const ok = await message.edit({ embeds: nouveaux }).then(() => true).catch(() => false);
@@ -280,6 +353,9 @@ module.exports = {
         'Champs d\'embed → **sections** ◆ / ➜',
         'Filet, bannière, signature et ligne d\'auteur **remis à la version du jour**',
         couleurs === 'uniformiser' ? 'Couleurs **uniformisées**' : 'Couleurs porteuses de sens **conservées**',
+        mode === 'recreer'
+          ? `**${totaux.recrees}** message(s) recréé(s) en carte sans bordure — réactions, réponses et liens vers ces messages sont perdus`
+          : 'Modifiés **sur place** : réactions, épingles et liens conservés. Les cartes sans bordure ne s\'appliquent qu\'aux **nouveaux** messages',
         `${limite} message(s) examiné(s) au maximum par salon`,
       ], { prefixe: '🎯', compte: null }),
     ];

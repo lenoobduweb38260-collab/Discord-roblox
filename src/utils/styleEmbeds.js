@@ -1,4 +1,5 @@
 const { getGuildConfig } = require('../database');
+const { convertirCorps, DRAPEAU_V2 } = require('./cartes');
 
 // 🎨 Identité visuelle des embeds — appliquée PARTOUT.
 //
@@ -83,6 +84,13 @@ function reglages(guildId) {
     banniere: /^https?:\/\/\S+$/i.test(String(cfg.embed_banniere || '').trim())
       ? String(cfg.embed_banniere).trim()
       : null,
+    // 🃏 Cartes sans bordure : le message n'est plus un embed mais un
+    // conteneur de composants. C'est la seule façon de se débarrasser de la
+    // barre verticale colorée que Discord colle au bord gauche des embeds.
+    cartes: Number(cfg.embed_cartes ?? 1) === 1,
+    // 'aucune' → pas de barre du tout ; 'accent' → on la garde, à la couleur
+    // du serveur, pour qui la préfère.
+    bordure: String(cfg.embed_bordure || 'aucune') === 'accent' ? 'accent' : 'aucune',
   };
 }
 
@@ -252,19 +260,90 @@ function appliquer(client, options) {
   }
 }
 
+// ── Conversion en cartes ─────────────────────────────────────────
+// Seuls les ENVOIS sont convertis, jamais les modifications : Discord fige la
+// famille de composants d'un message à sa création. Un message parti en embed
+// ne peut pas devenir une carte par simple édition — c'est /esthetique, avec
+// son mode « recréer », qui s'en charge.
+const ROUTES_ENVOI = [
+  /^\/channels\/\d+\/messages$/,
+  /^\/interactions\/\d+\/[\w-]+\/callback$/,
+  /^\/webhooks\/\d+\/[\w-]+(\?|$)/,
+];
+
+function routeDEnvoi(route, methode) {
+  if (String(methode || 'POST').toUpperCase() !== 'POST') return false;
+  const r = String(route || '').split('?')[0];
+  return ROUTES_ENVOI.some((re) => re.test(r) || re.test(`${r}?`));
+}
+
+// Si l'API refuse les cartes (hébergeur sur une vieille version, composants
+// désactivés pour l'application…), on cesse d'insister au bout de trois
+// refus : mieux vaut l'ancien style que deux requêtes pour chaque message.
+let _refusCartes = 0;
+const REFUS_MAX = 3;
+
+// Prépare la conversion. Renvoie le corps d'ORIGINE si une conversion a eu
+// lieu (pour pouvoir y revenir), sinon null.
+function preparerCartes(client, options) {
+  if (_refusCartes >= REFUS_MAX) return null;
+  if (!routeDEnvoi(options?.fullRoute, options?.method)) return null;
+  const body = options?.body;
+  if (!body || typeof body !== 'object') return null;
+
+  const guild = guildeDe(client, options.fullRoute);
+  const r = reglages(guild?.id);
+  if (!r.actif || !r.cartes) return null;
+
+  // Réponse à une interaction : le message est dans `data`. Un modal ou une
+  // autocomplétion n'a pas d'embeds — la garde suffit à les écarter.
+  const estInteraction = Array.isArray(body?.data?.embeds);
+  const cible = estInteraction ? body.data : body;
+  const converti = convertirCorps(cible, { bordure: r.bordure });
+  if (!converti) return null;
+
+  const origine = JSON.parse(JSON.stringify(body));
+  if (estInteraction) body.data = converti;
+  else options.body = converti;
+  return origine;
+}
+
+// Un refus dû aux cartes se voit à un code 400 : la requête n'est pas partie,
+// on peut la rejouer telle qu'elle aurait été sans conversion. Tout le reste
+// (réseau, 403, 429, 5xx) se propage normalement — rejouer y serait faux.
+const refusDeCartes = (err) => Number(err?.status) === 400;
+
 // Branche l'identité sur la couche REST du client. Idempotent.
 function installer(client) {
   const rest = client?.rest;
   if (!rest || rest.__styleInstalle) return false;
   const originale = rest.request.bind(rest);
   rest.request = async (options) => {
+    let origine = null;
     // Jamais d'exception ici : elle empêcherait l'envoi du message.
     try {
       appliquer(client, options);
+      origine = preparerCartes(client, options);
     } catch (err) {
       console.warn(`⚠️ Identité des embeds non appliquée : ${err.message}`);
     }
-    return originale(options);
+    if (!origine) return originale(options);
+
+    try {
+      const reponse = await originale(options);
+      _refusCartes = 0;
+      return reponse;
+    } catch (err) {
+      if (!refusDeCartes(err)) throw err;
+      // On repart sur le message tel qu'il aurait été sans cartes : un
+      // message dans l'ancien style vaut infiniment mieux qu'aucun message.
+      _refusCartes += 1;
+      if (_refusCartes === REFUS_MAX) {
+        console.warn('⚠️ Cartes sans bordure refusées par Discord — retour aux embeds classiques.');
+      }
+      options.body = origine;
+      return originale(options);
+    }
   };
   rest.__styleInstalle = true;
   return true;
@@ -273,4 +352,5 @@ function installer(client) {
 module.exports = {
   installer, appliquer, styliserUn, reglages, versEntier, guildeDe, listesDEmbeds, noterInteraction,
   couleurNeutre, COULEURS_NEUTRES, DEFAUT_ACCENT, FILET, filetDe, FILET_DEFAUT,
+  preparerCartes, routeDEnvoi, refusDeCartes, DRAPEAU_V2,
 };
