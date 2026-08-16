@@ -519,6 +519,14 @@ try {
   db.exec('ALTER TABLE bot_tickets ADD COLUMN proof TEXT');
 } catch {}
 
+// 🎫 Prise en charge d'un ticket : quel membre du staff s'en occupe, et depuis
+// quand. Vide = personne ne l'a encore pris.
+for (const colonne of ['claimed_by TEXT', 'claimed_at TEXT']) {
+  try {
+    db.exec(`ALTER TABLE tickets ADD COLUMN ${colonne}`);
+  } catch {}
+}
+
 // 📊 Niveaux fusionnés : un seul compteur d'XP au lieu d'un écrit et d'un
 // vocal séparés. Les colonnes text_xp / voice_xp sont conservées (elles
 // disent d'où vient l'XP), mais le niveau se calcule sur le total.

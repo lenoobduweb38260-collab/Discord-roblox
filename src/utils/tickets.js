@@ -11,6 +11,7 @@ const {
   TextInputBuilder,
   TextInputStyle,
   MessageFlags,
+  UserSelectMenuBuilder,
 } = require('discord.js');
 const { db, getGuildConfig } = require('../database');
 const { COLORS, sendLog, logEmbed } = require('./embeds');
@@ -418,10 +419,14 @@ async function provisionTicket(guild, type, owner) {
   );
   // 📋 Réponses types écrites par le staff (/preset), s'il y en a.
   const presetRow = require('./ticketPresets').menuPresets(guild.id, ticketId);
+  // 🛠️ Actions réservées au staff du serveur. Le menu est visible de tous —
+  // Discord ne sait pas masquer un composant par rôle — mais chaque action
+  // vérifie les droits avant d'agir.
+  const staffRow = menuActionsStaff(ticketId);
   await channel.send({
     content: `<@${owner.id}>${roleMentions ? ` ${roleMentions}` : ''}`,
     embeds: [intro],
-    components: presetRow ? [closeRow, presetRow] : [closeRow],
+    components: [closeRow, ...(presetRow ? [presetRow] : []), staffRow],
   });
   return { channel, num };
 }
@@ -701,21 +706,27 @@ const RELANCES = [
   'Le silence est d\'or, mais là ça devient cher 💰',
 ];
 
+// ⚠️ Appelée depuis DEUX chemins : le bouton « Relancer » (interaction
+// vierge) et le menu « Actions staff » (interaction déjà consommée par la
+// remise à zéro du menu). `dire` choisit donc reply ou followUp — sans quoi
+// la relance depuis le menu échouerait silencieusement.
 async function reviveTicket(interaction, ticketId) {
+  const dire = (payload) =>
+    interaction.replied || interaction.deferred ? interaction.followUp(payload) : interaction.reply(payload);
   const ticket = getTicket.get(ticketId, interaction.guildId);
   if (!ticket) {
-    return interaction.reply({ content: '❌ Ce ticket n\'existe plus.', flags: MessageFlags.Ephemeral });
+    return dire({ content: '❌ Ce ticket n\'existe plus.', flags: MessageFlags.Ephemeral });
   }
   if (ticket.status !== 'ouvert') {
-    return interaction.reply({ content: '🔒 Ce ticket est fermé : inutile de relancer.', flags: MessageFlags.Ephemeral });
+    return dire({ content: '🔒 Ce ticket est fermé : inutile de relancer.', flags: MessageFlags.Ephemeral });
   }
   const type = ticket.type_id ? getType.get(ticket.type_id, interaction.guildId) : null;
   if (!canManageTicket(interaction.member, type)) {
-    return interaction.reply({ content: '⛔ Seul le staff peut relancer un ticket.', flags: MessageFlags.Ephemeral });
+    return dire({ content: '⛔ Seul le staff peut relancer un ticket.', flags: MessageFlags.Ephemeral });
   }
   // Relancer l'auteur en le pinguant soi-même n'aurait aucun intérêt.
   if (ticket.user_id === interaction.user.id) {
-    return interaction.reply({
+    return dire({
       content: '🙂 C\'est votre propre ticket : la relance sert à réveiller quelqu\'un d\'autre.',
       flags: MessageFlags.Ephemeral,
     });
@@ -728,7 +739,230 @@ async function reviveTicket(interaction, ticketId) {
     .setFooter({ text: `Relancé par ${interaction.user.username}` })
     .setTimestamp();
   await interaction.channel.send({ content: `<@${ticket.user_id}>`, embeds: [embed] }).catch(() => null);
-  return interaction.reply({ content: '🔔 Relance envoyée.', flags: MessageFlags.Ephemeral });
+  return dire({ content: '🔔 Relance envoyée.', flags: MessageFlags.Ephemeral });
+}
+
+
+// ══════════════════════════════════════════════════════════════════
+// 🛠️ ACTIONS STAFF — le menu déroulant du ticket
+// ══════════════════════════════════════════════════════════════════
+//
+// Réservé au staff DU SERVEUR : le grade staff, ou l'un des rôles support du
+// type de ticket. Rien à voir avec l'équipe du bot — celle qu'on prévient des
+// mises à jour n'a aucun pouvoir ici.
+//
+// Le menu est visible par tout le monde (Discord n'offre pas de composant
+// masqué par rôle), mais chaque action vérifie les droits avant d'agir et
+// répond en éphémère à qui n'y a pas droit.
+
+const claimTicket = db.prepare('UPDATE tickets SET claimed_by = ?, claimed_at = ? WHERE id = ?');
+const getTicketById = db.prepare('SELECT * FROM tickets WHERE id = ? AND guild_id = ?');
+
+const ACTIONS_STAFF = [
+  { value: 'prendre', label: 'Ticket pris en charge', description: 'M\'assigner ce ticket', emoji: '🚀' },
+  { value: 'liberer', label: 'Ticket libéré', description: 'Désassigner ce ticket', emoji: '🔓' },
+  { value: 'ajouter', label: 'Ajouter un membre', description: 'Ajouter quelqu\'un au ticket', emoji: '➕' },
+  { value: 'retirer', label: 'Retirer un membre', description: 'Retirer quelqu\'un du ticket', emoji: '➖' },
+  { value: 'relancer', label: 'Avez-vous toujours besoin de ce ticket ?', description: 'Demander si le ticket est encore actif', emoji: '🔔' },
+  { value: 'infos', label: 'Ticket', description: 'Voir les détails du ticket', emoji: 'ℹ️' },
+  { value: 'supprimer', label: 'Supprimer le ticket', description: 'Supprimer définitivement ce salon', emoji: '🗑️' },
+];
+
+function menuActionsStaff(ticketId) {
+  return new ActionRowBuilder().addComponents(
+    new StringSelectMenuBuilder()
+      .setCustomId(`tktstaff:${ticketId}`)
+      .setPlaceholder('Actions staff…')
+      .addOptions(ACTIONS_STAFF)
+  );
+}
+
+// Refus poli et éphémère : le menu est visible de tous, l'action ne l'est pas.
+async function refuser(interaction) {
+  return interaction.reply({
+    content: '⛔ Ces actions sont réservées au **staff du serveur** et aux rôles support de ce type de ticket.',
+    flags: MessageFlags.Ephemeral,
+  });
+}
+
+async function handleStaffMenu(interaction, ticketId) {
+  const ticket = getTicketById.get(ticketId, interaction.guildId);
+  if (!ticket) {
+    return interaction.reply({ content: '❌ Ticket introuvable (déjà supprimé ?).', flags: MessageFlags.Ephemeral });
+  }
+  const type = ticket.type_id ? getType.get(ticket.type_id, interaction.guildId) : null;
+  if (!canManageTicket(interaction.member, type)) {
+    // Le menu garde l'option cochée sinon : on le remet à zéro.
+    await resetStaffMenu(interaction).catch(() => null);
+    return refuser(interaction);
+  }
+
+  const choix = interaction.values[0];
+  const moi = interaction.user;
+
+  if (choix === 'prendre') {
+    if (ticket.claimed_by === moi.id) {
+      await resetStaffMenu(interaction);
+      return interaction.followUp({ content: 'ℹ️ Vous avez déjà pris ce ticket en charge.', flags: MessageFlags.Ephemeral });
+    }
+    claimTicket.run(moi.id, new Date().toISOString(), ticket.id);
+    await resetStaffMenu(interaction);
+    await interaction.followUp({
+      embeds: [
+        new EmbedBuilder()
+          .setColor(COLORS.SUCCESS)
+          .setTitle('🚀 Ticket pris en charge')
+          .setDescription(
+            M.description([
+              `<@${moi.id}> s'occupe désormais de ce ticket.`,
+              ticket.claimed_by ? M.bloc('Reprise', [`Auparavant assigné à <@${ticket.claimed_by}>`], { prefixe: '🔄', compte: null }) : null,
+            ].filter(Boolean))
+          ),
+      ],
+    });
+    return;
+  }
+
+  if (choix === 'liberer') {
+    if (!ticket.claimed_by) {
+      await resetStaffMenu(interaction);
+      return interaction.followUp({ content: 'ℹ️ Ce ticket n\'est pris en charge par personne.', flags: MessageFlags.Ephemeral });
+    }
+    claimTicket.run(null, null, ticket.id);
+    await resetStaffMenu(interaction);
+    await interaction.followUp({
+      embeds: [
+        new EmbedBuilder()
+          .setColor(COLORS.WARNING)
+          .setTitle('🔓 Ticket libéré')
+          .setDescription(`<@${moi.id}> a libéré ce ticket : il attend un nouveau membre du staff.`),
+      ],
+    });
+    return;
+  }
+
+  if (choix === 'ajouter' || choix === 'retirer') {
+    // Un menu déroulant ne peut pas en ouvrir un autre à sa place : on répond
+    // par un sélecteur de membres, en éphémère.
+    await resetStaffMenu(interaction);
+    const ajout = choix === 'ajouter';
+    return interaction.followUp({
+      content: ajout ? '➕ Qui ajouter à ce ticket ?' : '➖ Qui retirer de ce ticket ?',
+      components: [
+        new ActionRowBuilder().addComponents(
+          new UserSelectMenuBuilder()
+            .setCustomId(`${ajout ? 'tktadd' : 'tktrem'}:${ticket.id}`)
+            .setPlaceholder(ajout ? 'Choisissez un membre à ajouter' : 'Choisissez un membre à retirer')
+            .setMinValues(1)
+            .setMaxValues(1)
+        ),
+      ],
+      flags: MessageFlags.Ephemeral,
+    });
+  }
+
+  if (choix === 'relancer') {
+    await resetStaffMenu(interaction);
+    return reviveTicket(interaction, ticket.id, true);
+  }
+
+  if (choix === 'infos') {
+    await resetStaffMenu(interaction);
+    return interaction.followUp({ embeds: [ficheTicket(interaction, ticket, type)], flags: MessageFlags.Ephemeral });
+  }
+
+  if (choix === 'supprimer') {
+    // ⚠️ Suppression définitive du salon, transcript compris : on demande
+    // confirmation. Une fausse manœuvre dans un menu ne doit pas effacer une
+    // conversation entière.
+    await resetStaffMenu(interaction);
+    return interaction.followUp({
+      content:
+        '🗑️ **Supprimer définitivement ce ticket ?**\n' +
+        '-# Le salon et toute la conversation disparaissent. Préférez **Fermer le ticket** : la conversation est archivée avant suppression.',
+      components: [
+        new ActionRowBuilder().addComponents(
+          new ButtonBuilder().setCustomId(`tktdel:${ticket.id}`).setLabel('Supprimer définitivement').setEmoji('🗑️').setStyle(ButtonStyle.Danger)
+        ),
+      ],
+      flags: MessageFlags.Ephemeral,
+    });
+  }
+}
+
+// Fiche d'un ticket : qui, quand, où en est-on.
+function ficheTicket(interaction, ticket, type) {
+  const ouvert = new Date(ticket.opened_at);
+  const quand = (d) => (Number.isNaN(d.getTime()) ? 'inconnu' : `<t:${Math.floor(d.getTime() / 1000)}:R>`);
+  return new EmbedBuilder()
+    .setColor(COLORS.INFO)
+    .setTitle(`ℹ️ Ticket n°${ticket.id}${type ? ` — ${type.label}` : ''}`)
+    .setDescription(
+      M.description([
+        M.bloc('Demandeur', [`<@${ticket.user_id}>`], { prefixe: '👤', compte: null }),
+        M.bloc('Prise en charge', [
+          ticket.claimed_by
+            ? `<@${ticket.claimed_by}> · depuis ${quand(new Date(ticket.claimed_at))}`
+            : '*Personne pour le moment*',
+        ], { prefixe: '🚀', compte: null }),
+        M.bloc('Ouvert', [quand(ouvert)], { prefixe: '🕰️', compte: null }),
+        M.bloc('État', [ticket.status === 'ouvert' ? '🟢 Ouvert' : `🔴 ${ticket.status}`], { prefixe: '📊', compte: null }),
+      ])
+    );
+}
+
+// Remet le menu à zéro pour pouvoir rechoisir la même action ensuite.
+async function resetStaffMenu(interaction) {
+  try {
+    await interaction.update({ components: interaction.message.components.map((c) => (c.toJSON ? c.toJSON() : c)) });
+  } catch {
+    // Interaction déjà consommée : sans importance.
+  }
+}
+
+// Ajout / retrait d'un membre choisi dans le sélecteur.
+async function appliquerMembre(interaction, ticketId, ajout) {
+  const ticket = getTicketById.get(ticketId, interaction.guildId);
+  if (!ticket) return interaction.update({ content: '❌ Ticket introuvable.', components: [] });
+  const type = ticket.type_id ? getType.get(ticket.type_id, interaction.guildId) : null;
+  if (!canManageTicket(interaction.member, type)) return refuser(interaction);
+
+  const cibleId = interaction.values[0];
+  if (!ajout && cibleId === ticket.user_id) {
+    return interaction.update({
+      content: '❌ Impossible de retirer le **demandeur** de son propre ticket. Fermez le ticket à la place.',
+      components: [],
+    });
+  }
+
+  const channel = await interaction.guild.channels.fetch(ticket.channel_id).catch(() => null);
+  if (!channel) return interaction.update({ content: '❌ Salon du ticket introuvable.', components: [] });
+
+  const ok = await channel.permissionOverwrites
+    .edit(cibleId, ajout
+      ? { ViewChannel: true, SendMessages: true, ReadMessageHistory: true, AttachFiles: true }
+      : { ViewChannel: false })
+    .then(() => true)
+    .catch(() => false);
+
+  if (!ok) {
+    return interaction.update({
+      content: '❌ Modification impossible : vérifiez que le bot a **Gérer les permissions** sur ce salon.',
+      components: [],
+    });
+  }
+
+  await interaction.update({ content: `✅ <@${cibleId}> ${ajout ? 'ajouté au' : 'retiré du'} ticket.`, components: [] });
+  await channel
+    .send({
+      embeds: [
+        new EmbedBuilder()
+          .setColor(ajout ? COLORS.SUCCESS : COLORS.WARNING)
+          .setTitle(ajout ? '➕ Membre ajouté' : '➖ Membre retiré')
+          .setDescription(`<@${cibleId}> a été ${ajout ? 'ajouté au' : 'retiré du'} ticket par <@${interaction.user.id}>.`),
+      ],
+    })
+    .catch(() => null);
 }
 
 async function handleTicketButton(interaction) {
@@ -746,6 +980,17 @@ async function handleTicketButton(interaction) {
       const type = ticket?.type_id ? getType.get(ticket.type_id, interaction.guildId) : null;
       return await require('./ticketPresets').envoyerPreset(interaction, canManageTicket(interaction.member, type));
     }
+    // 🛠️ Menu des actions staff, et sélecteurs de membre qui en découlent.
+    if (interaction.isStringSelectMenu() && interaction.customId.startsWith('tktstaff:')) {
+      return await handleStaffMenu(interaction, Number(interaction.customId.split(':')[1]));
+    }
+    if (interaction.isUserSelectMenu?.() && interaction.customId.startsWith('tktadd:')) {
+      return await appliquerMembre(interaction, Number(interaction.customId.split(':')[1]), true);
+    }
+    if (interaction.isUserSelectMenu?.() && interaction.customId.startsWith('tktrem:')) {
+      return await appliquerMembre(interaction, Number(interaction.customId.split(':')[1]), false);
+    }
+
     const [prefix, rawId] = interaction.customId.split(':');
     const id = Number(rawId);
     if (prefix === 'tktopen') return await openTicket(interaction, id);

@@ -140,9 +140,14 @@ module.exports = {
 
     // ----- Sélecteur de raison du panneau de tickets (menu déroulant) -----
     // …et sélecteur des réponses types à l'intérieur d'un ticket.
+    // …le menu des actions staff, et les sélecteurs de membre qui en découlent.
     if (
-      interaction.isStringSelectMenu() &&
-      (interaction.customId === 'tktmenu' || interaction.customId.startsWith('tktpreset:'))
+      (interaction.isStringSelectMenu() &&
+        (interaction.customId === 'tktmenu' ||
+          interaction.customId.startsWith('tktpreset:') ||
+          interaction.customId.startsWith('tktstaff:'))) ||
+      (interaction.isUserSelectMenu?.() &&
+        (interaction.customId.startsWith('tktadd:') || interaction.customId.startsWith('tktrem:')))
     ) {
       if (!interaction.inGuild()) return;
       return handleTicketButton(interaction);

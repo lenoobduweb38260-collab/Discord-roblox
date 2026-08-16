@@ -864,6 +864,24 @@ const RELEASES = [
     ],
     retrait: [],
   },
+  {
+    id: 'actions-staff-tickets-2026-08am',
+    title: 'Un menu « Actions staff » dans chaque ticket 🛠️',
+    ajout: [
+      '🛠️ **Menu deroulant dans le message du ticket**, avec sept actions : `🚀 Ticket pris en charge`, `🔓 Ticket libere`, `➕ Ajouter un membre`, `➖ Retirer un membre`, `🔔 Avez-vous toujours besoin de ce ticket ?`, `ℹ️ Ticket` (les details), `🗑️ Supprimer le ticket`',
+      '🚀 **Prise en charge** : un membre du staff s\'assigne le ticket, et tout le monde voit qui s\'en occupe. Une reprise indique qui l\'avait avant',
+      'ℹ️ **Fiche du ticket** : demandeur, responsable, date d\'ouverture, etat — a l\'heure de chaque lecteur',
+      '👥 **Ajouter / retirer un membre** via un selecteur de membres natif : plus besoin de retenir une commande',
+    ],
+    amelioration: [
+      '🔒 **Reserve au staff DU SERVEUR** : le grade staff, ou l\'un des roles support du type de ticket. Rien a voir avec l\'equipe du bot, celle qu\'on previent des mises a jour. Le menu est visible de tous — Discord ne sait pas masquer un composant par role — mais chaque action verifie les droits et refuse en prive',
+      '🛡️ **Le demandeur ne peut pas etre retire de son propre ticket** : il faut le fermer, ce qui archive la conversation',
+      '⚠️ **La suppression demande confirmation** et rappelle que « Fermer le ticket » archive avant de supprimer, la ou « Supprimer » efface tout',
+      '🔁 Le menu se remet a zero apres chaque action : on peut rechoisir la meme deux fois de suite',
+    ],
+    fix: [],
+    retrait: [],
+  },
 ];
 
 // Construit l'embed d'une note à partir d'une entrée { title, ajout, fix,
