@@ -7,11 +7,14 @@ const M = require('../utils/miseEnPage');
 
 // Log des messages supprimés (contenu disponible si le message était en cache).
 //
-// 📎 La pièce jointe est RÉCUPÉRÉE puis RENVOYÉE avec le journal. Noter son
-// lien ne servirait à rien : une URL de pièce jointe Discord est signée et
-// meurt avec son message. Quelques minutes après la suppression, le journal
-// n'afficherait plus qu'un lien mort — c'est-à-dire la preuve disparue au
-// moment précis où on en aurait besoin.
+// 📎 La pièce jointe est TÉLÉCHARGÉE puis ARCHIVÉE SUR L'HÉBERGEUR, quelle que
+// soit sa taille. Noter son lien ne servirait à rien : une URL de pièce jointe
+// Discord est signée et meurt avec son message. Quelques minutes après la
+// suppression, le journal n'afficherait plus qu'un lien mort — c'est-à-dire la
+// preuve disparue au moment précis où on en aurait besoin.
+//
+// Ce qui tient dans la limite de Discord est en plus RENVOYÉ dans le journal,
+// donc visible tout de suite. Le reste est archivé et référencé.
 module.exports = {
   name: Events.MessageDelete,
   async execute(message) {
@@ -45,7 +48,12 @@ module.exports = {
     });
 
     // ⏱️ D'abord la pièce jointe, tant que son lien vit encore.
-    const { fichiers, resume, apercu } = await sauvegarder(message.attachments);
+    const { fichiers, resume, apercu } = await sauvegarder(message.attachments, {
+      guildId: message.guild.id,
+      channelId: message.channelId,
+      messageId: message.id,
+      authorId: message.author?.id,
+    });
 
     const auteur = message.author ? `<@${message.author.id}> (\`${message.author.id}\`)` : '*Auteur inconnu*';
     const contenu = message.content

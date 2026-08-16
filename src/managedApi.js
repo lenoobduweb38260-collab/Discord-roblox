@@ -162,6 +162,50 @@ function startManagedApi(client, baseDir) {
     try {
       const url = new URL(req.url, 'http://localhost');
 
+      // 📎 Archives des pièces jointes supprimées.
+      // L'API n'écoute que sur 127.0.0.1 : c'est la frontière de sécurité,
+      // l'agent de l'hébergeur est le seul à pouvoir l'appeler.
+      if (req.method === 'GET' && url.pathname === '/archives') {
+        const A = require('./utils/piecesJointes');
+        const guildId = String(url.searchParams.get('serveur') || '');
+        if (!guildId) return send(400, { error: 'Serveur manquant.' });
+        const limite = Math.min(200, Math.max(1, Number(url.searchParams.get('limite')) || 50));
+        const depuis = Math.max(0, Number(url.searchParams.get('depuis')) || 0);
+        const lignes = A.listerArchives.all(guildId, limite, depuis).map((a) => ({
+          id: a.id,
+          nom: a.name,
+          taille: a.size,
+          lisible: A.tailleLisible(a.size),
+          type: a.content_type,
+          salon: a.channel_id,
+          message: a.message_id,
+          auteur: a.author_id,
+          date: a.created_at,
+        }));
+        return send(200, { archives: lignes, etat: A.etatArchives() });
+      }
+
+      // Téléchargement d'une archive. Le chemin vient de la BASE, jamais de
+      // l'appelant : impossible de demander un fichier arbitraire du disque.
+      if (req.method === 'GET' && url.pathname === '/archive-fichier') {
+        const A = require('./utils/piecesJointes');
+        const ligne = A.archiveParId.get(Number(url.searchParams.get('id')) || 0);
+        if (!ligne) return send(404, { error: 'Archive introuvable.' });
+        // Une double sécurité : le chemin enregistré doit rester DANS le
+        // dossier d'archives, même si la base avait été altérée.
+        const resolu = path.resolve(ligne.chemin);
+        if (!resolu.startsWith(path.resolve(A.DOSSIER) + path.sep)) {
+          return send(403, { error: 'Chemin hors du dossier d\'archives.' });
+        }
+        if (!fs.existsSync(resolu)) return send(410, { error: 'Fichier effacé (rétention ou budget disque).' });
+        res.writeHead(200, {
+          'Content-Type': ligne.content_type || 'application/octet-stream',
+          'Content-Disposition': `attachment; filename="${encodeURIComponent(ligne.name)}"`,
+          'Content-Length': String(ligne.size),
+        });
+        return fs.createReadStream(resolu).pipe(res);
+      }
+
       if (req.method === 'GET' && url.pathname === '/infos') {
         const guilds = [...client.guilds.cache.values()].map((g) => ({
           id: g.id,

@@ -957,6 +957,24 @@ const RELEASES = [
     fix: [],
     retrait: [],
   },
+  {
+    id: 'archives-sans-limite-2026-08as',
+    title: 'Les fichiers supprimes sont archives, sans limite de taille 💾',
+    ajout: [
+      '💾 **Plus aucun plafond de taille.** Le fichier d\'un message supprime est telecharge et ecrit sur l\'hebergeur, qu\'il pese 20 Ko ou 400 Mo. La base ne garde que la fiche — qui, quand, ou, et l\'emplacement du fichier',
+      '📂 **Les archives se relisent depuis le tableau de bord** : liste par serveur, et telechargement du fichier d\'origine',
+      '📊 Un etat des archives donne le nombre de fichiers, la place occupee et la place restante',
+    ],
+    amelioration: [
+      '📎 **Un fichier trop lourd pour Discord est archive quand meme.** Avant, au-dela de 8 Mo, il etait simplement perdu. Desormais il est conserve : seul son reaffichage dans le journal est impossible, et le journal le dit (`💾 archive sur l\'hebergeur`)',
+      '🗄️ **Pourquoi pas le fichier en base ?** Un SQLite gonfle de videos devient lent pour TOUT le bot : chaque lecture de configuration trainerait le poids des archives. Le disque sait faire ca, pas une base',
+      '⏱️ Le delai de telechargement passe de 6 secondes a 2 minutes : un gros fichier a le temps d\'arriver. Il protege d\'un serveur muet, plus d\'un fichier volumineux',
+      '🧹 **Le disque de l\'hebergeur est fini, lui.** Deux garde-fous reglables : une duree de conservation (90 jours par defaut) et un budget total (5 Go par defaut). Quand le budget est atteint, les archives **les plus anciennes** partent en premier — jamais les recentes',
+      '🔒 Le nom du fichier est desinfecte avant ecriture, et le telechargement depuis le tableau de bord revalide le chemin : rien ne peut sortir du dossier d\'archives',
+    ],
+    fix: [],
+    retrait: [],
+  },
 ];
 
 // Construit l'embed d'une note à partir d'une entrée { title, ajout, fix,
