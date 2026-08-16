@@ -224,115 +224,157 @@ module.exports = {
     // Le travail dépasse largement les 3 s de Discord : on accuse réception.
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
-    const totaux = { examines: 0, retouches: 0, conformes: 0, echecs: 0, salonsIgnores: 0, recrees: 0 };
+    const totaux = {
+      examines: 0, retouches: 0, conformes: 0, echecs: 0, salonsIgnores: 0, recrees: 0,
+      // Messages qui resteront des embeds — donc garderont leur barre colorée
+      // — parce que seule la recréation peut en faire des cartes.
+      aRecreer: 0,
+    };
     const parServeur = [];
     const debut = Date.now();
     let dernierPoint = 0;
+    let interrompu = false;
 
-    // Petit compte rendu d'avancement : une opération globale peut durer
-    // plusieurs minutes, on ne laisse pas l'utilisateur devant un écran muet.
-    const avancement = async (serveurEnCours) => {
+    // ⏳ Un jeton d'interaction Discord vit 15 minutes. Passé ce délai,
+    // editReply échoue — et comme l'échec est avalé, le message resterait sur
+    // « chargement » DÉFINITIVEMENT, sans jamais afficher le moindre résultat.
+    // C'est exactement ce qui se produisait sur un serveur un peu fourni :
+    // 100 messages par salon, 250 ms par modification, quelques dizaines de
+    // salons, et le compte est bon.
+    // On s'arrête donc AVANT, et on rend compte de ce qui a été fait.
+    const BUDGET = 13 * 60 * 1000;
+    const tempsEcoule = () => Date.now() - debut > BUDGET;
+
+    // Compte rendu d'avancement. Appelé souvent — à chaque salon, à chaque
+    // lot de messages, à chaque modification — et non plus seulement quand
+    // un message change : sur un serveur où le bot a peu écrit, l'écran
+    // restait muet pendant tout le balayage.
+    const avancement = async (serveurEnCours, salonEnCours = null) => {
       if (Date.now() - dernierPoint < 5000) return;
       dernierPoint = Date.now();
+      const restant = Math.max(0, Math.round((BUDGET - (Date.now() - debut)) / 1000));
       await interaction
         .editReply({
           content:
-            `⏳ **${serveurEnCours}** en cours…\n` +
-            `${totaux.retouches} message(s) réhabillé(s) · ${totaux.examines} examiné(s) · ` +
-            `${parServeur.length}/${interaction.client.guilds.cache.size} serveur(s)`,
+            `⏳ **${serveurEnCours}**${salonEnCours ? ` · #${salonEnCours}` : ''} en cours…\n` +
+            `${totaux.retouches} refait(s) · ${totaux.examines} embed(s) examiné(s) · ` +
+            `${parServeur.length}/${interaction.client.guilds.cache.size} serveur(s)\n` +
+            `-# ${Math.floor(restant / 60)} min ${restant % 60} s avant l'arrêt automatique`,
         })
         .catch(() => null);
     };
 
     for (const guild of interaction.client.guilds.cache.values()) {
-      const r = reglages(guild.id);
-      if (!r.actif) {
-        parServeur.push({ nom: guild.name, ignore: 'identité désactivée' });
-        continue;
-      }
-      const contexte = {
-        reglages: { ...r, accent: r.accent ?? versEntier(DEFAUT_ACCENT) },
-        bot: interaction.client.user.username,
-        serveur: guild.name,
-        icone: guild.iconURL({ size: 64 }) || null,
-        couleurs,
-      };
-
-      let retouchesServeur = 0;
-      let examinesServeur = 0;
-      let ignoresServeur = 0;
-
-      const salons = [...guild.channels.cache.values()].filter(
-        (c) => c.type === ChannelType.GuildText || c.type === ChannelType.GuildAnnouncement
-      );
-
-      for (const salon of salons) {
-        const droits = salon.permissionsFor(guild.members.me);
-        if (!droits?.has(PermissionFlagsBits.ViewChannel) || !droits?.has(PermissionFlagsBits.ReadMessageHistory)) {
-          ignoresServeur++;
+      if (tempsEcoule()) { interrompu = true; break; }
+      // Un serveur en échec ne doit pas emporter tout le balayage avec lui.
+      try {
+        const r = reglages(guild.id);
+        if (!r.actif) {
+          parServeur.push({ nom: guild.name, ignore: 'identité désactivée' });
           continue;
         }
 
-        let restants = limite;
-        let avant = null;
-        while (restants > 0) {
-          const lot = await salon.messages
-            .fetch({ limit: Math.min(100, restants), ...(avant ? { before: avant } : {}) })
-            .catch(() => null);
-          if (!lot || lot.size === 0) break;
-          restants -= lot.size;
-          avant = lot.last()?.id;
-
-          for (const message of lot.values()) {
-            // Un bot ne peut modifier QUE ses propres messages.
-            if (message.author.id !== interaction.client.user.id) continue;
-            if (!message.embeds?.length) continue;
-            totaux.examines++;
-            examinesServeur++;
-
-            const nouveaux = [];
-            let change = false;
-            for (const embed of message.embeds) {
-              const json = embed.toJSON ? embed.toJSON() : { ...embed.data };
-              const refait = rehabiller(json, contexte, message.createdAt);
-              if (refait) { change = true; nouveaux.push(refait); } else nouveaux.push(json);
-            }
-
-            // ── Recréation en carte sans bordure ──
-            // Seul chemin possible vers une carte pour un message déjà envoyé.
-            // Ce qui est perdu est perdu : réactions, réponses accrochées,
-            // liens partagés, date et place dans la conversation.
-            if (mode === 'recreer' && r.cartes) {
-              const recree = await recreerEnCarte(message, nouveaux, r);
-              if (recree === null) {
-                // Non convertible (trop long, droits manquants) : on retombe
-                // sur la modification, qui reste un progrès.
-              } else if (recree) {
-                totaux.recrees++; totaux.retouches++; retouchesServeur++;
-                await new Promise((res) => setTimeout(res, 400));
-                await avancement(guild.name);
-                continue;
-              } else {
-                totaux.echecs++;
-                continue;
-              }
-            }
-
-            if (!change) { totaux.conformes++; continue; }
-
-            const ok = await message.edit({ embeds: nouveaux }).then(() => true).catch(() => false);
-            if (ok) { totaux.retouches++; retouchesServeur++; } else totaux.echecs++;
-            // Discord limite le rythme des modifications : on souffle.
-            await new Promise((res) => setTimeout(res, 250));
-            await avancement(guild.name);
-          }
-          if (lot.size < 100) break;
+        // ⚠️ Sans le membre « bot », permissionsFor renvoie null et TOUS les
+        // salons seraient déclarés illisibles : la commande se terminerait sur
+        // « rien à changer » en n'ayant rien regardé.
+        const moi = guild.members.me || (await guild.members.fetchMe().catch(() => null));
+        if (!moi) {
+          parServeur.push({ nom: guild.name, ignore: 'bot introuvable sur ce serveur' });
+          continue;
         }
-      }
 
-      totaux.salonsIgnores += ignoresServeur;
-      parServeur.push({ nom: guild.name, retouches: retouchesServeur, examines: examinesServeur, ignores: ignoresServeur });
-      await avancement(guild.name);
+        const contexte = {
+          reglages: { ...r, accent: r.accent ?? versEntier(DEFAUT_ACCENT) },
+          bot: interaction.client.user.username,
+          serveur: guild.name,
+          icone: guild.iconURL({ size: 64 }) || null,
+          couleurs,
+        };
+
+        let retouchesServeur = 0;
+        let examinesServeur = 0;
+        let ignoresServeur = 0;
+
+        const salons = [...guild.channels.cache.values()].filter(
+          (c) => c.type === ChannelType.GuildText || c.type === ChannelType.GuildAnnouncement
+        );
+
+        for (const salon of salons) {
+          if (tempsEcoule()) { interrompu = true; break; }
+          const droits = salon.permissionsFor(moi);
+          if (!droits?.has(PermissionFlagsBits.ViewChannel) || !droits?.has(PermissionFlagsBits.ReadMessageHistory)) {
+            ignoresServeur++;
+            continue;
+          }
+          await avancement(guild.name, salon.name);
+
+          let restants = limite;
+          let avant = null;
+          while (restants > 0) {
+            if (tempsEcoule()) { interrompu = true; break; }
+            const lot = await salon.messages
+              .fetch({ limit: Math.min(100, restants), ...(avant ? { before: avant } : {}) })
+              .catch(() => null);
+            if (!lot || lot.size === 0) break;
+            restants -= lot.size;
+            avant = lot.last()?.id;
+            await avancement(guild.name, salon.name);
+
+            for (const message of lot.values()) {
+              if (tempsEcoule()) { interrompu = true; break; }
+              // Un bot ne peut modifier QUE ses propres messages.
+              if (message.author.id !== interaction.client.user.id) continue;
+              if (!message.embeds?.length) continue;
+              totaux.examines++;
+              examinesServeur++;
+
+              const nouveaux = [];
+              let change = false;
+              for (const embed of message.embeds) {
+                const json = embed.toJSON ? embed.toJSON() : { ...embed.data };
+                const refait = rehabiller(json, contexte, message.createdAt);
+                if (refait) { change = true; nouveaux.push(refait); } else nouveaux.push(json);
+              }
+
+              // ── Recréation en carte sans bordure ──
+              // Seul chemin possible vers une carte pour un message déjà
+              // envoyé : Discord fige la famille de composants à la création.
+              if (mode === 'recreer' && r.cartes) {
+                const recree = await recreerEnCarte(message, nouveaux, r);
+                if (recree === true) {
+                  totaux.recrees++; totaux.retouches++; retouchesServeur++;
+                  await new Promise((res) => setTimeout(res, 400));
+                  await avancement(guild.name, salon.name);
+                  continue;
+                }
+                if (recree === false) { totaux.echecs++; continue; }
+                // null → non convertible : on retombe sur la modification.
+              } else if (r.cartes) {
+                // On modifie, donc ce message RESTE un embed : il gardera sa
+                // barre colorée. C'est la cause du « rien n'a changé » quand
+                // on attendait des cartes — il faut le dire, pas le taire.
+                totaux.aRecreer++;
+              }
+
+              if (!change) { totaux.conformes++; continue; }
+
+              const ok = await message.edit({ embeds: nouveaux }).then(() => true).catch(() => false);
+              if (ok) { totaux.retouches++; retouchesServeur++; } else totaux.echecs++;
+              // Discord limite le rythme des modifications : on souffle.
+              await new Promise((res) => setTimeout(res, 250));
+              await avancement(guild.name, salon.name);
+            }
+            if (lot.size < 100) break;
+          }
+        }
+
+        totaux.salonsIgnores += ignoresServeur;
+        parServeur.push({ nom: guild.name, retouches: retouchesServeur, examines: examinesServeur, ignores: ignoresServeur });
+        await avancement(guild.name);
+      } catch (err) {
+        parServeur.push({ nom: guild.name, ignore: `échec : ${String(err.message || err).slice(0, 80)}` });
+      }
+      if (interrompu) break;
     }
 
     const secondes = Math.round((Date.now() - debut) / 1000);
@@ -345,39 +387,77 @@ module.exports = {
 
     const blocs = [
       M.bloc('Résultat global', [
-        `**${totaux.retouches}** message(s) réhabillé(s)`,
+        `**${totaux.retouches}** message(s) refait(s)`,
         `**${totaux.conformes}** déjà au bon format`,
-        totaux.echecs ? `**${totaux.echecs}** échec(s) de modification` : null,
+        totaux.echecs ? `**${totaux.echecs}** échec(s)` : null,
       ].filter(Boolean), { prefixe: '📊', compte: totaux.examines, motCompte: 'embed examiné' }),
       M.bloc('Ce qui a été refait', [
         'Champs d\'embed → **sections** ◆ / ➜',
         'Filet, bannière, signature et ligne d\'auteur **remis à la version du jour**',
         couleurs === 'uniformiser' ? 'Couleurs **uniformisées**' : 'Couleurs porteuses de sens **conservées**',
         mode === 'recreer'
-          ? `**${totaux.recrees}** message(s) recréé(s) en carte sans bordure — réactions, réponses et liens vers ces messages sont perdus`
-          : 'Modifiés **sur place** : réactions, épingles et liens conservés. Les cartes sans bordure ne s\'appliquent qu\'aux **nouveaux** messages',
+          ? `**${totaux.recrees}** message(s) recréé(s) en carte — réactions, réponses et liens vers ces messages sont perdus`
+          : 'Modifiés **sur place** : réactions, épingles et liens conservés',
         `${limite} message(s) examiné(s) au maximum par salon`,
       ], { prefixe: '🎯', compte: null }),
     ];
+
+    // ⚠️ Le point qui manquait : en mode « modifier », un ancien embed RESTE un
+    // embed. Il garde donc sa barre colorée à gauche, et de l'extérieur « rien
+    // n'a changé » — alors que la commande a bien travaillé. Discord fige la
+    // famille de composants d'un message à sa création : seule la recréation
+    // peut transformer un embed en carte.
+    if (mode !== 'recreer' && totaux.aRecreer) {
+      blocs.push(M.bloc('⚠️ Pourquoi la barre colorée est toujours là', [
+        `**${totaux.aRecreer}** message(s) restent des embeds : ils gardent leur barre verticale colorée`,
+        'Discord **fige** la famille de composants d\'un message à sa création — aucune modification ne transforme un embed en carte',
+        'Pour les convertir : `/esthetique appliquer mode:Recréer`',
+        '➜ à savoir : la recréation **perd** réactions, réponses accrochées, liens partagés et date d\'origine',
+      ], { prefixe: '🃏', compte: null }));
+    }
+
+    if (interrompu) {
+      blocs.push(M.bloc('Balayage interrompu', [
+        'Arrêté à **13 minutes** : au-delà, Discord invalide la réponse et ce compte rendu ne pourrait plus s\'afficher',
+        'Les serveurs listés ci-dessous ont été traités ; relancez la commande pour continuer',
+        'Astuce : réduisez l\'option **messages** pour aller plus vite par salon',
+      ], { prefixe: '⏳', compte: null }));
+    }
+
     // La liste des serveurs peut être longue : on la borne.
     // ⚠️ Lignes brutes : c'est M.bloc qui pose la flèche ➜. Les préfixer ici
     // donnerait « ➜ ➜ Nom ».
-    const pages = M.paginer(lignesServeurs, { maxParPage: 20, budget: 1500 });
+    const pages = M.paginer(lignesServeurs, { maxParPage: 20, budget: 1200 });
     blocs.push(
       M.bloc('Serveurs', pages[0] || [], { prefixe: '🌍', compte: parServeur.length, motCompte: 'serveur', vide: 'Aucun serveur' })
     );
     if (pages.length > 1) blocs.push(`*… et ${lignesServeurs.length - (pages[0]?.length || 0)} serveur(s) de plus.*`);
 
     const embed = new EmbedBuilder()
-      .setTitle('🎨 Anciens embeds refaits au style actuel')
+      .setTitle(interrompu ? '⏳ Balayage interrompu — résultat partiel' : '🎨 Anciens embeds refaits au style actuel')
       .setDescription(M.borner(M.description(blocs), M.MAX_DESCRIPTION))
       .setFooter({ text: M.piedDePage({ total: totaux.examines, motTotal: 'embed examiné', extra: `en ${secondes} s` }) });
 
-    return interaction.editReply({
-      embeds: [embed],
-      content: totaux.retouches
-        ? '♻️ Les embeds ont été **reconstruits sur place** : réactions, épingles, réponses et liens vers les messages sont conservés — une suppression suivie d\'un renvoi les aurait tous perdus.'
-        : 'ℹ️ Rien à changer : les messages examinés portent déjà le style actuel. Les messages **écrits par des membres** ou par **un autre bot** ne peuvent pas être refaits — Discord ne laisse un bot modifier que ses propres messages.',
+    let entete;
+    if (mode !== 'recreer' && totaux.aRecreer) {
+      entete = `🃏 **${totaux.aRecreer} message(s) gardent leur barre colorée.** Un embed déjà envoyé ne peut pas devenir une carte : relancez avec **mode : Recréer** si vous acceptez d'en perdre les réactions et les liens.`;
+    } else if (totaux.retouches) {
+      entete = mode === 'recreer'
+        ? '♻️ Messages **recréés en cartes**. Réactions, réponses et liens vers les anciens messages sont perdus — c\'était le prix de la conversion.'
+        : '♻️ Embeds **reconstruits sur place** : réactions, épingles, réponses et liens conservés.';
+    } else {
+      entete = 'ℹ️ Rien à changer : les messages examinés portent déjà le style actuel. Ceux écrits par **un membre** ou **un autre bot** ne sont pas modifiables — Discord ne l\'autorise pas.';
+    }
+
+    // ⚠️ Si le jeton a malgré tout expiré, editReply lève. Sans ce filet, la
+    // commande resterait sur « chargement » sans jamais rien afficher — c'est
+    // précisément le symptôme qu'on corrige ici.
+    return interaction.editReply({ embeds: [embed], content: entete }).catch(async () => {
+      console.warn('⚠️ /esthetique : réponse expirée, compte rendu envoyé en message privé.');
+      await interaction.user
+        .send({ content: `${entete}\n-# (la réponse de la commande avait expiré)`, embeds: [embed] })
+        .catch(() => null);
+      return null;
     });
   },
   // Exporté pour les tests.

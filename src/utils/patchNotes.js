@@ -799,6 +799,22 @@ const RELEASES = [
     ],
     retrait: [],
   },
+  {
+    id: 'esthetique-bloquee-2026-08ai',
+    title: '/esthetique restait bloquee sur « chargement » ⏳',
+    ajout: [],
+    amelioration: [
+      '⏱️ **L\'avancement s\'affiche vraiment** : serveur et salon en cours, compteurs, et le temps restant avant l\'arret automatique. Avant, le point d\'avancement n\'etait envoye qu\'apres une modification — sur un serveur ou le bot a peu ecrit, l\'ecran restait muet pendant tout le balayage',
+      '🛡️ **Un serveur en echec n\'emporte plus le balayage** : il est signale dans la liste et les autres continuent',
+      '📨 Si la reponse a malgre tout expire, le compte rendu arrive **en message prive** plutot que de disparaitre',
+    ],
+    fix: [
+      '🩹 **La commande pouvait rester sur « chargement » pour toujours.** Un jeton d\'interaction Discord vit 15 minutes ; au-dela, la reponse ne peut plus etre modifiee et l\'echec etait avale silencieusement. Sur un serveur fourni — beaucoup de salons, 250 ms par message modifie — le balayage depassait ce delai. Il s\'arrete desormais a 13 minutes et rend compte de ce qui a ete fait',
+      '🩹 **Le compte rendu explique enfin pourquoi la barre coloree est toujours la.** En mode « modifier », un ancien embed reste un embed : Discord fige la famille de composants d\'un message a sa creation. La commande travaillait bien, mais rien ne changeait a l\'oeil. Elle indique maintenant combien de messages sont concernes et comment les convertir',
+      '🩹 Si le membre « bot » n\'etait pas en cache, TOUS les salons etaient declares illisibles et la commande se terminait sur « rien a changer » sans avoir rien regarde',
+    ],
+    retrait: [],
+  },
 ];
 
 // Construit l'embed d'une note à partir d'une entrée { title, ajout, fix,
