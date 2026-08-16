@@ -884,8 +884,14 @@ function startManagedApi(client, baseDir) {
           return send(400, { error: `Le bot n'a pas le droit d'écrire dans #${channel.name}.` });
         }
 
+        // Le texte écrit depuis le tableau de bord passe par les balises,
+        // exactement comme l'aperçu du site : « && » devient une barre, « &> »
+        // une entrée. Sans cela, l'aperçu et le message envoyé divergeraient.
+        const balises = require('./utils/balises');
+        const t = (v) => balises.appliquer(String(v || '')).trim();
+
         const payload = {};
-        if (String(body.content || '').trim()) payload.content = String(body.content).slice(0, 2000);
+        if (t(body.content)) payload.content = t(body.content).slice(0, 2000);
 
         // Embeds : autant que Discord en accepte (10 maximum).
         const embeds = [];
@@ -896,21 +902,21 @@ function startManagedApi(client, baseDir) {
           const embed = new EmbedBuilder();
           const c = String(e.couleur || '').match(/^#?([0-9a-f]{6})$/i);
           embed.setColor(c ? parseInt(c[1], 16) : 0x5865f2);
-          if (String(e.titre || '').trim()) embed.setTitle(String(e.titre).slice(0, 256));
-          if (String(e.description || '').trim()) embed.setDescription(String(e.description).slice(0, 4000));
+          if (t(e.titre)) embed.setTitle(t(e.titre).slice(0, 256));
+          if (t(e.description)) embed.setDescription(t(e.description).slice(0, 4000));
           if (String(e.url || '').trim()) { try { embed.setURL(String(e.url).trim()); } catch {} }
           if (String(e.image || '').trim()) embed.setImage(String(e.image).trim());
           if (String(e.miniature || '').trim()) embed.setThumbnail(String(e.miniature).trim());
           if (String(e.footer || '').trim()) {
-            embed.setFooter({ text: String(e.footer).slice(0, 2048), iconURL: String(e.footer_icone || '').trim() || undefined });
+            embed.setFooter({ text: t(e.footer).slice(0, 2048), iconURL: String(e.footer_icone || '').trim() || undefined });
           }
           if (String(e.auteur || '').trim()) {
-            embed.setAuthor({ name: String(e.auteur).slice(0, 256), iconURL: String(e.auteur_icone || '').trim() || undefined });
+            embed.setAuthor({ name: t(e.auteur).slice(0, 256), iconURL: String(e.auteur_icone || '').trim() || undefined });
           }
           if (e.horodatage) embed.setTimestamp();
           for (const f of (Array.isArray(e.champs) ? e.champs : []).slice(0, 25)) {
-            const nom = String(f.nom || '').trim();
-            const valeur = String(f.valeur || '').trim();
+            const nom = t(f.nom);
+            const valeur = t(f.valeur);
             if (!nom || !valeur) continue;
             embed.addFields({ name: nom.slice(0, 256), value: valeur.slice(0, 1024), inline: Boolean(f.aligne) });
           }

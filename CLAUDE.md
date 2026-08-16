@@ -25,6 +25,22 @@ qui répète le nom du serveur ne dirait la même chose qu'une deuxième fois to
 en écrasant le titre — elle est donc retirée. Une ligne d'auteur porteuse de
 sens (`Avis de @membre`) est conservée.
 
+### Le tableau de bord partage le moteur, il ne l'imite pas
+
+`src/utils/{identite,cartes,balises}.js` tournent **aussi dans le navigateur**.
+`./scripts-publier-moteur.sh` les copie vers `site-php/assets/js/moteur-*.js`,
+et un test échoue si les copies diffèrent d'un seul octet.
+
+C'est ce qui permet de promettre « ce que tu écris dans l'aperçu est
+exactement ce qui part ». Deux implémentations du rendu finiraient par
+diverger, et l'aperçu mentirait.
+
+Ces trois fichiers ne doivent donc **jamais** exiger quoi que ce soit de Node
+— ni `require`, ni base de données. Les réglages arrivent en argument. Et
+comme ils partagent la portée globale du navigateur, aucun nom de premier
+niveau ne doit être commun aux trois (un test le vérifie : trois `const API`
+avaient déjà suffi à empêcher la page de se charger).
+
 Trois règles à ne jamais enfreindre :
 
 - **Seuls les ENVOIS sont convertis, jamais les modifications.** Discord fige

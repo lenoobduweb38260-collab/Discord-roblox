@@ -1646,18 +1646,6 @@ body.reduce-effects .previewbar.alerte { animation: slideUp .3s ease both; }
 }
 .dc-embed-corps { min-width: 0; flex: 1; }
 
-/* 🃏 Carte sans bordure : ce que donne le mode « Components V2 » — pas de
-   barre colorée à gauche, un contour discret, et de VRAIS séparateurs tracés
-   par Discord à la largeur exacte de la carte. */
-.dc-embed.dc-carte {
-  border-left: none;
-  border: 1px solid rgba(255,255,255,.08);
-  border-radius: 8px;
-}
-/* Titre de panneau : le « # » de Discord, nettement plus grand que le corps. */
-.dc-titre-grand { font-size: 21px; line-height: 1.25; font-weight: 800; margin-bottom: 8px; }
-.dc-embed.dc-carte .dc-filet,
-.dc-embed.dc-carte .dc-sep { height: 1px; background: rgba(255,255,255,.09); margin: 9px 0; }
 
 .dc-auteur { display: flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 600; color: #f2f3f5; margin-bottom: 6px; }
 .dc-auteur img { width: 22px; height: 22px; border-radius: 50%; }
@@ -1745,3 +1733,82 @@ body.reduce-effects .previewbar.alerte { animation: slideUp .3s ease both; }
 }
 .balises .field-note { display: block; margin-top: 11px; }
 @media (max-width: 640px) { .balises-ex { grid-template-columns: 1fr; } }
+
+/* ══════════════════════════════════════════════════════════════════
+   🃏 CARTE ÉDITABLE — l'aperçu EST la zone de saisie
+   ══════════════════════════════════════════════════════════════════
+   Les mesures reproduisent le rendu de Discord : mêmes tailles de titre,
+   même interligne, même sous-texte. Ce qu'on voit ici doit être ce que le
+   salon affichera. */
+.cv-carte {
+  margin-top: 8px; padding: 14px 16px;
+  border: 1px solid rgba(255,255,255,.08); border-radius: 8px;
+  background: #2b2d31; max-width: 520px;
+}
+/* Barre colorée à gauche : uniquement si le réglage la demande. */
+.cv-carte.cv-bordure { border-left: 4px solid var(--cv-accent, #5865f2); border-radius: 4px; }
+.cv-carte-vide { border-style: dashed; }
+
+/* Le vrai séparateur tracé par Discord : pleine largeur de la carte. */
+.cv-sep { height: 1px; margin: 10px -16px; background: rgba(255,255,255,.09); }
+.cv-carte .cv-sep:first-child, .cv-carte .cv-sep:last-child { display: none; }
+
+/* Titres markdown, aux tailles de Discord. */
+.cv-h1 { font-size: 21px; line-height: 1.28; font-weight: 800; color: #f2f3f5; margin: 2px 0 4px; }
+.cv-h2 { font-size: 17px; line-height: 1.3; font-weight: 700; color: #f2f3f5; margin: 2px 0 4px; }
+.cv-h3 { font-size: 15px; line-height: 1.3; font-weight: 700; color: #f2f3f5; margin: 2px 0 3px; }
+.cv-ligne { font-size: 13.5px; line-height: 1.5; color: #dbdee1; word-break: break-word; }
+.cv-vide { height: 8px; }
+.cv-sous { font-size: 11.5px; line-height: 1.4; color: #949ba4; }
+.cv-cite { border-left: 3px solid #4e5058; padding-left: 9px; font-size: 13.5px; color: #dbdee1; }
+.cv-ligne code, .cv-sous code { padding: 1px 4px; border-radius: 4px; background: rgba(0,0,0,.35); font-size: 12px; }
+.cv-ligne a { color: #00a8fc; text-decoration: none; }
+
+/* Section : du texte, une vignette à droite. */
+.cv-section { display: flex; gap: 12px; align-items: flex-start; }
+.cv-section-txt { flex: 1; min-width: 0; }
+.cv-vignette { width: 72px; height: 72px; object-fit: cover; border-radius: 6px; flex-shrink: 0; }
+.cv-galerie { display: grid; gap: 4px; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); margin-top: 8px; }
+.cv-galerie img { width: 100%; border-radius: 6px; display: block; }
+
+/* Zones éditables : invisibles au repos, cadrées dès qu'on les survole. */
+.cv-zone {
+  outline: none; border-radius: 5px;
+  padding: 2px 4px; margin: 0 -4px;
+  transition: background .12s, box-shadow .12s;
+  white-space: pre-wrap; word-break: break-word;
+}
+.cv-zone:hover { background: rgba(255,255,255,.035); }
+.cv-zone:focus {
+  background: rgba(88,101,242,.08);
+  box-shadow: 0 0 0 1px rgba(120,140,255,.45);
+  /* En édition, on affiche le texte BRUT : police lisible, taille stable. */
+  font-size: 13.5px; line-height: 1.55; color: #f2f3f5; font-weight: 400;
+}
+.cv-titre-zone:focus { font-size: 15px; font-weight: 600; }
+.cv-zone-vide::before {
+  content: attr(data-vide);
+  color: var(--muted-2, #72767d); font-size: 13px; font-style: italic;
+}
+.cv-zone-vide:focus::before { content: ""; }
+.cv-contenu { font-size: 14px; line-height: 1.45; color: #dbdee1; margin-bottom: 4px; }
+.cv-astuce { margin-top: 10px; font-size: 12px; color: var(--muted); }
+
+/* Pied de l'aperçu : jauge de longueur + rappel des balises. */
+.cv-pied {
+  display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center;
+  margin-top: 12px; padding-top: 10px;
+  border-top: 1px solid rgba(255,255,255,.06);
+  font-size: 11.5px; color: var(--muted);
+}
+.cv-jauge { font-variant-numeric: tabular-nums; }
+.cv-jauge-plein { color: #ff8a8a; font-weight: 700; }
+.cv-balises-rappel code {
+  padding: 1px 5px; border-radius: 4px;
+  background: rgba(255,255,255,.07); font-size: 11px;
+}
+
+/* Bas de carte posé par l'identité — signature, image large. Non éditable :
+   ce n'est pas du texte d'auteur, et le laisser modifiable donnerait
+   l'impression qu'on peut le changer ici. */
+.cv-chrome { opacity: .92; }

@@ -1242,56 +1242,45 @@
   // Aperçu : trois embeds de nature différente, pour montrer l'effet de
   // « même couleur pour tous » sur des messages qui ont un sens de couleur.
   function apercuIdentite(cfg) {
-    const actif = Number(cfg.embed_style ?? 1) === 1;
-    const accent = /^#[0-9a-f]{6}$/i.test(cfg.embed_accent || "") ? cfg.embed_accent : "#5865F2";
-    const force = Number(cfg.embed_force_color ?? 0) === 1;
-    const pied = Number(cfg.embed_footer ?? 1) === 1;
-    const heure = Number(cfg.embed_timestamp ?? 1) === 1;
-    const fusion = Number(cfg.embed_fusion ?? 1) === 1;
-    // Mode carte : pas de barre à gauche, et de vrais séparateurs à la place
-    // des « ───── » qu'on dessinait faute de mieux.
-    const cartes = actif && Number(cfg.embed_cartes ?? 1) === 1;
-    const barre = String(cfg.embed_bordure || "aucune") === "accent";
-    const sansBarre = cartes && !barre;
-    // Titre en grand : c'est lui qui donne l'en-tête de panneau.
-    const grandTitre = cartes && String(cfg.embed_titre || "grand") !== "moyen";
-    // En mode carte, la ligne d'auteur n'est affichée que si elle dit autre
-    // chose que la signature — sinon la même information apparaîtrait deux
-    // fois et écraserait le titre.
-    const auteurVisible = actif && Number(cfg.embed_author ?? 1) === 1 && !(cartes && pied);
-    const champs = [["👤 Nom RP", "Durand"], ["🌍 Nationalité", "Française"]];
+    // Même moteur que l'aperçu du constructeur de messages, donc même
+    // promesse : ce qui est dessiné ici est ce que Discord affichera.
+    const r = reglagesApercu();
+    const ctx = contexteApercu(r);
     const exemples = [
-      { titre: "📥 Arrivée d'un membre", texte: "Bienvenue à @NouveauMembre !", couleur: null, champs },
-      { titre: "🚫 Sanction appliquée", texte: "@Tricheur a été banni du serveur.", couleur: "#ff5c74" },
-      { titre: "✅ Ticket fermé", texte: "Le ticket n°0042 a été archivé.", couleur: "#2fe38b" },
+      { titre: "📥 Arrivée d'un membre", texte: "Bienvenue à @NouveauMembre !",
+        couleur: null, champs: [["👤 Nom RP", "Durand"], ["🌍 Nationalité", "Française"]] },
+      { titre: "🚫 Sanction appliquée", texte: "@Tricheur a été banni du serveur.", couleur: 0xff5c74 },
+      { titre: "✅ Ticket fermé", texte: "Le ticket n°0042 a été archivé.", couleur: 0x2fe38b },
     ];
     return `<div class="apercu mt-16">
       <span class="apercu-titre">PRÉVISUALISATION — TROIS MESSAGES DE NATURES DIFFÉRENTES</span>
       ${exemples.map(x => {
-        const c = !actif ? (x.couleur || "#4f545c") : (force ? accent : (x.couleur || accent));
+        const json = { color: x.couleur ?? 0x5865f2, title: x.titre, description: x.texte };
+        if (x.champs) json.fields = x.champs.map(([n, v]) => ({ name: n, value: v }));
+        if (r.actif) window.Identite.styliserUn(json, ctx);
+        const carte = r.actif && r.cartes
+          ? window.Cartes.enCarte(json, { bordure: r.bordure, titre: r.titre }) : null;
         return `<div class="dc-msg">
           <div class="dc-pp"></div>
           <div class="dc-corps">
-            <div class="dc-nom">Votre bot <span class="dc-tag">APP</span></div>
-            <div class="dc-embed${sansBarre ? " dc-carte" : ""}"${sansBarre ? "" : ` style="border-left-color:${esc(c)}"`}>
-              <div class="dc-embed-corps">
-                ${auteurVisible ? `<div class="dc-auteur">Votre serveur</div>` : ""}
-                <div class="dc-titre${grandTitre ? " dc-titre-grand" : ""}">${esc(x.titre)}</div>
-                ${actif && Number(cfg.embed_ligne ?? 1) === 1 ? `<div class="dc-filet"></div>` : ""}
-                <div class="dc-desc">${esc(x.texte)}${actif && fusion && x.champs
-                  ? x.champs.map(([n, v]) => cartes
-                      ? `</div><div class="dc-sep"></div><div class="dc-desc">◆ ${esc(n)}\n➜ ${esc(v)}`
-                      : `\n${"─".repeat(16)}\n◆ ${n}\n➜ ${v}`).join("") : ""}</div>
-                ${x.champs && !(actif && fusion) ? `<div class="dc-champs">${x.champs.map(([n, v]) => `<div><b>${esc(n)}</b><span>${esc(v)}</span></div>`).join("")}</div>` : ""}
-                ${actif && /^https?:\/\//.test(String(cfg.embed_banniere || "").trim())
-                  ? `<img class="dc-image" src="${esc(String(cfg.embed_banniere).trim())}" alt="" onerror="this.style.display='none'">` : ""}
-                ${actif && pied ? `<div class="dc-pied">Votre bot • Votre serveur${heure ? " • aujourd'hui à 18:17" : ""}</div>` : ""}
-              </div>
-            </div>
+            <div class="dc-nom">${esc(ctx.bot)} <span class="dc-tag">APP</span></div>
+            ${carte ? carteFigee(carte) : apercuEmbedClassique(json, 0)}
           </div>
         </div>`;
       }).join("")}
+      <span class="field-note">${r.actif && r.cartes
+        ? "🃏 Mode carte : aucune barre colorée, et les séparateurs sont tracés par Discord."
+        : "⚠️ Mode embed classique : Discord impose sa barre verticale colorée à gauche."}</span>
     </div>`;
+  }
+
+  // Une carte non modifiable — pour les aperçus de réglages, où il n'y a rien
+  // à écrire.
+  function carteFigee(carte) {
+    const style = carte.accent_color !== undefined
+      ? ` style="--cv-accent:#${carte.accent_color.toString(16).padStart(6, "0")}"` : "";
+    return `<div class="cv-carte${carte.accent_color !== undefined ? " cv-bordure" : ""}"${style}>
+      ${dessinerComposants(carte.components, false)}</div>`;
   }
 
   // 👋 Arrivées & départs : salon, message, et APPARENCE de l'embed.
@@ -1645,8 +1634,12 @@
             </div>
           </div>
           <div class="msg-apercu">
-            <span class="apercu-titre">PRÉVISUALISATION</span>
+            <span class="apercu-titre">APERÇU — ÉCRIVEZ DIRECTEMENT DEDANS</span>
             ${apercuMessage(m)}
+            <div class="cv-pied">
+              <span id="msg-jauge" class="cv-jauge">0 / ${window.Cartes ? window.Cartes.MAX_TEXTE_TOTAL : 4000} caractères</span>
+              <span class="cv-balises-rappel">🏷️ <code>&&</code> une barre · <code>&& Titre</code> une section · <code>&></code> une entrée</span>
+            </div>
             <div class="form-actions" style="margin-top:14px">
               ${button("🧪 Vérifier", "msg-tester", "ghost")}
               ${button("📨 Envoyer sur Discord", "msg-envoyer", "success")}
@@ -1716,40 +1709,362 @@
   }
 
   // Rendu fidèle du message, façon Discord.
+  // ══════════════════════════════════════════════════════════════════
+  // 🃏 APERÇU FIDÈLE — et éditable directement dedans
+  // ══════════════════════════════════════════════════════════════════
+  //
+  // L'aperçu ne « ressemble » pas au résultat : il est calculé par LES MÊMES
+  // fonctions que celles du bot (moteur-balises, moteur-identite,
+  // moteur-cartes, copiés tels quels depuis src/utils). On construit donc ici
+  // exactement l'arbre de composants que Discord recevra, et on se contente
+  // de le dessiner.
+  //
+  // On écrit AUSSI directement dans cet aperçu : titre, texte et contenu sont
+  // des zones éditables placées à leur place définitive. Pendant qu'on tape,
+  // la zone montre le texte brut (les balises restent visibles, comme dans la
+  // zone de saisie de Discord) ; dès qu'on en sort, tout est rendu.
+
+  // Réglages d'identité du serveur, lus depuis la configuration enregistrée.
+  // Mêmes noms et mêmes défauts que reglages() côté bot.
+  function reglagesApercu() {
+    const cfg = cfgCourant();
+    const I = window.Identite;
+    return {
+      actif: Number(cfg.embed_style ?? 1) === 1,
+      accent: I.versEntier(cfg.embed_accent) ?? I.versEntier(I.DEFAUT_ACCENT),
+      piedDePage: Number(cfg.embed_footer ?? 1) === 1,
+      ligneAuteur: Number(cfg.embed_author ?? 1) === 1,
+      horodatage: Number(cfg.embed_timestamp ?? 1) === 1,
+      couleurUnique: Number(cfg.embed_force_color ?? 0) === 1,
+      ligne: Number(cfg.embed_ligne ?? 1) === 1,
+      filet: I.filetDe(cfg.embed_filet_taille ?? I.FILET_DEFAUT),
+      fusion: Number(cfg.embed_fusion ?? 1) === 1,
+      banniere: /^https?:\/\/\S+$/i.test(String(cfg.embed_banniere || "").trim()) ? String(cfg.embed_banniere).trim() : null,
+      cartes: Number(cfg.embed_cartes ?? 1) === 1,
+      bordure: String(cfg.embed_bordure || "aucune") === "accent" ? "accent" : "aucune",
+      titre: String(cfg.embed_titre || "grand") === "moyen" ? "moyen" : "grand",
+    };
+  }
+
+  // Le contexte que le bot passera à styliserUn : nom du bot, nom du serveur.
+  function contexteApercu(r) {
+    const srv = selectedServer();
+    return {
+      reglages: r,
+      bot: activeBot()?.name || "Votre bot",
+      serveur: srv?.name || "Votre serveur",
+      // L'icône n'est pas dessinée dans l'aperçu, mais styliserUn s'en sert
+      // pour décider d'écrire ou non icon_url : on lui donne la même valeur
+      // qu'aura le bot, sinon la signature différerait.
+      icone: srv?.icon ? `https://cdn.discordapp.com/icons/${srv.id}/${srv.icon}.png?size=64` : null,
+    };
+  }
+
+  // Forme d'un embed vierge — la même que celle du bouton « Ajouter un embed ».
+  function embedNeuf() {
+    return { couleur: "#5865f2", titre: "", description: "", champs: [] };
+  }
+
+  // 🎴 Construit l'embed JSON tel que le bot le construira à l'envoi, puis le
+  // fait passer par l'identité. C'est le point où l'aperçu et la réalité se
+  // rejoignent : mêmes entrées, mêmes fonctions, même sortie.
+  function embedJSON(e, r, ctx) {
+    const B = window.Balises;
+    const t = v => B.appliquer(String(v || "")).trim();
+    const json = {};
+    const couleur = String(e.couleur || "").match(/^#?([0-9a-f]{6})$/i);
+    // Le bot pose 0x5865f2 quand aucune couleur n'est choisie ; l'identité
+    // reconnaît ce bleu comme neutre et met l'accent du serveur à la place.
+    json.color = couleur ? parseInt(couleur[1], 16) : 0x5865f2;
+    if (t(e.titre)) json.title = t(e.titre).slice(0, 256);
+    if (t(e.description)) json.description = t(e.description).slice(0, 4000);
+    if (String(e.url || "").trim()) json.url = String(e.url).trim();
+    if (String(e.image || "").trim()) json.image = { url: String(e.image).trim() };
+    if (String(e.miniature || "").trim()) json.thumbnail = { url: String(e.miniature).trim() };
+    if (t(e.footer)) json.footer = { text: t(e.footer).slice(0, 2048) };
+    if (t(e.auteur)) json.author = { name: t(e.auteur).slice(0, 256) };
+    if (e.horodatage) json.timestamp = new Date().toISOString();
+    const champs = (e.champs || []).filter(c => String(c.nom || "").trim() && String(c.valeur || "").trim());
+    if (champs.length) {
+      json.fields = champs.slice(0, 25).map(c => ({
+        name: t(c.nom).slice(0, 256), value: t(c.valeur).slice(0, 1024), inline: Boolean(c.aligne),
+      }));
+    }
+    if (r.actif) window.Identite.styliserUn(json, ctx);
+    return json;
+  }
+
+  // Un embed vide ne produit rien : inutile de dessiner une carte fantôme.
+  const embedVide = e =>
+    ![e.titre, e.description, e.image, e.miniature, e.footer, e.auteur].some(v => String(v || "").trim())
+    && !(e.champs || []).filter(c => String(c.nom || "").trim() || String(c.valeur || "").trim()).length;
+
+  // ── Rendu du markdown de Discord ──────────────────────────────────
+  // Volontairement limité à ce que les cartes utilisent : titres #, ##, ###,
+  // sous-texte -#, gras, italique, barré, code, liens, citations.
+  function mdCarte(texte) {
+    return String(texte || "").split("\n").map(ligne => {
+      const sous = /^-#\s+(.*)$/.exec(ligne);
+      if (sous) return `<div class="cv-sous">${mdEnLigne(sous[1])}</div>`;
+      const h = /^(#{1,3})\s+(.*)$/.exec(ligne);
+      if (h) return `<div class="cv-h${h[1].length}">${mdEnLigne(h[2])}</div>`;
+      const cite = /^>\s?(.*)$/.exec(ligne);
+      if (cite) return `<div class="cv-cite">${mdEnLigne(cite[1])}</div>`;
+      if (!ligne.trim()) return `<div class="cv-vide"></div>`;
+      return `<div class="cv-ligne">${mdEnLigne(ligne)}</div>`;
+    }).join("");
+  }
+
+  function mdEnLigne(texte) {
+    let t = esc(texte);
+    t = t.replace(/`([^`]+)`/g, '<code>$1</code>');
+    t = t.replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>");
+    t = t.replace(/\*([^*]+)\*/g, "<i>$1</i>");
+    t = t.replace(/~~([^~]+)~~/g, "<s>$1</s>");
+    t = t.replace(/\[([^\]]+)\]\((https?:[^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+    // Un horodatage Discord s'affiche à l'heure de chaque lecteur ; ici on
+    // montre l'heure locale du navigateur, ce que verra l'auteur.
+    t = t.replace(/&lt;t:(\d+):[a-zA-Z]&gt;/g, (_, s) => new Date(Number(s) * 1000).toLocaleString("fr-FR"));
+    return t;
+  }
+
+  // ── Dessin de l'arbre de composants ───────────────────────────────
+  // Un composant = une brique de l'API Discord. On les dessine une à une,
+  // sans jamais réinterpréter : ce qui n'est pas dans l'arbre n'apparaît pas.
+  function dessinerComposants(liste, editable) {
+    const C = window.Cartes.T;
+    return (liste || []).map(c => {
+      if (c.type === C.SEPARATEUR) return `<div class="cv-sep"></div>`;
+      if (c.type === C.TEXTE) return mdCarte(c.content);
+      if (c.type === C.SECTION) {
+        return `<div class="cv-section">
+          <div class="cv-section-txt">${dessinerComposants(c.components, editable)}</div>
+          ${c.accessory?.media?.url ? `<img class="cv-vignette" src="${esc(c.accessory.media.url)}" alt="" onerror="this.remove()">` : ""}
+        </div>`;
+      }
+      if (c.type === C.GALERIE) {
+        return `<div class="cv-galerie">${(c.items || []).map(i =>
+          `<img src="${esc(i.media?.url || "")}" alt="" onerror="this.remove()">`).join("")}</div>`;
+      }
+      return "";
+    }).join("");
+  }
+
+  // 🖊️ Zone éditable posée à sa place définitive dans la carte.
+  // `champ` = chemin de la donnée ; `rendu` = ce qu'on affiche au repos.
+  function zone(champ, rendu, brut, classe, vide) {
+    const attrs = `contenteditable="plaintext-only" spellcheck="false" data-zone="${esc(champ)}"`;
+    if (!String(brut || "").trim()) {
+      return `<div class="cv-zone cv-zone-vide ${classe}" ${attrs} data-vide="${esc(vide)}"></div>`;
+    }
+    return `<div class="cv-zone ${classe}" ${attrs} data-brut="${esc(brut)}">${rendu}</div>`;
+  }
+
   function apercuMessage(m) {
-    const vide = !m.content.trim() && !m.embeds.length;
-    if (vide) return `<div class="dc-msg"><div class="dc-pp"></div><div class="dc-corps">
-      <div class="dc-nom">Votre bot <span class="dc-tag">APP</span></div>
-      <div style="color:var(--muted-2);font-size:13px">Votre message apparaîtra ici.</div></div></div>`;
+    const r = reglagesApercu();
+    const ctx = contexteApercu(r);
+    const nomBot = esc(ctx.bot);
+    const cartesActives = r.actif && r.cartes;
+
+    const liste = m.embeds.length ? m.embeds : [embedNeuf()];
+    const corps = liste.map((e, i) => {
+      if (embedVide(e)) return apercuCarteVide(i);
+      const json = embedJSON(e, r, ctx);
+      if (!cartesActives) return apercuEmbedClassique(json, i);
+      const carte = window.Cartes.enCarte(json, { bordure: r.bordure, titre: r.titre });
+      if (!carte) return apercuCarteVide(i);
+      return apercuCarte(carte, json, i, e);
+    }).join("");
+
+    const rienDuTout = !String(m.content || "").trim() && !m.embeds.some(e => !embedVide(e));
+
     return `<div class="dc-msg">
       <div class="dc-pp"></div>
       <div class="dc-corps">
-        <div class="dc-nom">Votre bot <span class="dc-tag">APP</span> <span class="dc-heure">aujourd'hui</span></div>
-        ${m.content.trim() ? `<div class="dc-texte">${esc(m.content)}</div>` : ""}
-        ${m.embeds.map(e => apercuEmbed(e)).join("")}
+        <div class="dc-nom">${nomBot} <span class="dc-tag">APP</span> <span class="dc-heure">aujourd'hui</span></div>
+        ${zone("content", mdCarte(window.Balises.appliquer(m.content || "")), m.content, "cv-contenu", "Texte au-dessus de la carte (facultatif)")}
+        ${corps}
         ${m.boutons.length ? `<div class="dc-boutons">${m.boutons.map(b =>
           `<span class="dc-bouton ${b.lien ? "lien" : esc(b.style || "secondaire")}">${esc(b.label || "Bouton")}${b.lien ? " ↗" : ""}</span>`).join("")}</div>` : ""}
         ${m.selecteur.length ? `<div class="dc-select">${esc(m.selecteurTexte || "Faites un choix…")} ▾</div>` : ""}
+        ${rienDuTout ? `<div class="cv-astuce">✍️ Cliquez ci-dessus et écrivez : ce que vous voyez est exactement ce que Discord affichera.</div>` : ""}
       </div>
     </div>`;
   }
 
-  function apercuEmbed(e) {
-    const rien = ![e.titre, e.description, e.image, e.miniature, e.footer, e.auteur].some(v => String(v || "").trim())
-      && !(e.champs || []).length;
-    if (rien) return "";
-    return `<div class="dc-embed" style="border-left-color:${esc(e.couleur || "#5865f2")}">
-      <div class="dc-embed-corps">
-        ${e.auteur ? `<div class="dc-auteur">${e.auteur_icone ? `<img src="${esc(e.auteur_icone)}" alt="" onerror="this.remove()">` : ""}${esc(e.auteur)}</div>` : ""}
-        ${e.titre ? `<div class="dc-titre">${esc(e.titre)}</div>` : ""}
-        ${e.description ? `<div class="dc-desc">${mdApercu(e.description)}</div>` : ""}
-        ${(e.champs || []).length ? `<div class="dc-champs">${(e.champs || []).filter(c => c.nom || c.valeur).map(c =>
-          `<div class="${c.aligne ? "aligne" : ""}"><b>${esc(c.nom || "")}</b><span>${esc(c.valeur || "")}</span></div>`).join("")}</div>` : ""}
-        ${e.image ? `<img class="dc-image" src="${esc(e.image)}" alt="" onerror="this.style.display='none'">` : ""}
-        ${e.footer ? `<div class="dc-footer">${esc(e.footer)}</div>` : ""}
-      </div>
-      ${e.miniature ? `<img class="dc-miniature-img" src="${esc(e.miniature)}" alt="" onerror="this.remove()">` : ""}
+  // La carte elle-même. Les zones éditables remplacent le rendu du titre et
+  // du corps : on écrit à l'endroit exact où le texte apparaîtra.
+  function apercuCarte(carte, json, i, e) {
+    const C = window.Cartes.T;
+    const composants = carte.components || [];
+    // Le premier bloc porte la tête (auteur + titre).
+    const tete = composants[0];
+    const aTete = tete && (tete.type === C.TEXTE || tete.type === C.SECTION) && /^(-#|#)/.test(
+      tete.type === C.TEXTE ? tete.content : (tete.components?.[0]?.content || "")
+    );
+    // Après la tête vient un séparateur, puis le corps.
+    let reste = composants.slice(aTete ? 1 : 0);
+    if (reste[0]?.type === C.SEPARATEUR) reste = reste.slice(1);
+
+    // ⚠️ Seul le CORPS est éditable. La galerie et la signature sont posées
+    // par l'identité, pas écrites par l'auteur : les rendre modifiables ferait
+    // croire qu'on peut les changer là, et elles disparaîtraient en cours de
+    // frappe pour réapparaître à la sortie.
+    // On sait exactement combien de composants vient de la description : ce
+    // sont ceux que produit enBlocs, la fonction même qu'utilise enCarte.
+    const nCorps = window.Cartes.enBlocs(json.description || "").length;
+    const corps = reste.slice(0, nCorps);
+    let chrome = reste.slice(nCorps);
+    if (chrome[0]?.type === C.SEPARATEUR) chrome = chrome.slice(1);
+
+    const style = carte.accent_color !== undefined
+      ? ` style="--cv-accent:#${carte.accent_color.toString(16).padStart(6, "0")}"` : "";
+    return `<div class="cv-carte${carte.accent_color !== undefined ? " cv-bordure" : ""}"${style} data-embed-apercu="${i}">
+      ${aTete ? `<div class="cv-tete">${zone(`embeds.${i}.titre`, mdCarte(tete.type === C.TEXTE ? tete.content : tete.components[0].content), e.titre, "cv-titre-zone", "Titre de la carte")}</div>` : ""}
+      ${aTete && (corps.length || chrome.length) ? `<div class="cv-sep"></div>` : ""}
+      ${zone(`embeds.${i}.description`, dessinerComposants(corps, true), e.description, "cv-corps-zone", "Texte de la carte — tapez && pour une barre")}
+      ${chrome.length ? `<div class="cv-sep"></div><div class="cv-chrome">${dessinerComposants(chrome, false)}</div>` : ""}
     </div>`;
+  }
+
+  function apercuCarteVide(i) {
+    return `<div class="cv-carte cv-carte-vide" data-embed-apercu="${i}">
+      ${zone(`embeds.${i}.titre`, "", "", "cv-titre-zone", "Titre de la carte")}
+      ${zone(`embeds.${i}.description`, "", "", "cv-corps-zone", "Texte de la carte — tapez && pour une barre")}
+    </div>`;
+  }
+
+  // Repli : identité coupée, ou cartes désactivées → l'embed d'origine, barre
+  // colorée comprise. L'aperçu doit montrer ce cas tel qu'il est.
+  function apercuEmbedClassique(json, i) {
+    const couleur = typeof json.color === "number" ? `#${json.color.toString(16).padStart(6, "0")}` : "#5865f2";
+    return `<div class="dc-embed" style="border-left-color:${esc(couleur)}" data-embed-apercu="${i}">
+      <div class="dc-embed-corps">
+        ${json.author?.name ? `<div class="dc-auteur">${esc(json.author.name)}</div>` : ""}
+        ${json.title ? `<div class="dc-titre">${esc(json.title)}</div>` : ""}
+        ${json.description ? `<div class="dc-desc">${mdApercu(json.description)}</div>` : ""}
+        ${(json.fields || []).length ? `<div class="dc-champs">${json.fields.map(c =>
+          `<div class="${c.inline ? "aligne" : ""}"><b>${esc(c.name)}</b><span>${esc(c.value)}</span></div>`).join("")}</div>` : ""}
+        ${json.image?.url ? `<img class="dc-image" src="${esc(json.image.url)}" alt="" onerror="this.style.display='none'">` : ""}
+        ${json.footer?.text ? `<div class="dc-footer">${esc(json.footer.text)}</div>` : ""}
+      </div>
+      ${json.thumbnail?.url ? `<img class="dc-miniature-img" src="${esc(json.thumbnail.url)}" alt="" onerror="this.remove()">` : ""}
+    </div>`;
+  }
+
+
+  // ══════════════════════════════════════════════════════════════════
+  // ✍️ ÉCRIRE DIRECTEMENT DANS L'APERÇU
+  // ══════════════════════════════════════════════════════════════════
+  //
+  // Le principe est celui de la zone de saisie de Discord : pendant qu'on
+  // écrit, on voit le texte BRUT (les « && » et les « ** » restent lisibles) ;
+  // dès qu'on quitte la zone, tout est rendu.
+  //
+  // On ne redessine JAMAIS pendant la frappe : reconstruire le HTML d'un
+  // élément éditable replace le curseur au début, et écrire devient
+  // impossible. Le modèle est mis à jour à chaque frappe, l'affichage
+  // seulement à la sortie.
+
+  // Écrit une valeur dans le brouillon à partir du chemin de la zone.
+  // « content » ou « embeds.0.titre ».
+  function ecrireDansBrouillon(chemin, valeur) {
+    const m = brouillon();
+    const bouts = String(chemin).split(".");
+    if (bouts[0] === "content") m.content = valeur;
+    else if (bouts[0] === "embeds") {
+      const i = Number(bouts[1]);
+      while (m.embeds.length <= i) m.embeds.push(embedNeuf());
+      m.embeds[i][bouts[2]] = valeur;
+    }
+    refleterDansFormulaire(chemin, valeur);
+  }
+
+  // ⚠️ Le panneau de gauche et l'aperçu écrivent dans le MÊME brouillon, mais
+  // l'envoi relit d'abord les champs du formulaire (lireBrouillon). Sans cette
+  // recopie, écrire dans l'aperçu puis envoyer publierait l'ancien texte —
+  // exactement la promesse qu'on cherche à tenir. On tient donc les deux
+  // affichages synchronisés dans les deux sens.
+  function refleterDansFormulaire(chemin, valeur) {
+    const bouts = String(chemin).split(".");
+    let champ = null;
+    if (bouts[0] === "content") champ = document.querySelector("#msg-content");
+    else if (bouts[0] === "embeds") {
+      champ = document.querySelector(`.embed-edit[data-embed="${bouts[1]}"] [data-emb="${bouts[2]}"]`);
+    }
+    if (champ && champ.value !== valeur) champ.value = valeur;
+  }
+
+  function lireDansBrouillon(chemin) {
+    const m = brouillon();
+    const bouts = String(chemin).split(".");
+    if (bouts[0] === "content") return m.content || "";
+    if (bouts[0] === "embeds") return m.embeds[Number(bouts[1])]?.[bouts[2]] || "";
+    return "";
+  }
+
+  // Au clic dans une zone : on montre le texte brut, tel qu'il est enregistré.
+  document.addEventListener("focusin", event => {
+    const z = event.target.closest?.("[data-zone]");
+    if (!z || z.dataset.edition === "1") return;
+    z.dataset.edition = "1";
+    z.textContent = lireDansBrouillon(z.dataset.zone);
+    z.classList.remove("cv-zone-vide");
+  });
+
+  // Pendant la frappe : on tient le modèle à jour, sans redessiner.
+  document.addEventListener("input", event => {
+    const z = event.target.closest?.("[data-zone]");
+    if (!z) return;
+    ecrireDansBrouillon(z.dataset.zone, z.innerText.replace(/ /g, " "));
+    majEtatMessage();
+  });
+
+  // À la sortie : on redessine tout, donc on voit le résultat définitif.
+  document.addEventListener("focusout", event => {
+    const z = event.target.closest?.("[data-zone]");
+    if (!z) return;
+    ecrireDansBrouillon(z.dataset.zone, z.innerText.replace(/ /g, " "));
+    redessinerApercu();
+  });
+
+  // Entrée insère un saut de ligne ; Échap sort de la zone.
+  document.addEventListener("keydown", event => {
+    const z = event.target.closest?.("[data-zone]");
+    if (!z) return;
+    if (event.key === "Escape") { event.preventDefault(); z.blur(); }
+  });
+
+  // Redessine l'aperçu sans toucher au reste de la page : reconstruire tout
+  // le module ferait perdre le défilement et la sélection.
+  function redessinerApercu() {
+    const boite = document.querySelector(".msg-apercu");
+    if (!boite) return;
+    const ancien = boite.querySelector(".dc-msg");
+    if (!ancien) return;
+    const provisoire = document.createElement("div");
+    provisoire.innerHTML = apercuMessage(brouillon());
+    const neuf = provisoire.firstElementChild;
+    if (neuf) ancien.replaceWith(neuf);
+    majEtatMessage();
+  }
+
+  // Compteur de longueur : les cartes ont un budget de texte, et dépasser
+  // annule la conversion — mieux vaut le savoir en écrivant qu'à l'envoi.
+  function majEtatMessage() {
+    const jauge = document.querySelector("#msg-jauge");
+    if (!jauge) return;
+    const m = brouillon();
+    const B = window.Balises;
+    const total = [String(m.content || ""), ...m.embeds.flatMap(e => [e.titre, e.description, e.footer, e.auteur])]
+      .map(v => B.appliquer(String(v || "")).length)
+      .reduce((a, b) => a + b, 0);
+    const max = window.Cartes.MAX_TEXTE_TOTAL;
+    jauge.textContent = `${total} / ${max} caractères`;
+    jauge.className = total > max ? "cv-jauge cv-jauge-plein" : "cv-jauge";
+    jauge.title = total > max
+      ? "Au-delà de cette limite, Discord refuse la carte : le message partira en embed classique, avec sa barre colorée."
+      : "Longueur totale du texte de la carte.";
   }
 
   // 📥 Import des sanctions prononcées sur Discord.
@@ -3640,7 +3955,7 @@
         // ── 📨 Constructeur de messages ─────────────────────────────
         case "msg-embed-add":
           lireBrouillon();
-          brouillon().embeds.push({ couleur: "#5865f2", titre: "", description: "", champs: [] });
+          brouillon().embeds.push(embedNeuf());
           render();
           break;
         case "msg-embed-suppr":

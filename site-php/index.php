@@ -117,7 +117,14 @@ unset($_SESSION['oauth_detail']);
 function empreinte_assets(): string
 {
     $parts = [];
-    foreach (['/assets/js/app.js', '/assets/css/style.css'] as $f) {
+    foreach ([
+        '/assets/js/app.js',
+        '/assets/css/style.css',
+        // Moteur de rendu partagé avec le bot : s'il change, l'aperçu change.
+        '/assets/js/moteur-identite.js',
+        '/assets/js/moteur-cartes.js',
+        '/assets/js/moteur-balises.js',
+    ] as $f) {
         $parts[] = (string) @filemtime(__DIR__ . $f);
     }
     $parts[] = trim((string) @file_get_contents(__DIR__ . '/data/version.txt'));
@@ -212,6 +219,13 @@ function taille_envoi_lisible(): string
         window.AINCRAD_ACCES = <?= json_encode($acces, JSON_UNESCAPED_SLASHES) ?>;
         window.AINCRAD_DIAG = <?= json_encode($diagnostic, JSON_UNESCAPED_SLASHES) ?>;
     </script>
+    <!-- 🃏 Moteur de rendu : les MÊMES fichiers que ceux du bot, copiés tels
+         quels. C'est ce qui garantit que l'aperçu montre exactement la carte
+         que Discord recevra. Chargés avant app.js, sans « defer » pour que
+         les globales existent au démarrage. -->
+    <script src="assets/js/moteur-identite.js?v=<?= empreinte_assets() ?>"></script>
+    <script src="assets/js/moteur-cartes.js?v=<?= empreinte_assets() ?>"></script>
+    <script src="assets/js/moteur-balises.js?v=<?= empreinte_assets() ?>"></script>
     <script src="assets/js/app.js?v=<?= empreinte_assets() ?>" defer></script>
 </body>
 </html>

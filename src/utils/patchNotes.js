@@ -780,6 +780,25 @@ const RELEASES = [
       '➖ Plus aucune mention codee en dur dans le bot',
     ],
   },
+  {
+    id: 'apercu-editable-2026-08ah',
+    title: 'Ecrivez directement dans l\'apercu ✍️',
+    ajout: [
+      '✍️ **L\'apercu du tableau de bord est devenu la zone de saisie.** Cliquez sur le titre ou le texte de la carte et ecrivez : plus de formulaire d\'un cote et d\'apercu de l\'autre. Pendant la frappe vous voyez le texte brut (les `&&` restent lisibles), et des que vous sortez de la zone tout est rendu — comme la zone de message de Discord',
+      '🃏 **L\'apercu montre enfin une vraie carte** : pas de barre coloree, grand titre, separateurs traces, sections `◆` / `➜`, signature du bot. L\'ancien apercu dessinait un embed classique, il ne ressemblait plus au resultat',
+      '📊 **Une jauge de longueur** previent avant la limite des cartes : au-dela, Discord refuse la carte et le message part en embed classique',
+      '🎨 L\'apercu des reglages d\'identite passe au meme moteur : changer l\'accent, le filet ou la barre se voit immediatement sur trois messages de natures differentes',
+    ],
+    amelioration: [
+      '🔗 **Le site et le bot partagent le MEME code de rendu.** Les trois modules qui decident de l\'apparence tournent des deux cotes, et un test echoue si les copies different d\'un seul octet. C\'est ce qui permet de promettre que l\'apercu ne ment pas',
+      '🏷️ Le texte ecrit depuis le tableau de bord passe par les balises, comme partout ailleurs : `&&` trace une barre a l\'envoi comme dans l\'apercu',
+      '🔒 La signature et l\'image de bas de carte ne sont pas modifiables dans l\'apercu : elles sont posees par l\'identite, pas ecrites par vous',
+    ],
+    fix: [
+      '🩹 L\'apercu du constructeur de messages affichait encore l\'ancien style — barre coloree a gauche et grille de champs grise — alors que le bot envoyait des cartes depuis plusieurs versions',
+    ],
+    retrait: [],
+  },
 ];
 
 // Construit l'embed d'une note à partir d'une entrée { title, ajout, fix,
