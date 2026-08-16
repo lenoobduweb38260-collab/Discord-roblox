@@ -10,6 +10,7 @@ const {
 const { getGuildConfig, setGuildConfig } = require('../database');
 const { COLORS, sendLog, logEmbed } = require('../utils/embeds');
 const { getGrade, GRADES } = require('../utils/permissions');
+const { mettreAJour } = require('../utils/reponse');
 
 // Partenariats : un membre propose un partenariat, le staff valide, puis le
 // BOT publie le message de partenariat dans le salon configuré.
@@ -90,7 +91,7 @@ module.exports = {
     const action = interaction.customId.split(':')[1];
     const embed = interaction.message.embeds[0];
     if (action === 'reject') {
-      await interaction.update({ content: `❌ Partenariat refusé par <@${interaction.user.id}>.`, components: [] });
+      await mettreAJour(interaction, { content: `❌ Partenariat refusé par <@${interaction.user.id}>.`, components: [] });
       return;
     }
     // approve
@@ -102,7 +103,7 @@ module.exports = {
       return interaction.reply({ content: '❌ Salon de partenariats introuvable.', flags: MessageFlags.Ephemeral });
     }
     await channel.send({ embeds: [EmbedBuilder.from(embed)] });
-    await interaction.update({ content: `✅ Partenariat validé par <@${interaction.user.id}> et publié dans <#${channel.id}>.`, components: [] });
+    await mettreAJour(interaction, { content: `✅ Partenariat validé par <@${interaction.user.id}> et publié dans <#${channel.id}>.`, components: [] });
     await sendLog(interaction.guild, logEmbed('🤝 Partenariat publié', `Validé par <@${interaction.user.id}>.`, COLORS.SUCCESS));
   },
 };

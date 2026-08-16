@@ -4,6 +4,7 @@ const { getGrade, GRADES, GRADE_NAMES } = require('../utils/permissions');
 const { buildEnterpriseEmbed, sendLog, logEmbed, COLORS } = require('../utils/embeds');
 const { handleConfigInteraction } = require('../utils/configPanel');
 const { handleTicketButton } = require('../utils/tickets');
+const { mettreAJour } = require('../utils/reponse');
 
 const getEnterprise = db.prepare('SELECT * FROM enterprises WHERE id = ?');
 const setInsuranceTypes = db.prepare('UPDATE enterprises SET insurance_types = ? WHERE id = ?');
@@ -178,14 +179,14 @@ module.exports = {
       // on ne compare donc pas guild_id à celui du serveur courant, sinon la
       // sélection des types d'assurance échouerait toujours (« introuvable »).
       if (!ent) {
-        return interaction.update({ content: '❌ Entreprise introuvable.', embeds: [], components: [] });
+        return mettreAJour(interaction, { content: '❌ Entreprise introuvable.', embeds: [], components: [] });
       }
       setInsuranceTypes.run(JSON.stringify(interaction.values), entId);
       const updated = getEnterprise.get(entId);
       const heads = getHeads.all(entId).map((r) => r.user_id);
       const employees = getEmployees.all(entId).map((r) => r.user_id);
       const { embed, extraContent } = buildEnterpriseEmbed(updated, heads, employees);
-      await interaction.update({
+      await mettreAJour(interaction, {
         content: extraContent || '',
         embeds: [embed],
         components: [],

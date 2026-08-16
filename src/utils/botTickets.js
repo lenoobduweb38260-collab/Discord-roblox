@@ -8,6 +8,7 @@ const {
 } = require('discord.js');
 const { db } = require('../database');
 const { hasPerm, applyBlacklist, state, setState } = require('./botTeam');
+const { mettreAJour } = require('./reponse');
 
 // QG des tickets de l'équipe du bot : les bannissements des serveurs et les
 // /report arrivent en embeds dans le salon QG configuré (/botstaff salon-qg).
@@ -133,7 +134,7 @@ async function handleButton(interaction) {
     if (ticket.claimed_by) return eph(`⚠️ Déjà claim par <@${ticket.claimed_by}>.`);
     setTicketClaim.run('claim', interaction.user.id, ticket.id);
     const updated = getTicket.get(ticket.id);
-    await interaction.update({ embeds: [buildTicketEmbed(updated)], components: buildTicketButtons(updated) });
+    await mettreAJour(interaction, { embeds: [buildTicketEmbed(updated)], components: buildTicketButtons(updated) });
     return;
   }
 
@@ -162,7 +163,7 @@ async function handleButton(interaction) {
   if (action === 'pass') {
     setTicketClaim.run('ouvert', null, ticket.id);
     const updated = getTicket.get(ticket.id);
-    await interaction.update({ embeds: [buildTicketEmbed(updated)], components: buildTicketButtons(updated) });
+    await mettreAJour(interaction, { embeds: [buildTicketEmbed(updated)], components: buildTicketButtons(updated) });
     return;
   }
 
@@ -184,7 +185,7 @@ async function handleButton(interaction) {
   if (action === 'sanction') {
     if (choice === 'blacklist') {
       if (!(await hasPerm(interaction.client, interaction.user.id, 'blacklist'))) {
-        return interaction.update({ content: '⛔ Il vous manque la permission 🚫 Blacklist pour cette décision.', components: [] });
+        return mettreAJour(interaction, { content: '⛔ Il vous manque la permission 🚫 Blacklist pour cette décision.', components: [] });
       }
       // Accusé de réception AVANT le MP + bans multi-serveurs (plusieurs
       // secondes), sinon « l'application ne répond pas ».
@@ -206,7 +207,7 @@ async function handleButton(interaction) {
     }
     setTicketDone.run('aucune', ticket.id);
     await refreshTicketMessage(interaction.client, getTicket.get(ticket.id));
-    return interaction.update({ content: `✅ Ticket n°${ticket.id} traité : **aucune sanction**.`, components: [] });
+    return mettreAJour(interaction, { content: `✅ Ticket n°${ticket.id} traité : **aucune sanction**.`, components: [] });
   }
 }
 

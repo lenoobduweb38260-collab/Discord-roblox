@@ -900,6 +900,18 @@ const RELEASES = [
     ],
     retrait: [],
   },
+  {
+    id: 'echec-interaction-cartes-2026-08ao',
+    title: '« Echec de l\'interaction » sur les boutons 🩹',
+    ajout: [],
+    amelioration: [],
+    fix: [
+      '🩹 **Les boutons « Rendre » des animations echouaient** — pat, kiss, hug, toutes. Le message part en carte, et une carte n\'a ni texte ni embed : TOUT son contenu vit dans ses composants. Retirer les boutons revenait donc a vider le message, ce que Discord refuse. D\'ou « Echec de l\'interaction », sans la moindre trace cote bot',
+      '🩹 **Le meme defaut touchait bien plus que les animations** : `/config` (navigation entre categories), l\'aventure SAO, les tickets du QG, les partenariats, le constructeur d\'embed, les patch notes — soit **67 endroits** ou un bouton met un message a jour. Tous corriges d\'un coup',
+      '🩹 Si une mise a jour est malgre tout refusee, le bot accuse desormais reception au lieu de laisser « Echec de l\'interaction » a l\'ecran',
+    ],
+    retrait: [],
+  },
 ];
 
 // Construit l'embed d'une note à partir d'une entrée { title, ajout, fix,

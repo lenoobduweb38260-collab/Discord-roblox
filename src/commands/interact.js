@@ -396,14 +396,14 @@ module.exports = {
         return interaction.reply({ content: L.onlyTarget, flags: MessageFlags.Ephemeral });
       }
       if (prefix === 'itxr') {
-        await interaction.update({ components: [] });
+        await mettreAJour(interaction, { components: [] });
         await interaction.followUp({ content: L.rejected(`<@${toId}>`, `<@${fromId}>`) });
         return;
       }
       // « Rendre » : nouvelle interaction dans l'autre sens, boutons retirés de l'original.
       const author = interaction.user;
       const target = await interaction.client.users.fetch(fromId);
-      await interaction.update({ components: [] });
+      await mettreAJour(interaction, { components: [] });
       const payload = await buildInteractionMessage(interaction, actionKey, author, target, false, lang);
       await interaction.followUp(payload);
     } catch (err) {

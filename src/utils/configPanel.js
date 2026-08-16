@@ -17,6 +17,7 @@ const { COLORS, sendLog, logEmbed } = require('./embeds');
 const { GRADES, getGrade, staffRoleIds, adminRoleIds, policeRoleIds } = require('./permissions');
 const { supportRoleIds } = require('./tickets');
 const { isCreator } = require('./botTeam');
+const { mettreAJour } = require('./reponse');
 
 // Panneau central de configuration : /config ouvre une vue d'ensemble avec un
 // menu de catégories ; chaque catégorie se règle via des sélecteurs de rôles,
@@ -698,13 +699,13 @@ async function handleConfigInteraction(interaction) {
     const id = interaction.customId;
 
     if (id === 'cfgback') {
-      return await interaction.update(mainView(interaction.guild));
+      return await mettreAJour(interaction, mainView(interaction.guild));
     }
 
     if (id === 'cfgcat') {
       const view = CATEGORY_VIEWS[interaction.values[0]];
       if (!view) return;
-      return await interaction.update(view(interaction.guild));
+      return await mettreAJour(interaction, view(interaction.guild));
     }
 
     // Sécurité : bascule anti-spam / anti-nuke / captcha.
@@ -713,7 +714,7 @@ async function handleConfigInteraction(interaction) {
       if (!SECURITY_TOGGLES.has(col)) return;
       const next = getGuildConfig(interaction.guildId)[col] ? 0 : 1;
       setGuildConfig(interaction.guildId, col, next);
-      await interaction.update(securiteView(interaction.guild));
+      await mettreAJour(interaction, securiteView(interaction.guild));
       await sendLog(
         interaction.guild,
         logEmbed('🛡️ Sécurité modifiée', `\`${col}\` → ${next ? 'activé' : 'désactivé'} par <@${interaction.user.id}>.`, COLORS.INFO)
@@ -734,7 +735,7 @@ async function handleConfigInteraction(interaction) {
       const roleId = interaction.values[0] || null; // menu vide = retrait
       setGuildConfig(interaction.guildId, col, roleId);
       const viewFor = { verified_role_id: securiteView, wlrp_role_id: whitelistView };
-      await interaction.update((viewFor[col] || rolesView)(interaction.guild));
+      await mettreAJour(interaction, (viewFor[col] || rolesView)(interaction.guild));
       await sendLog(
         interaction.guild,
         logEmbed('⚙️ Configuration modifiée', `${ROLE_COLUMNS[col]} → ${roleId ? `<@&${roleId}>` : '*retiré*'}\nPar <@${interaction.user.id}>`, COLORS.INFO)
@@ -766,7 +767,7 @@ async function handleConfigInteraction(interaction) {
         setGuildConfig(interaction.guildId, `${kind}_role_ids`, JSON.stringify(ids));
         setGuildConfig(interaction.guildId, `${kind}_role_id`, ids[0] || null); // compatibilité colonne historique
       }
-      await interaction.update(rolesView(interaction.guild));
+      await mettreAJour(interaction, rolesView(interaction.guild));
       const label = { staff: 'Staff', admin: 'Administration', police: 'Police' }[kind];
       await sendLog(
         interaction.guild,
@@ -795,7 +796,7 @@ async function handleConfigInteraction(interaction) {
         setGuildConfig(interaction.guildId, `${kind}_role_ids`, '[]');
         setGuildConfig(interaction.guildId, `${kind}_role_id`, null);
       }
-      await interaction.update(rolesView(interaction.guild));
+      await mettreAJour(interaction, rolesView(interaction.guild));
       const label = { staff: 'Staff', admin: 'Administration', police: 'Police' }[kind];
       await sendLog(
         interaction.guild,
@@ -815,7 +816,7 @@ async function handleConfigInteraction(interaction) {
       }
       const enable = id === 'cfgrpon' ? 1 : 0;
       setGuildConfig(interaction.guildId, 'rp_enabled', enable);
-      await interaction.update(rpView(interaction.guild));
+      await mettreAJour(interaction, rpView(interaction.guild));
       require('../commandSync')
         .syncGuild(interaction.guildId)
         .then(() =>
@@ -840,7 +841,7 @@ async function handleConfigInteraction(interaction) {
     if (id === 'cfginton' || id === 'cfgintoff') {
       const enable = id === 'cfginton' ? 1 : 0;
       setGuildConfig(interaction.guildId, 'interact_enabled', enable);
-      await interaction.update(rpView(interaction.guild));
+      await mettreAJour(interaction, rpView(interaction.guild));
       await sendLog(
         interaction.guild,
         logEmbed('🎮 Module Interactions', `Interactions ${enable ? 'activées' : 'désactivées'} par <@${interaction.user.id}>.`, enable ? COLORS.SUCCESS : COLORS.DANGER)
@@ -852,7 +853,7 @@ async function handleConfigInteraction(interaction) {
     if (id === 'cfglvlon' || id === 'cfglvloff') {
       const enable = id === 'cfglvlon' ? 1 : 0;
       setGuildConfig(interaction.guildId, 'levels_enabled', enable);
-      await interaction.update(xpView(interaction.guild));
+      await mettreAJour(interaction, xpView(interaction.guild));
       await sendLog(
         interaction.guild,
         logEmbed('📈 Système de niveaux', `Niveaux ${enable ? 'activés' : 'désactivés'} par <@${interaction.user.id}>.`, enable ? COLORS.SUCCESS : COLORS.DANGER)
@@ -864,7 +865,7 @@ async function handleConfigInteraction(interaction) {
     if (id === 'cfgsaoon' || id === 'cfgsaooff') {
       const enable = id === 'cfgsaoon' ? 1 : 0;
       setGuildConfig(interaction.guildId, 'sao_enabled', enable);
-      await interaction.update(rpView(interaction.guild));
+      await mettreAJour(interaction, rpView(interaction.guild));
       await sendLog(
         interaction.guild,
         logEmbed('⚔️ Module Aventure SAO', `Aventure SAO ${enable ? 'activée' : 'désactivée'} par <@${interaction.user.id}>.`, enable ? COLORS.SUCCESS : COLORS.DANGER)
@@ -874,7 +875,7 @@ async function handleConfigInteraction(interaction) {
 
     // ----- Tickets : sélection, création (formulaire → catégorie), support, suppression -----
     if (id === 'cfgtktsel') {
-      return await interaction.update(ticketsView(interaction.guild, Number(interaction.values[0])));
+      return await mettreAJour(interaction, ticketsView(interaction.guild, Number(interaction.values[0])));
     }
 
     if (id === 'cfgtktadd') {
@@ -898,37 +899,37 @@ async function handleConfigInteraction(interaction) {
       pendingTicketTypes.set(`${interaction.guildId}:${interaction.user.id}`, { label, emoji: null });
       const creator = await isCreator(interaction.client, interaction.user.id);
       const view = ticketEmojiView(label, interaction.guild, interaction.client, creator, 0);
-      if (interaction.isFromMessage()) return await interaction.update(view);
+      if (interaction.isFromMessage()) return await mettreAJour(interaction, view);
       return await interaction.reply({ ...view, flags: MessageFlags.Ephemeral });
     }
 
     // Bulle emoji : changement de page.
     if (id.startsWith('cfgtktemojipg:')) {
       const pending = pendingTicketTypes.get(`${interaction.guildId}:${interaction.user.id}`);
-      if (!pending) return await interaction.update(ticketsView(interaction.guild));
+      if (!pending) return await mettreAJour(interaction, ticketsView(interaction.guild));
       const creator = await isCreator(interaction.client, interaction.user.id);
       const page = Number(id.split(':')[1]) || 0;
-      return await interaction.update(ticketEmojiView(pending.label, interaction.guild, interaction.client, creator, page));
+      return await mettreAJour(interaction, ticketEmojiView(pending.label, interaction.guild, interaction.client, creator, page));
     }
 
     // Bulle emoji : un emoji a été choisi → étape catégorie.
     if (id.startsWith('cfgtktemoji:')) {
       const pendingKey = `${interaction.guildId}:${interaction.user.id}`;
       const pending = pendingTicketTypes.get(pendingKey);
-      if (!pending) return await interaction.update(ticketsView(interaction.guild));
+      if (!pending) return await mettreAJour(interaction, ticketsView(interaction.guild));
       pending.emoji = interaction.values[0] || null;
       pendingTicketTypes.set(pendingKey, pending);
-      return await interaction.update(ticketCategoryView(pending.label, pending.emoji));
+      return await mettreAJour(interaction, ticketCategoryView(pending.label, pending.emoji));
     }
 
     // Bulle emoji : « Sans emoji » → étape catégorie sans emoji.
     if (id === 'cfgtktnoemoji') {
       const pendingKey = `${interaction.guildId}:${interaction.user.id}`;
       const pending = pendingTicketTypes.get(pendingKey);
-      if (!pending) return await interaction.update(ticketsView(interaction.guild));
+      if (!pending) return await mettreAJour(interaction, ticketsView(interaction.guild));
       pending.emoji = null;
       pendingTicketTypes.set(pendingKey, pending);
-      return await interaction.update(ticketCategoryView(pending.label, null));
+      return await mettreAJour(interaction, ticketCategoryView(pending.label, null));
     }
 
     if (id === 'cfgtktcat') {
@@ -936,11 +937,11 @@ async function handleConfigInteraction(interaction) {
       const pending = pendingTicketTypes.get(pendingKey);
       if (!pending || getTicketTypeByLabel.get(interaction.guildId, pending.label)) {
         pendingTicketTypes.delete(pendingKey);
-        return await interaction.update(ticketsView(interaction.guild));
+        return await mettreAJour(interaction, ticketsView(interaction.guild));
       }
       const result = insertTicketType.run(interaction.guildId, pending.label, pending.emoji, interaction.values[0], null);
       pendingTicketTypes.delete(pendingKey);
-      await interaction.update(ticketsView(interaction.guild, Number(result.lastInsertRowid)));
+      await mettreAJour(interaction, ticketsView(interaction.guild, Number(result.lastInsertRowid)));
       await interaction.followUp({
         content:
           `✅ Type « **${pending.label}** » créé. Définissez son rôle support via le sélecteur si besoin, ` +
@@ -957,11 +958,11 @@ async function handleConfigInteraction(interaction) {
     if (id.startsWith('cfgtktrole:')) {
       const typeId = Number(id.split(':')[1]);
       const type = getTicketType.get(typeId, interaction.guildId);
-      if (!type) return await interaction.update(ticketsView(interaction.guild));
+      if (!type) return await mettreAJour(interaction, ticketsView(interaction.guild));
       // Fusion : les rôles support s'accumulent (voir Rôles). Retrait = « Vider support ».
       const roleIds = [...new Set([...supportRoleIds(type), ...interaction.values.map(String)])].slice(0, 10);
       setTicketSupport.run(roleIds[0] || null, roleIds.length ? JSON.stringify(roleIds) : null, typeId, interaction.guildId);
-      await interaction.update(ticketsView(interaction.guild, typeId));
+      await mettreAJour(interaction, ticketsView(interaction.guild, typeId));
       await sendLog(
         interaction.guild,
         logEmbed('🎫 Rôles support définis', `**${type.label}** → ${roleIds.map((r) => `<@&${r}>`).join(' ')}\nPar <@${interaction.user.id}>`, COLORS.INFO)
@@ -973,9 +974,9 @@ async function handleConfigInteraction(interaction) {
     if (id.startsWith('cfgtktrolereset:')) {
       const typeId = Number(id.split(':')[1]);
       const type = getTicketType.get(typeId, interaction.guildId);
-      if (!type) return await interaction.update(ticketsView(interaction.guild));
+      if (!type) return await mettreAJour(interaction, ticketsView(interaction.guild));
       setTicketSupport.run(null, null, typeId, interaction.guildId);
-      await interaction.update(ticketsView(interaction.guild, typeId));
+      await mettreAJour(interaction, ticketsView(interaction.guild, typeId));
       await sendLog(
         interaction.guild,
         logEmbed('🎫 Rôles support vidés', `**${type.label}** : rôles support réinitialisés par <@${interaction.user.id}>.`, COLORS.WARNING)
@@ -986,9 +987,9 @@ async function handleConfigInteraction(interaction) {
     if (id.startsWith('cfgtktdel:')) {
       const typeId = Number(id.split(':')[1]);
       const type = getTicketType.get(typeId, interaction.guildId);
-      if (!type) return await interaction.update(ticketsView(interaction.guild));
+      if (!type) return await mettreAJour(interaction, ticketsView(interaction.guild));
       deleteTicketTypeStmt.run(typeId, interaction.guildId);
-      await interaction.update(ticketsView(interaction.guild));
+      await mettreAJour(interaction, ticketsView(interaction.guild));
       await interaction.followUp({
         content: `🗑 Type « **${type.label}** » supprimé. Republiez le panneau : \`/ticket panneau-modifier\`.`,
         flags: MessageFlags.Ephemeral,
@@ -1001,7 +1002,7 @@ async function handleConfigInteraction(interaction) {
     }
 
     if (id === 'cfgchansel') {
-      return await interaction.update(salonsView(interaction.guild, interaction.values[0]));
+      return await mettreAJour(interaction, salonsView(interaction.guild, interaction.values[0]));
     }
 
     // 🔔 Mention des patch notes : « personne » (défaut), @everyone, @here…
@@ -1009,7 +1010,7 @@ async function handleConfigInteraction(interaction) {
       const choix = interaction.values[0];
       const valeur = choix === 'aucune' ? null : choix;
       setGuildConfig(interaction.guildId, 'patch_mention', valeur);
-      await interaction.update(salonsView(interaction.guild, 'patch_channel_id'));
+      await mettreAJour(interaction, salonsView(interaction.guild, 'patch_channel_id'));
       await sendLog(
         interaction.guild,
         logEmbed('⚙️ Configuration modifiée', `🔔 Mention des patch notes → ${libelleMention(valeur)}\nPar <@${interaction.user.id}>`, COLORS.INFO)
@@ -1021,7 +1022,7 @@ async function handleConfigInteraction(interaction) {
     if (id === 'cfgpatchrole') {
       const roleId = interaction.values[0] || null;
       setGuildConfig(interaction.guildId, 'patch_mention', roleId);
-      await interaction.update(salonsView(interaction.guild, 'patch_channel_id'));
+      await mettreAJour(interaction, salonsView(interaction.guild, 'patch_channel_id'));
       await sendLog(
         interaction.guild,
         logEmbed('⚙️ Configuration modifiée', `🔔 Mention des patch notes → ${libelleMention(roleId)}\nPar <@${interaction.user.id}>`, COLORS.INFO)
@@ -1034,7 +1035,7 @@ async function handleConfigInteraction(interaction) {
       if (!(col in CHANNEL_COLUMNS)) return;
       const channelId = interaction.values[0];
       setGuildConfig(interaction.guildId, col, channelId);
-      await interaction.update(col === 'captcha_channel_id' ? securiteView(interaction.guild) : salonsView(interaction.guild, col));
+      await mettreAJour(interaction, col === 'captcha_channel_id' ? securiteView(interaction.guild) : salonsView(interaction.guild, col));
       await sendLog(
         interaction.guild,
         logEmbed('⚙️ Configuration modifiée', `${CHANNEL_COLUMNS[col]} → <#${channelId}>\nPar <@${interaction.user.id}>`, COLORS.INFO)
@@ -1064,7 +1065,7 @@ async function handleConfigInteraction(interaction) {
       setGuildConfig(interaction.guildId, 'xp_text', xpText);
       setGuildConfig(interaction.guildId, 'xp_voice', xpVoice);
       setGuildConfig(interaction.guildId, 'xp_cooldown', cooldown);
-      if (interaction.isFromMessage()) await interaction.update(xpView(interaction.guild));
+      if (interaction.isFromMessage()) await mettreAJour(interaction, xpView(interaction.guild));
       else await interaction.reply({ content: '✅ Réglages XP mis à jour.', flags: MessageFlags.Ephemeral });
       await sendLog(
         interaction.guild,

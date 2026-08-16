@@ -1,5 +1,7 @@
 const { MessageFlags } = require('discord.js');
 const { reglages, guildeDe } = require('./styleEmbeds');
+const { styliserUn } = require('./identite');
+const C = require('./cartes');
 
 // 📮 Répondre à une interaction SANS retomber sur l'ancien style d'embed.
 //
@@ -77,3 +79,106 @@ async function repondre(interaction, payload) {
 }
 
 module.exports = { repondre, cartesActives, CLOTURE };
+
+
+// ══════════════════════════════════════════════════════════════════
+// 🔄 METTRE À JOUR UN MESSAGE DÉJÀ ENVOYÉ EN CARTE
+// ══════════════════════════════════════════════════════════════════
+//
+// Une carte n'a ni `content` ni `embeds` : TOUT son contenu vit dans ses
+// composants. D'où deux façons de la casser sans s'en rendre compte :
+//
+//   update({ components: [] })            → message vide → Discord refuse
+//   update({ embeds: [nouvelEmbed] })     → embeds interdits → Discord refuse
+//
+// Les deux se soldent par « Échec de l'interaction », sans trace côté bot.
+// C'est ce qui cassait les boutons « Rendre » des animations : le message
+// partait bien en carte, et retirer ses boutons le vidait.
+//
+// `mettreAJour` traite les deux familles : sur un message classique elle
+// appelle update() tel quel, sur une carte elle reconstruit le contenu en
+// composants.
+
+const RANGEE = C.T.RANGEE;
+
+function estCarte(message) {
+  const f = Number(message?.flags?.bitfield ?? message?.flags ?? 0);
+  return Boolean(f & C.DRAPEAU_V2);
+}
+
+// Les réglages du serveur, tels que la couche réseau les appliquerait.
+function contexteDe(interaction) {
+  const guild = interaction.guild || null;
+  const r = reglages(guild?.id);
+  return {
+    r,
+    contexte: {
+      reglages: r,
+      bot: interaction.client?.user?.username || null,
+      serveur: guild?.name || null,
+      icone: guild?.iconURL?.({ size: 64 }) || null,
+    },
+  };
+}
+
+const enJSON = (x) => (x && typeof x.toJSON === 'function' ? x.toJSON() : x);
+
+// Construit les composants d'une carte à partir d'un payload classique.
+function composantsPour(interaction, payload, message) {
+  const rangees = (payload.components || []).map(enJSON);
+  const embeds = (payload.embeds || []).map(enJSON);
+
+  if (embeds.length) {
+    const { r, contexte } = contexteDe(interaction);
+    const cartes = [];
+    if (String(payload.content || '').trim()) cartes.push({ type: C.T.TEXTE, content: String(payload.content) });
+    for (const e of embeds) {
+      const habille = r.actif ? styliserUn(JSON.parse(JSON.stringify(e)), contexte) : e;
+      const carte = C.enCarte(habille, { bordure: r.bordure, titre: r.titre, serveur: contexte.serveur });
+      if (!carte) return null; // non convertible : l'appelant fera autrement
+      cartes.push(carte);
+    }
+    return [...cartes, ...rangees];
+  }
+
+  // Pas d'embed fourni : soit on remplace le contenu par un simple texte,
+  // soit on ne touche qu'aux rangées de boutons.
+  if (Object.prototype.hasOwnProperty.call(payload, 'content')) {
+    const t = String(payload.content ?? '').trim();
+    return [...(t ? [{ type: C.T.TEXTE, content: t }] : []), ...rangees];
+  }
+
+  // ⚠️ On GARDE la carte et on ne remplace que les rangées : c'est le cas du
+  // « retirer les boutons », qui vidait le message jusqu'ici.
+  const existants = (message?.components || []).map(enJSON).filter((c) => c.type !== RANGEE);
+  return [...existants, ...rangees];
+}
+
+async function mettreAJour(interaction, payload) {
+  const message = interaction.message;
+  if (!estCarte(message)) return interaction.update(payload).catch(() => null);
+
+  const composants = composantsPour(interaction, payload, message);
+  if (!composants || !composants.length) {
+    // Rien de convertible : plutôt que d'envoyer un message vide, on laisse
+    // la carte en place et on retire seulement les boutons.
+    const restants = (message.components || []).map(enJSON).filter((c) => c.type !== RANGEE);
+    if (restants.length) {
+      return interaction.update({ components: restants, flags: C.DRAPEAU_V2 }).catch(() => null);
+    }
+    return interaction.deferUpdate().catch(() => null);
+  }
+
+  const ok = await interaction
+    .update({ components: composants, flags: C.DRAPEAU_V2 })
+    .then(() => true)
+    .catch(() => false);
+  if (ok) return null;
+
+  // Repli : si la mise à jour est refusée, on accuse au moins réception —
+  // sans quoi l'utilisateur verrait « Échec de l'interaction ».
+  return interaction.deferUpdate().catch(() => null);
+}
+
+module.exports.mettreAJour = mettreAJour;
+module.exports.estCarte = estCarte;

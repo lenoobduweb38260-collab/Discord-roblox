@@ -10,6 +10,7 @@ const { GRADES } = require('../utils/permissions');
 const { getGuildConfig } = require('../database');
 const { COLORS } = require('../utils/embeds');
 const G = require('../utils/saoGame');
+const { mettreAJour } = require('../utils/reponse');
 
 // ----- ⚔️ Aventure SAO -----
 // Jeu d'aventure interactif (façon « Aventure » de Koya) sur le thème Sword Art
@@ -400,7 +401,7 @@ module.exports = {
       } else {
         embed.setTitle(`💀 Vaincu par ${res.mob}…`).setDescription(`Perte de **${res.lostCol} Col**, PV restaurés.\n❤️ ${p.hp}/${G.maxHp(p.level)} · 💰 ${p.col}`);
       }
-      return interaction.update({ embeds: [embed], components: [new ActionRowBuilder().addComponents(
+      return mettreAJour(interaction, { embeds: [embed], components: [new ActionRowBuilder().addComponents(
         new ButtonBuilder().setCustomId(`sao:hunt:${u}`).setLabel('Rechasser').setEmoji('🔁').setStyle(ButtonStyle.Primary)
       )] });
     }
@@ -409,7 +410,7 @@ module.exports = {
       const p = G.getPlayer(g, u);
       if (!p) return interaction.reply({ content: '🕹️ Fais `/sao start` d\'abord.', flags: MessageFlags.Ephemeral });
       if (p.weapon >= G.TOP_WEAPON) {
-        return interaction.update(forgePayload(p, interaction.user));
+        return mettreAJour(interaction, forgePayload(p, interaction.user));
       }
       const next = G.WEAPONS[p.weapon + 1];
       if (p.col < next.cost) {
@@ -422,7 +423,7 @@ module.exports = {
       G.savePlayer(p);
       const payload = forgePayload(p, interaction.user);
       payload.content = `🔨 Tu as forgé **${G.WEAPONS[p.weapon].name}** !${badgesText(forged)}`;
-      return interaction.update(payload);
+      return mettreAJour(interaction, payload);
     }
 
     // ----- Combat de boss -----
@@ -441,7 +442,7 @@ module.exports = {
         G.savePlayer(p);
       }
       const embed = new EmbedBuilder().setColor(COLORS.WARNING).setTitle('🏃 Fuite').setDescription(`Tu fuis **${fight.bossName}**… l'étage ${fight.floor} attendra. Reviens plus fort !`);
-      return interaction.update({ embeds: [embed], components: [] });
+      return mettreAJour(interaction, { embeds: [embed], components: [] });
     }
 
     if (action === 'atk') {
@@ -454,7 +455,7 @@ module.exports = {
       if (fight.bHp <= 0) {
         fight.over = true;
         fights.delete(key);
-        return interaction.update(await resolveVictory(interaction, fight));
+        return mettreAJour(interaction, await resolveVictory(interaction, fight));
       }
 
       // Le boss riposte.
@@ -479,10 +480,10 @@ module.exports = {
           .setColor(COLORS.DANGER)
           .setTitle('💀 Défaite')
           .setDescription(`**${fight.bossName}** t'a terrassé (perte de **${lost} Col**). Tu réapparais en ville, PV restaurés.\n\n🔨 Forge une meilleure arme (\`/sao forge\`) puis retente !`);
-        return interaction.update({ embeds: [embed], components: [] });
+        return mettreAJour(interaction, { embeds: [embed], components: [] });
       }
 
-      return interaction.update({ embeds: [bossEmbed(fight, interaction.user)], components: [bossButtons(u)] });
+      return mettreAJour(interaction, { embeds: [bossEmbed(fight, interaction.user)], components: [bossButtons(u)] });
     }
   },
 };

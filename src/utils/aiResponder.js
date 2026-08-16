@@ -6,6 +6,7 @@ const {
   ButtonStyle,
   MessageFlags,
 } = require('discord.js');
+const { mettreAJour } = require('./reponse');
 
 // Réponse IA supervisée : quand on mentionne le bot, il génère une réponse et
 // l'envoie EN MP au créateur, qui choisit le ton, régénère ou envoie. Le bot ne
@@ -170,7 +171,7 @@ async function handle(interaction) {
 
   if (action === 'cancel') {
     pending.delete(id);
-    return interaction.update({ content: '❌ Annulé.', embeds: [], components: [] });
+    return mettreAJour(interaction, { content: '❌ Annulé.', embeds: [], components: [] });
   }
 
   if (action === 'send') {
@@ -181,7 +182,7 @@ async function handle(interaction) {
         channel.send({ content: state.response }).catch(() => null)
       );
     }
-    return interaction.update({ content: '✅ Réponse envoyée.', embeds: [], components: [] });
+    return mettreAJour(interaction, { content: '✅ Réponse envoyée.', embeds: [], components: [] });
   }
 
   // tone change / regen : régénération

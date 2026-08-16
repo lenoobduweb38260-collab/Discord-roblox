@@ -11,6 +11,7 @@ const {
   MessageFlags,
 } = require('discord.js');
 const balises = require('./balises');
+const { mettreAJour } = require('./reponse');
 
 // Éditeur d'embed/message avec APERÇU EN DIRECT : le message affiché dans
 // l'éditeur (éphémère) est exactement celui qui sera envoyé. À chaque
@@ -143,25 +144,25 @@ async function handle(interaction) {
     state.title = interaction.fields.getTextInputValue('title');
     state.description = interaction.fields.getTextInputValue('description');
     state.footer = interaction.fields.getTextInputValue('footer');
-    return interaction.update(editorPayload(id, state));
+    return mettreAJour(interaction, editorPayload(id, state));
   }
   if (kind === 'embm' && action === 'sty') {
     state.color = parseColor(interaction.fields.getTextInputValue('color'));
     state.image = interaction.fields.getTextInputValue('image').trim();
     state.thumbnail = interaction.fields.getTextInputValue('thumbnail').trim();
     state.author = interaction.fields.getTextInputValue('author');
-    return interaction.update(editorPayload(id, state));
+    return mettreAJour(interaction, editorPayload(id, state));
   }
 
   // Choix du salon
   if (kind === 'emb' && action === 'ch') {
     state.targetChannelId = interaction.values[0];
-    return interaction.update(editorPayload(id, state));
+    return mettreAJour(interaction, editorPayload(id, state));
   }
 
   if (kind === 'emb' && action === 'cxl') {
     drafts.delete(id);
-    return interaction.update({ content: '❌ Annulé.', embeds: [], components: [] });
+    return mettreAJour(interaction, { content: '❌ Annulé.', embeds: [], components: [] });
   }
 
   if (kind === 'emb' && action === 'snd') {
@@ -172,7 +173,7 @@ async function handle(interaction) {
     const payload = render(state);
     await channel.send({ content: payload.content || undefined, embeds: payload.embeds });
     drafts.delete(id);
-    return interaction.update({ content: `✅ Message envoyé dans <#${channel.id}>.`, embeds: [], components: [] });
+    return mettreAJour(interaction, { content: `✅ Message envoyé dans <#${channel.id}>.`, embeds: [], components: [] });
   }
 }
 

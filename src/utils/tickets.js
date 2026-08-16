@@ -19,6 +19,7 @@ const { GRADES, getGrade } = require('./permissions');
 const balises = require('./balises');
 const M = require('./miseEnPage');
 const { reglages } = require('./styleEmbeds');
+const { mettreAJour } = require('./reponse');
 
 const listTypes = db.prepare('SELECT * FROM ticket_types WHERE guild_id = ? ORDER BY id');
 const getType = db.prepare('SELECT * FROM ticket_types WHERE id = ? AND guild_id = ?');
@@ -342,7 +343,7 @@ async function handlePanelBuilder(interaction) {
   try {
     if (interaction.isStringSelectMenu() && interaction.customId === 'tktpansel') {
       const panel = getPanelById.get(Number(interaction.values[0]), interaction.guildId);
-      if (!panel) return await interaction.update({ content: '❌ Panneau introuvable.', components: [] });
+      if (!panel) return await mettreAJour(interaction, { content: '❌ Panneau introuvable.', components: [] });
       return await openModifyModal(interaction, panel);
     }
     if (interaction.isModalSubmit() && interaction.customId === 'tktpanmodal') {
@@ -914,7 +915,7 @@ function ficheTicket(interaction, ticket, type) {
 // Remet le menu à zéro pour pouvoir rechoisir la même action ensuite.
 async function resetStaffMenu(interaction) {
   try {
-    await interaction.update({ components: interaction.message.components.map((c) => (c.toJSON ? c.toJSON() : c)) });
+    await mettreAJour(interaction, { components: interaction.message.components.map((c) => (c.toJSON ? c.toJSON() : c)) });
   } catch {
     // Interaction déjà consommée : sans importance.
   }
@@ -923,20 +924,20 @@ async function resetStaffMenu(interaction) {
 // Ajout / retrait d'un membre choisi dans le sélecteur.
 async function appliquerMembre(interaction, ticketId, ajout) {
   const ticket = getTicketById.get(ticketId, interaction.guildId);
-  if (!ticket) return interaction.update({ content: '❌ Ticket introuvable.', components: [] });
+  if (!ticket) return mettreAJour(interaction, { content: '❌ Ticket introuvable.', components: [] });
   const type = ticket.type_id ? getType.get(ticket.type_id, interaction.guildId) : null;
   if (!canManageTicket(interaction.member, type)) return refuser(interaction);
 
   const cibleId = interaction.values[0];
   if (!ajout && cibleId === ticket.user_id) {
-    return interaction.update({
+    return mettreAJour(interaction, {
       content: '❌ Impossible de retirer le **demandeur** de son propre ticket. Fermez le ticket à la place.',
       components: [],
     });
   }
 
   const channel = await interaction.guild.channels.fetch(ticket.channel_id).catch(() => null);
-  if (!channel) return interaction.update({ content: '❌ Salon du ticket introuvable.', components: [] });
+  if (!channel) return mettreAJour(interaction, { content: '❌ Salon du ticket introuvable.', components: [] });
 
   const ok = await channel.permissionOverwrites
     .edit(cibleId, ajout
@@ -946,13 +947,13 @@ async function appliquerMembre(interaction, ticketId, ajout) {
     .catch(() => false);
 
   if (!ok) {
-    return interaction.update({
+    return mettreAJour(interaction, {
       content: '❌ Modification impossible : vérifiez que le bot a **Gérer les permissions** sur ce salon.',
       components: [],
     });
   }
 
-  await interaction.update({ content: `✅ <@${cibleId}> ${ajout ? 'ajouté au' : 'retiré du'} ticket.`, components: [] });
+  await mettreAJour(interaction, { content: `✅ <@${cibleId}> ${ajout ? 'ajouté au' : 'retiré du'} ticket.`, components: [] });
   await channel
     .send({
       embeds: [

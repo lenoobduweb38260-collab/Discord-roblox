@@ -13,6 +13,7 @@ const { GRADES } = require('../utils/permissions');
 const { getGuildConfig } = require('../database');
 const { isCreator } = require('../utils/botTeam');
 const patch = require('../utils/patchNotes');
+const { mettreAJour } = require('../utils/reponse');
 
 // Patch notes : le créateur rédige une note (mise à jour / retrait /
 // amélioration / fix) UNIQUEMENT côté utilisateurs (jamais ce qui touche le
@@ -130,10 +131,10 @@ module.exports = {
     // Boutons
     const [, action, id] = interaction.customId.split(':');
     const fields = drafts.get(id);
-    if (!fields) return interaction.update({ content: '⏳ Brouillon expiré.', embeds: [], components: [] }).catch(() => null);
+    if (!fields) return mettreAJour(interaction, { content: '⏳ Brouillon expiré.', embeds: [], components: [] }).catch(() => null);
     if (action === 'cxl') {
       drafts.delete(id);
-      return interaction.update({ content: '❌ Annulé.', embeds: [], components: [] });
+      return mettreAJour(interaction, { content: '❌ Annulé.', embeds: [], components: [] });
     }
     // pub
     if (!(await isCreator(interaction.client, interaction.user.id))) {
@@ -155,6 +156,6 @@ module.exports = {
       }
     }
     drafts.delete(id);
-    return interaction.update({ content: `✅ Patch note publiée dans **${count}** serveur(s).`, embeds: [buildEmbed(fields)], components: [] });
+    return mettreAJour(interaction, { content: `✅ Patch note publiée dans **${count}** serveur(s).`, embeds: [buildEmbed(fields)], components: [] });
   },
 };

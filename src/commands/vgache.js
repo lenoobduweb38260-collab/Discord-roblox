@@ -3,6 +3,7 @@ const { db } = require('../database');
 const { COLORS } = require('../utils/embeds');
 const { GRADES } = require('../utils/permissions');
 const { isCreator } = require('../utils/botTeam');
+const { mettreAJour } = require('../utils/reponse');
 
 // Vgache : gacha façon Mudae. Le roster (personnages : nom + image) est GLOBAL
 // et rempli par le créateur ; la collection (qui possède qui) est propre à
@@ -133,7 +134,7 @@ module.exports = {
     const res = claim.run(interaction.guildId, charId, interaction.user.id, new Date().toISOString());
     if (!res.changes) return interaction.reply({ content: '❌ Trop tard, déjà réclamé.', flags: MessageFlags.Ephemeral });
     claimCd.set(key, now);
-    await interaction.update({
+    await mettreAJour(interaction, {
       embeds: [charEmbed(ch, interaction.user.username)],
       components: [
         new ActionRowBuilder().addComponents(

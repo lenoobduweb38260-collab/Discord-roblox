@@ -62,6 +62,13 @@ Trois règles à ne jamais enfreindre :
 
   La seule exception légitime est un aperçu qui se rafraîchit en boucle
   (l'éditeur d'IA) : le convertir enverrait un message par frappe.
+
+  **Et l'inverse est vrai aussi.** Une carte n'a ni `content` ni `embeds` :
+  tout son contenu vit dans ses composants. Donc `update({ components: [] })`
+  la VIDE — Discord refuse, et l'utilisateur voit « Échec de l'interaction ».
+  Idem pour `update({ embeds: [...] })`, interdit sur une carte. Toute mise à
+  jour d'un message du bot passe par `mettreAJour()` (`src/utils/reponse.js`),
+  qui reconstruit le contenu en composants quand la cible est une carte.
 - **Toujours un repli.** Si l'API refuse (code 400), on rejoue la requête
   d'origine. Un message dans l'ancien style vaut infiniment mieux qu'aucun
   message. Après trois refus, on cesse d'insister.
