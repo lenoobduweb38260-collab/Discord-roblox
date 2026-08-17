@@ -10,7 +10,7 @@ const {
 } = require('discord.js');
 const { db } = require('../database');
 const { GRADES } = require('../utils/permissions');
-const { repondreVite } = require('../utils/reponse');
+const { repondreVite, mettreAJour } = require('../utils/reponse');
 
 // Interactions façon Nekotina : GIF anime, compteur par duo, boutons
 // « Rendre » / « Rejeter », badges par paliers envoyés en MP, et textes

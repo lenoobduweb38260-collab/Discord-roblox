@@ -1053,6 +1053,19 @@ const RELEASES = [
     ],
     retrait: [],
   },
+  {
+    id: 'bouton-rendre-2026-08ax',
+    title: 'Le bouton « Rendre » des animations 🖐️',
+    ajout: [],
+    amelioration: [
+      '🔍 **Deux controles automatiques** empechent ce defaut de revenir : l\'un releve tout appel de fonction non importe, l\'autre CHARGE les 91 modules du bot pour de bon. Un import mort ne casse qu\'au chargement — donc au demarrage, ou jamais si le module est appele plus tard',
+    ],
+    fix: [
+      '🩹 **Rendre un calin, un bisou ou une caresse echouait a tous les coups.** La fonction qui met a jour la carte etait appelee sans avoir ete importee : le code est syntaxiquement parfait, `node --check` ne voit rien, et l\'erreur disparaissait dans le filet de la commande — remplacee par un « ❌ Une erreur est survenue » qui ne disait rien',
+      '🃏 En repondant desormais **sans differer**, `/interact` envoie une vraie carte : c\'est ce passage qui a fait sortir le defaut de l\'ombre, puisque le bouton touchait une carte pour la premiere fois',
+    ],
+    retrait: [],
+  },
 ];
 
 // Construit l'embed d'une note à partir d'une entrée { title, ajout, fix,
