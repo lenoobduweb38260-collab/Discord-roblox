@@ -11,6 +11,8 @@ const {
 const { db } = require('../database');
 const M = require('./miseEnPage');
 const { reglages } = require('./styleEmbeds');
+const { mettreAJour, estCarte, enComposants } = require('./reponse');
+const { DRAPEAU_V2 } = require('./cartes');
 
 // Listes RP partagées : Blacklist RP (kind « blrp ») et Whitelist RP (« wlrp »).
 // Même structure : un embed « panneau » posté dans un salon, trié par ordre
@@ -73,14 +75,21 @@ const setBoard = db.prepare(
 );
 
 // Une entrée de liste, dans la grammaire du projet : ➜ et jamais un numéro.
-// L'identifiant brut disparaît de la ligne — la mention le porte déjà, et il
-// prenait à lui seul un cinquième de la largeur sur téléphone. La raison,
-// quand il y en a une, passe en sous-texte : elle éclaire sans encombrer.
+//
+// 🆔 L'identifiant est INDISPENSABLE : c'est lui qu'on copie pour bannir,
+// retrouver un compte parti du serveur, ou vérifier une correspondance. Une
+// mention ne le montre pas, et un membre qui a quitté le serveur n'affiche
+// même plus de nom. Il avait été retiré pour gagner de la largeur sur
+// téléphone — c'était échanger l'utile contre le joli.
+//
+// Il vit donc en sous-texte, avec la raison : lisible et copiable, sans
+// manger la ligne principale.
 function entryLine(r) {
   const tete = `**${r.roblox_name || '?'}** · <@${r.user_id}>`;
   const tag = r.discord_tag ? ` — ${r.discord_tag}` : '';
-  const raison = r.reason ? `\n-# 📄 ${r.reason}` : '';
-  return `${M.entree(tete + tag)}${raison}`;
+  const details = [`🆔 \`${r.user_id}\``];
+  if (r.reason) details.push(`📄 ${r.reason}`);
+  return `${M.entree(tete + tag)}\n-# ${details.join(' · ')}`;
 }
 
 // ----- 📄 Pagination -----
@@ -245,6 +254,18 @@ async function refreshBoard(client, kind, guildId) {
       }
     }
 
+    // ⚠️ Panneau DÉJÀ en carte : `edit({ embeds })` y est refusé par Discord,
+    // et le refus est silencieux (il est avalé par le catch du dessous). Le
+    // panneau cessait donc simplement de se mettre à jour — un ajout ou un
+    // retrait n'apparaissait plus, sans la moindre erreur visible.
+    if (estCarte(msg)) {
+      const composants = enComposants(msg.guild || channel.guild || null, client, contenu);
+      if (composants?.length) {
+        await msg.edit({ components: composants, flags: DRAPEAU_V2 });
+        return;
+      }
+    }
+
     await msg.edit(contenu);
   } catch {
     /* le panneau a pu être supprimé : on ignore */
@@ -267,15 +288,18 @@ async function handleSearchInteraction(interaction) {
     const [, kind, pageBrute, ...reste] = interaction.customId.split(':');
     const filtre = reste.join(':');
     const page = Number(pageBrute) || 0;
-    // deferUpdate d'abord : Discord n'attend que 3 secondes, et la liste peut
-    // être longue à reconstruire.
-    await interaction.deferUpdate().catch(() => {});
-    return interaction
-      .editReply({
-        embeds: [renderEmbed(kind, interaction.guildId, filtre, page)],
-        components: [searchRow(kind, interaction.guildId, filtre, page)],
-      })
-      .catch(() => {});
+    // ⚠️ Ni deferUpdate, ni editReply. Le panneau est une CARTE : ses embeds
+    // n'existent plus, tout son contenu vit dans ses composants, et Discord
+    // refuse un `embeds` sur un tel message. L'échec était muet — le bouton
+    // tournait dans le vide et la page ne changeait jamais.
+    //
+    // `mettreAJour` reconstruit la carte quand c'en est une, et retombe sur
+    // un update() classique sinon. La reconstruction ne fait aucun appel
+    // réseau : rien à différer.
+    return mettreAJour(interaction, {
+      embeds: [renderEmbed(kind, interaction.guildId, filtre, page)],
+      components: [searchRow(kind, interaction.guildId, filtre, page)],
+    });
   }
   if (interaction.isButton()) {
     const kind = interaction.customId.split(':')[1];

@@ -1066,6 +1066,20 @@ const RELEASES = [
     ],
     retrait: [],
   },
+  {
+    id: 'listes-rp-pages-ids-2026-08ay',
+    title: 'Listes RP : les identifiants reviennent, les pages tournent 📋',
+    ajout: [],
+    amelioration: [
+      '🆔 **L\'identifiant est de retour** sous chaque entree des listes Blacklist et Whitelist RP. Il avait ete retire pour gagner de la largeur sur telephone — c\'etait echanger l\'utile contre le joli : c\'est lui qu\'on copie pour bannir, ou pour retrouver un compte qui a quitte le serveur et n\'affiche donc plus aucun nom',
+      '📄 Il occupe la ligne discrete sous l\'entree, avec la raison : lisible et copiable, sans manger la ligne principale',
+    ],
+    fix: [
+      '🩹 **Les boutons ◀️ / ▶️ ne changeaient plus de page.** Le panneau est devenu une carte, et une carte n\'a ni texte ni embed : tout son contenu vit dans ses composants. Discord refusait donc la mise a jour — en silence. Le bouton tournait dans le vide',
+      '🩹 **Et le panneau ne se mettait plus a jour du tout.** Meme cause : apres un ajout ou un retrait, le bot tentait de reecrire des embeds sur une carte. Le refus etant muet, la liste restait figee sans la moindre erreur visible',
+    ],
+    retrait: [],
+  },
 ];
 
 // Construit l'embed d'une note à partir d'une entrée { title, ajout, fix,

@@ -132,17 +132,41 @@ function estCarte(message) {
 
 // Les réglages du serveur, tels que la couche réseau les appliquerait.
 function contexteDe(interaction) {
-  const guild = interaction.guild || null;
+  return contexteDeGuilde(interaction.guild || null, interaction.client);
+}
+
+function contexteDeGuilde(guild, client) {
   const r = reglages(guild?.id);
   return {
     r,
     contexte: {
       reglages: r,
-      bot: interaction.client?.user?.username || null,
+      bot: client?.user?.username || null,
       serveur: guild?.name || null,
       icone: guild?.iconURL?.({ size: 64 }) || null,
     },
   };
+}
+
+// 🃏 Traduit un payload classique { content, embeds, components } en
+// composants de carte. Renvoie null si le contenu ne tient pas dans une carte.
+//
+// Utile hors interaction : un panneau se met à jour tout seul après un ajout
+// ou un retrait, sans que personne n'ait cliqué. `message.edit({ embeds })`
+// sur une carte est refusé par Discord — et l'échec est muet, donc le panneau
+// cessait simplement de se mettre à jour.
+function enComposants(guild, client, payload) {
+  const { r, contexte } = contexteDeGuilde(guild, client);
+  const rangees = (payload.components || []).map(enJSON);
+  const cartes = [];
+  if (String(payload.content || '').trim()) cartes.push({ type: C.T.TEXTE, content: String(payload.content) });
+  for (const e of (payload.embeds || []).map(enJSON)) {
+    const habille = r.actif ? styliserUn(JSON.parse(JSON.stringify(e)), contexte) : e;
+    const carte = C.enCarte(habille, { bordure: r.bordure, titre: r.titre, serveur: contexte.serveur });
+    if (!carte) return null;
+    cartes.push(carte);
+  }
+  return [...cartes, ...rangees];
 }
 
 const enJSON = (x) => (x && typeof x.toJSON === 'function' ? x.toJSON() : x);
@@ -153,16 +177,10 @@ function composantsPour(interaction, payload, message) {
   const embeds = (payload.embeds || []).map(enJSON);
 
   if (embeds.length) {
-    const { r, contexte } = contexteDe(interaction);
-    const cartes = [];
-    if (String(payload.content || '').trim()) cartes.push({ type: C.T.TEXTE, content: String(payload.content) });
-    for (const e of embeds) {
-      const habille = r.actif ? styliserUn(JSON.parse(JSON.stringify(e)), contexte) : e;
-      const carte = C.enCarte(habille, { bordure: r.bordure, titre: r.titre, serveur: contexte.serveur });
-      if (!carte) return null; // non convertible : l'appelant fera autrement
-      cartes.push(carte);
-    }
-    return [...cartes, ...rangees];
+    // Même rendu que hors interaction : deux implémentations finiraient par
+    // diverger, et un panneau n'aurait pas la même tête selon qu'on ait
+    // cliqué ou non.
+    return enComposants(interaction.guild || null, interaction.client, payload);
   }
 
   // Pas d'embed fourni : soit on remplace le contenu par un simple texte,
@@ -206,3 +224,4 @@ async function mettreAJour(interaction, payload) {
 
 module.exports.mettreAJour = mettreAJour;
 module.exports.estCarte = estCarte;
+module.exports.enComposants = enComposants;
