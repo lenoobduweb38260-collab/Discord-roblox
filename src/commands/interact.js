@@ -10,7 +10,7 @@ const {
 } = require('discord.js');
 const { db } = require('../database');
 const { GRADES } = require('../utils/permissions');
-const { repondreVite, mettreAJour } = require('../utils/reponse');
+const { repondreVite, mettreAJour, suivre } = require('../utils/reponse');
 
 // Interactions façon Nekotina : GIF anime, compteur par duo, boutons
 // « Rendre » / « Rejeter », badges par paliers envoyés en MP, et textes
@@ -462,7 +462,7 @@ module.exports = {
       }
       if (prefix === 'itxr') {
         await mettreAJour(interaction, { components: [] });
-        await interaction.followUp({ content: L.rejected(`<@${toId}>`, `<@${fromId}>`) });
+        await suivre(interaction, { content: L.rejected(`<@${toId}>`, `<@${fromId}>`) });
         return;
       }
       // « Rendre » : nouvelle interaction dans l'autre sens, boutons retirés de l'original.
@@ -470,12 +470,10 @@ module.exports = {
       const target = await interaction.client.users.fetch(fromId);
       await mettreAJour(interaction, { components: [] });
       const payload = await buildInteractionMessage(interaction, actionKey, author, target, false, lang);
-      await interaction.followUp(payload);
+      await suivre(interaction, payload);
     } catch (err) {
       console.error('Erreur interaction :', err);
-      const payload = { content: '❌ Une erreur est survenue.', flags: MessageFlags.Ephemeral };
-      if (interaction.replied || interaction.deferred) await interaction.followUp(payload).catch(() => null);
-      else await interaction.reply(payload).catch(() => null);
+      await suivre(interaction, { content: '❌ Une erreur est survenue.', flags: MessageFlags.Ephemeral });
     }
   },
 };

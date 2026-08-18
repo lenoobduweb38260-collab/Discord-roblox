@@ -6,7 +6,7 @@ const {
   ButtonStyle,
   MessageFlags,
 } = require('discord.js');
-const { mettreAJour } = require('./reponse');
+const { mettreAJour, suivre } = require('./reponse');
 
 // Réponse IA supervisée : quand on mentionne le bot, il génère une réponse et
 // l'envoie EN MP au créateur, qui choisit le ton, régénère ou envoie. Le bot ne
@@ -194,7 +194,7 @@ async function handle(interaction) {
     state.response = gen.response;
     if (!state.used.includes(gen.tone)) state.used.push(gen.tone);
   } catch (err) {
-    return interaction.followUp({ content: `❌ Régénération impossible : ${err.message}`, flags: MessageFlags.Ephemeral }).catch(() => null);
+    return suivre(interaction, { content: `❌ Régénération impossible : ${err.message}`, flags: MessageFlags.Ephemeral });
   }
   // ⚠️ Volontairement une MODIFICATION, donc un embed classique et non une
   // carte : cet aperçu se rafraîchit à chaque réglage. Le convertir

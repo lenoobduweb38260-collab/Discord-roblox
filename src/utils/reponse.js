@@ -219,6 +219,24 @@ function composantsPour(interaction, payload, message) {
   return [...existants, ...rangees];
 }
 
+// 💬 Un mot APRÈS une mise à jour, sans jamais se tromper de méthode.
+//
+// Le piège : `mettreAJour` avale ses erreurs — c'est voulu, une mise à jour
+// ratée ne doit pas emporter l'action. Mais quand elle rate, l'interaction
+// n'est PAS accusée, et le `followUp` qui suit lève
+// « InteractionNotReplied ». Le message de confirmation disparaissait alors,
+// et l'erreur remontait jusqu'au journal du bot.
+//
+// Choisir d'après `isFromMessage()` ne suffit donc pas : ce qui compte est
+// l'état RÉEL de l'interaction au moment où l'on parle, pas d'où elle vient.
+async function suivre(interaction, payload) {
+  const corps = typeof payload === 'string' ? { content: payload } : payload;
+  if (interaction.replied || interaction.deferred) {
+    return interaction.followUp(corps).catch(() => null);
+  }
+  return interaction.reply(corps).catch(() => null);
+}
+
 // 🔁 Réaffiche un message SANS rien y changer.
 //
 // C'est le seul moyen de remettre une liste déroulante à zéro : Discord garde
@@ -240,7 +258,10 @@ async function reafficher(interaction) {
 
 async function mettreAJour(interaction, payload) {
   const message = interaction.message;
-  if (!estCarte(message)) return interaction.update(payload).catch(() => null);
+  if (!estCarte(message)) {
+    const fait = await interaction.update(payload).then(() => true).catch(() => false);
+    return fait ? null : accuserQuandMeme(interaction);
+  }
 
   const composants = composantsPour(interaction, payload, message);
   if (!composants || !composants.length) {
@@ -248,9 +269,11 @@ async function mettreAJour(interaction, payload) {
     // la carte en place et on retire seulement les boutons.
     const restants = (message.components || []).map(enJSON).filter((c) => c.type !== RANGEE);
     if (restants.length) {
-      return interaction.update({ components: restants, flags: C.DRAPEAU_V2 }).catch(() => null);
+      const fait = await interaction.update({ components: restants, flags: C.DRAPEAU_V2 })
+        .then(() => true).catch(() => false);
+      if (fait) return null;
     }
-    return interaction.deferUpdate().catch(() => null);
+    return accuserQuandMeme(interaction);
   }
 
   const ok = await interaction
@@ -260,11 +283,39 @@ async function mettreAJour(interaction, payload) {
   if (ok) return null;
 
   // Repli : si la mise à jour est refusée, on accuse au moins réception —
-  // sans quoi l'utilisateur verrait « Échec de l'interaction ».
-  return interaction.deferUpdate().catch(() => null);
+  // sans quoi l'utilisateur verrait « Échec de l'interaction », et le message
+  // de confirmation qui suit lèverait « InteractionNotReplied ».
+  return accuserQuandMeme(interaction);
+}
+
+// Dernier recours : accuser réception, quoi qu'il arrive. `deferUpdate`
+// n'existe que pour ce qui vient d'un message ; ailleurs il faut une vraie
+// réponse différée.
+async function accuserQuandMeme(interaction) {
+  if (interaction.replied || interaction.deferred) return null;
+  // ⚠️ Cette fonction est le DERNIER filet : elle ne doit jamais lever, pas
+  // même sur une interaction incomplète. Une exception ici ferait échouer
+  // l'action qu'on essayait justement de rattraper.
+  const essayer = async (methode, ...args) => {
+    try {
+      if (typeof interaction[methode] !== 'function') return false;
+      await interaction[methode](...args);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  // `mettreAJour` ne s'appelle que sur un composant ou un modal ouvert depuis
+  // un message : `deferUpdate` est donc la bonne porte, et on l'essaie
+  // d'abord. `deferReply` ne sert que si elle est fermée.
+  if (await essayer('deferUpdate')) return null;
+  await essayer('deferReply', { flags: MessageFlags.Ephemeral });
+  return null;
 }
 
 module.exports.mettreAJour = mettreAJour;
 module.exports.estCarte = estCarte;
 module.exports.enComposants = enComposants;
 module.exports.reafficher = reafficher;
+module.exports.suivre = suivre;
+module.exports.accuserQuandMeme = accuserQuandMeme;

@@ -19,7 +19,7 @@ const { GRADES, getGrade } = require('./permissions');
 const balises = require('./balises');
 const M = require('./miseEnPage');
 const { reglages } = require('./styleEmbeds');
-const { mettreAJour, reafficher } = require('./reponse');
+const { mettreAJour, reafficher, suivre } = require('./reponse');
 
 const listTypes = db.prepare('SELECT * FROM ticket_types WHERE guild_id = ? ORDER BY id');
 const getType = db.prepare('SELECT * FROM ticket_types WHERE id = ? AND guild_id = ?');
@@ -368,9 +368,7 @@ async function handlePanelBuilder(interaction) {
     }
   } catch (err) {
     console.error('Erreur constructeur de panneau :', err);
-    const payload = { content: '❌ Une erreur est survenue sur le panneau.', flags: MessageFlags.Ephemeral };
-    if (interaction.replied || interaction.deferred) await interaction.followUp(payload).catch(() => null);
-    else await interaction.reply(payload).catch(() => null);
+    await suivre(interaction, { content: '❌ Une erreur est survenue sur le panneau.', flags: MessageFlags.Ephemeral });
   }
 }
 
@@ -752,11 +750,10 @@ const RELANCES = [
 
 // ⚠️ Appelée depuis DEUX chemins : le bouton « Relancer » (interaction
 // vierge) et le menu « Actions staff » (interaction déjà consommée par la
-// remise à zéro du menu). `dire` choisit donc reply ou followUp — sans quoi
-// la relance depuis le menu échouerait silencieusement.
+// remise à zéro du menu). `suivre` regarde l'état réel avant de choisir —
+// sans quoi la relance depuis le menu échouerait silencieusement.
 async function reviveTicket(interaction, ticketId) {
-  const dire = (payload) =>
-    interaction.replied || interaction.deferred ? interaction.followUp(payload) : interaction.reply(payload);
+  const dire = (payload) => suivre(interaction, payload);
   const ticket = getTicket.get(ticketId, interaction.guildId);
   if (!ticket) {
     return dire({ content: '❌ Ce ticket n\'existe plus.', flags: MessageFlags.Ephemeral });
@@ -850,11 +847,11 @@ async function handleStaffMenu(interaction, ticketId) {
   if (choix === 'prendre') {
     if (ticket.claimed_by === moi.id) {
       await resetStaffMenu(interaction);
-      return interaction.followUp({ content: 'ℹ️ Vous avez déjà pris ce ticket en charge.', flags: MessageFlags.Ephemeral });
+      return suivre(interaction, { content: 'ℹ️ Vous avez déjà pris ce ticket en charge.', flags: MessageFlags.Ephemeral });
     }
     claimTicket.run(moi.id, new Date().toISOString(), ticket.id);
     await resetStaffMenu(interaction);
-    await interaction.followUp({
+    await suivre(interaction, {
       embeds: [
         new EmbedBuilder()
           .setColor(COLORS.SUCCESS)
@@ -873,11 +870,11 @@ async function handleStaffMenu(interaction, ticketId) {
   if (choix === 'liberer') {
     if (!ticket.claimed_by) {
       await resetStaffMenu(interaction);
-      return interaction.followUp({ content: 'ℹ️ Ce ticket n\'est pris en charge par personne.', flags: MessageFlags.Ephemeral });
+      return suivre(interaction, { content: 'ℹ️ Ce ticket n\'est pris en charge par personne.', flags: MessageFlags.Ephemeral });
     }
     claimTicket.run(null, null, ticket.id);
     await resetStaffMenu(interaction);
-    await interaction.followUp({
+    await suivre(interaction, {
       embeds: [
         new EmbedBuilder()
           .setColor(COLORS.WARNING)
@@ -893,7 +890,7 @@ async function handleStaffMenu(interaction, ticketId) {
     // par un sélecteur de membres, en éphémère.
     await resetStaffMenu(interaction);
     const ajout = choix === 'ajouter';
-    return interaction.followUp({
+    return suivre(interaction, {
       content: ajout
         ? '➕ Qui ajouter à ce ticket ? *(plusieurs membres possibles)*'
         : '➖ Qui retirer de ce ticket ? *(plusieurs membres possibles)*',
@@ -920,7 +917,7 @@ async function handleStaffMenu(interaction, ticketId) {
 
   if (choix === 'infos') {
     await resetStaffMenu(interaction);
-    return interaction.followUp({ embeds: [ficheTicket(interaction, ticket, type)], flags: MessageFlags.Ephemeral });
+    return suivre(interaction, { embeds: [ficheTicket(interaction, ticket, type)], flags: MessageFlags.Ephemeral });
   }
 
   if (choix === 'supprimer') {
@@ -928,7 +925,7 @@ async function handleStaffMenu(interaction, ticketId) {
     // confirmation. Une fausse manœuvre dans un menu ne doit pas effacer une
     // conversation entière.
     await resetStaffMenu(interaction);
-    return interaction.followUp({
+    return suivre(interaction, {
       content:
         '🗑️ **Supprimer définitivement ce ticket ?**\n' +
         '-# Le salon et toute la conversation disparaissent. Préférez **Fermer le ticket** : la conversation est archivée avant suppression.',
@@ -1073,9 +1070,7 @@ async function handleTicketButton(interaction) {
     // Interaction morte (réponse trop tardive ou en double) : inutile — et
     // impossible — de répondre à nouveau, on évite juste une 2ᵉ erreur bruyante.
     if (err?.code === 10062 || err?.code === 40060) return;
-    const payload = { content: '❌ Une erreur est survenue sur ce ticket.', flags: MessageFlags.Ephemeral };
-    if (interaction.replied || interaction.deferred) await interaction.followUp(payload).catch(() => null);
-    else await interaction.reply(payload).catch(() => null);
+    await suivre(interaction, { content: '❌ Une erreur est survenue sur ce ticket.', flags: MessageFlags.Ephemeral });
   }
 }
 

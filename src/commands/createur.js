@@ -3,6 +3,7 @@ const { GRADES } = require('../utils/permissions');
 const { sendLog, logEmbed, COLORS } = require('../utils/embeds');
 const { isCreator, addImmunity, removeImmunity, listImmunity } = require('../utils/botTeam');
 const { relaunch } = require('../updater');
+const { suivre } = require('../utils/reponse');
 
 // Pouvoirs réservés au CRÉATEUR du bot (OWNER_ID ou propriétaire de
 // l'application) : force update, immunité, retrait manuel d'un serveur.
@@ -107,7 +108,7 @@ module.exports = [
       const name = guild.name;
       await interaction.reply({ content: `👋 Le bot quitte **${name}** (\`${guild.id}\`)…`, flags: MessageFlags.Ephemeral }).catch(() => null);
       await guild.leave().catch(async (err) => {
-        await interaction.followUp({ content: `❌ Échec : ${err.message}`, flags: MessageFlags.Ephemeral }).catch(() => null);
+        await suivre(interaction, { content: `❌ Échec : ${err.message}`, flags: MessageFlags.Ephemeral });
       });
     },
   },

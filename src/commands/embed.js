@@ -1,6 +1,7 @@
 const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 const { GRADES } = require('../utils/permissions');
 const composer = require('../utils/embedComposer');
+const { suivre } = require('../utils/reponse');
 
 // /embed : composer un message/embed avec APERÇU EN DIRECT, puis l'envoyer
 // dans le salon choisi. Le message affiché pendant l'édition est exactement
@@ -71,7 +72,7 @@ module.exports = {
       // mémoire : on est reparti du rendu. Le dire évite la surprise de voir
       // des « ➜ » là où l'on avait tapé « &> ».
       if (r?.repris) {
-        return interaction.followUp({
+        return suivre(interaction, {
           content: '-# ℹ️ Ce message a été publié avant la mémoire des sources : son texte a été relu depuis '
             + 'le rendu. Les balises `&&` et `&>` y apparaissent donc déjà transformées. Les prochaines '
             + 'modifications, elles, repartiront du texte exact.',

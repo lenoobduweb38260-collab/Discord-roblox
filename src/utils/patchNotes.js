@@ -1103,6 +1103,21 @@ const RELEASES = [
     ],
     retrait: [],
   },
+  {
+    id: 'interaction-not-replied-2026-08ba',
+    title: 'Le panneau /config levait une erreur apres certaines actions ⚙️',
+    ajout: [],
+    amelioration: [
+      '🔍 **Un controle automatique** interdit desormais ce motif : tout message envoye apres une mise a jour doit passer par la fonction qui verifie l\'etat reel. Verifie sur l\'ancien code, il signale les 6 endroits concernes',
+      '🛡️ **La mise a jour garantit l\'accuse de reception** : meme refusee, elle accuse — sans quoi l\'action suivante partait sur une interaction que Discord considerait comme sans reponse',
+    ],
+    fix: [
+      '🩹 **« InteractionNotReplied » dans `/config`.** Apres avoir cree un type de ticket, supprime un type, active le Module RP ou demande une liaison d\'entreprises, le message de confirmation levait une erreur au lieu de s\'afficher',
+      '🩹 La cause : la mise a jour du panneau **avale ses erreurs** — c\'est voulu, une mise a jour ratee ne doit pas emporter l\'action. Mais quand elle rate, l\'interaction n\'est pas accusee, et le message qui suit ne peut plus partir. Le choix se faisait sur « d\'ou vient l\'interaction » au lieu de « ou en est-elle »',
+      '🩹 Le meme motif dormait dans les **tickets** (menu staff, relance, ajout de membre), les **animations** et l\'**editeur d\'IA** : tous corriges d\'un coup',
+    ],
+    retrait: [],
+  },
 ];
 
 // Construit l'embed d'une note à partir d'une entrée { title, ajout, fix,

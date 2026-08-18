@@ -17,7 +17,7 @@ const { COLORS, sendLog, logEmbed } = require('./embeds');
 const { GRADES, getGrade, staffRoleIds, adminRoleIds, policeRoleIds } = require('./permissions');
 const { supportRoleIds } = require('./tickets');
 const { isCreator } = require('./botTeam');
-const { mettreAJour } = require('./reponse');
+const { mettreAJour, suivre } = require('./reponse');
 const { diagnostiquerRecompenses, definirRecompense, effacerRecompense } = require('./levels');
 const { themeParCle, listeThemes, CLES } = require('./rpThemes');
 const { lien: lienCommunaute, demanderLiaison, delier } = require('./communaute');
@@ -925,7 +925,7 @@ async function handleConfigInteraction(interaction) {
       require('../commandSync')
         .syncGuild(interaction.guildId)
         .then(() =>
-          interaction.followUp({
+          suivre(interaction, {
             content: enable
               ? '🟢 Module RP **activé** — les commandes RP sont maintenant visibles sur le serveur.'
               : '🔴 Module RP **désactivé** — les commandes RP ont été retirées du serveur.',
@@ -933,7 +933,7 @@ async function handleConfigInteraction(interaction) {
           })
         )
         .catch((err) =>
-          interaction.followUp({ content: `⚠️ Synchronisation des commandes : ${err.message}`, flags: MessageFlags.Ephemeral })
+          suivre(interaction, { content: `⚠️ Synchronisation des commandes : ${err.message}`, flags: MessageFlags.Ephemeral })
         );
       await sendLog(
         interaction.guild,
@@ -1092,7 +1092,7 @@ async function handleConfigInteraction(interaction) {
       const result = insertTicketType.run(interaction.guildId, pending.label, pending.emoji, interaction.values[0], null);
       pendingTicketTypes.delete(pendingKey);
       await mettreAJour(interaction, ticketsView(interaction.guild, Number(result.lastInsertRowid)));
-      await interaction.followUp({
+      await suivre(interaction, {
         content:
           `✅ Type « **${pending.label}** » créé. Définissez son rôle support via le sélecteur si besoin, ` +
           'puis republiez le panneau : `/ticket panneau-modifier`.',
@@ -1140,7 +1140,7 @@ async function handleConfigInteraction(interaction) {
       if (!type) return await mettreAJour(interaction, ticketsView(interaction.guild));
       deleteTicketTypeStmt.run(typeId, interaction.guildId);
       await mettreAJour(interaction, ticketsView(interaction.guild));
-      await interaction.followUp({
+      await suivre(interaction, {
         content: `🗑 Type « **${type.label}** » supprimé. Republiez le panneau : \`/ticket panneau-modifier\`.`,
         flags: MessageFlags.Ephemeral,
       });
@@ -1201,7 +1201,10 @@ async function handleConfigInteraction(interaction) {
       const r = await demanderLiaison(interaction, interaction.fields.getTextInputValue('serveur'));
       if (r.erreur) return await interaction.reply({ content: r.erreur, flags: MessageFlags.Ephemeral });
       if (interaction.isFromMessage()) await mettreAJour(interaction, rpView(interaction.guild));
-      const dire = interaction.isFromMessage() ? (p) => interaction.followUp(p) : (p) => interaction.reply(p);
+      // ⚠️ `suivre` regarde l'état RÉEL de l'interaction. Se fier à
+      // `isFromMessage()` supposait que `mettreAJour` a réussi — or elle avale
+      // ses erreurs, et le followUp levait alors « InteractionNotReplied ».
+      const dire = (p) => suivre(interaction, p);
       if (r.immediat) {
         await sendLog(interaction.guild, logEmbed('🏢 Entreprises partagées',
           `<@${interaction.user.id}> (👑 propriétaire) a relié ce serveur à sa communauté.`, COLORS.SUCCESS));
@@ -1320,9 +1323,7 @@ async function handleConfigInteraction(interaction) {
     }
   } catch (err) {
     console.error('Erreur panneau de configuration :', err);
-    const payload = { content: '❌ Une erreur est survenue dans le panneau de configuration.', flags: MessageFlags.Ephemeral };
-    if (interaction.replied || interaction.deferred) await interaction.followUp(payload).catch(() => null);
-    else await interaction.reply(payload).catch(() => null);
+    await suivre(interaction, { content: '❌ Une erreur est survenue dans le panneau de configuration.', flags: MessageFlags.Ephemeral });
   }
 }
 
