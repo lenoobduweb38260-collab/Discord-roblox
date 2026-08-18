@@ -6,6 +6,14 @@ const {
   MessageFlags,
 } = require('discord.js');
 const { db, RP_SCOPE } = require('../database');
+const { porteeEntreprises } = require('../utils/communaute');
+
+// 🔑 Où vivent les entreprises de CE serveur.
+//
+// Partagées avec la communauté seulement si le propriétaire du serveur l'a
+// validé. Sinon, chez soi : sans cette porte, le bot ajouté sur un serveur
+// inconnu voyait — et pouvait modifier — les entreprises de tout le monde.
+const PORTEE = (interaction) => porteeEntreprises(interaction.guildId);
 const { buildEnterpriseEmbed, sendLog, logEmbed, COLORS } = require('../utils/embeds');
 const { GRADES, getGrade } = require('../utils/permissions');
 
@@ -177,7 +185,7 @@ module.exports = {
 
   async autocomplete(interaction) {
     const focused = interaction.options.getFocused();
-    const rows = searchNames.all(RP_SCOPE, `%${focused}%`);
+    const rows = searchNames.all(PORTEE(interaction), `%${focused}%`);
     await interaction.respond(rows.map((r) => ({ name: r.name, value: r.name })));
   },
 
@@ -194,8 +202,8 @@ module.exports = {
 
     if (sub === 'retirer-membre') {
       const user = interaction.options.getUser('utilisateur');
-      const heads = removeHeadEverywhere.run(user.id, RP_SCOPE).changes;
-      const emps = removeEmployeeEverywhere.run(user.id, RP_SCOPE).changes;
+      const heads = removeHeadEverywhere.run(user.id, PORTEE(interaction)).changes;
+      const emps = removeEmployeeEverywhere.run(user.id, PORTEE(interaction)).changes;
       if (!heads && !emps) {
         return interaction.reply({
           content: `ℹ️ <@${user.id}> n'était ni patron ni employé d'une entreprise.`,
@@ -217,7 +225,7 @@ module.exports = {
     }
 
     if (sub === 'media') {
-      const ent = getByName.get(RP_SCOPE, interaction.options.getString('nom').trim());
+      const ent = getByName.get(PORTEE(interaction), interaction.options.getString('nom').trim());
       if (!ent) {
         return interaction.reply({ content: '❌ Entreprise introuvable.', flags: MessageFlags.Ephemeral });
       }
@@ -246,7 +254,7 @@ module.exports = {
 
     if (sub === 'creer') {
       const nom = interaction.options.getString('nom').trim();
-      if (getByName.get(RP_SCOPE, nom)) {
+      if (getByName.get(PORTEE(interaction), nom)) {
         return interaction.reply({ content: `❌ L'entreprise **${nom}** existe déjà.`, flags: MessageFlags.Ephemeral });
       }
       const assurance = interaction.options.getString('assurance') === 'oui';
@@ -258,7 +266,7 @@ module.exports = {
       const patron = interaction.options.getUser('patron');
 
       const result = insertEnterprise.run(
-        RP_SCOPE,
+        PORTEE(interaction),
         nom,
         interaction.options.getString('description'),
         mediaUrl,
@@ -296,7 +304,7 @@ module.exports = {
     }
 
     if (sub === 'liste') {
-      const rows = listAll.all(RP_SCOPE);
+      const rows = listAll.all(PORTEE(interaction));
       if (!rows.length) {
         return interaction.reply({ content: '❌ Aucune entreprise sur ce serveur.', flags: MessageFlags.Ephemeral });
       }
@@ -324,7 +332,7 @@ module.exports = {
 
     // Toutes les sous-commandes restantes ciblent une entreprise par nom.
     const nom = interaction.options.getString('nom').trim();
-    const ent = getByName.get(RP_SCOPE, nom);
+    const ent = getByName.get(PORTEE(interaction), nom);
     if (!ent) {
       return interaction.reply({ content: `❌ Entreprise **${nom}** introuvable.`, flags: MessageFlags.Ephemeral });
     }
@@ -397,7 +405,7 @@ module.exports = {
         return interaction.reply({ content: '❌ Indiquez une **valeur** pour ce champ.', flags: MessageFlags.Ephemeral });
       }
       const column = { nom: 'name', description: 'description' }[champ];
-      if (champ === 'nom' && getByName.get(RP_SCOPE, valeur)) {
+      if (champ === 'nom' && getByName.get(PORTEE(interaction), valeur)) {
         return interaction.reply({ content: `❌ Une entreprise nommée **${valeur}** existe déjà.`, flags: MessageFlags.Ephemeral });
       }
       db.prepare(`UPDATE enterprises SET ${column} = ? WHERE id = ?`).run(valeur, ent.id);

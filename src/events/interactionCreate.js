@@ -245,6 +245,22 @@ module.exports = {
       return handleTicketButton(interaction);
     }
 
+    // ----- Liaison des entreprises : le propriétaire tranche, en MP -----
+    // Volontairement AVANT la garde « hors serveur » : ce bouton vit
+    // précisément dans un message privé.
+    if (interaction.isButton() && interaction.customId?.startsWith('comm:')) {
+      return require('../utils/communaute').handleDecision(interaction);
+    }
+
+    // ----- Panneau des matricules RP : pages et recherche -----
+    if (
+      (interaction.isButton() && /^matr(page:|search$)/.test(interaction.customId || ''))
+      || (interaction.isModalSubmit() && interaction.customId === 'matrmodal')
+    ) {
+      if (!interaction.inGuild()) return horsServeur(interaction);
+      return require('../commands/matricule').handleComposant(interaction);
+    }
+
     // ----- /esthetique message : choix du salon puis du message -----
     if (
       (interaction.isChannelSelectMenu?.() || interaction.isStringSelectMenu()) &&

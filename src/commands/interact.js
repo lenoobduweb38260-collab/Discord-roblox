@@ -166,6 +166,44 @@ async function awardBadges(user, counterKey, totalUses, lang) {
   }
 }
 
+// 🎞️ Réserve de GIF déjà obtenus.
+//
+// Les API publiques d'anime tombent, souvent et sans prévenir : 403, 502,
+// délai dépassé. Quand les trois refusent en même temps, l'animation partait
+// sans image et affichait « GIF momentanément indisponible » — c'est-à-dire
+// tout sauf l'animation qu'on venait de demander.
+//
+// Chaque GIF obtenu est donc mémorisé. En cas de panne, on en ressert un déjà
+// vu : moins de nouveauté, mais une image. La réserve est bornée pour ne pas
+// gonfler indéfiniment.
+const RESERVE_MAX = 60;
+const garderGif = db.prepare(
+  'INSERT INTO gif_cache (categorie, url, anime, at) VALUES (?, ?, ?, ?) ON CONFLICT (categorie, url) DO NOTHING'
+);
+const gifAuHasard = db.prepare(
+  'SELECT url, anime FROM gif_cache WHERE categorie = ? ORDER BY RANDOM() LIMIT 1'
+);
+const compterGifs = db.prepare('SELECT COUNT(*) AS n FROM gif_cache WHERE categorie = ?');
+const purgerGifs = db.prepare(
+  'DELETE FROM gif_cache WHERE categorie = ? AND rowid NOT IN'
+  + ' (SELECT rowid FROM gif_cache WHERE categorie = ? ORDER BY at DESC LIMIT ?)'
+);
+
+// Une URL que Discord ne saura pas afficher casse l'embed entier : on ne
+// garde que ce qui ressemble vraiment à une image.
+const urlAffichable = (u) => /^https:\/\/\S+$/i.test(String(u || ''));
+
+function memoriserGif(categorie, gif) {
+  try {
+    garderGif.run(categorie, gif.url, gif.anime || null, new Date().toISOString());
+    if (Number(compterGifs.get(categorie)?.n || 0) > RESERVE_MAX) {
+      purgerGifs.run(categorie, categorie, RESERVE_MAX);
+    }
+  } catch {
+    // La réserve est un confort : elle ne doit jamais empêcher l'animation.
+  }
+}
+
 // GIF depuis internet : trois sources essayées dans l'ordre, timeout 5 s
 // chacune, et cause d'échec journalisée dans la console pour diagnostic.
 async function fetchGif(category) {
@@ -173,7 +211,11 @@ async function fetchGif(category) {
   const sources = [
     {
       name: 'nekos.best',
-      url: `https://nekos.best/api/v2/${category}`,
+      // ⚠️ `simple`, et non `category` : nekos.best ne connaît pas « peck ».
+      // Un bisou sur la joue partait donc systématiquement en 404 sur la
+      // première source — d'où l'impression que les bisous échouent plus que
+      // le reste.
+      url: `https://nekos.best/api/v2/${simple}`,
       parse: (data) => ({ url: data.results?.[0]?.url, anime: data.results?.[0]?.anime_name || null }),
     },
     {
@@ -198,13 +240,24 @@ async function fetchGif(category) {
         continue;
       }
       const gif = source.parse(await res.json());
-      if (gif.url) return gif;
-      console.warn(`⚠️ GIF ${source.name} (${category}) : réponse sans URL`);
+      if (urlAffichable(gif.url)) {
+        memoriserGif(simple, gif);
+        return gif;
+      }
+      console.warn(`⚠️ GIF ${source.name} (${category}) : réponse sans URL exploitable`);
     } catch (err) {
       console.warn(`⚠️ GIF ${source.name} (${category}) : ${err.message}`);
     }
   }
-  console.warn(`⚠️ Aucun GIF trouvé pour « ${category} » — les 3 sources ont échoué.`);
+
+  // Les trois sources sont tombées : on ressert une image déjà vue plutôt que
+  // de rendre une animation sans animation.
+  const secours = gifAuHasard.get(simple);
+  if (secours?.url) {
+    console.warn(`⚠️ Sources HS pour « ${category} » — GIF repris de la réserve.`);
+    return { url: secours.url, anime: secours.anime || null, reserve: true };
+  }
+  console.warn(`⚠️ Aucun GIF trouvé pour « ${category} » — les 3 sources ont échoué et la réserve est vide.`);
   return null;
 }
 
@@ -231,7 +284,12 @@ async function buildInteractionMessage(interaction, actionKey, author, target, w
   const embed = new EmbedBuilder()
     .setColor(0xff6b81)
     .setDescription(`${action.phrase(displayName(interaction, author), displayName(interaction, target))}\n${action.count(count)}`);
-  if (gif?.url) embed.setImage(gif.url);
+  if (urlAffichable(gif?.url)) {
+    // setImage lève sur une URL invalide, et l'exception ressortirait en
+    // « ❌ Une erreur est survenue » : l'animation entière perdue pour une
+    // image.
+    try { embed.setImage(gif.url); } catch { /* on continue sans image */ }
+  }
   if (gif?.anime) embed.setFooter({ text: `${L.anime}${gif.anime}` });
   if (!gif?.url) embed.setFooter({ text: L.noGif });
 

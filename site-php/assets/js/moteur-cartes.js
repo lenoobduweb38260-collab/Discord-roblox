@@ -44,6 +44,9 @@ const DRAPEAU_V2 = 1 << 15; // 32768
 // Limites propres aux composants V2.
 const MAX_TEXTE_TOTAL = 4000; // tous les blocs de texte cumulés
 const MAX_COMPOSANTS = 40; // conteneurs et enfants compris
+// Un conteneur n'accepte pas plus de 10 composants directs. Au-delà, Discord
+// refuse le message entier.
+const MAX_DANS_CONTENEUR = 10;
 
 const texte = (contenu) => ({ type: T.TEXTE, content: String(contenu) });
 const separateur = (grand = false) => ({ type: T.SEPARATEUR, divider: true, spacing: grand ? 2 : 1 });
@@ -232,9 +235,27 @@ function convertirCorps(corps, options = {}) {
     cartes.push(carte);
   }
 
-  // Les boutons et menus déjà présents restent au même endroit, après.
+  // 🎛️ Boutons et menus DANS la carte, pas en dessous.
+  //
+  // Une rangée posée après le conteneur s'affiche détachée : un bloc gris
+  // sous la carte, visuellement séparé de ce qu'il commande. Le menu d'un
+  // ticket avait l'air d'appartenir à un autre message. Placée à l'intérieur
+  // du conteneur, la rangée fait partie de la carte — c'est tout l'intérêt
+  // des composants V2, et ce que fait la référence dont nous partons.
+  //
+  // ⚠️ Un conteneur n'accepte que 10 composants directs. Au-delà, ou s'il n'y
+  // a pas de carte du tout, on garde les rangées à l'extérieur : mieux vaut
+  // un bouton détaché qu'un message refusé.
   const existants = Array.isArray(corps.components) ? corps.components : [];
-  const tous = [...cartes, ...existants];
+  const derniere = cartes[cartes.length - 1];
+  const tous = [];
+  if (derniere?.type === T.CONTENEUR && existants.length
+      && derniere.components.length + existants.length <= MAX_DANS_CONTENEUR) {
+    derniere.components.push(...existants);
+    tous.push(...cartes);
+  } else {
+    tous.push(...cartes, ...existants);
+  }
 
   if (compter(tous) > MAX_COMPOSANTS) return null;
   if (longueurTexte(tous) > MAX_TEXTE_TOTAL) return null;
@@ -254,7 +275,7 @@ function convertirCorps(corps, options = {}) {
 // premier niveau se seraient écrasés — et la page ne se chargeait plus.
 {
   const API = {
-    T, DRAPEAU_V2, MAX_TEXTE_TOTAL, MAX_COMPOSANTS,
+    T, DRAPEAU_V2, MAX_TEXTE_TOTAL, MAX_COMPOSANTS, MAX_DANS_CONTENEUR,
     enBlocs, enCarte, convertirCorps, compter, longueurTexte, estFilet, dateDiscord,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = API;

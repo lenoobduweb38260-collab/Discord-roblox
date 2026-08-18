@@ -438,6 +438,37 @@ CREATE TABLE IF NOT EXISTS composed_messages (
   PRIMARY KEY (channel_id, message_id)
 );
 
+-- 🎞️ Reserve de GIF deja vus, par categorie.
+-- Les API publiques d'anime tombent souvent : quand les trois refusent, on
+-- ressert une image deja obtenue plutot que d'afficher « GIF indisponible ».
+CREATE TABLE IF NOT EXISTS gif_cache (
+  categorie TEXT NOT NULL,
+  url       TEXT NOT NULL,
+  anime     TEXT,
+  at        TEXT,
+  PRIMARY KEY (categorie, url)
+);
+
+-- 🔢 Matricules RP : le numero qui suit une personne dans le RP.
+-- Relie les trois facons de la designer — matricule, pseudo du jeu, compte
+-- Discord — pour qu'aucune ne soit un cul-de-sac. Le retrait garde la ligne
+-- (active = 0) : l'historique dit qui portait tel numero avant.
+CREATE TABLE IF NOT EXISTS matricules (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  guild_id     TEXT NOT NULL,
+  matricule    TEXT NOT NULL,
+  user_id      TEXT NOT NULL,
+  roblox_name  TEXT,
+  discord_tag  TEXT,
+  note         TEXT,
+  active       INTEGER NOT NULL DEFAULT 1,
+  by_id        TEXT,
+  at           TEXT,
+  removed_by   TEXT,
+  removed_at   TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_matricules_guild ON matricules (guild_id, active);
+
 -- 🏅 Recompenses de niveau : un role donne en atteignant un palier.
 -- Aucune ligne par defaut — un serveur qui n'en veut pas n'en a aucune, et
 -- le bot ne distribue donc rien de lui-meme.

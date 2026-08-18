@@ -1080,6 +1080,29 @@ const RELEASES = [
     ],
     retrait: [],
   },
+  {
+    id: 'matricules-communaute-2026-08az',
+    title: 'Matricules RP, entreprises sous cle, tickets repares 🔢',
+    ajout: [
+      '🔢 **`/matricule` — le numero qui relie le jeu et Discord.** En jeu on connait quelqu\'un par son pseudo ou son matricule ; pour agir sur Discord il faut son identifiant. Les trois se retrouvent desormais l\'un par l\'autre : `/matricule chercher` accepte le matricule, le pseudo du jeu, le pseudo Discord, une mention ou un identifiant',
+      '📋 **Un panneau de matricules** dans un salon, comme les listes Whitelist RP : recherche, pages, mise a jour automatique. `/matricule panneau`',
+      '🎖️ Le matricule appartient au **Module RP** : module coupe, il disparait de la liste du serveur',
+      '🔎 Une recherche sans resultat exact **propose ce qui ressemble** au lieu d\'un « introuvable » devant lequel il n\'y a rien a faire',
+      '🏢 **Les entreprises ne sont plus partagees d\'office.** Un serveur doit demander a rejoindre une communaute, et seul le **proprietaire** — celui qui porte la couronne 👑 — peut l\'accepter. Un administrateur peut etre nomme le matin et parti le soir',
+      '📨 Si le demandeur n\'a pas la couronne, le proprietaire recoit un **message prive** avec Valider / Refuser, et ce qu\'il partage exactement. Tant qu\'il n\'a pas repondu, rien n\'est partage',
+      '👥 **Plusieurs membres a la fois** dans un ticket : ajouter trois renforts demandait de rouvrir le menu a chaque fois',
+    ],
+    amelioration: [
+      '🎛️ **Les boutons et menus sont DANS la carte**, plus en dessous. Une rangee posee apres la carte s\'affichait detachee, comme si elle appartenait a un autre message — c\'est ce qui donnait au menu d\'un ticket l\'air d\'etre a cote',
+      '🔁 **Le menu d\'un ticket se rechoisit** : Discord gardait l\'option cochee, et resselectionner la meme entree ne declenchait plus rien',
+      '🎞️ **Beaucoup moins d\'echecs de GIF.** Un bisou sur la joue partait systematiquement en 404 sur la premiere source, qui ne connait pas cette categorie. Et chaque GIF obtenu est desormais mis en reserve : quand les trois API tombent en meme temps, on ressert une image deja vue au lieu d\'afficher « GIF indisponible »',
+    ],
+    fix: [
+      '🩹 **Le transcript ne partait plus a la fermeture d\'un ticket.** Une carte ne peut porter que les fichiers qu\'un de ses composants designe ; le fichier du transcript, lui, est libre — Discord refusait donc le message entier. Un message a piece jointe libre garde l\'ancien style, et si le fichier est refuse malgre tout, la conversation part en clair plutot que d\'etre perdue avec le salon',
+      '💬 La fermeture dit maintenant **dans quel salon** part le transcript, ou previent qu\'aucun n\'est configure — au lieu d\'un « si un salon est configure » que personne ne verifiait',
+    ],
+    retrait: [],
+  },
 ];
 
 // Construit l'embed d'une note à partir d'une entrée { title, ajout, fix,

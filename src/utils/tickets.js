@@ -19,7 +19,7 @@ const { GRADES, getGrade } = require('./permissions');
 const balises = require('./balises');
 const M = require('./miseEnPage');
 const { reglages } = require('./styleEmbeds');
-const { mettreAJour } = require('./reponse');
+const { mettreAJour, reafficher } = require('./reponse');
 
 const listTypes = db.prepare('SELECT * FROM ticket_types WHERE guild_id = ? ORDER BY id');
 const getType = db.prepare('SELECT * FROM ticket_types WHERE id = ? AND guild_id = ?');
@@ -592,22 +592,44 @@ async function sendTranscript(interaction, ticket, byId) {
               `[${new Date(m.createdTimestamp).toLocaleString('fr-FR', { timeZone: 'Europe/Paris' })}] ${m.author.tag} : ${m.content || '(embed/fichier)'}`
           )
       : ['(historique indisponible)'];
-    const file = new AttachmentBuilder(Buffer.from(lines.join('\n') || '(vide)', 'utf8'), {
+    const texte = lines.join('\n') || '(vide)';
+    const file = new AttachmentBuilder(Buffer.from(texte, 'utf8'), {
       name: `transcript-ticket-${ticket.id}.txt`,
     });
-    await target.send({
-      embeds: [
-        logEmbed(
-          '🎫 Ticket fermé & archivé',
-          `Ticket ${type ? `**${type.label}** ` : ''}de <@${ticket.user_id}>, fermé par <@${byId}> — transcript ci-joint.`,
-          COLORS.WARNING
-        ),
-      ],
-      files: [file],
+    const entete = logEmbed(
+      '🎫 Ticket fermé & archivé',
+      `Ticket ${type ? `**${type.label}** ` : ''}de <@${ticket.user_id}>, fermé par <@${byId}> — transcript ci-joint.`,
+      COLORS.WARNING
+    );
+
+    const envoye = await target.send({ embeds: [entete], files: [file] }).then(() => true).catch(async (err) => {
+      // ⚠️ Un fichier refusé ne doit pas emporter l'archive : c'est la
+      // conversation entière qui disparaîtrait avec le salon, cinq secondes
+      // plus tard. On renvoie donc le texte, tronqué s'il le faut, plutôt que
+      // rien du tout.
+      console.warn(`⚠️ Transcript : fichier refusé (${err.message}) — envoi en texte.`);
+      const extrait = texte.length > 3800 ? `${texte.slice(-3800)}\n… (début tronqué)` : texte;
+      return target
+        .send({
+          embeds: [
+            logEmbed(
+              '🎫 Ticket fermé & archivé',
+              `Ticket ${type ? `**${type.label}** ` : ''}de <@${ticket.user_id}>, fermé par <@${byId}>.\n`
+              + '-# Le fichier a été refusé par Discord : voici la conversation en clair.\n'
+              + `\`\`\`\n${extrait}\n\`\`\``,
+              COLORS.WARNING
+            ),
+          ],
+        })
+        .then(() => true)
+        .catch(() => false);
     });
-    return true;
-  } catch {
-    return false; // le transcript ne doit jamais bloquer la fermeture
+    return envoye;
+  } catch (err) {
+    // Le transcript ne doit jamais bloquer la fermeture — mais un échec muet
+    // laissait croire qu'il était parti.
+    console.warn(`⚠️ Transcript du ticket impossible : ${err.message}`);
+    return false;
   }
 }
 
@@ -646,12 +668,16 @@ async function closeTicket(interaction, ticketId) {
   // et la suppression, qui peuvent prendre un peu de temps (récupération des
   // messages + envoi du fichier). Sinon, sur une connexion lente, la réponse
   // arriverait trop tard (« Unknown interaction »).
+  const salonArchive = await transcriptChannelOf(interaction.guild);
   const embed = new EmbedBuilder()
     .setColor(COLORS.WARNING)
     .setTitle('🔒 Ticket fermé')
     .setDescription(
       `Fermé par <@${interaction.user.id}>.\n` +
-        '📄 Transcript envoyé dans les logs (si un salon est configuré).\n' +
+        (salonArchive
+          ? `📄 Transcript envoyé dans <#${salonArchive.id}>.\n`
+          : '⚠️ **Aucun salon d\'archives configuré** : la conversation va être perdue.\n'
+            + '-# Réglez-le dans `/config` → ⚙️ Salons → 📄 Transcripts des tickets.\n') +
         '🗑️ Ce salon va être **supprimé automatiquement**…'
     )
     .setTimestamp();
@@ -776,6 +802,9 @@ async function reviveTicket(interaction, ticketId) {
 const claimTicket = db.prepare('UPDATE tickets SET claimed_by = ?, claimed_at = ? WHERE id = ?');
 const getTicketById = db.prepare('SELECT * FROM tickets WHERE id = ? AND guild_id = ?');
 
+// Discord plafonne un sélecteur de membres à 25 choix.
+const MAX_MEMBRES_A_LA_FOIS = 10;
+
 const ACTIONS_STAFF = [
   { value: 'prendre', label: 'Ticket pris en charge', description: 'M\'assigner ce ticket', emoji: '🚀' },
   { value: 'liberer', label: 'Ticket libéré', description: 'Désassigner ce ticket', emoji: '🔓' },
@@ -865,14 +894,19 @@ async function handleStaffMenu(interaction, ticketId) {
     await resetStaffMenu(interaction);
     const ajout = choix === 'ajouter';
     return interaction.followUp({
-      content: ajout ? '➕ Qui ajouter à ce ticket ?' : '➖ Qui retirer de ce ticket ?',
+      content: ajout
+        ? '➕ Qui ajouter à ce ticket ? *(plusieurs membres possibles)*'
+        : '➖ Qui retirer de ce ticket ? *(plusieurs membres possibles)*',
       components: [
         new ActionRowBuilder().addComponents(
           new UserSelectMenuBuilder()
             .setCustomId(`${ajout ? 'tktadd' : 'tktrem'}:${ticket.id}`)
-            .setPlaceholder(ajout ? 'Choisissez un membre à ajouter' : 'Choisissez un membre à retirer')
+            .setPlaceholder(ajout ? 'Choisissez un ou plusieurs membres' : 'Choisissez un ou plusieurs membres')
             .setMinValues(1)
-            .setMaxValues(1)
+            // Ajouter trois renforts un par un demandait de rouvrir le menu à
+            // chaque fois — et le menu restait coché, donc il fallait passer
+            // par une autre action entre chaque.
+            .setMaxValues(MAX_MEMBRES_A_LA_FOIS)
         ),
       ],
       flags: MessageFlags.Ephemeral,
@@ -929,10 +963,17 @@ function ficheTicket(interaction, ticket, type) {
     );
 }
 
-// Remet le menu à zéro pour pouvoir rechoisir la même action ensuite.
+// Remet le menu à zéro pour pouvoir rechoisir la MÊME action ensuite.
+//
+// Sans cela, Discord garde l'option cochée : rechoisir « Ajouter un membre » juste après ne déclenchait rien du tout,
+// et il fallait passer par une autre entrée pour « débloquer » le menu.
+//
+// ⚠️ On réaffiche le message tel quel. Lui repasser ses propres composants via
+// mettreAJour prenait le conteneur de la carte pour une rangée à ajouter — et
+// la carte s'affichait en double à chaque action.
 async function resetStaffMenu(interaction) {
   try {
-    await mettreAJour(interaction, { components: interaction.message.components.map((c) => (c.toJSON ? c.toJSON() : c)) });
+    await reafficher(interaction);
   } catch {
     // Interaction déjà consommée : sans importance.
   }
@@ -945,39 +986,51 @@ async function appliquerMembre(interaction, ticketId, ajout) {
   const type = ticket.type_id ? getType.get(ticket.type_id, interaction.guildId) : null;
   if (!canManageTicket(interaction.member, type)) return refuser(interaction);
 
-  const cibleId = interaction.values[0];
-  if (!ajout && cibleId === ticket.user_id) {
-    return mettreAJour(interaction, {
-      content: '❌ Impossible de retirer le **demandeur** de son propre ticket. Fermez le ticket à la place.',
-      components: [],
-    });
-  }
-
   const channel = await interaction.guild.channels.fetch(ticket.channel_id).catch(() => null);
   if (!channel) return mettreAJour(interaction, { content: '❌ Salon du ticket introuvable.', components: [] });
 
-  const ok = await channel.permissionOverwrites
-    .edit(cibleId, ajout
-      ? { ViewChannel: true, SendMessages: true, ReadMessageHistory: true, AttachFiles: true }
-      : { ViewChannel: false })
-    .then(() => true)
-    .catch(() => false);
+  // 👥 Plusieurs membres d'un coup. Chacun est traité séparément : un refus
+  // sur l'un ne doit pas emporter les autres, et le compte rendu dit
+  // exactement ce qui est passé et ce qui a échoué.
+  const faits = [];
+  const refuses = [];
+  for (const cibleId of interaction.values) {
+    if (!ajout && cibleId === ticket.user_id) {
+      refuses.push(`<@${cibleId}> — c'est le **demandeur** : fermez le ticket plutôt que de l'en sortir`);
+      continue;
+    }
+    const ok = await channel.permissionOverwrites
+      .edit(cibleId, ajout
+        ? { ViewChannel: true, SendMessages: true, ReadMessageHistory: true, AttachFiles: true }
+        : { ViewChannel: false })
+      .then(() => true)
+      .catch(() => false);
+    if (ok) faits.push(cibleId);
+    else refuses.push(`<@${cibleId}> — Discord a refusé la modification`);
+  }
 
-  if (!ok) {
+  if (!faits.length) {
     return mettreAJour(interaction, {
-      content: '❌ Modification impossible : vérifiez que le bot a **Gérer les permissions** sur ce salon.',
+      content: `❌ Aucun membre ${ajout ? 'ajouté' : 'retiré'}.\n`
+        + `${refuses.map((r) => `➜ ${r}`).join('\n')}\n`
+        + '-# Vérifiez que j\'ai la permission **Gérer les permissions** sur ce salon.',
       components: [],
     });
   }
 
-  await mettreAJour(interaction, { content: `✅ <@${cibleId}> ${ajout ? 'ajouté au' : 'retiré du'} ticket.`, components: [] });
+  const liste = faits.map((id) => `<@${id}>`).join(', ');
+  await mettreAJour(interaction, {
+    content: `✅ ${liste} ${faits.length > 1 ? 'ont été' : 'a été'} ${ajout ? 'ajouté(s) au' : 'retiré(s) du'} ticket.`
+      + (refuses.length ? `\n⚠️ Non traité(s) :\n${refuses.map((r) => `➜ ${r}`).join('\n')}` : ''),
+    components: [],
+  });
   await channel
     .send({
       embeds: [
         new EmbedBuilder()
           .setColor(ajout ? COLORS.SUCCESS : COLORS.WARNING)
-          .setTitle(ajout ? '➕ Membre ajouté' : '➖ Membre retiré')
-          .setDescription(`<@${cibleId}> a été ${ajout ? 'ajouté au' : 'retiré du'} ticket par <@${interaction.user.id}>.`),
+          .setTitle(ajout ? '➕ Membre(s) ajouté(s)' : '➖ Membre(s) retiré(s)')
+          .setDescription(`${liste} ${faits.length > 1 ? 'ont été' : 'a été'} ${ajout ? 'ajouté(s) au' : 'retiré(s) du'} ticket par <@${interaction.user.id}>.`),
       ],
     })
     .catch(() => null);

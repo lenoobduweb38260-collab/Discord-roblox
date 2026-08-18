@@ -20,6 +20,7 @@ const { isCreator } = require('./botTeam');
 const { mettreAJour } = require('./reponse');
 const { diagnostiquerRecompenses, definirRecompense, effacerRecompense } = require('./levels');
 const { themeParCle, listeThemes, CLES } = require('./rpThemes');
+const { lien: lienCommunaute, demanderLiaison, delier } = require('./communaute');
 const M = require('./miseEnPage');
 
 // Panneau central de configuration : /config ouvre une vue d'ensemble avec un
@@ -493,6 +494,25 @@ function rpView(guild) {
     new ButtonBuilder().setCustomId('cfgrpon').setLabel('Activer le Module RP').setEmoji('🟢').setStyle(ButtonStyle.Success).setDisabled(enabled || locked),
     new ButtonBuilder().setCustomId('cfgrpoff').setLabel('Désactiver le RP').setEmoji('🔴').setStyle(ButtonStyle.Danger).setDisabled(!enabled || locked)
   );
+  // 🏢 Liaison des entreprises avec la communauté.
+  const L = lienCommunaute(guild.id);
+  const etatLien = !L
+    ? '🔒 **Non liée** — les entreprises de ce serveur restent chez lui.'
+    : L.statut === 'valide'
+      ? `🔗 **Liée** à la communauté \`${L.main_guild_id}\` — entreprises partagées.`
+      : L.statut === 'en_attente'
+        ? `⏳ **En attente** de la couronne 👑 du serveur — demandée par <@${L.demande_par}>.`
+        : `🚫 **Refusée** par le propriétaire.`;
+  embed.addFields({
+    name: '🏢 Entreprises partagées',
+    value: `${etatLien}\n`
+      + '-# Relier fait des entreprises RP un bien commun aux serveurs d\'une même communauté. '
+      + 'Seul le **propriétaire** du serveur peut l\'accepter — un administrateur peut être nommé le matin et parti le soir.',
+  });
+  const rowLien = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('cfgcomm').setLabel(L?.statut === 'valide' ? '🔗 Changer de communauté' : '🏢 Relier à une communauté').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId('cfgcommoff').setLabel('🔒 Garder les entreprises ici').setStyle(ButtonStyle.Secondary).setDisabled(!L)
+  );
   const rowJeu = new ActionRowBuilder().addComponents(
     new StringSelectMenuBuilder()
       .setCustomId('cfgrpjeu')
@@ -509,7 +529,7 @@ function rpView(guild) {
     new ButtonBuilder().setCustomId('cfgsaoon').setLabel('Activer l\'Aventure SAO').setEmoji('⚔️').setStyle(ButtonStyle.Success).setDisabled(saoOn),
     new ButtonBuilder().setCustomId('cfgsaooff').setLabel('Désactiver').setEmoji('🔴').setStyle(ButtonStyle.Danger).setDisabled(!saoOn)
   );
-  return { embeds: [embed], components: [row, rowJeu, rowInteract, rowSao, backRow()] };
+  return { embeds: [embed], components: [row, rowLien, rowJeu, rowInteract, backRow()] };
 }
 
 // ----- Catégorie : réseaux sociaux (annonces lives / nouvelles vidéos) -----
@@ -934,6 +954,28 @@ async function handleConfigInteraction(interaction) {
       return;
     }
 
+    // 🏢 Liaison des entreprises avec une communauté.
+    if (id === 'cfgcomm') {
+      return await interaction.showModal(
+        new ModalBuilder().setCustomId('cfgcommmodal').setTitle('🏢 Relier les entreprises').addComponents(
+          new ActionRowBuilder().addComponents(
+            new TextInputBuilder().setCustomId('serveur')
+              .setLabel('Identifiant du serveur principal')
+              .setPlaceholder('Clic droit sur le serveur → Copier l\'identifiant')
+              .setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(25)
+          )
+        )
+      );
+    }
+    if (id === 'cfgcommoff') {
+      delier(interaction.guildId);
+      await mettreAJour(interaction, rpView(interaction.guild));
+      await sendLog(interaction.guild, logEmbed('🏢 Entreprises',
+        `<@${interaction.user.id}> a détaché ce serveur de sa communauté : les entreprises redeviennent locales.`,
+        COLORS.WARNING));
+      return;
+    }
+
     // 🎮 Jeu du serveur (vocabulaire du Module RP).
     if (id === 'cfgrpjeu') {
       const choix = CLES.includes(interaction.values?.[0]) ? interaction.values[0] : 'roblox';
@@ -1153,6 +1195,29 @@ async function handleConfigInteraction(interaction) {
 
     if (id === 'cfgxp') {
       return await interaction.showModal(xpModal(getGuildConfig(interaction.guildId)));
+    }
+
+    if (id === 'cfgcommmodal') {
+      const r = await demanderLiaison(interaction, interaction.fields.getTextInputValue('serveur'));
+      if (r.erreur) return await interaction.reply({ content: r.erreur, flags: MessageFlags.Ephemeral });
+      if (interaction.isFromMessage()) await mettreAJour(interaction, rpView(interaction.guild));
+      const dire = interaction.isFromMessage() ? (p) => interaction.followUp(p) : (p) => interaction.reply(p);
+      if (r.immediat) {
+        await sendLog(interaction.guild, logEmbed('🏢 Entreprises partagées',
+          `<@${interaction.user.id}> (👑 propriétaire) a relié ce serveur à sa communauté.`, COLORS.SUCCESS));
+        return await dire({
+          content: '✅ Liaison validée : vous portez la couronne, il n\'y a personne au-dessus à consulter.',
+          flags: MessageFlags.Ephemeral,
+        });
+      }
+      return await dire({
+        content: r.mpFerme
+          ? `📨 Demande enregistrée, mais <@${r.proprietaire}> a ses **messages privés fermés** : je n'ai pas pu le prévenir.\n`
+            + '➜ Demandez-lui de lancer lui-même `/config` → 🎭 Module RP → 🏢 Entreprises.'
+          : `📨 Demande envoyée à <@${r.proprietaire}> (👑 propriétaire du serveur) en message privé.\n`
+            + '-# Rien n\'est partagé tant qu\'il n\'a pas validé.',
+        flags: MessageFlags.Ephemeral,
+      });
     }
 
     if (id === 'cfgrecmodal' || id === 'cfgrecdelmodal') {

@@ -160,6 +160,17 @@ function preparerCartes(client, options) {
   // autocomplétion n'a pas d'embeds — la garde suffit à les écarter.
   const estInteraction = Array.isArray(body?.data?.embeds);
   const cible = estInteraction ? body.data : body;
+
+  // 📎 Fichiers joints : une carte ne peut porter QUE des fichiers qu'un de
+  // ses composants désigne (`attachment://nom`). Un fichier libre — le
+  // transcript d'un ticket, par exemple — fait refuser TOUT le message par
+  // Discord avec un 400.
+  //
+  // Le repli rejouait bien la requête, mais deux envois pour chaque message à
+  // pièce jointe, et trois refus suffisent à couper les cartes partout. On
+  // renonce donc AVANT d'essayer : une image citée par l'embed reste
+  // convertie, un fichier libre garde l'ancien style.
+  if (!tousLesFichiersSontCites(options, cible)) return null;
   const converti = convertirCorps(cible, { bordure: r.bordure, titre: r.titre, serveur: guild?.name || null });
   if (!converti) return null;
 
@@ -167,6 +178,22 @@ function preparerCartes(client, options) {
   if (estInteraction) body.data = converti;
   else options.body = converti;
   return origine;
+}
+
+// Chaque fichier joint est-il désigné par l'embed ? `setImage` et
+// `setThumbnail` acceptent `attachment://nom` : ces fichiers-là survivent à la
+// conversion, puisque la carte les cite à son tour. Les autres non.
+function tousLesFichiersSontCites(options, cible) {
+  const fichiers = Array.isArray(options?.files) ? options.files : [];
+  if (!fichiers.length) return true;
+  const cites = new Set();
+  for (const e of cible.embeds || []) {
+    for (const url of [e?.image?.url, e?.thumbnail?.url]) {
+      const m = /^attachment:\/\/(.+)$/.exec(String(url || ''));
+      if (m) cites.add(m[1]);
+    }
+  }
+  return fichiers.every((f) => cites.has(String(f?.name || '')));
 }
 
 // Un refus dû aux cartes se voit à un code 400 : la requête n'est pas partie,
@@ -223,5 +250,5 @@ function installer(client) {
 module.exports = {
   installer, appliquer, styliserUn, reglages, versEntier, guildeDe, listesDEmbeds, noterInteraction,
   couleurNeutre, COULEURS_NEUTRES, DEFAUT_ACCENT, FILET, filetDe, FILET_DEFAUT,
-  preparerCartes, routeDEnvoi, refusDeCartes, etatCartes, DRAPEAU_V2,
+  preparerCartes, routeDEnvoi, refusDeCartes, etatCartes, DRAPEAU_V2, tousLesFichiersSontCites,
 };

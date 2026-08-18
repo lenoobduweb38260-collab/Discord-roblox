@@ -166,6 +166,15 @@ function enComposants(guild, client, payload) {
     if (!carte) return null;
     cartes.push(carte);
   }
+  // Les rangées vont DANS la carte, comme à l'envoi : sans cela un panneau
+  // reconstruit aurait ses boutons détachés alors que le même panneau, publié,
+  // les a collés. La même carte n'aurait pas la même tête selon son âge.
+  const derniere = cartes[cartes.length - 1];
+  if (derniere?.type === C.T.CONTENEUR && rangees.length
+      && derniere.components.length + rangees.length <= C.MAX_DANS_CONTENEUR) {
+    derniere.components.push(...rangees);
+    return cartes;
+  }
   return [...cartes, ...rangees];
 }
 
@@ -192,8 +201,41 @@ function composantsPour(interaction, payload, message) {
 
   // ⚠️ On GARDE la carte et on ne remplace que les rangées : c'est le cas du
   // « retirer les boutons », qui vidait le message jusqu'ici.
+  //
+  // Les rangées vivent DANS le conteneur — c'est ce qui les colle à la carte
+  // au lieu de les laisser flotter dessous. Il faut donc les retirer de
+  // l'intérieur, pas seulement du premier niveau : filtrer uniquement le
+  // premier niveau laissait les anciens boutons en place et ajoutait les
+  // nouveaux à côté, donc en double.
   const existants = (message?.components || []).map(enJSON).filter((c) => c.type !== RANGEE);
+  const conteneur = existants.find((c) => c.type === C.T.CONTENEUR);
+  if (conteneur) {
+    conteneur.components = (conteneur.components || []).filter((c) => c.type !== RANGEE);
+    if (rangees.length && conteneur.components.length + rangees.length <= C.MAX_DANS_CONTENEUR) {
+      conteneur.components.push(...rangees);
+      return existants;
+    }
+  }
   return [...existants, ...rangees];
+}
+
+// 🔁 Réaffiche un message SANS rien y changer.
+//
+// C'est le seul moyen de remettre une liste déroulante à zéro : Discord garde
+// l'option cochée, et recliquer la MÊME entrée ne déclenche alors plus rien.
+// Renvoyer les composants tels quels suffit à la décocher.
+//
+// ⚠️ Ne PAS passer par mettreAJour avec `components: message.components` : sur
+// une carte, le conteneur serait pris pour une rangée à ajouter — et la carte
+// s'afficherait deux fois.
+async function reafficher(interaction) {
+  const message = interaction.message;
+  if (!message) return null;
+  const composants = (message.components || []).map(enJSON);
+  const corps = estCarte(message)
+    ? { components: composants, flags: C.DRAPEAU_V2 }
+    : { components: composants };
+  return interaction.update(corps).catch(() => interaction.deferUpdate().catch(() => null));
 }
 
 async function mettreAJour(interaction, payload) {
@@ -225,3 +267,4 @@ async function mettreAJour(interaction, payload) {
 module.exports.mettreAJour = mettreAJour;
 module.exports.estCarte = estCarte;
 module.exports.enComposants = enComposants;
+module.exports.reafficher = reafficher;
