@@ -182,7 +182,11 @@ module.exports = {
       }
       return null;
     } catch (err) {
-      return dire(interaction, ABSENTE.test(err.message) ? MESSAGE_ABSENTE : `❌ ${err.message}`);
+      // ⚠️ Pas de « ❌ » ajouté ici : les messages du moteur portent déjà le
+      // leur, et on lisait « ❌❌ ».
+      const m = err.message || '';
+      const texte = ABSENTE.test(m) ? MESSAGE_ABSENTE : (/^[❌⛔⚠️]/.test(m.trim()) ? m : `❌ ${m}`);
+      return dire(interaction, texte);
     }
   },
 

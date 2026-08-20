@@ -320,41 +320,67 @@ function scene({ enVocal = true, droits = true } = {}) {
       /ne laissent \*\*personne\*\* diffuser leur audio/.test(sources.description));
   }
 
-  console.log('\n13) Un échec vocal nomme la VRAIE cause');
+  console.log('\n13) Un échec vocal CONSTATE au lieu de supposer');
 {
-  // ⚠️ L'ancien message accusait les permissions. C'était faux : elles sont
-  // vérifiées AVANT d'essayer de se connecter — si on arrive là, elles sont
-  // bonnes. Accuser une cause qu'on n'a pas vérifiée envoie chercher des
-  // heures du mauvais côté.
+  // ⚠️ Deux messages successifs ont été faux. Le premier accusait les
+  // permissions — vérifiées avant même d'essayer. Le second demandait de
+  // vérifier l'intent vocal — que le bot peut lire lui-même. Une hypothèse
+  // envoie chercher partout ; un constat désigne un endroit.
   const salon = { id: 'VOC1' };
-  const moteur2 = require('../src/utils/musiqueMoteur');
-  const vraiManque = moteur2.briquesManquantes;
+  const vraiManque = moteur.briquesManquantes;
+  moteur.briquesManquantes = () => null;
+  const dit = (etat, preuves) => musique.expliquerEchecVocal(etat, salon, preuves);
+  const complet = { membre: true, intentVocal: true, vuDansLeSalon: null };
 
-  // Cas 1 : toutes les briques sont là — la cause est ailleurs.
-  moteur2.briquesManquantes = () => null;
-  const sig = musique.expliquerEchecVocal('signalling', salon);
-  V('bloqué en « signalling » → on parle de l\'intent vocal', /Server Voice States/.test(sig), sig.split('\n')[2]);
-  V('… et de la connexion déjà ouverte ailleurs', /déjà connecté à un autre salon/.test(sig));
-  V('… sans accuser les permissions', !/permissions \*\*Se connecter\*\*/.test(sig));
+  const pasMembre = dit('signalling', { ...complet, membre: false });
+  V('bot non membre → on le dit, et pourquoi', /pas membre de ce serveur/.test(pasMembre));
+  V('… en nommant l\'installation « application utilisateur »', /application utilisateur/.test(pasMembre));
 
-  const con = musique.expliquerEchecVocal('connecting', salon);
-  V('bloqué en « connecting » → on parle des ports UDP', /UDP/.test(con), con.split('\n')[3]);
-  V('… on propose de changer la région du salon', /région du salon vocal/.test(con));
-  V('… et on dit explicitement que les permissions sont bonnes',
-    /Mes permissions sont bonnes/.test(con));
+  const sansIntent = dit('signalling', { ...complet, intentVocal: false });
+  V('intent coupé → le bot le CONSTATE lui-même', /je l'ai vérifié moi-même/.test(sansIntent));
+  V('… et dit que ce n\'est pas un réglage du portail', /pas un réglage du portail/.test(sansIntent));
 
-  const autre = musique.expliquerEchecVocal('bizarre', salon);
-  V('un état imprévu est nommé tel quel', /« bizarre »/.test(autre), autre);
-  V('… et renvoie vers le diagnostic', /\/musique sources/.test(autre));
+  const plein = dit('signalling', { ...complet, salonPlein: true });
+  V('salon plein → cause immédiate', /salon est plein/.test(plein));
 
-  // Cas 2 : une brique manque — c'est LA cause, et elle passe devant.
-  moteur2.briquesManquantes = () => ['un **encodeur Opus** (`npm install opusscript`)'];
-  const sansOpus = musique.expliquerEchecVocal('connecting', salon);
-  V('une brique manquante est annoncée en premier', /Cause trouvée/.test(sansOpus), sansOpus.split('\n')[2]);
+  // 🔑 Le témoin décisif : Discord a-t-il pris acte de notre arrivée ?
+  const vu = dit('connecting', { ...complet, vuDansLeSalon: 'VOC1' });
+  V('placé dans le salon → le blocage est APRÈS, dans le flux', /flux vocal n'aboutit pas/.test(vu));
+  V('… donc on parle UDP et hébergeur', /UDP/.test(vu) && /hébergeur/.test(vu));
+  V('… et on affirme que tout le reste est vérifié',
+    /permissions, mes intents et mes bibliothèques audio sont bons/.test(vu));
+
+  const ignore = dit('signalling', complet);
+  V('jamais placé dans le salon → Discord nous a ignorés', /a ignoré ma demande/.test(ignore));
+  V('… on ne redemande PAS de vérifier l\'intent, il est constaté',
+    !/Vérifiez que l'intent/.test(ignore), ignore);
+  V('… deux causes seulement, toutes deux hors du bot', /hors du bot/.test(ignore));
+  V('… avec le détail technique pour l\'hébergeur', /VOICE_SERVER_UPDATE/.test(ignore));
+
+  // Une brique manquante passe devant tout le reste.
+  moteur.briquesManquantes = () => ['un **encodeur Opus** (`npm install opusscript`)'];
+  const sansOpus = dit('connecting', { ...complet, vuDansLeSalon: 'VOC1' });
+  V('une brique manquante est annoncée en premier', /brique audio sur l'hébergeur/.test(sansOpus));
   V('… avec la commande pour l\'installer', /npm install opusscript/.test(sansOpus));
-  V('… et l\'avertissement que ça ressemble aux permissions',
-    /ressemble à un problème de permissions, mais n'en est pas un/.test(sansOpus));
-  moteur2.briquesManquantes = vraiManque;
+  moteur.briquesManquantes = vraiManque;
+
+  // Un seul ❌ : la commande ajoutait le sien par-dessus celui du moteur.
+  const cmd2 = require('../src/commands/musique');
+  V('le message ne porte qu\'une seule croix',
+    (dit('signalling', complet).match(/❌/g) || []).length === 1);
+  const src = require('fs').readFileSync(`${__dirname}/../src/commands/musique.js`, 'utf8');
+  V('… et la commande n\'en rajoute pas', /\/\^\[❌⛔⚠️\]\//.test(src));
+}
+
+console.log('\n13 bis) Une seconde tentative avant de renoncer');
+{
+  const mu = require('fs').readFileSync(`${__dirname}/../src/utils/music.js`, 'utf8');
+  // Discord laisse parfois tomber le premier « voice server update » : rien
+  // ne revient jamais, et la connexion reste en « signalling ».
+  V('deux essais', /for \(let essai = 1; essai <= 2; essai\+\+\)/.test(mu));
+  V('… le premier plus court', /essai === 1 \? DELAI_PREMIER : DELAI_PRET/.test(mu));
+  V('… et chaque échec est tracé côté hébergeur', /1re tentative bloquée en/.test(mu));
+  V('une connexion orpheline est nettoyée avant', /ancienne\.destroy\(\)/.test(mu));
 }
 
 console.log('\n14) Branchements');

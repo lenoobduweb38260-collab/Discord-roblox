@@ -1157,6 +1157,23 @@ const RELEASES = [
     ],
     retrait: [],
   },
+  {
+    id: 'vocal-constat-2026-08bd',
+    title: 'Le bot constate au lieu de supposer 🔬',
+    ajout: [
+      '🔁 **Une seconde tentative de connexion** avant de renoncer : Discord laisse parfois tomber le premier signal vocal, et rien ne revient jamais',
+      '🧹 Une connexion vocale orpheline est nettoyee avant d\'en ouvrir une neuve — sinon la nouvelle demande recuperait l\'ancienne, qui n\'attend plus rien',
+    ],
+    amelioration: [
+      '🔬 **Le message d\'echec vocal ne suppose plus rien : il constate.** Le bot lit lui-meme s\'il est membre du serveur, si son intent vocal est actif, si le salon est plein, et surtout **si Discord l\'a place dans le salon**. Ce dernier point tranche tout : si Discord a repondu, le blocage est dans le flux audio (ports UDP de l\'hebergeur) ; sinon, la demande a ete ignoree',
+      '📓 Les constats partent aussi dans la console de l\'hebergeur, avec le detail technique a lui transmettre',
+    ],
+    fix: [
+      '🩹 **Le message demandait de verifier l\'intent vocal — que le bot peut lire lui-meme.** Comme la version d\'avant qui accusait les permissions deja verifiees, il envoyait chercher partout au lieu de designer un endroit',
+      '🩹 Deux croix « ❌❌ » s\'affichaient : la commande ajoutait la sienne par-dessus celle du message',
+    ],
+    retrait: [],
+  },
 ];
 
 // Construit l'embed d'une note à partir d'une entrée { title, ajout, fix,

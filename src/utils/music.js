@@ -17,6 +17,7 @@ const S = require('./musiqueSources');
 
 const files = new Map(); // guildId → File
 
+const DELAI_PREMIER = 12000;   // 1re tentative : on n'insiste pas trop longtemps
 const DELAI_PRET = 20000;      // Discord met parfois 10 s à ouvrir le vocal
 const DELAI_SEUL = 60000;      // seul dans le salon : on part au bout d'une minute
 const DELAI_VIDE = 30000;      // file terminée : on laisse le temps d'en ajouter
@@ -67,85 +68,160 @@ const fileDe = (guildId) => files.get(String(guildId)) || null;
 
 async function connecter(interaction, salonVocal) {
   const v = moteur.voice();
-  const connexion = v.joinVoiceChannel({
-    channelId: salonVocal.id,
-    guildId: interaction.guildId,
-    adapterCreator: interaction.guild.voiceAdapterCreator,
-    selfDeaf: true,
-    selfMute: false,
-  });
 
-  // ⚠️ L'étape qui manquait. `joinVoiceChannel` rend la main tout de suite,
-  // bien avant que la voix soit établie : jouer à cet instant envoie l'audio
-  // dans le vide. Le bot apparaissait dans le salon, et personne n'entendait
-  // rien — sans aucune erreur pour l'expliquer.
-  try {
-    await v.entersState(connexion, v.VoiceConnectionStatus.Ready, DELAI_PRET);
-  } catch {
-    const etatAtteint = connexion.state?.status || 'inconnu';
-    connexion.destroy();
-    throw new Error(expliquerEchecVocal(etatAtteint, salonVocal));
+  // 🧹 Une connexion précédente restée dans un état bancal empêche la
+  // suivante d'aboutir : `joinVoiceChannel` renvoie l'ancienne au lieu d'en
+  // ouvrir une neuve, et l'ancienne n'attend plus rien.
+  const ancienne = v.getVoiceConnection?.(interaction.guildId);
+  if (ancienne && !fileDe(interaction.guildId)) {
+    try { ancienne.destroy(); } catch {}
+    await new Promise((r) => setTimeout(r, 500));
   }
-  return connexion;
+
+  // Une seconde tentative vaut la peine : Discord laisse parfois tomber le
+  // premier « voice server update », et rien ne revient jamais. C'est
+  // exactement la panne qui laisse la connexion en « signalling ».
+  let derniereEtat = 'inconnu';
+  for (let essai = 1; essai <= 2; essai++) {
+    const connexion = v.joinVoiceChannel({
+      channelId: salonVocal.id,
+      guildId: interaction.guildId,
+      adapterCreator: interaction.guild.voiceAdapterCreator,
+      selfDeaf: true,
+      selfMute: false,
+    });
+
+    // ⚠️ L'étape qui manquait. `joinVoiceChannel` rend la main tout de suite,
+    // bien avant que la voix soit établie : jouer à cet instant envoie l'audio
+    // dans le vide. Le bot apparaissait dans le salon, et personne n'entendait
+    // rien — sans aucune erreur pour l'expliquer.
+    try {
+      await v.entersState(connexion, v.VoiceConnectionStatus.Ready, essai === 1 ? DELAI_PREMIER : DELAI_PRET);
+      return connexion;
+    } catch {
+      derniereEtat = connexion.state?.status || 'inconnu';
+      try { connexion.destroy(); } catch {}
+      if (essai === 1) {
+        console.warn(`⚠️ Vocal : 1re tentative bloquée en « ${derniereEtat} » sur ${interaction.guildId} — on réessaie.`);
+        await new Promise((r) => setTimeout(r, 1000));
+      }
+    }
+  }
+
+  const preuves = releverPreuves(interaction, salonVocal);
+  console.warn(`⚠️ Vocal impossible (${derniereEtat}) : ${JSON.stringify(preuves)}`);
+  throw new Error(expliquerEchecVocal(derniereEtat, salonVocal, preuves));
 }
 
-// 🩺 Pourquoi la voix ne s'est pas ouverte.
+// 🔬 Ce qu'on peut CONSTATER, ici, maintenant.
 //
-// L'ancien message accusait les permissions. C'était FAUX dans le cas le plus
-// courant, et trompeur dans tous : les permissions sont vérifiées avant même
-// d'essayer de se connecter — si on arrive ici, elles sont bonnes.
-//
-// L'état atteint, lui, dit vraiment où ça bloque :
-//
-//   signalling → la passerelle n'a jamais répondu. Intent vocal manquant, ou
-//                le bot est déjà connecté ailleurs sur ce serveur.
-//   connecting → la passerelle a répondu, mais la voix elle-même n'aboutit
-//                pas. C'est l'UDP : soit une brique audio manque, soit
-//                l'hébergeur bloque les ports.
-//
-// Et on cite d'abord ce qui manque, quand quelque chose manque : c'est la
-// seule cause qu'on puisse constater sans quitter le processus.
-function expliquerEchecVocal(etatAtteint, salonVocal) {
-  const manque = moteur.briquesManquantes();
-  const lignes = [`❌ Je n'ai pas réussi à ouvrir <#${salonVocal.id}>.`];
+// La version précédente listait des hypothèses — dont « vérifiez l'intent »,
+// alors que le bot peut lire ses propres intents, et « vérifiez les
+// permissions », alors qu'il vient de les vérifier. Une liste d'hypothèses
+// envoie chercher partout ; un constat désigne un endroit.
+function releverPreuves(interaction, salonVocal) {
+  const v = moteur.voice();
+  const guild = interaction.guild;
+  const moi = guild?.members?.me || null;
+  let intentVocal = null;
+  try {
+    const { GatewayIntentBits } = require('discord.js');
+    intentVocal = Boolean(interaction.client?.options?.intents?.has?.(GatewayIntentBits.GuildVoiceStates));
+  } catch { intentVocal = null; }
 
-  if (manque) {
-    lignes.push(
-      '',
-      '**Cause trouvée : il manque une brique audio sur l\'hébergeur.**',
-      ...manque.map((m) => `➜ ${m}`),
-      '-# Sans elle, la connexion est acceptée puis n\'aboutit jamais — cela ressemble à un problème de permissions, mais n\'en est pas un.'
-    );
+  return {
+    // Le bot fait-il vraiment partie du serveur ? En « app utilisateur », une
+    // commande s'exécute sur un serveur où le bot n'est PAS membre : Discord
+    // ignore alors sa demande de connexion, sans rien répondre.
+    membre: Boolean(moi),
+    intentVocal,
+    // 🔑 Le témoin décisif : Discord a-t-il seulement pris acte de notre
+    // arrivée ? S'il l'a fait, la passerelle répond et le blocage est plus
+    // loin. Sinon, elle nous a purement ignorés.
+    vuDansLeSalon: moi?.voice?.channelId || null,
+    dejaConnecteA: v.getVoiceConnection?.(interaction.guildId) ? 'oui' : 'non',
+    salonPlein: Boolean(salonVocal.userLimit && salonVocal.members?.size >= salonVocal.userLimit),
+    typeSalon: salonVocal.type,
+  };
+}
+
+// 🩺 Pourquoi la voix ne s'est pas ouverte — d'après ce qu'on CONSTATE.
+//
+// L'ancien message accusait les permissions. C'était faux : elles sont
+// vérifiées avant même d'essayer de se connecter. Le suivant listait des
+// hypothèses, dont « vérifiez l'intent vocal » — alors que le bot peut lire
+// ses propres intents et répondre lui-même à la question.
+//
+// Une hypothèse envoie chercher partout. Un constat désigne un endroit.
+function expliquerEchecVocal(etatAtteint, salonVocal, preuves = {}) {
+  const lignes = [`❌ Je n'ai pas réussi à ouvrir <#${salonVocal.id}>.`];
+  const conclure = (titre, ...suite) => {
+    lignes.push('', `**${titre}**`, ...suite);
     return lignes.join('\n');
+  };
+
+  // ── Ce qu'on peut constater sans quitter le processus ──
+  const manque = moteur.briquesManquantes();
+  if (manque) {
+    return conclure(
+      'Il manque une brique audio sur l\'hébergeur.',
+      ...manque.map((m) => `➜ ${m}`),
+      '-# Sans elle, la connexion est acceptée puis n\'aboutit jamais. Cela ressemble à un problème de permissions, mais n\'en est pas un.'
+    );
+  }
+
+  if (preuves.membre === false) {
+    return conclure(
+      'Je ne suis pas membre de ce serveur.',
+      '➜ La commande vient de mon installation « application utilisateur » : je peux répondre, mais pas rejoindre un salon vocal.',
+      '➜ Invitez-moi sur le serveur pour que la musique fonctionne.'
+    );
+  }
+
+  if (preuves.intentVocal === false) {
+    return conclure(
+      'Mon intent vocal est désactivé — je l\'ai vérifié moi-même.',
+      '➜ L\'hébergeur doit relancer le bot avec l\'intent **GuildVoiceStates**.',
+      '-# Ce n\'est pas un réglage du portail développeur : il est écrit dans le code de démarrage.'
+    );
+  }
+
+  if (preuves.salonPlein) {
+    return conclure(
+      'Le salon est plein.',
+      '➜ Sa limite d\'utilisateurs est atteinte. Libérez une place, ou augmentez la limite.'
+    );
+  }
+
+  // ── Le témoin décisif ──
+  //
+  // Si Discord m'a placé dans le salon, la passerelle a répondu : le blocage
+  // est APRÈS, dans le flux vocal lui-même. Sinon, elle m'a ignoré.
+  if (preuves.vuDansLeSalon) {
+    return conclure(
+      'Discord m\'a bien placé dans le salon, mais le flux vocal n\'aboutit pas.',
+      '➜ C\'est presque toujours l\'hébergeur qui bloque les ports **UDP** sortants — beaucoup d\'hébergements mutualisés le font. C\'est à lui qu\'il faut le demander.',
+      '➜ En attendant : changez la **région du salon** (Modifier le salon → Région), cela change de serveur vocal.',
+      '-# Mes permissions, mes intents et mes bibliothèques audio sont bons : je viens de les vérifier.'
+    );
   }
 
   if (etatAtteint === 'signalling') {
-    lignes.push(
-      '',
-      '**Discord n\'a jamais répondu à ma demande de connexion.**',
-      '➜ Vérifiez que l\'intent **Server Voice States** est actif sur le portail développeur.',
-      '➜ Vérifiez aussi que je ne suis pas déjà connecté à un autre salon vocal de ce serveur : déconnectez-moi à la main, puis réessayez.'
+    return conclure(
+      'Discord a ignoré ma demande, deux fois de suite.',
+      '➜ Je suis bien membre du serveur, mon intent vocal est actif et mes permissions sont bonnes : je les ai vérifiés.',
+      '➜ Il reste deux causes possibles, toutes deux hors du bot :',
+      '  • la passerelle Discord ne relaie pas mes paquets vocaux — un **redémarrage du bot** la remet souvent d\'aplomb ;',
+      '  • l\'hébergeur bloque la sortie vers les serveurs vocaux de Discord.',
+      '-# Détail technique pour l\'hébergeur : la connexion reste bloquée en « signalling », aucun `VOICE_SERVER_UPDATE` n\'est reçu.'
     );
-    return lignes.join('\n');
   }
 
-  if (etatAtteint === 'connecting') {
-    lignes.push(
-      '',
-      '**Discord a accepté, mais le flux vocal n\'aboutit pas.**',
-      '➜ C\'est presque toujours l\'hébergeur qui bloque les ports **UDP** sortants — beaucoup d\'hébergements mutualisés le font.',
-      '➜ Essayez de changer la **région du salon vocal** (Modifier le salon → Région) : cela change de serveur vocal.',
-      '-# Mes permissions sont bonnes : je les vérifie avant même d\'essayer.'
-    );
-    return lignes.join('\n');
-  }
-
-  lignes.push(
-    '',
+  return conclure(
     `La connexion s'est arrêtée à l'état « ${etatAtteint} ».`,
-    '➜ Lancez `/musique sources` : le diagnostic y détaille l\'état des briques audio.'
+    '➜ Lancez `/musique sources` : le diagnostic y détaille l\'état des briques audio.',
+    `-# Constats : membre=${preuves.membre} · intent=${preuves.intentVocal} · vu dans le salon=${preuves.vuDansLeSalon || 'non'}`
   );
-  return lignes.join('\n');
 }
 
 // Discord coupe et rétablit la connexion quand le salon change de région.
