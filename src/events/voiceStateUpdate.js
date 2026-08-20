@@ -6,8 +6,30 @@ module.exports = {
   name: Events.VoiceStateUpdate,
   async execute(oldState, newState) {
     const member = newState.member || oldState.member;
-    if (!member || member.user.bot) return;
     const guild = newState.guild;
+
+    // 🎵 Le bot ne joue pas pour les murs.
+    //
+    // On regarde AVANT d'écarter les bots : c'est justement le départ du
+    // dernier humain qui doit être vu. Compter les humains plutôt que les
+    // membres, sinon le bot se compterait lui-même et resterait pour
+    // l'éternité dans un salon vide.
+    try {
+      const musique = require('../utils/music');
+      const file = musique.fileDe(guild.id);
+      if (file) {
+        for (const salonId of new Set([oldState.channelId, newState.channelId].filter(Boolean))) {
+          if (salonId !== file.salonVocalId) continue;
+          const salon = guild.channels.cache.get(salonId);
+          const humains = salon?.members?.filter((m) => !m.user.bot).size ?? 1;
+          musique.verifierSolitude(guild.id, humains);
+        }
+      }
+    } catch (err) {
+      console.warn(`⚠️ Surveillance du vocal (musique) : ${err.message}`);
+    }
+
+    if (!member || member.user.bot) return;
 
     if (!oldState.channelId && newState.channelId) {
       await sendLog(

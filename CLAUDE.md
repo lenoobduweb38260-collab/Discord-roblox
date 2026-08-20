@@ -253,3 +253,36 @@ Français, phrases courtes, une idée par ligne. Un emoji en tête de section
 pour l'orientation visuelle — pas de décoration gratuite. Les messages
 d'erreur disent **ce qui s'est passé et quoi faire**, jamais « une erreur
 est survenue » tout court.
+
+## 🧪 Tests
+
+`npm test` lance toutes les suites de `tests/`. Une suite est un fichier
+`tests/*.test.js` qui conclut par `N réussis, M échoués` et sort avec le bon
+code — le lanceur signale « MUETTE » une suite qui meurt sans conclure, sans
+quoi un fichier qui plante au chargement passerait pour vert.
+
+Les faux (`tests/aides/`) remplacent ce qu'on ne peut pas faire tourner ici :
+`discord.js`, `better-sqlite3` (registre npm bloqué), `@discordjs/voice` et
+`play-dl`. Ils produisent le VRAI JSON de l'API, seul juge du résultat.
+
+⚠️ Un test qui charge `src/database.js` doit poser `process.env.DATA_FILE`
+**avant** le premier `require` : la base s'ouvre au chargement du module, et
+sans cela le test écrit dans la vraie base du bot, à la racine du dépôt.
+
+## 🎵 Musique
+
+**Spotify et Deezer ne laissent personne diffuser leur audio.** Leurs flux sont
+chiffrés et réservés à leurs applications. Le bot lit la FICHE du lien (titre,
+artiste, durée) puis joue la même chanson depuis YouTube, et il le DIT dans sa
+réponse — sans quoi on prend pour un défaut ce qui est une règle de leur côté.
+YouTube et SoundCloud, eux, se lisent directement.
+
+Trois pièges, tous rencontrés :
+
+- `play-dl` ne fonctionne pas seul : SoundCloud exige une clé d'accès
+  (`getFreeClientID`), Spotify des identifiants d'application. Sans la
+  préparation, toute une plateforme échoue en silence.
+- `joinVoiceChannel` rend la main **avant** que la voix soit établie. Jouer à
+  cet instant envoie l'audio dans le vide : le bot rejoint le salon et reste
+  muet, sans erreur. Il faut `entersState(…, Ready)`.
+- Un morceau illisible ne doit jamais détruire la connexion : on le passe.

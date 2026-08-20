@@ -252,6 +252,12 @@ module.exports = {
       return require('../utils/communaute').handleDecision(interaction);
     }
 
+    // ----- Boutons de la carte de lecture (/musique) -----
+    if (interaction.isButton() && interaction.customId?.startsWith('mus:')) {
+      if (!interaction.inGuild()) return horsServeur(interaction);
+      return require('../commands/musique').handleComposant(interaction);
+    }
+
     // ----- Panneau des matricules RP : pages et recherche -----
     if (
       (interaction.isButton() && /^matr(page:|search$)/.test(interaction.customId || ''))

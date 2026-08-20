@@ -1118,6 +1118,31 @@ const RELEASES = [
     ],
     retrait: [],
   },
+  {
+    id: 'musique-refonte-2026-08bb',
+    title: 'La musique refaite : YouTube, SoundCloud, Spotify, Deezer 🎶',
+    ajout: [
+      '🎧 **Les quatre plateformes demandees fonctionnent** : YouTube (videos et playlists), SoundCloud (pistes et playlists), Spotify et Deezer (pistes, albums et listes)',
+      '🎛️ **Des boutons sous la lecture** : pause, morceau suivant, boucle, file, arret — sans retaper une commande. Ils n\'obeissent qu\'aux personnes presentes dans le salon vocal',
+      '📃 **`/musique file`**, **`melanger`**, **`retirer`**, **`boucle`** (le morceau ou toute la file), **`volume`** reglable en direct sans relancer le morceau, et **`maintenant`** avec une barre de progression',
+      '🩺 **`/musique sources`** dit ce que le bot sait lire, et signale ce qui manque a la configuration',
+      '👥 **Le bot part quand il reste seul** dans le salon, et quand la file se termine',
+    ],
+    amelioration: [
+      'ℹ️ **Spotify et Deezer ne laissent personne diffuser leur audio** — leurs flux sont reserves a leurs propres applications. Le bot lit donc la fiche du lien puis joue la meme chanson depuis YouTube, **et il le dit** : sans cela on prendrait pour un defaut ce qui est une regle de leur cote. Le titre affiche reste celui de la plateforme d\'origine, jamais la version enjolivee de YouTube',
+      '🔑 **Spotify sans configuration** : sans identifiants d\'application, le bot passe par le lien public et lit quand meme une piste. Avec identifiants (`SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET`, `SPOTIFY_REFRESH_TOKEN`), il lit les albums et listes entiers',
+      '⚠️ **Un titre sans equivalent trouvable est nomme**, au lieu de disparaitre silencieusement de la file',
+      '🧪 **Les tests vivent enfin dans le depot** (`npm test`), au lieu d\'un dossier temporaire',
+    ],
+    fix: [
+      '🩹 **Le bot rejoignait le vocal et restait muet.** La lecture demarrait AVANT que la connexion soit prete : l\'audio partait dans le vide, sans la moindre erreur. Le bot attend desormais l\'etat « pret »',
+      '🩹 **Tout lien SoundCloud echouait** : la bibliotheque audio exige une cle d\'acces qui n\'etait demandee nulle part',
+      '🩹 **Les liens Deezer n\'etaient pas traites du tout** : le bot cherchait sur YouTube l\'adresse elle-meme, ce qui ne donnait rien',
+      '🩹 **Un seul morceau illisible coupait toute la session** — une video supprimee et le bot quittait le vocal. Il est desormais passe, en le disant, et trois echecs de suite arretent proprement',
+      '🩹 Un changement de region vocale coupait la musique : il est maintenant distingue d\'une vraie deconnexion',
+    ],
+    retrait: [],
+  },
 ];
 
 // Construit l'embed d'une note à partir d'une entrée { title, ajout, fix,
