@@ -1143,6 +1143,20 @@ const RELEASES = [
     ],
     retrait: [],
   },
+  {
+    id: 'musique-vraie-cause-2026-08bc',
+    title: 'Le vocal qui ne s\'ouvre pas dit enfin POURQUOI 🩺',
+    ajout: [
+      '🔧 **`/musique sources` montre l\'etat des briques audio** : encodeur Opus et chiffrement de la voix, avec la commande d\'installation quand il en manque une',
+      '📣 **Le bot le signale au demarrage** : une brique manquante apparait dans la console de l\'hebergeur, sans avoir a lancer quoi que ce soit',
+    ],
+    amelioration: [],
+    fix: [
+      '🩹 **« Verifiez que j\'ai les permissions » s\'affichait meme avec toutes les permissions.** Le message accusait une cause que le bot n\'avait pas verifiee — et il les verifie pourtant AVANT d\'essayer de se connecter : si ce message apparaissait, les permissions etaient forcement bonnes. On cherchait donc des heures du mauvais cote',
+      '🩺 **Le message nomme desormais la vraie cause**, d\'apres l\'endroit ou la connexion s\'est arretee : brique audio manquante, intent **Server Voice States** absent, bot deja connecte ailleurs, ou ports **UDP** bloques par l\'hebergeur — le cas le plus frequent sur un hebergement mutualise, avec le changement de region du salon comme contournement',
+    ],
+    retrait: [],
+  },
 ];
 
 // Construit l'embed d'une note à partir d'une entrée { title, ajout, fix,

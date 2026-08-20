@@ -251,6 +251,57 @@ async function ouvrirFlux(morceau) {
   return ressource;
 }
 
+// ══════════════════════════════════════════════════════════════════
+// 🩺 DIAGNOSTIC DES DÉPENDANCES AUDIO
+// ══════════════════════════════════════════════════════════════════
+//
+// @discordjs/voice a besoin de deux briques que rien n'installe tout seul :
+//
+//  • un ENCODEUR OPUS — sans lui, aucun son ne peut être encodé ;
+//  • une bibliothèque de CHIFFREMENT — Discord chiffre la voix, et a retiré
+//    les anciens modes. Sans une bibliothèque à jour, la connexion est
+//    acceptée par la passerelle puis n'aboutit jamais.
+//
+// Sans ces briques, `joinVoiceChannel` réussit, la connexion passe en
+// « connecting »… et reste là. On voit alors un bot dans le salon, muet, et
+// tout DONNE L'IMPRESSION d'un défaut de permissions — alors que les
+// permissions n'y sont pour rien.
+//
+// C'est ce que ce diagnostic sert à dire.
+function rapportDependances() {
+  const rapport = { texte: null, opus: null, chiffrement: null, ffmpeg: null };
+  try {
+    const v = voice();
+    rapport.texte = typeof v.generateDependencyReport === 'function' ? v.generateDependencyReport() : null;
+  } catch (err) {
+    rapport.texte = `indisponible : ${err.message}`;
+  }
+
+  const trouver = (noms) => {
+    for (const nom of noms) {
+      try {
+        require.resolve(nom);
+        return nom;
+      } catch { /* suivant */ }
+    }
+    return null;
+  };
+  rapport.opus = trouver(['@discordjs/opus', 'opusscript']);
+  rapport.chiffrement = trouver(['sodium-native', 'libsodium-wrappers', 'sodium', 'tweetnacl']);
+  rapport.ffmpeg = trouver(['ffmpeg-static', 'prism-media']);
+  return rapport;
+}
+
+// Ce qui manque, dit en une phrase actionnable — ou null si tout est là.
+function briquesManquantes() {
+  const r = rapportDependances();
+  const manque = [];
+  if (!r.opus) manque.push('un **encodeur Opus** (`npm install opusscript`)');
+  if (!r.chiffrement) manque.push('une **bibliothèque de chiffrement** (`npm install libsodium-wrappers`)');
+  return manque.length ? manque : null;
+}
+
 module.exports = {
   preparer, etatSources, resoudre, chercherSurYouTube, ouvrirFlux, play, voice,
+  rapportDependances, briquesManquantes,
 };

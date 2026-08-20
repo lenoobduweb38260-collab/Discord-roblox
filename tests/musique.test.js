@@ -320,7 +320,44 @@ function scene({ enVocal = true, droits = true } = {}) {
       /ne laissent \*\*personne\*\* diffuser leur audio/.test(sources.description));
   }
 
-  console.log('\n13) Branchements');
+  console.log('\n13) Un échec vocal nomme la VRAIE cause');
+{
+  // ⚠️ L'ancien message accusait les permissions. C'était faux : elles sont
+  // vérifiées AVANT d'essayer de se connecter — si on arrive là, elles sont
+  // bonnes. Accuser une cause qu'on n'a pas vérifiée envoie chercher des
+  // heures du mauvais côté.
+  const salon = { id: 'VOC1' };
+  const moteur2 = require('../src/utils/musiqueMoteur');
+  const vraiManque = moteur2.briquesManquantes;
+
+  // Cas 1 : toutes les briques sont là — la cause est ailleurs.
+  moteur2.briquesManquantes = () => null;
+  const sig = musique.expliquerEchecVocal('signalling', salon);
+  V('bloqué en « signalling » → on parle de l\'intent vocal', /Server Voice States/.test(sig), sig.split('\n')[2]);
+  V('… et de la connexion déjà ouverte ailleurs', /déjà connecté à un autre salon/.test(sig));
+  V('… sans accuser les permissions', !/permissions \*\*Se connecter\*\*/.test(sig));
+
+  const con = musique.expliquerEchecVocal('connecting', salon);
+  V('bloqué en « connecting » → on parle des ports UDP', /UDP/.test(con), con.split('\n')[3]);
+  V('… on propose de changer la région du salon', /région du salon vocal/.test(con));
+  V('… et on dit explicitement que les permissions sont bonnes',
+    /Mes permissions sont bonnes/.test(con));
+
+  const autre = musique.expliquerEchecVocal('bizarre', salon);
+  V('un état imprévu est nommé tel quel', /« bizarre »/.test(autre), autre);
+  V('… et renvoie vers le diagnostic', /\/musique sources/.test(autre));
+
+  // Cas 2 : une brique manque — c'est LA cause, et elle passe devant.
+  moteur2.briquesManquantes = () => ['un **encodeur Opus** (`npm install opusscript`)'];
+  const sansOpus = musique.expliquerEchecVocal('connecting', salon);
+  V('une brique manquante est annoncée en premier', /Cause trouvée/.test(sansOpus), sansOpus.split('\n')[2]);
+  V('… avec la commande pour l\'installer', /npm install opusscript/.test(sansOpus));
+  V('… et l\'avertissement que ça ressemble aux permissions',
+    /ressemble à un problème de permissions, mais n'en est pas un/.test(sansOpus));
+  moteur2.briquesManquantes = vraiManque;
+}
+
+console.log('\n14) Branchements');
   {
     const fs = require('fs');
     const ic = fs.readFileSync(`${__dirname}/../src/events/interactionCreate.js`, 'utf8');
@@ -330,6 +367,9 @@ function scene({ enVocal = true, droits = true } = {}) {
     V('… en comptant les HUMAINS, pas les bots', /filter\(\(m\) => !m\.user\.bot\)/.test(vs));
     const mu = fs.readFileSync(`${__dirname}/../src/utils/music.js`, 'utf8');
     V('la déconnexion distingue un changement de région', /Signalling[\s\S]{0,120}Connecting/.test(mu));
+    const rd = fs.readFileSync(`${__dirname}/../src/events/ready.js`, 'utf8');
+    V('les briques manquantes sont signalées au démarrage', /briquesManquantes\(\)/.test(rd));
+    V('… en disant que la connexion vocale n\'aboutira pas', /n'aboutira pas/.test(rd));
   }
 
   global.fetch = vraiFetch;

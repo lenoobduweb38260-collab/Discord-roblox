@@ -9,6 +9,21 @@ module.exports = {
     console.log(`✅ Connecté en tant que ${client.user.tag}`);
     client.user.setActivity('le serveur RP 🎭', { type: ActivityType.Watching });
 
+    // 🎵 État des briques audio, DÈS le démarrage.
+    //
+    // Sans encodeur Opus ni bibliothèque de chiffrement, le bot rejoint un
+    // salon vocal et reste muet : la connexion est acceptée puis n'aboutit
+    // jamais. Cela ressemble à un défaut de permissions, et on cherche des
+    // heures du mauvais côté. Autant l'écrire une fois, au démarrage.
+    try {
+      const manque = require('../utils/musiqueMoteur').briquesManquantes();
+      if (manque) {
+        console.warn(`⚠️ Musique : ${manque.join(' et ').replace(/\*\*/g, '')} — la connexion vocale n'aboutira pas.`);
+      }
+    } catch (err) {
+      console.warn(`⚠️ Musique : diagnostic audio impossible (${err.message}).`);
+    }
+
     // XP vocal : chaque minute, chaque membre connecté en vocal (non muet
     // serveur, hors salon AFK, hors bots) gagne l'XP vocal configuré.
     setInterval(() => {

@@ -82,13 +82,70 @@ async function connecter(interaction, salonVocal) {
   try {
     await v.entersState(connexion, v.VoiceConnectionStatus.Ready, DELAI_PRET);
   } catch {
+    const etatAtteint = connexion.state?.status || 'inconnu';
     connexion.destroy();
-    throw new Error(
-      'Je n\'ai pas réussi à ouvrir le salon vocal.\n'
-      + '➜ Vérifiez que j\'ai les permissions **Se connecter** et **Parler**, et que le salon n\'est pas plein.'
-    );
+    throw new Error(expliquerEchecVocal(etatAtteint, salonVocal));
   }
   return connexion;
+}
+
+// 🩺 Pourquoi la voix ne s'est pas ouverte.
+//
+// L'ancien message accusait les permissions. C'était FAUX dans le cas le plus
+// courant, et trompeur dans tous : les permissions sont vérifiées avant même
+// d'essayer de se connecter — si on arrive ici, elles sont bonnes.
+//
+// L'état atteint, lui, dit vraiment où ça bloque :
+//
+//   signalling → la passerelle n'a jamais répondu. Intent vocal manquant, ou
+//                le bot est déjà connecté ailleurs sur ce serveur.
+//   connecting → la passerelle a répondu, mais la voix elle-même n'aboutit
+//                pas. C'est l'UDP : soit une brique audio manque, soit
+//                l'hébergeur bloque les ports.
+//
+// Et on cite d'abord ce qui manque, quand quelque chose manque : c'est la
+// seule cause qu'on puisse constater sans quitter le processus.
+function expliquerEchecVocal(etatAtteint, salonVocal) {
+  const manque = moteur.briquesManquantes();
+  const lignes = [`❌ Je n'ai pas réussi à ouvrir <#${salonVocal.id}>.`];
+
+  if (manque) {
+    lignes.push(
+      '',
+      '**Cause trouvée : il manque une brique audio sur l\'hébergeur.**',
+      ...manque.map((m) => `➜ ${m}`),
+      '-# Sans elle, la connexion est acceptée puis n\'aboutit jamais — cela ressemble à un problème de permissions, mais n\'en est pas un.'
+    );
+    return lignes.join('\n');
+  }
+
+  if (etatAtteint === 'signalling') {
+    lignes.push(
+      '',
+      '**Discord n\'a jamais répondu à ma demande de connexion.**',
+      '➜ Vérifiez que l\'intent **Server Voice States** est actif sur le portail développeur.',
+      '➜ Vérifiez aussi que je ne suis pas déjà connecté à un autre salon vocal de ce serveur : déconnectez-moi à la main, puis réessayez.'
+    );
+    return lignes.join('\n');
+  }
+
+  if (etatAtteint === 'connecting') {
+    lignes.push(
+      '',
+      '**Discord a accepté, mais le flux vocal n\'aboutit pas.**',
+      '➜ C\'est presque toujours l\'hébergeur qui bloque les ports **UDP** sortants — beaucoup d\'hébergements mutualisés le font.',
+      '➜ Essayez de changer la **région du salon vocal** (Modifier le salon → Région) : cela change de serveur vocal.',
+      '-# Mes permissions sont bonnes : je les vérifie avant même d\'essayer.'
+    );
+    return lignes.join('\n');
+  }
+
+  lignes.push(
+    '',
+    `La connexion s'est arrêtée à l'état « ${etatAtteint} ».`,
+    '➜ Lancez `/musique sources` : le diagnostic y détaille l\'état des briques audio.'
+  );
+  return lignes.join('\n');
 }
 
 // Discord coupe et rétablit la connexion quand le salon change de région.
@@ -345,6 +402,7 @@ function verifierSolitude(guildId, nombreHumains) {
 
 module.exports = {
   ajouter, quitter, passer, pause, reprendre, volume, boucler, melanger, retirer,
+  expliquerEchecVocal,
   etat, fileDe, verifierSolitude, files,
   DELAI_SEUL, DELAI_VIDE, MAX_ECHECS, VOLUME_DEFAUT,
   // Conservés pour compatibilité avec l'ancienne interface.

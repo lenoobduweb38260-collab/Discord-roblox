@@ -293,6 +293,8 @@ function carteFile(etat) {
 function carteSources() {
   const moteur = require('../utils/musiqueMoteur');
   const e = moteur.etatSources();
+  const d = moteur.rapportDependances();
+  const manque = moteur.briquesManquantes();
   return new EmbedBuilder()
     .setColor(COLORS.INFO)
     .setTitle('🎧 Ce que je sais lire')
@@ -307,6 +309,16 @@ function carteSources() {
       ], { prefixe: '🔁', compte: null }),
       '-# ⚠️ Spotify et Deezer ne laissent **personne** diffuser leur audio : leurs flux sont réservés à leurs propres applications. '
       + 'Je lis donc la fiche du lien, puis je joue la même chanson depuis YouTube. Aucun bot Discord ne fait autrement.',
+      // 🩺 Les briques audio. Sans elles, le bot rejoint le salon et reste
+      // muet — et tout ressemble à un défaut de permissions.
+      M.bloc('Briques audio', [
+        `${d.opus ? '✅' : '❌'} Encodeur Opus${d.opus ? ` — \`${d.opus}\`` : ' — **manquant**'}`,
+        `${d.chiffrement ? '✅' : '❌'} Chiffrement de la voix${d.chiffrement ? ` — \`${d.chiffrement}\`` : ' — **manquant**'}`,
+      ], { prefixe: '🔧', compte: null }),
+      manque
+        ? `⚠️ **Il manque ${manque.length === 1 ? 'une brique' : 'des briques'} :**\n${manque.map((m) => `➜ ${m}`).join('\n')}\n`
+          + '-# Sans elle, la connexion vocale est acceptée puis n\'aboutit jamais.'
+        : null,
       e.erreurs.length ? M.bloc('Soucis au démarrage', e.erreurs, { prefixe: '⚠️', compte: null }) : null,
     ].filter(Boolean)));
 }
