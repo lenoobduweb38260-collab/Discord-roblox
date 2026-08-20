@@ -1174,6 +1174,21 @@ const RELEASES = [
     ],
     retrait: [],
   },
+  {
+    id: 'musique-diagnostic-2026-08be',
+    title: 'La poignee de main vocale, etape par etape 🔬',
+    ajout: [
+      '🔬 **`/musique diagnostic`** ouvre une vraie connexion vocale, note chaque etape de la poignee de main, puis la referme. Il ne joue rien : il cherche l\'endroit exact ou ca s\'arrete',
+      '📶 **Les cinq etapes sont affichees** : connexion a Discord, envoi de ma demande, reponse « ou je suis », attribution du serveur vocal, ouverture du flux audio. Chacune accuse un coupable different',
+      '📓 La meme fiche part dans la console de l\'hebergeur, prete a lui etre transmise',
+    ],
+    amelioration: [
+      '📡 **Une precision qui change tout** : les quatre premieres etapes passent par le WebSocket de la passerelle, **aucune n\'utilise l\'UDP**. Il n\'entre en jeu qu\'a la cinquieme. Un pare-feu UDP ouvert n\'innocente donc rien tant qu\'on n\'a pas passe les quatre premieres — et le bot ne parle plus d\'UDP avant d\'y etre arrive',
+      '🎯 Chaque etape manquante a maintenant sa cause et son remede : passerelle qui redemarre, defaut interne au bot, passerelle qui ne relaie pas les paquets vocaux (un redemarrage suffit), region du salon a changer, ou brique audio absente',
+    ],
+    fix: [],
+    retrait: [],
+  },
 ];
 
 // Construit l'embed d'une note à partir d'une entrée { title, ajout, fix,

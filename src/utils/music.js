@@ -224,6 +224,128 @@ function expliquerEchecVocal(etatAtteint, salonVocal, preuves = {}) {
   );
 }
 
+// ══════════════════════════════════════════════════════════════════
+// 🔬 DIAGNOSTIC : où exactement la poignée de main s'arrête
+// ══════════════════════════════════════════════════════════════════
+//
+// Rester en « signalling » ne dit qu'une chose : la passerelle Discord ne
+// nous a pas répondu. Mais quatre étapes se cachent derrière, et elles
+// n'accusent pas les mêmes coupables :
+//
+//   1. la connexion à la passerelle est-elle vivante ?
+//   2. ai-je ENVOYÉ la demande de connexion vocale (opcode 4) ?
+//   3. Discord m'a-t-il répondu où je suis (VOICE_STATE_UPDATE) ?
+//   4. Discord m'a-t-il donné le serveur vocal (VOICE_SERVER_UPDATE) ?
+//
+// ⚠️ Aucune de ces étapes n'utilise l'UDP : tout passe par le WebSocket de la
+// passerelle. Un pare-feu UDP ouvert ou fermé n'y change RIEN — l'UDP n'entre
+// en jeu qu'après la 4ᵉ. C'est pourquoi il fallait instrumenter plutôt que de
+// continuer à supposer.
+//
+// On enveloppe donc l'adaptateur pour noter chaque étape, et on dit laquelle
+// n'est jamais arrivée.
+async function diagnostiquerVocal(interaction, salonVocal, delai = 12000) {
+  const v = moteur.voice();
+  const guild = interaction.guild;
+  const etapes = {
+    passerelle: null,      // état du shard
+    demandeEnvoyee: null,  // opcode 4 accepté par discord.js ?
+    etatRecu: false,       // VOICE_STATE_UPDATE
+    serveurRecu: false,    // VOICE_SERVER_UPDATE
+    statutFinal: null,
+    erreur: null,
+  };
+
+  try {
+    etapes.passerelle = guild.shard?.status ?? null;
+  } catch { etapes.passerelle = null; }
+
+  // L'adaptateur est le seul point par lequel passent les paquets vocaux :
+  // l'envelopper montre EXACTEMENT ce qui entre et ce qui sort.
+  const creerAdaptateurEspion = (methodes) => {
+    const vrai = guild.voiceAdapterCreator(methodes);
+    return {
+      sendPayload(charge) {
+        const ok = vrai.sendPayload(charge);
+        etapes.demandeEnvoyee = ok !== false;
+        return ok;
+      },
+      destroy() { return vrai.destroy?.(); },
+    };
+  };
+
+  const espion = (methodes) => creerAdaptateurEspion({
+    onVoiceStateUpdate(donnees) { etapes.etatRecu = true; return methodes.onVoiceStateUpdate(donnees); },
+    onVoiceServerUpdate(donnees) { etapes.serveurRecu = true; return methodes.onVoiceServerUpdate(donnees); },
+    destroy: methodes.destroy,
+  });
+
+  let connexion = null;
+  try {
+    connexion = v.joinVoiceChannel({
+      channelId: salonVocal.id,
+      guildId: interaction.guildId,
+      adapterCreator: espion,
+      selfDeaf: true,
+      selfMute: false,
+    });
+    await v.entersState(connexion, v.VoiceConnectionStatus.Ready, delai);
+    etapes.statutFinal = 'ready';
+  } catch (err) {
+    etapes.statutFinal = connexion?.state?.status || 'inconnu';
+    etapes.erreur = err.message;
+  } finally {
+    try { connexion?.destroy(); } catch {}
+  }
+  return etapes;
+}
+
+// Traduit le relevé en une conclusion. Chaque étape manquante a une cause
+// distincte : c'est tout l'intérêt de les avoir séparées.
+function lireDiagnostic(e) {
+  if (e.statutFinal === 'ready') {
+    return {
+      verdict: '✅ La connexion vocale fonctionne.',
+      suite: 'Si la musique reste muette malgré cela, le problème est dans l\'audio lui-même, pas dans la connexion.',
+    };
+  }
+  if (e.passerelle !== null && e.passerelle !== 0) {
+    return {
+      verdict: '❌ Ma connexion à Discord n\'est pas établie.',
+      suite: `Le shard est à l'état ${e.passerelle} au lieu de « prêt ». Le bot vient sans doute de démarrer, ou il se reconnecte : réessayez dans quelques secondes.`,
+    };
+  }
+  if (e.demandeEnvoyee === false) {
+    return {
+      verdict: '❌ Ma demande de connexion vocale n\'a même pas pu partir.',
+      suite: 'discord.js a refusé de l\'envoyer à la passerelle. C\'est un défaut interne au bot : signalez-le à son créateur avec cette fiche.',
+    };
+  }
+  if (!e.etatRecu && !e.serveurRecu) {
+    return {
+      verdict: '❌ Discord n\'a répondu ni où je suis, ni quel serveur vocal utiliser.',
+      suite: 'Ma demande est partie, et rien n\'est revenu. C\'est le signe d\'une passerelle qui ne relaie pas les paquets vocaux : '
+        + '**redémarrez le bot**, cela repart presque toujours. Si cela recommence, c\'est l\'intent vocal qui n\'est pas actif côté hébergeur.',
+    };
+  }
+  if (e.etatRecu && !e.serveurRecu) {
+    return {
+      verdict: '❌ Discord m\'a placé dans le salon, mais ne m\'a jamais donné de serveur vocal.',
+      suite: 'C\'est une panne côté Discord, souvent liée à la **région du salon**. Changez-la (Modifier le salon → Région), puis réessayez.',
+    };
+  }
+  if (e.serveurRecu) {
+    return {
+      verdict: '❌ Discord m\'a tout donné, mais le flux audio ne s\'ouvre pas.',
+      suite: 'C\'est la seule étape qui utilise l\'**UDP**. Si les ports sortants sont ouverts, il manque alors une brique audio : voyez `/musique sources`.',
+    };
+  }
+  return {
+    verdict: `❌ La connexion s'est arrêtée à l'état « ${e.statutFinal} ».`,
+    suite: e.erreur || 'Aucune cause identifiable.',
+  };
+}
+
 // Discord coupe et rétablit la connexion quand le salon change de région.
 // Détruire au premier signe couperait la musique pour rien ; ne jamais
 // détruire laisserait un bot fantôme dans le salon.
@@ -478,7 +600,7 @@ function verifierSolitude(guildId, nombreHumains) {
 
 module.exports = {
   ajouter, quitter, passer, pause, reprendre, volume, boucler, melanger, retirer,
-  expliquerEchecVocal,
+  expliquerEchecVocal, diagnostiquerVocal, lireDiagnostic, releverPreuves,
   etat, fileDe, verifierSolitude, files,
   DELAI_SEUL, DELAI_VIDE, MAX_ECHECS, VOLUME_DEFAUT,
   // Conservés pour compatibilité avec l'ancienne interface.

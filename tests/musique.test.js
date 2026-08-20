@@ -383,6 +383,48 @@ console.log('\n13 bis) Une seconde tentative avant de renoncer');
   V('une connexion orpheline est nettoyée avant', /ancienne\.destroy\(\)/.test(mu));
 }
 
+console.log('\n13 ter) Le diagnostic dit à QUELLE étape ça s\'arrête');
+{
+  // ⚠️ Rester en « signalling » ne dit qu'une chose : Discord n'a pas
+  // répondu. Quatre étapes se cachent derrière, et elles n'accusent pas les
+  // mêmes coupables. Aucune n'utilise l'UDP — il n'entre en jeu qu'après la
+  // quatrième. C'est pourquoi « UDP ouvert » n'innocente rien tout seul.
+  const lire = musique.lireDiagnostic;
+
+  const passerelle = lire({ passerelle: 2, statutFinal: 'signalling' });
+  V('passerelle non prête → on le dit', /connexion à Discord n'est pas établie/.test(passerelle.verdict));
+  V('… et on propose d\'attendre', /réessayez dans quelques secondes/.test(passerelle.suite));
+
+  const pasPartie = lire({ passerelle: 0, demandeEnvoyee: false, statutFinal: 'signalling' });
+  V('demande jamais envoyée → défaut interne au bot', /n'a même pas pu partir/.test(pasPartie.verdict));
+  V('… et c\'est nommé comme tel', /défaut interne au bot/.test(pasPartie.suite));
+
+  const rienRecu = lire({ passerelle: 0, demandeEnvoyee: true, etatRecu: false, serveurRecu: false, statutFinal: 'signalling' });
+  V('rien reçu → la passerelle ne relaie pas', /ni où je suis, ni quel serveur vocal/.test(rienRecu.verdict));
+  V('… on propose le redémarrage, qui règle ce cas', /redémarrez le bot/.test(rienRecu.suite));
+  V('… et l\'UDP n\'est PAS accusé ici', !/UDP/.test(rienRecu.suite), rienRecu.suite);
+
+  const sansServeur = lire({ passerelle: 0, demandeEnvoyee: true, etatRecu: true, serveurRecu: false, statutFinal: 'signalling' });
+  V('état reçu mais pas le serveur → région du salon', /région du salon/.test(sansServeur.suite));
+  V('… et c\'est bien une panne côté Discord', /panne côté Discord/.test(sansServeur.suite));
+
+  const toutRecu = lire({ passerelle: 0, demandeEnvoyee: true, etatRecu: true, serveurRecu: true, statutFinal: 'connecting' });
+  V('tout reçu → LÀ seulement on parle d\'UDP', /UDP/.test(toutRecu.suite));
+  V('… en disant que c\'est la seule étape concernée', /seule étape qui utilise/.test(toutRecu.suite));
+
+  const bon = lire({ passerelle: 0, demandeEnvoyee: true, etatRecu: true, serveurRecu: true, statutFinal: 'ready' });
+  V('connexion réussie → verdict positif', /fonctionne/.test(bon.verdict));
+
+  const cmd3 = require('fs').readFileSync(`${__dirname}/../src/commands/musique.js`, 'utf8').replace(/\\'/g, "'");
+  V('la commande /musique diagnostic existe', /setName\('diagnostic'\)/.test(cmd3));
+  V('… elle refuse hors vocal', /le test a besoin d'un salon où essayer/.test(cmd3));
+  V('… et ne relance rien si la musique joue déjà', /la connexion vocale fonctionne donc/.test(cmd3));
+  const mu2 = require('fs').readFileSync(`${__dirname}/../src/utils/music.js`, 'utf8').replace(/\\'/g, "'");
+  V('l\'adaptateur est instrumenté', /onVoiceServerUpdate\(donnees\) \{ etapes\.serveurRecu = true/.test(mu2));
+  V('… et la connexion de test est toujours refermée', /finally \{\s*\n\s*try \{ connexion\?\.destroy/.test(mu2));
+  V('le fait que l\'UDP n\'intervient qu\'à la fin est écrit', /Aucune de ces étapes n'utilise l'UDP/.test(mu2));
+}
+
 console.log('\n14) Branchements');
   {
     const fs = require('fs');

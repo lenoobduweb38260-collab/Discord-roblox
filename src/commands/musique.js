@@ -111,13 +111,16 @@ module.exports = {
     .addSubcommand((s) => s.setName('volume')
       .setDescription('Régler le volume (0 à 200 %)')
       .addIntegerOption((o) => o.setName('niveau').setDescription('En pourcentage').setRequired(true).setMinValue(0).setMaxValue(200)))
-    .addSubcommand((s) => s.setName('sources').setDescription('Ce que le bot sait lire, et comment')),
+    .addSubcommand((s) => s.setName('sources').setDescription('Ce que le bot sait lire, et comment'))
+    .addSubcommand((s) => s.setName('diagnostic')
+      .setDescription('Tester la connexion vocale et dire précisément où elle bloque')),
 
   async execute(interaction) {
     const sub = interaction.options.getSubcommand();
     try {
       if (sub === 'play') return await jouer(interaction);
       if (sub === 'sources') return await interaction.reply({ embeds: [carteSources()], flags: MessageFlags.Ephemeral });
+      if (sub === 'diagnostic') return await diagnostic(interaction);
 
       const etat = musique.etat(interaction.guildId);
       if (!etat && sub !== 'file') {
@@ -275,6 +278,65 @@ async function jouer(interaction) {
     if (p.vignette) embed.setThumbnail(p.vignette);
 
     return { embeds: [embed], components: premiere && etat ? [boutons(etat)] : [] };
+  });
+}
+
+// 🔬 Le test qui remplace les hypothèses.
+//
+// Il ouvre une vraie connexion, en notant chaque étape de la poignée de main,
+// puis la referme. Rien n'est joué : on ne cherche que l'endroit où ça
+// s'arrête.
+async function diagnostic(interaction) {
+  const salonVocal = interaction.member?.voice?.channel;
+  if (!salonVocal) {
+    return interaction.reply({
+      content: '🔬 Rejoignez d\'abord un salon vocal : le test a besoin d\'un salon où essayer.',
+      flags: MessageFlags.Ephemeral,
+    });
+  }
+  if (musique.etat(interaction.guildId)) {
+    return interaction.reply({
+      content: '🔬 Je joue déjà : la connexion vocale fonctionne donc. Arrêtez avec `/musique stop` pour relancer le test.',
+      flags: MessageFlags.Ephemeral,
+    });
+  }
+
+  return repondreVite(interaction, async () => {
+    const e = await musique.diagnostiquerVocal(interaction, salonVocal);
+    const { verdict, suite } = musique.lireDiagnostic(e);
+    const preuves = musique.releverPreuves(interaction, salonVocal);
+    const d = require('../utils/musiqueMoteur').rapportDependances();
+    const oui = (v) => (v ? '✅' : '❌');
+
+    const embed = new EmbedBuilder()
+      .setColor(e.statutFinal === 'ready' ? COLORS.SUCCESS : COLORS.DANGER)
+      .setTitle('🔬 Diagnostic de la connexion vocale')
+      .setDescription(M.description([
+        `**${verdict}**`,
+        suite,
+        // Les quatre étapes, dans l'ordre. Aucune n'utilise l'UDP : il
+        // n'entre en jeu qu'APRÈS la quatrième.
+        M.bloc('La poignée de main, étape par étape', [
+          `${e.passerelle === 0 ? '✅' : '❌'} 1. Connexion à Discord ${e.passerelle === 0 ? 'établie' : `— état ${e.passerelle}`}`,
+          `${oui(e.demandeEnvoyee !== false)} 2. Ma demande de connexion vocale est partie`,
+          `${oui(e.etatRecu)} 3. Discord m'a dit où je suis`,
+          `${oui(e.serveurRecu)} 4. Discord m'a donné le serveur vocal`,
+          `${oui(e.statutFinal === 'ready')} 5. Flux audio ouvert ${e.statutFinal === 'ready' ? '' : '*(seule étape qui utilise l\'UDP)*'}`,
+        ], { prefixe: '📶', compte: null }),
+        M.bloc('Constats', [
+          `${oui(preuves.membre)} Je suis membre du serveur`,
+          `${oui(preuves.intentVocal)} Mon intent vocal est actif`,
+          `${oui(!preuves.salonPlein)} Le salon n'est pas plein`,
+          `${oui(d.opus)} Encodeur Opus${d.opus ? ` — \`${d.opus}\`` : ''}`,
+          `${oui(d.chiffrement)} Chiffrement de la voix${d.chiffrement ? ` — \`${d.chiffrement}\`` : ''}`,
+        ], { prefixe: '🔎', compte: null }),
+      ].filter(Boolean)))
+      .setFooter({ text: `État final : ${e.statutFinal}${e.erreur ? ` · ${e.erreur}` : ''}` });
+
+    // La même fiche part dans la console : c'est elle qu'on transmet à
+    // l'hébergeur, et on ne recopie pas un embed à la main.
+    console.log(`🔬 Diagnostic vocal ${interaction.guildId} : ${JSON.stringify({ ...e, ...preuves })}`);
+    return { embeds: [embed], flags: MessageFlags.Ephemeral };
   });
 }
 
