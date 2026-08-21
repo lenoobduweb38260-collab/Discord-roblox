@@ -25,6 +25,10 @@ const TECHNIQUE = [
   // Une définition de colonne — `wanted INTEGER NOT NULL DEFAULT 0` —
   // ressemble à trois mots anglais, et n'est pas un message.
   /\b(INTEGER|TEXT|REAL|BLOB|BOOLEAN)\b[\s\S]*\b(NOT NULL|DEFAULT|PRIMARY KEY|REFERENCES)\b/i,
+  /VALUES\s*\(/i,
+  /ON CONFLICT|DO UPDATE SET/i,
+  // L'en-tête d'un navigateur, envoyé aux plateformes : ce n'est pas du texte.
+  /^Mozilla\/[\d.]+/,
   /^https?:\/\//,
   /^#[0-9a-f]{3,8}$/i,
   /^[\s\-─=_*#`|]+$/,                     // décors, séparateurs
@@ -232,6 +236,12 @@ function relever() {
   // pas des messages du bot.
   // utils/langues.js et traductions.json SONT le dictionnaire : les relever
   // reviendrait à demander de traduire les traductions.
+  // utils/carteVisuelle.js dessine ses étiquettes sur une image : elles ne
+  // peuvent pas passer par le dictionnaire (police latine sans accents,
+  // mots seuls). Sa table vit dans le fichier, comme celle d'interact.
+  // utils/carteVisuelle.js dessine ses étiquettes sur une image : elles ne
+  // peuvent pas passer par le dictionnaire (police latine sans accents,
+  // mots seuls). Sa table vit dans le fichier, comme celle d'interact.
   // commands/interact.js porte ses propres traductions et suit la langue
   // Discord de chaque membre, pas celle du serveur : le relever ferait
   // retraduire des phrases déjà écrites en anglais, en espagnol et en
@@ -239,6 +249,8 @@ function relever() {
   const ecartes = new Set([
     'manager/index.js', 'utils/patchNotes.js', 'utils/langues.js',
     'utils/traduire.js', 'commands/interact.js',
+    'utils/carteVisuelle.js',
+    'utils/carteVisuelle.js',
   ]);
   for (const fichier of parcourir(RACINE).sort()) {
     const rel = path.relative(RACINE, fichier).replace(/\\/g, '/');

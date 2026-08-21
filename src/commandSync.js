@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { REST, Routes } = require('discord.js');
 const { getGuildConfig } = require('./database');
+const { localiser } = require('./utils/localiserCommandes');
 
 // Synchronisation des commandes par serveur selon la configuration :
 // - commandes « app utilisateur » (userInstall) → GLOBALES
@@ -23,7 +24,9 @@ function loadDefs() {
       // Module interactions désactivé par l'administrateur du bot : la
       // commande n'est enregistrée nulle part.
       if (command.botModule === 'interact' && process.env.MODULE_INTERACT?.trim().toLowerCase() === 'off') continue;
-      const json = command.data.toJSON();
+      // Les descriptions partent traduites : Discord les affichera dans la
+      // langue de chaque membre.
+      const json = localiser(command.data.toJSON());
       if (command.userInstall) globalCmds.push(json);
       else if (command.module === 'rp') rpCmds.push(json);
       else baseCmds.push(json);

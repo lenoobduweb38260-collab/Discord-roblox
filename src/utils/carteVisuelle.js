@@ -17,6 +17,61 @@ const LARGEUR = 1000;
 const HAUTEUR = 630;          // proportions d'une carte au format ID-1
 const MARGE = 34;
 
+
+// 🌍 Les étiquettes DESSINÉES sur le document.
+//
+// Elles ne passent pas par le dictionnaire commun, pour deux raisons de fond :
+//
+//  • les polices livrées avec jimp n'existent qu'en alphabet latin, et sans
+//    accents — d'où le `sansAccent` déjà présent partout ici. Un texte russe
+//    se dessinerait en carrés vides : le russe reprend donc l'anglais, qui se
+//    lit, plutôt qu'un document illisible ;
+//  • ce sont des mots seuls et sans accents (« Nom », « Sexe », « Points ») :
+//    le rattrapage par morceaux les écarte exprès, pour ne pas aller les
+//    remplacer au milieu du texte écrit par un membre.
+const ETIQUETTES = {
+  fr: {
+    serveur: 'SERVEUR RP',
+    carte: "CARTE D'IDENTITE RP", permis: 'PERMIS DE CONDUIRE RP',
+    mention: 'DOCUMENT RP - SANS VALEUR LEGALE',
+    nom: 'Nom', prenom: 'Prenom', neLe: 'Ne(e) le', a: 'A', sexe: 'Sexe',
+    nationalite: 'Nationalite', pseudo: 'Pseudo Roblox', discord: 'Identifiant Discord',
+    titulaire: 'Titulaire', statut: 'Statut', valide: 'VALIDE', invalide: 'INVALIDE',
+    points: 'Points', delivreLe: 'Delivre le', categories: 'Categories', autorite: 'Autorite',
+  },
+  en: {
+    serveur: 'RP SERVER',
+    carte: 'RP IDENTITY CARD', permis: 'RP DRIVING LICENCE',
+    mention: 'RP DOCUMENT - NO LEGAL VALUE',
+    nom: 'Surname', prenom: 'First name', neLe: 'Born on', a: 'In', sexe: 'Sex',
+    nationalite: 'Nationality', pseudo: 'Roblox name', discord: 'Discord ID',
+    titulaire: 'Holder', statut: 'Status', valide: 'VALID', invalide: 'INVALID',
+    points: 'Points', delivreLe: 'Issued on', categories: 'Categories', autorite: 'Authority',
+  },
+  de: {
+    serveur: 'RP-SERVER',
+    carte: 'RP-PERSONALAUSWEIS', permis: 'RP-FUEHRERSCHEIN',
+    mention: 'RP-DOKUMENT - OHNE RECHTSWIRKUNG',
+    nom: 'Name', prenom: 'Vorname', neLe: 'Geboren am', a: 'In', sexe: 'Geschlecht',
+    nationalite: 'Nationalitaet', pseudo: 'Roblox-Name', discord: 'Discord-ID',
+    titulaire: 'Inhaber', statut: 'Status', valide: 'GUELTIG', invalide: 'UNGUELTIG',
+    points: 'Punkte', delivreLe: 'Ausgestellt am', categories: 'Klassen', autorite: 'Behoerde',
+  },
+  es: {
+    serveur: 'SERVIDOR RP',
+    carte: 'DOCUMENTO DE IDENTIDAD RP', permis: 'PERMISO DE CONDUCIR RP',
+    mention: 'DOCUMENTO RP - SIN VALOR LEGAL',
+    nom: 'Apellido', prenom: 'Nombre', neLe: 'Nacido el', a: 'En', sexe: 'Sexo',
+    nationalite: 'Nacionalidad', pseudo: 'Nombre Roblox', discord: 'ID de Discord',
+    titulaire: 'Titular', statut: 'Estado', valide: 'VALIDO', invalide: 'NO VALIDO',
+    points: 'Puntos', delivreLe: 'Expedido el', categories: 'Categorias', autorite: 'Autoridad',
+  },
+};
+// L'alphabet cyrillique ne se dessine pas : l'anglais, lui, se lit.
+ETIQUETTES.ru = ETIQUETTES.en;
+
+const mots = (langue) => ETIQUETTES[langue] || ETIQUETTES.fr;
+
 const THEMES = {
   identite: {
     fond: '#eef1f7',
@@ -25,7 +80,6 @@ const THEMES = {
     accent: '#1b3a8f',
     encre: '#111827',
     discret: '#5b6478',
-    titre: "CARTE D'IDENTITE RP",
   },
   permis: {
     fond: '#fdeef2',
@@ -34,7 +88,6 @@ const THEMES = {
     accent: '#a8264f',
     encre: '#111827',
     discret: '#6b5560',
-    titre: 'PERMIS DE CONDUIRE RP',
   },
 };
 
@@ -57,6 +110,8 @@ function champ(label, valeur, x, y, largeur) {
 // donc vérifiable sans jimp.
 function planDocument(type, donnees = {}) {
   const theme = THEMES[type] || THEMES.identite;
+  const M = mots(donnees.langue);
+  const titreDefaut = type === 'permis' ? M.permis : M.carte;
   const hauteurBandeau = 92;
   const photo = { x: MARGE, y: hauteurBandeau + 30, largeur: 240, hauteur: 300 };
   const colonneX = photo.x + photo.largeur + 34;
@@ -64,8 +119,8 @@ function planDocument(type, donnees = {}) {
   const demiColonne = Math.floor(largeurColonne / 2) - 12;
 
   const textes = [
-    { texte: assainirTexte(donnees.serveur) || 'SERVEUR RP', taille: 16, x: MARGE, y: 22, ton: 'bandeau' },
-    { texte: donnees.titre || theme.titre, taille: 32, x: MARGE, y: 44, ton: 'bandeau' },
+    { texte: assainirTexte(donnees.serveur) || M.serveur, taille: 16, x: MARGE, y: 22, ton: 'bandeau' },
+    { texte: donnees.titre || titreDefaut, taille: 32, x: MARGE, y: 44, ton: 'bandeau' },
   ];
 
   // Deux colonnes de champs, empilées.
@@ -83,7 +138,7 @@ function planDocument(type, donnees = {}) {
   const basY = HAUTEUR - MARGE - 44;
   textes.push({ texte: assainirTexte(donnees.numero) || '', taille: 32, x: MARGE, y: basY, ton: 'accent' });
   textes.push({
-    texte: 'DOCUMENT RP - SANS VALEUR LEGALE',
+    texte: M.mention,
     taille: 16,
     x: LARGEUR - MARGE,
     y: basY + 14,
@@ -117,19 +172,21 @@ const sansAccent = (t) => String(t || '').normalize('NFD').replace(/[\u0300-\u03
 // Champs d'une carte d'identité RP.
 function planCarte(card, extra = {}) {
   const T = extra.theme || null;
+  const M = mots(extra.langue);
   return planDocument('identite', {
+    langue: extra.langue,
     serveur: extra.serveur,
     titre: T ? `${sansAccent(T.carte.titre).toUpperCase()} RP` : undefined,
     numero: card.card_id ? `N° ${card.card_id}` : '',
     champs: [
-      ['Nom', card.rp_nom],
-      ['Prenom', card.rp_prenom],
-      ['Ne(e) le', card.date_naissance],
-      [T ? sansAccent(T.carte.lieu) : 'A', card.lieu_naissance],
-      ['Sexe', card.sexe],
-      [T ? sansAccent(T.carte.nationalite) : 'Nationalite', card.nationalite],
-      [T ? sansAccent(T.compte.label) : 'Pseudo Roblox', card.pseudo_roblox],
-      ['Identifiant Discord', card.user_id],
+      [M.nom, card.rp_nom],
+      [M.prenom, card.rp_prenom],
+      [M.neLe, card.date_naissance],
+      [T ? sansAccent(T.carte.lieu) : M.a, card.lieu_naissance],
+      [M.sexe, card.sexe],
+      [T ? sansAccent(T.carte.nationalite) : M.nationalite, card.nationalite],
+      [T ? sansAccent(T.compte.label) : M.pseudo, card.pseudo_roblox],
+      [M.discord, card.user_id],
     ],
   });
 }
@@ -138,17 +195,19 @@ function planCarte(card, extra = {}) {
 function planPermis(permit, extra = {}) {
   const valide = permit.valid === 1;
   const T = extra.theme || null;
+  const M = mots(extra.langue);
   return planDocument('permis', {
+    langue: extra.langue,
     serveur: extra.serveur,
     titre: T ? `${sansAccent(T.permis.titre).toUpperCase()} RP` : undefined,
     numero: permit.permit_number ? `N° ${permit.permit_number}` : '',
     champs: [
-      [T ? sansAccent(T.permis.titulaire) : 'Titulaire', extra.titulaire || ''],
-      ['Statut', valide ? 'VALIDE' : 'INVALIDE'],
-      [T ? sansAccent(T.permis.points) : 'Points', `${permit.points}/12`],
-      ['Delivre le', extra.delivre || ''],
-      ['Categories', extra.categories || 'B'],
-      ['Autorite', extra.serveur || ''],
+      [T ? sansAccent(T.permis.titulaire) : M.titulaire, extra.titulaire || ''],
+      [M.statut, valide ? M.valide : M.invalide],
+      [T ? sansAccent(T.permis.points) : M.points, `${permit.points}/12`],
+      [M.delivreLe, extra.delivre || ''],
+      [M.categories, extra.categories || 'B'],
+      [M.autorite, extra.serveur || ''],
     ],
   });
 }
@@ -214,4 +273,4 @@ async function police(Jimp, taille, clair) {
   return font;
 }
 
-module.exports = { planDocument, planCarte, planPermis, fabriquer, THEMES, LARGEUR, HAUTEUR, tailleValide };
+module.exports = { planDocument, planCarte, planPermis, fabriquer, THEMES, ETIQUETTES, LARGEUR, HAUTEUR, tailleValide };

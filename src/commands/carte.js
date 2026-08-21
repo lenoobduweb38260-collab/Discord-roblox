@@ -3,6 +3,7 @@ const { db, RP_SCOPE } = require('../database');
 const { generateCardId } = require('../utils/ids');
 const { buildCardEmbed, sendLog, logEmbed, COLORS } = require('../utils/embeds');
 const { themeDe } = require('../utils/rpThemes');
+const { langueDe } = require('../utils/langues');
 const { GRADES, getGrade } = require('../utils/permissions');
 
 const insertCard = db.prepare(`
@@ -164,7 +165,7 @@ module.exports = {
       // 🪪 Document dessiné par le bot. Si jimp manque ou échoue, on retombe
       // sur l'embed classique : la commande répond toujours.
       const V = require('../utils/carteVisuelle');
-      const png = await V.fabriquer(V.planCarte(card, { serveur: interaction.guild?.name, theme: themeDe(interaction.guildId) }), {
+      const png = await V.fabriquer(V.planCarte(card, { serveur: interaction.guild?.name, theme: themeDe(interaction.guildId), langue: langueDe(interaction.guildId) }), {
         photoUrl: card.photo_url || user.displayAvatarURL({ size: 512, extension: 'png' }),
       }).catch(() => null);
       if (png) {

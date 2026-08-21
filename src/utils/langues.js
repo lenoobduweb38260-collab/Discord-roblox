@@ -7,11 +7,15 @@ const { getGuildConfig } = require('../database');
 // message en français vaut infiniment mieux qu'une clé technique affichée
 // telle quelle — et infiniment mieux qu'un texte vide.
 //
-// ⚠️ Ce fichier ne contient QUE ce que les membres lisent vraiment : montées
-// de niveau, tickets, rôles au clic, musique, refus courants. Traduire d'un
-// coup les 38 commandes donnerait de la traduction de machine, et un bot à
-// moitié traduit ment davantage qu'un bot qui reste en français. Le panneau
-// `/config` dit donc noir sur blanc ce qui est traduit et ce qui ne l'est pas.
+// ⚠️ Ce fichier n'est PAS le dictionnaire du bot. Il ne porte que les rares
+// textes dont la traduction dépend de variables — un accord, un ordre de
+// mots — et qui ne peuvent donc pas être une simple correspondance de
+// phrase à phrase.
+//
+// Tout le reste vit dans `traductions.json`, indexé par le texte français
+// lui-même, et s'applique sur la couche réseau (`traduire.js`). Le panneau
+// `/config` dit noir sur blanc ce qui est traduit et ce qui ne l'est pas :
+// un texte sans traduction reste en français, jamais vide.
 //
 // Ajouter une langue = ajouter une colonne dans DICO. Une clé oubliée retombe
 // en français, jamais dans le vide : un test le vérifie.

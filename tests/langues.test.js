@@ -205,6 +205,79 @@ console.log('\n11) Les phrases construites par morceaux');
     TR.traduireTexte('🎫 Contenu du panneau', 'fr') === '🎫 Contenu du panneau');
 }
 
+console.log('\n12) Les descriptions de commandes');
+{
+  // Discord affiche une description dans la langue du MEMBRE, à partir des
+  // `*_localizations` données à l'enregistrement. C'est la seule surface que
+  // la couche réseau ne peut pas traduire.
+  const { localiser } = require('../src/utils/localiserCommandes');
+  const cmd = localiser({
+    name: 'ticket',
+    description: '[Staff] Système de tickets : types, catégories et panneau',
+    options: [{
+      type: 1,
+      name: 'panneau',
+      description: 'Publier le panneau de tickets dans un salon',
+      options: [{
+        type: 3, name: 'format', description: 'Format du message du panneau',
+        choices: [{ name: '🔘 Boutons', value: 'boutons' }],
+      }],
+    }],
+  });
+  V('la description part traduite', cmd.description_localizations?.['en-US'] === '[Staff] Ticket system: types, categories and panel',
+    JSON.stringify(cmd.description_localizations));
+  V('… les deux anglais sont servis', Boolean(cmd.description_localizations?.['en-GB']));
+  V('… une sous-commande aussi', cmd.options[0].description_localizations?.['en-US'] === 'Publish the ticket panel in a channel');
+  V('… une option aussi', cmd.options[0].options[0].description_localizations?.['en-US'] === 'Format of the panel message');
+  V('… l\'intitulé d\'un choix aussi', cmd.options[0].options[0].choices[0].name_localizations?.['en-US'] === '🔘 Buttons');
+  V('le NOM d\'une commande ne bouge jamais', cmd.name === 'ticket' && !cmd.name_localizations);
+  V('… ni celui d\'une option', cmd.options[0].options[0].name === 'format');
+  V('… ni la VALEUR d\'un choix', cmd.options[0].options[0].choices[0].value === 'boutons');
+
+  const sync = fs.readFileSync(`${__dirname}/../src/commandSync.js`, 'utf8');
+  V('la synchronisation passe par la localisation', /localiser\(command\.data\.toJSON\(\)\)/.test(sync));
+}
+
+console.log('\n13) Les documents RP dessinés');
+{
+  const V2 = require('../src/utils/carteVisuelle');
+  const carte = V2.planCarte({ rp_nom: 'Doe', rp_prenom: 'John' }, { langue: 'en' });
+  const textes = carte.textes.map((t) => t.texte);
+  V('le titre du document suit la langue', textes.includes('RP IDENTITY CARD'), textes.join(' | '));
+  V('… la mention légale aussi', textes.includes('RP DOCUMENT - NO LEGAL VALUE'));
+  // Les intitulés sont dessinés en capitales.
+  V('… et les étiquettes des champs', textes.includes('SURNAME') && textes.includes('FIRST NAME'), textes.join(' | '));
+
+  const fr = V2.planCarte({ rp_nom: 'Doe' }, {}).textes.map((t) => t.texte);
+  V('sans langue, tout reste en français', fr.includes("CARTE D'IDENTITE RP") && fr.includes('NOM'), fr.join(' | '));
+
+  const permis = V2.planPermis({ valid: 1, points: 12 }, { langue: 'en' }).textes.map((t) => t.texte);
+  V('le permis suit la langue', permis.includes('RP DRIVING LICENCE') && permis.includes('VALID'), permis.join(' | '));
+
+  // Les polices de jimp ne dessinent pas le cyrillique : un document anglais
+  // se lit, un document en carrés vides non.
+  V('le russe reprend l\'anglais, faute de police cyrillique',
+    V2.ETIQUETTES.ru === V2.ETIQUETTES.en);
+}
+
+console.log('\n14) L\'IA répond dans la langue du serveur');
+{
+  const ai = fs.readFileSync(`${__dirname}/../src/utils/aiResponder.js`, 'utf8');
+  V('la consigne n\'écrit plus « en français » en dur', !/en français, et fidèle au ton/.test(ai));
+  V('… elle porte la langue reçue', /nomFr\}, et fidèle au ton/.test(ai));
+  V('… et la langue vient du serveur', /langueDe\(message\.guildId\)/.test(ai) && /langueDe\(interaction\.guildId\)/.test(ai));
+  for (const c of LG.CLES) V(`${c} a son nom en français`, Boolean(LG.LANGUES[c].nomFr), LG.LANGUES[c].nomFr);
+}
+
+console.log('\n15) Couverture : tout le bot est traduit en anglais');
+{
+  const catalogue = extracteur.relever().filter((e) => !e.risque);
+  const table = TR.table();
+  const manquants = catalogue.filter((e) => !table[e.fr]?.en);
+  V(`aucun texte sans anglais (${catalogue.length} relevés)`, manquants.length === 0,
+    manquants.slice(0, 5).map((e) => `${e.fichier}: ${JSON.stringify(e.fr)}`).join(' | '));
+}
+
 fs.rmSync(RACINE, { recursive: true, force: true });
 console.log(`\n${ko === 0 ? '✅' : '❌'} ${ok} réussis, ${ko} échoués`);
 process.exit(ko === 0 ? 0 : 1);

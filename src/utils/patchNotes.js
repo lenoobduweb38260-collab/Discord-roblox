@@ -1205,6 +1205,28 @@ const RELEASES = [
     fix: [],
     retrait: [],
   },
+  {
+    id: 'anglais-complet-2026-08bg',
+    title: 'Le bot au complet en anglais 🇬🇧',
+    ajout: [
+      '🇬🇧 **Tout le bot est traduit en anglais** : 2 395 textes, soit la totalite de ce qu\'il affiche. Rien ne reste en francais sur un serveur regle en English',
+      '📝 **Les descriptions des commandes suivent la langue de chaque membre.** C\'est Discord qui les affiche, pas le bot : elles partent donc traduites a l\'enregistrement. Le NOM d\'une commande, lui, ne bouge jamais — c\'est ce qu\'on tape, et ce que les messages d\'aide citent',
+      '🪪 **La carte d\'identite et le permis RP sont dessines dans la langue du serveur** : titre, mention legale et intitules des champs. Le russe reprend l\'anglais, faute de police cyrillique dessinable — un document qui se lit vaut mieux qu\'un document en carres vides',
+    ],
+    amelioration: [
+      '🧩 **Les phrases a trous se traduisent enfin.** « ✅ @membre a ete ajoute au ticket. » n\'existe jamais entiere : elle porte un pseudo au milieu et change a chaque envoi. Le bot traduit desormais ses morceaux, ce qui represente pres de la moitie de ce qu\'il dit',
+      '🤖 **L\'IA repond dans la langue du serveur.** Sa consigne disait « en francais » en dur : tout etait traduit sauf la seule phrase ecrite a la volee',
+      '📄 **Le fichier des traducteurs passe a 2 401 lignes**, colonne anglaise deja remplie. Elle sert de seconde source : quand une tournure francaise est ambigue, la version anglaise dit comment elle a ete comprise',
+      '🎭 **/interact recoit le russe** qui lui manquait. Cette commande suit la langue Discord de chaque membre, pas celle du serveur : deux personnes y lisent le meme message dans deux langues',
+    ],
+    fix: [
+      '🩹 **Le releve de textes lisait mal le code.** Une apostrophe dans une phrase — « c\'est le demandeur … plutot que de l\'en sortir » — lui faisait relever le morceau ENTRE les deux apostrophes : un texte qui n\'existe nulle part, a faire traduire pour rien',
+      '🩹 **Les morceaux de phrases n\'etaient pas releves du tout**, alors qu\'ils sont exactement ce qui arrive a l\'ecran. 2 401 textes releves au lieu de 1 871',
+      '🩹 **Un saut de ligne ecrit dans le code restait deux caracteres** au lieu d\'en devenir un vrai : la traduction ne correspondait alors a aucun message reel, et ne sortait jamais',
+      '🩹 **80 vraies phrases etaient declarees « valeur technique, ne pas traduire ».** Un choix entre deux tournures etait pris pour une cle de tableau. Il n\'en reste que 6, toutes legitimes',
+    ],
+    retrait: [],
+  },
 ];
 
 // Construit l'embed d'une note à partir d'une entrée { title, ajout, fix,
