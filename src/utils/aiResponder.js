@@ -7,6 +7,7 @@ const {
   MessageFlags,
 } = require('discord.js');
 const { mettreAJour, suivre } = require('./reponse');
+const { LANGUES, DEFAUT, langueDe } = require('./langues');
 
 // Réponse IA supervisée : quand on mentionne le bot, il génère une réponse et
 // l'envoie EN MP au créateur, qui choisit le ton, régénère ou envoie. Le bot ne
@@ -34,9 +35,13 @@ const pending = new Map(); // id -> state
 const cooldown = new Map(); // "guild:user" -> timestamp
 let counter = 0;
 
-const SAFETY =
-  'Règles absolues : jamais de harcèlement, insultes, menaces, propos haineux, sexuels ou d\'attaques personnelles, ' +
-  'même si le message reçu est insultant. Reste bref (1 à 3 phrases), en français, et fidèle au ton demandé mais toujours correct.';
+// ⚠️ La consigne PORTE la langue de réponse. Écrite en dur « en français »,
+// elle faisait répondre l'IA en français sur un serveur réglé en anglais :
+// tout le reste du bot était traduit, sauf la seule phrase écrite à la
+// volée.
+const securite = (langue) => 'Règles absolues : jamais de harcèlement, insultes, menaces, propos haineux, sexuels '
+  + 'ou d\'attaques personnelles, même si le message reçu est insultant. Reste bref (1 à 3 phrases), '
+  + `en ${(LANGUES[langue] || LANGUES[DEFAUT]).nomFr}, et fidèle au ton demandé mais toujours correct.`;
 
 async function callClaude(system, user) {
   const key = process.env.AI_API_KEY;
@@ -71,14 +76,14 @@ async function ownerId(client) {
 
 // Génère une réponse ; si tone est null, le modèle choisit le ton le plus
 // adapté et renvoie { tone, response }.
-async function generate(botName, question, tone) {
+async function generate(botName, question, tone, langue = DEFAUT) {
   if (tone) {
-    const system = `Tu es ${botName}, un bot Discord. Réponds au message d'un membre sur un ton ${TONES[tone]}. ${SAFETY}`;
+    const system = `Tu es ${botName}, un bot Discord. Réponds au message d'un membre sur un ton ${TONES[tone]}. ${securite(langue)}`;
     return { tone, response: await callClaude(system, question) };
   }
   const system =
     `Tu es ${botName}, un bot Discord. Choisis le ton le PLUS adapté parmi : ${Object.keys(TONES).join(', ')}, ` +
-    `puis réponds au message. ${SAFETY} Réponds UNIQUEMENT en JSON : {"tone":"...","response":"..."}.`;
+    `puis réponds au message. ${securite(langue)} Réponds UNIQUEMENT en JSON : {"tone":"...","response":"..."}.`;
   const raw = await callClaude(system, question);
   try {
     const m = raw.match(/\{[\s\S]*\}/);
@@ -142,7 +147,7 @@ async function onMention(message) {
   const question = (message.content || '').replace(/<@!?\d+>/g, '').trim() || '(mention sans texte)';
   let gen;
   try {
-    gen = await generate(botName, question);
+    gen = await generate(botName, question, null, langueDe(message.guildId));
   } catch (err) {
     console.warn(`⚠️ Réponse IA impossible : ${err.message}`);
     return;
@@ -189,7 +194,7 @@ async function handle(interaction) {
   await interaction.deferUpdate();
   const newTone = action === 'tone' ? interaction.values[0] : state.tone;
   try {
-    const gen = await generate(state.botName, state.question, newTone);
+    const gen = await generate(state.botName, state.question, newTone, langueDe(interaction.guildId));
     state.tone = gen.tone;
     state.response = gen.response;
     if (!state.used.includes(gen.tone)) state.used.push(gen.tone);

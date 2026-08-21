@@ -16,12 +16,15 @@ const { getGuildConfig } = require('../database');
 // Ajouter une langue = ajouter une colonne dans DICO. Une clé oubliée retombe
 // en français, jamais dans le vide : un test le vérifie.
 
+// `nomFr` sert aux consignes rédigées en français — celle envoyée à l'IA,
+// par exemple : « réponds en anglais » se comprend mieux que « réponds en
+// English ».
 const LANGUES = {
-  fr: { cle: 'fr', nom: 'Français', drapeau: '🇫🇷', discord: 'fr' },
-  en: { cle: 'en', nom: 'English', drapeau: '🇬🇧', discord: 'en-GB' },
-  de: { cle: 'de', nom: 'Deutsch', drapeau: '🇩🇪', discord: 'de' },
-  ru: { cle: 'ru', nom: 'Русский', drapeau: '🇷🇺', discord: 'ru' },
-  es: { cle: 'es', nom: 'Español', drapeau: '🇪🇸', discord: 'es-ES' },
+  fr: { cle: 'fr', nom: 'Français', nomFr: 'français', drapeau: '🇫🇷', discord: 'fr' },
+  en: { cle: 'en', nom: 'English', nomFr: 'anglais', drapeau: '🇬🇧', discord: 'en-GB' },
+  de: { cle: 'de', nom: 'Deutsch', nomFr: 'allemand', drapeau: '🇩🇪', discord: 'de' },
+  ru: { cle: 'ru', nom: 'Русский', nomFr: 'russe', drapeau: '🇷🇺', discord: 'ru' },
+  es: { cle: 'es', nom: 'Español', nomFr: 'espagnol', drapeau: '🇪🇸', discord: 'es-ES' },
 };
 const CLES = Object.keys(LANGUES);
 const DEFAUT = 'fr';
