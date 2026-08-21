@@ -49,6 +49,14 @@ if (process.pkg && process.env.BOT_MANAGED !== '1' && !fs.existsSync(envPath)) {
 }
 require('dotenv').config({ path: envPath });
 
+// 🎛️ FFmpeg posé à côté du bot : prism-media honore FFMPEG_PATH. C'est le
+// seul moyen d'avoir les radios avec l'exécutable packagé — un binaire dans
+// l'instantané pkg ne peut pas être lancé.
+if (!process.env.FFMPEG_PATH) {
+  const ffmpegLocal = path.join(baseDir, process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg');
+  if (fs.existsSync(ffmpegLocal)) process.env.FFMPEG_PATH = ffmpegLocal;
+}
+
 // Toute erreur fatale est aussi consignée dans erreur.log à côté de
 // l'exécutable, pour pouvoir diagnostiquer même si la fenêtre s'est fermée.
 function logErrorFile(message) {

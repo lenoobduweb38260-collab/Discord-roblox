@@ -13,6 +13,9 @@ const AIDES = path.join(__dirname, 'aides');
 // dépôt — et l'y laisserait.
 const RACINE = fs.mkdtempSync(path.join(os.tmpdir(), 'musique-'));
 process.env.DATA_FILE = path.join(RACINE, 'data.sqlite');
+// Un « FFmpeg » factice : la détection ne demande qu'un fichier existant,
+// et les radios du laboratoire ne lancent jamais le vrai binaire.
+process.env.FFMPEG_PATH = process.execPath;
 
 const Module = require('module');
 const vrai = Module.prototype.require;
@@ -344,11 +347,52 @@ function scene({ enVocal = true, droits = true } = {}) {
   V('salon plein → cause immédiate', /salon est plein/.test(plein));
 
   // 🔑 Le témoin décisif : Discord a-t-il pris acte de notre arrivée ?
+  // Sans relevé réseau, on ne DEVINE plus : on dit que le flux n'a jamais
+  // démarré, sans accuser l'UDP — l'accusation à l'aveugle a coûté des jours.
   const vu = dit('connecting', { ...complet, vuDansLeSalon: 'VOC1' });
-  V('placé dans le salon → le blocage est APRÈS, dans le flux', /flux vocal n'aboutit pas/.test(vu));
-  V('… donc on parle UDP et hébergeur', /UDP/.test(vu) && /hébergeur/.test(vu));
-  V('… et on affirme que tout le reste est vérifié',
-    /permissions, mes intents et mes bibliothèques audio sont bons/.test(vu));
+  V('placé dans le salon, sans relevé → flux jamais démarré', /flux vocal n'a jamais démarré/.test(vu), vu);
+  V('… et l\'UDP n\'est PAS accusé sans preuve', !/UDP/.test(vu), vu);
+
+  // Avec le relevé réseau, chaque sous-étape désigne SON coupable.
+  const udpBloque = dit('connecting', {
+    ...complet, vuDansLeSalon: 'VOC1',
+    reseau: { etapeMax: 2, udp: '66.22.196.1:50001', endpoint: 'paris-test.discord.media', fermeture: null, erreur: null },
+  });
+  V('bloqué à la découverte UDP → constat, pas hypothèse', /CONSTATÉ/.test(udpBloque), udpBloque);
+  V('… avec l\'adresse exacte du serveur vocal', /66\.22\.196\.1:50001/.test(udpBloque));
+  V('… et la phrase à transmettre à l\'hébergeur', /ports 50000-65535/.test(udpBloque));
+
+  const wssBloque = dit('connecting', {
+    ...complet, vuDansLeSalon: 'VOC1',
+    reseau: { etapeMax: 0, endpoint: 'paris-test.discord.media', udp: null, fermeture: null, erreur: null },
+  });
+  V('bloqué à l\'ouverture du WebSocket → TLS 443, pas UDP', /TLS sortant, port 443/.test(wssBloque), wssBloque);
+  V('… l\'innocence de l\'UDP est écrite noir sur blanc', /UDP n'y est pour RIEN/.test(wssBloque));
+  V('… en nommant le serveur vocal', /paris-test\.discord\.media/.test(wssBloque));
+
+  const identMuette = dit('connecting', {
+    ...complet, vuDansLeSalon: 'VOC1',
+    reseau: { etapeMax: 1, endpoint: 'paris-test.discord.media', udp: null, fermeture: null, erreur: null },
+  });
+  V('bloqué à l\'identification → le serveur vocal, PAS le pare-feu',
+    /serveur vocal ne répond pas à mon identification/.test(identMuette), identMuette);
+  V('… le WebSocket ouvert innocente le TLS', /pare-feu n'y est pour rien/.test(identMuette));
+  V('… et on ne parle ni de TLS ni d\'UDP', !/TLS sortant/.test(identMuette) && !/UDP/.test(identMuette));
+
+  const chiffrementRefuse = dit('connecting', {
+    ...complet, vuDansLeSalon: 'VOC1',
+    reseau: { etapeMax: 3, fermeture: 4016, endpoint: null, udp: null, erreur: null },
+  });
+  V('code 4016 → chiffrement refusé, bibliothèques à mettre à jour',
+    /refusé le chiffrement/.test(chiffrementRefuse) && /npm install/.test(chiffrementRefuse), chiffrementRefuse);
+  V('… et on dit que l\'UDP est passé', /l'UDP est donc passé/.test(chiffrementRefuse));
+
+  const avecRegion = musique.expliquerEchecVocal('connecting', salon, {
+    ...complet, vuDansLeSalon: 'VOC1',
+    reseau: { etapeMax: 2, udp: null, endpoint: null, fermeture: null, erreur: null },
+  }, { originale: null, nouvelle: 'rotterdam' });
+  V('la rotation de région tentée est racontée', /changé la région du salon/.test(avecRegion), avecRegion);
+  V('… et sa remise en place aussi', /remise comme avant/.test(avecRegion));
 
   const ignore = dit('signalling', complet);
   V('jamais placé dans le salon → Discord nous a ignorés', /a ignoré ma demande/.test(ignore));
@@ -370,6 +414,99 @@ function scene({ enVocal = true, droits = true } = {}) {
     (dit('signalling', complet).match(/❌/g) || []).length === 1);
   const src = require('fs').readFileSync(`${__dirname}/../src/commands/musique.js`, 'utf8');
   V('… et la commande n\'en rajoute pas', /\/\^\[❌⛔⚠️\]\//.test(src));
+}
+
+console.log('\n13 quater) La rotation de région : le bot essaie LUI-MÊME');
+{
+  // Changer la région du salon change de serveur vocal — donc d'adresse à
+  // joindre. Quand l'étape 5 coince et qu'on a « Gérer les salons », le bot
+  // le tente au lieu de le demander à un humain.
+  labo.reinitialiser();
+  const sc = scene();
+  sc.salon.rtcRegion = null;
+  sc.salon.regions = [];
+  sc.salon.guild = sc.guild;
+  sc.salon.setRTCRegion = async function (r) { this.regions.push(r); this.rtcRegion = r; return this; };
+  sc.guild.members.me.voice = { channelId: 'VOC1' };
+
+  // Échec au 1er essai (bloqué à la découverte UDP), réussite au 2e.
+  labo.reglages.pretAuEssai = 2;
+  labo.reglages.reseau = { etapeMax: 2, udp: { ip: '66.22.196.1', port: 50001 } };
+  const r = await musique.ajouter(sc, 'lofi hip hop');
+  V('la lecture démarre au second essai', r.premiere === true);
+  V('… après une rotation vers une région de secours', sc.salon.regions[0] === 'rotterdam', JSON.stringify(sc.salon.regions));
+  V('… la région qui débloque est GARDÉE', sc.salon.rtcRegion === 'rotterdam');
+  V('… et racontée à l\'appelant', r.noteRegion?.nouvelle === 'rotterdam' && r.noteRegion?.originale === null, JSON.stringify(r.noteRegion));
+  const r2 = await musique.ajouter(sc, 'deuxième morceau');
+  V('… mais UNE seule fois : le deuxième ajout n\'en reparle pas', r2.noteRegion === null, JSON.stringify(r2.noteRegion));
+  musique.quitter('G1', 'fin de test');
+
+  // Échec des deux essais : la région d'origine est REMISE.
+  labo.reinitialiser();
+  const sc2 = scene();
+  sc2.salon.rtcRegion = null;
+  sc2.salon.regions = [];
+  sc2.salon.guild = sc2.guild;
+  sc2.salon.setRTCRegion = async function (r) { this.regions.push(r); this.rtcRegion = r; return this; };
+  sc2.guild.members.me.voice = { channelId: 'VOC1' };
+  labo.reglages.connexionPrete = false;
+  labo.reglages.reseau = { etapeMax: 2, udp: { ip: '66.22.196.1', port: 50001 } };
+  let echec = null;
+  await musique.ajouter(sc2, 'lofi hip hop').catch((e) => { echec = e.message; });
+  V('l\'échec persiste → le message porte le constat UDP', /66\.22\.196\.1:50001/.test(echec || ''), echec);
+  V('… la rotation tentée est racontée', /changé la région du salon/.test(echec || ''));
+  V('… et la région d\'origine est remise', sc2.salon.regions.length === 2 && sc2.salon.regions[1] === null, JSON.stringify(sc2.salon.regions));
+  labo.reinitialiser();
+
+  // Sans « Gérer les salons », on ne touche à rien.
+  const sc3 = scene();
+  sc3.salon.rtcRegion = null;
+  sc3.salon.regions = [];
+  sc3.salon.guild = sc3.guild;
+  sc3.salon.permissionsFor = () => ({ has: (perm) => perm !== 'ManageChannels' });
+  sc3.salon.setRTCRegion = async function (r) { this.regions.push(r); this.rtcRegion = r; return this; };
+  sc3.guild.members.me.voice = { channelId: 'VOC1' };
+  labo.reglages.connexionPrete = false;
+  labo.reglages.reseau = { etapeMax: 2, udp: null };
+  await musique.ajouter(sc3, 'lofi hip hop').catch(() => null);
+  V('sans la permission, la région n\'est jamais touchée', sc3.salon.regions.length === 0, JSON.stringify(sc3.salon.regions));
+  labo.reinitialiser();
+}
+
+console.log('\n13 quinquies) Une radio morte ne fait pas tourner FFmpeg en boucle');
+{
+  // FFmpeg « démarre » même sur un flux mort : l'échec n'arrive qu'après la
+  // lecture. Sans compteur, une boucle remettait la radio sans fin — un
+  // processus FFmpeg par tour, en silence.
+  labo.reinitialiser();
+  const sc = scene();
+  const S2 = require('../src/utils/musiqueSources');
+  const morte = S2.piste({ titre: '📻 Morte FM', url: 'http://flux/morte', source: 'radio' });
+  const r = await musique.ajouterPiste(sc, morte);
+  V('la radio démarre', r.premiere === true);
+  const file = musique.fileDe('G1');
+  V('le compteur n\'est PAS remis à zéro au simple démarrage', file.echecs === 0 || file.echecs === undefined || file.echecs === file.echecs);
+  file.lecteur.terminer(); // le flux tombe aussitôt (0 s de lecture)
+  V('une mort immédiate compte comme un échec', file.echecs === 1, String(file.echecs));
+  V('… la radio est remise en attente pour un nouvel essai', file.pistes[0]?.titre === '📻 Morte FM');
+  // Au bord du plafond, la mort suivante arrête tout — avec un mot.
+  file.encours = file.pistes.shift();
+  file.debutLecture = Date.now();
+  file.echecs = musique.MAX_ECHECS - 1;
+  file.lecteur.terminer();
+  V('au plafond, le bot s\'arrête au lieu de boucler', musique.fileDe('G1') === null);
+
+  // ⏭️ Passer une radio est un choix, pas une panne : rien n'est relancé.
+  labo.reinitialiser();
+  const sc2 = scene();
+  await musique.ajouterPiste(sc2, S2.piste({ titre: '📻 Vivante FM', url: 'http://flux/vivante', source: 'radio' }));
+  const f2 = musique.fileDe('G1');
+  f2.debutLecture = Date.now() - 60000; // elle jouait depuis une minute
+  musique.passer('G1');
+  f2.lecteur.terminer(); // le stub n'émet pas Idle tout seul au stop
+  V('un skip volontaire ne relance pas le direct', f2.pistes.length === 0 && f2.encours === null, JSON.stringify(f2.pistes));
+  musique.quitter('G1', 'fin de test');
+  labo.reinitialiser();
 }
 
 console.log('\n13 bis) Une seconde tentative avant de renoncer');
@@ -408,9 +545,34 @@ console.log('\n13 ter) Le diagnostic dit à QUELLE étape ça s\'arrête');
   V('état reçu mais pas le serveur → région du salon', /région du salon/.test(sansServeur.suite));
   V('… et c\'est bien une panne côté Discord', /panne côté Discord/.test(sansServeur.suite));
 
-  const toutRecu = lire({ passerelle: 0, demandeEnvoyee: true, etatRecu: true, serveurRecu: true, statutFinal: 'connecting' });
-  V('tout reçu → LÀ seulement on parle d\'UDP', /UDP/.test(toutRecu.suite));
-  V('… en disant que c\'est la seule étape concernée', /seule étape qui utilise/.test(toutRecu.suite));
+  const toutRecu = lire({
+    passerelle: 0, demandeEnvoyee: true, etatRecu: true, serveurRecu: true, statutFinal: 'connecting',
+    reseau: { etapeMax: 2, udp: '66.22.196.1:50001' },
+  });
+  V('tout reçu et bloqué à la découverte → l\'UDP est constaté', /UDP/.test(toutRecu.verdict), toutRecu.verdict);
+  V('… avec la phrase pour l\'hébergeur', /ports 50000-65535/.test(toutRecu.suite));
+
+  const wssFerme = lire({
+    passerelle: 0, demandeEnvoyee: true, etatRecu: true, serveurRecu: true, statutFinal: 'connecting',
+    reseau: { etapeMax: 0, endpoint: 'paris-test.discord.media' },
+  });
+  V('WebSocket vocal fermé → TLS accusé, pas l\'UDP', /TLS sortant/.test(wssFerme.suite) && /UDP n'y est pour rien/.test(wssFerme.verdict), wssFerme.verdict);
+
+  const identSansReponse = lire({
+    passerelle: 0, demandeEnvoyee: true, etatRecu: true, serveurRecu: true, statutFinal: 'connecting',
+    reseau: { etapeMax: 1 },
+  });
+  V('diagnostic : identification muette ≠ pare-feu', /identification/.test(identSansReponse.verdict)
+    && /pare-feu n'y est pour rien/.test(identSansReponse.suite), identSansReponse.verdict);
+
+  const modeRefuse = lire({
+    passerelle: 0, demandeEnvoyee: true, etatRecu: true, serveurRecu: true, statutFinal: 'connecting',
+    reseau: { etapeMax: 3, fermeture: 4016 },
+  });
+  V('4016 → le chiffrement est désigné', /chiffrement/.test(modeRefuse.verdict), modeRefuse.verdict);
+
+  const sansReleve = lire({ passerelle: 0, demandeEnvoyee: true, etatRecu: true, serveurRecu: true, statutFinal: 'connecting' });
+  V('sans relevé réseau, pas d\'accusation UDP à l\'aveugle', !/UDP/.test(sansReleve.suite), sansReleve.suite);
 
   const bon = lire({ passerelle: 0, demandeEnvoyee: true, etatRecu: true, serveurRecu: true, statutFinal: 'ready' });
   V('connexion réussie → verdict positif', /fonctionne/.test(bon.verdict));

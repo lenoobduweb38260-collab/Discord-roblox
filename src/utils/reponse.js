@@ -86,10 +86,13 @@ async function repondre(interaction, payload) {
 // (compteurs, badges) ne sont donc jamais joués deux fois.
 const MARGE = 2200;
 
-async function repondreVite(interaction, travail, { marge = MARGE } = {}) {
+async function repondreVite(interaction, travail, { marge = MARGE, ephemere = false } = {}) {
+  // ⚠️ L'éphémère se décide AU MOMENT du report : un message différé public
+  // ne peut plus le devenir, et le drapeau posé ensuite est ignoré sans
+  // erreur. Une commande dont TOUTES les issues sont éphémères le dit ici.
   let differe = null;
   const minuteur = setTimeout(() => {
-    differe = interaction.deferReply().catch(() => null);
+    differe = interaction.deferReply(ephemere ? { flags: 64 } : undefined).catch(() => null);
   }, marge);
 
   let payload = null;

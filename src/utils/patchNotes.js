@@ -1227,6 +1227,28 @@ const RELEASES = [
     ],
     retrait: [],
   },
+  {
+    id: 'radio-et-constat-udp-2026-08bh',
+    title: 'Les radios francaises debarquent, et le vocal dit enfin ou ca coince 📻',
+    ajout: [
+      '📻 **`/radio`** : les radios francaises en direct dans le vocal. `/radio ecouter` puis tapez un nom — la liste se remplit toute seule, des milliers de stations repondent (France Inter, Skyrock, Cherie FM…). `/radio liste` montre les plus ecoutees, `/radio stop` coupe',
+      '🔁 **La radio partage la file de `/musique`** : memes boutons, meme volume, meme stop. Une radio est simplement un morceau sans fin',
+      '🔄 **Le bot change LUI-MEME la region du salon** quand le flux vocal coince a l\'etape UDP et qu\'il a la permission « Gerer les salons » : changer de region change de serveur vocal, donc d\'adresse a joindre. Si ca debloque, il garde la region et le dit ; sinon il remet tout comme avant',
+    ],
+    amelioration: [
+      '🔬 **« Le flux vocal n\'aboutit pas » cachait quatre sous-etapes** : ouverture du WebSocket vocal, identification, decouverte d\'adresse UDP, choix du chiffrement. Le bot les ecoute desormais une a une et dit LAQUELLE s\'arrete — un blocage TLS n\'a rien a voir avec un blocage UDP, et accuser l\'un quand c\'est l\'autre a deja fait perdre des jours',
+      '🎯 **Chaque sous-etape designe son coupable et sa phrase exacte pour l\'hebergeur** : « autoriser l\'UDP sortant et ses reponses vers les serveurs vocaux de Discord, ports 50000-65535 » — avec l\'adresse constatee du serveur vocal quand elle est connue',
+      '🔎 **`/musique diagnostic` montre l\'interieur de l\'etape 5** : les quatre sous-etapes cochees une a une, l\'adresse du serveur vocal, le code de fermeture',
+      '🧱 **`/musique sources` affiche la brique FFmpeg**, exigee par les radios seulement — avec la marche a suivre quand elle manque : `apt install ffmpeg` chez l\'hebergeur, ou poser `ffmpeg.exe` a cote de l\'executable',
+    ],
+    fix: [
+      '🩹 **Le message accusait l\'UDP sans preuve.** Il conclut desormais sur ce qui est CONSTATE : si la machine s\'arrete avant l\'UDP, l\'UDP est innocente — et c\'est ecrit noir sur blanc',
+      '🩹 **Le bot pouvait dire « intent vocal desactive » alors que Discord venait de le placer dans le salon** — ce qui prouve l\'inverse. La preuve passe desormais avant l\'hypothese',
+      '🩹 **Une « brique audio manquante » n\'est plus accusee** quand la poignee de main a depasse l\'identification : y arriver prouve que les bibliotheques ont charge',
+      '🩹 Le chiffrement de la voix est reconnu **natif dans Node 18+** : plus de fausse alerte « bibliotheque de chiffrement manquante »',
+    ],
+    retrait: [],
+  },
 ];
 
 // Construit l'embed d'une note à partir d'une entrée { title, ajout, fix,

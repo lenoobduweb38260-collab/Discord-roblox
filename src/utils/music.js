@@ -66,6 +66,91 @@ const fileDe = (guildId) => files.get(String(guildId)) || null;
 
 // ── Connexion ────────────────────────────────────────────────────
 
+// ── L'intérieur de l'étape 5 ─────────────────────────────────────
+//
+// « Le flux vocal n'aboutit pas » cachait QUATRE sous-étapes, et elles
+// n'accusent pas les mêmes coupables :
+//
+//   5a. ouvrir le WebSocket vocal (wss vers *.discord.media, port 443) ;
+//   5b. s'identifier auprès du serveur vocal ;
+//   5c. la découverte d'adresse UDP — LA seule qui utilise l'UDP ;
+//   5d. le choix du chiffrement de la voix.
+//
+// @discordjs/voice joue ces étapes dans une machine interne (`networking`).
+// L'écouter transforme « c'est sûrement l'UDP » en un constat : on SAIT à
+// quelle sous-étape ça s'arrête, et on peut enfin désigner le bon coupable —
+// un blocage TLS n'a rien à voir avec un blocage UDP, et accuser l'un quand
+// c'est l'autre a déjà fait perdre des jours.
+const ETAPES_RESEAU = [
+  'ouverture du WebSocket vocal (wss, port 443)',
+  'identification auprès du serveur vocal',
+  'découverte d\'adresse UDP',
+  'choix du chiffrement de la voix',
+  'flux prêt',
+];
+
+// Les codes de fermeture du serveur vocal qui portent une cause.
+const FERMETURES_VOCALES = {
+  4006: 'session invalidée par Discord',
+  4009: 'session expirée',
+  4011: 'serveur vocal introuvable',
+  4014: 'déconnexion demandée par Discord (expulsion, salon supprimé, ou région changée)',
+  4015: 'le serveur vocal de Discord a planté',
+  4016: 'mode de chiffrement refusé par Discord',
+};
+
+const nouveauReleveReseau = () => ({ etapeMax: -1, fermeture: null, erreur: null, endpoint: null, udp: null });
+
+function espionnerReseau(connexion, releve) {
+  const noter = (etatReseau) => {
+    if (!etatReseau || typeof etatReseau.code !== 'number') return;
+    if (etatReseau.code >= 0 && etatReseau.code <= 4 && etatReseau.code > releve.etapeMax) {
+      releve.etapeMax = etatReseau.code;
+    }
+    if (!releve.endpoint) releve.endpoint = etatReseau.connectionOptions?.endpoint || null;
+    // L'adresse UDP du serveur vocal, quand la bibliothèque la montre : c'est
+    // EXACTEMENT ce que l'hébergeur demande pour vérifier son pare-feu.
+    const distante = etatReseau.udp?.remote;
+    if (distante?.ip && !releve.udp) releve.udp = `${distante.ip}:${distante.port}`;
+  };
+  const brancher = (reseau) => {
+    if (!reseau || typeof reseau.on !== 'function' || reseau.__espionne) return;
+    reseau.__espionne = true;
+    noter(reseau.state);
+    reseau.on('stateChange', (_ancien, neuf) => noter(neuf));
+    reseau.on('error', (err) => { releve.erreur = err?.message || String(err); });
+    reseau.on('close', (code) => { releve.fermeture = code; });
+  };
+  connexion.on('stateChange', (_ancien, neuf) => brancher(neuf?.networking));
+  // Un 'error' sans écouteur TUE le process (règle EventEmitter). On le
+  // relève : c'est une preuve de plus, pas une raison de mourir.
+  connexion.on('error', (err) => { if (!releve.erreur) releve.erreur = err?.message || String(err); });
+  brancher(connexion.state?.networking);
+}
+
+// 🔁 Changer la région du salon change de serveur vocal — donc d'adresse à
+// joindre. Quand la poignée de main s'arrête dans l'étape 5 et qu'on a la
+// permission, on l'essaie NOUS-MÊMES au lieu de le demander à un humain.
+const REGIONS_DE_SECOURS = ['rotterdam', 'us-east'];
+
+async function tenterAutreRegion(salonVocal, releve) {
+  // La passerelle n'a jamais donné de serveur vocal : la région n'y est pour rien.
+  if (releve.etapeMax < 0 || releve.etapeMax >= 4) return null;
+  const moi = salonVocal.guild?.members?.me;
+  if (!salonVocal.permissionsFor?.(moi)?.has?.('ManageChannels')) return null;
+  if (typeof salonVocal.setRTCRegion !== 'function') return null;
+  const originale = salonVocal.rtcRegion ?? null;
+  const nouvelle = REGIONS_DE_SECOURS.find((r) => r !== originale);
+  try {
+    await salonVocal.setRTCRegion(nouvelle, 'Musique : le flux vocal n\'aboutit pas, essai d\'un autre serveur vocal');
+    console.warn(`🔁 Vocal : région du salon changée (${originale ?? 'automatique'} → ${nouvelle}) pour retenter.`);
+    return { originale, nouvelle };
+  } catch {
+    return null;
+  }
+}
+
+
 async function connecter(interaction, salonVocal) {
   const v = moteur.voice();
 
@@ -82,6 +167,8 @@ async function connecter(interaction, salonVocal) {
   // premier « voice server update », et rien ne revient jamais. C'est
   // exactement la panne qui laisse la connexion en « signalling ».
   let derniereEtat = 'inconnu';
+  let region = null; // la rotation de région, si on l'a tentée
+  const reseau = nouveauReleveReseau();
   for (let essai = 1; essai <= 2; essai++) {
     const connexion = v.joinVoiceChannel({
       channelId: salonVocal.id,
@@ -90,6 +177,7 @@ async function connecter(interaction, salonVocal) {
       selfDeaf: true,
       selfMute: false,
     });
+    espionnerReseau(connexion, reseau);
 
     // ⚠️ L'étape qui manquait. `joinVoiceChannel` rend la main tout de suite,
     // bien avant que la voix soit établie : jouer à cet instant envoie l'audio
@@ -97,20 +185,29 @@ async function connecter(interaction, salonVocal) {
     // rien — sans aucune erreur pour l'expliquer.
     try {
       await v.entersState(connexion, v.VoiceConnectionStatus.Ready, essai === 1 ? DELAI_PREMIER : DELAI_PRET);
+      // Si c'est le changement de région qui a débloqué, on GARDE la
+      // nouvelle : la remettre renverrait sur le serveur vocal bloqué.
+      connexion.noteRegion = region;
       return connexion;
     } catch {
       derniereEtat = connexion.state?.status || 'inconnu';
       try { connexion.destroy(); } catch {}
       if (essai === 1) {
         console.warn(`⚠️ Vocal : 1re tentative bloquée en « ${derniereEtat} » sur ${interaction.guildId} — on réessaie.`);
+        region = await tenterAutreRegion(salonVocal, reseau);
         await new Promise((r) => setTimeout(r, 1000));
       }
     }
   }
 
+  // Les deux essais ont échoué : si on avait touché à la région, on la remet.
+  if (region) {
+    await salonVocal.setRTCRegion(region.originale, 'Musique : la région de secours n\'a rien changé').catch(() => {});
+  }
   const preuves = releverPreuves(interaction, salonVocal);
+  preuves.reseau = { ...reseau };
   console.warn(`⚠️ Vocal impossible (${derniereEtat}) : ${JSON.stringify(preuves)}`);
-  throw new Error(expliquerEchecVocal(derniereEtat, salonVocal, preuves));
+  throw new Error(expliquerEchecVocal(derniereEtat, salonVocal, preuves, region));
 }
 
 // 🔬 Ce qu'on peut CONSTATER, ici, maintenant.
@@ -153,16 +250,19 @@ function releverPreuves(interaction, salonVocal) {
 // ses propres intents et répondre lui-même à la question.
 //
 // Une hypothèse envoie chercher partout. Un constat désigne un endroit.
-function expliquerEchecVocal(etatAtteint, salonVocal, preuves = {}) {
+function expliquerEchecVocal(etatAtteint, salonVocal, preuves = {}, regionTentee = null) {
   const lignes = [`❌ Je n'ai pas réussi à ouvrir <#${salonVocal.id}>.`];
   const conclure = (titre, ...suite) => {
-    lignes.push('', `**${titre}**`, ...suite);
+    lignes.push('', `**${titre}**`, ...suite.filter(Boolean));
     return lignes.join('\n');
   };
 
   // ── Ce qu'on peut constater sans quitter le processus ──
   const manque = moteur.briquesManquantes();
-  if (manque) {
+  // ⚠️ Sauf si la poignée de main a DÉPASSÉ l'identification : arriver à la
+  // découverte UDP prouve que les bibliothèques ont chargé — accuser une
+  // brique absente contredirait ce qu'on vient de constater.
+  if (manque && !(preuves.reseau && preuves.reseau.etapeMax >= 2)) {
     return conclure(
       'Il manque une brique audio sur l\'hébergeur.',
       ...manque.map((m) => `➜ ${m}`),
@@ -178,6 +278,68 @@ function expliquerEchecVocal(etatAtteint, salonVocal, preuves = {}) {
     );
   }
 
+  // ⚠️ L'ordre compte : être VU dans le salon prouve que l'intent vocal
+  // fonctionne — c'est lui qui apporte cette information. Conclure « intent
+  // désactivé » alors qu'on se voit dans le salon serait une contradiction,
+  // de la même famille que l'ancien message qui accusait des permissions
+  // déjà vérifiées.
+  // ── Le témoin décisif ──
+  //
+  // Si Discord m'a placé dans le salon, la passerelle a répondu : le blocage
+  // est APRÈS, dans l'étape 5 — dont l'espion réseau dit la sous-étape exacte.
+  if (preuves.vuDansLeSalon) {
+    const r = preuves.reseau || {};
+    const bloquee = ETAPES_RESEAU[r.etapeMax] || null;
+    const noteRegion = regionTentee
+      ? `\n-# J'ai aussi changé la région du salon (${regionTentee.originale || 'automatique'} → ${regionTentee.nouvelle}) pour changer de serveur vocal : même blocage. Je l'ai remise comme avant.`
+      : '';
+    const fermeture = r.fermeture
+      ? `\n-# Le serveur vocal a fermé la connexion : code ${r.fermeture}${FERMETURES_VOCALES[r.fermeture] ? ` — ${FERMETURES_VOCALES[r.fermeture]}` : ''}.`
+      : '';
+
+    if (r.fermeture === 4016 || r.etapeMax === 3) {
+      return conclure(
+        'Discord a refusé le chiffrement de la voix.',
+        '➜ La machine est allée jusqu\'au **choix du chiffrement** (l\'UDP est donc passé), et Discord n\'a jamais confirmé.',
+        '➜ Les bibliothèques du bot sont trop anciennes sur cet hébergement : relancez `npm install` à côté du bot, ou reprenez le dernier exécutable.',
+        fermeture.trim() ? fermeture.trimStart() : null
+      );
+    }
+    if (r.etapeMax === 2) {
+      return conclure(
+        'La découverte d\'adresse UDP n\'obtient jamais de réponse — c\'est CONSTATÉ, pas supposé.',
+        `➜ Le WebSocket vocal s'est ouvert, l'identification est passée : seul l'**UDP** ne revient pas${r.udp ? ` (serveur vocal : \`${r.udp}\`)` : ''}.`,
+        '➜ Phrase exacte à envoyer à l\'hébergeur : « merci d\'autoriser l\'UDP **sortant et ses réponses** vers les serveurs vocaux de Discord'
+        + `${r.udp ? ` — constaté vers \`${r.udp}\`` : ''}, ports 50000-65535 ».`,
+        noteRegion.trim() ? noteRegion.trimStart() : null
+      );
+    }
+    if (r.etapeMax === 1) {
+      // ⚠️ PAS le pare-feu : arriver à l'identification prouve que le
+      // WebSocket s'est ouvert. C'est le serveur vocal qui reste muet.
+      return conclure(
+        'Le serveur vocal ne répond pas à mon identification.',
+        '➜ Le WebSocket vocal s\'est ouvert (le pare-feu n\'y est pour rien) : c\'est le serveur vocal de Discord qui ne répond plus.',
+        '➜ Réessayez, puis changez la **région du salon** (Modifier le salon → Région) : cela change de serveur vocal.',
+        fermeture.trim() ? fermeture.trimStart() : null
+      );
+    }
+    if (r.etapeMax === 0) {
+      return conclure(
+        'Le WebSocket vocal ne s\'ouvre pas — l\'UDP n\'y est pour RIEN.',
+        `➜ La connexion chiffrée vers le serveur vocal${r.endpoint ? ` (\`${r.endpoint}\`)` : ''} n'aboutit pas : c'est du **TLS sortant, port 443**, vers \`*.discord.media\`.`,
+        '➜ Phrase exacte à envoyer à l\'hébergeur : « merci d\'autoriser le TLS sortant (port 443) vers `*.discord.media` ».',
+        fermeture.trim() ? fermeture.trimStart() : null
+      );
+    }
+    return conclure(
+      'Discord m\'a placé dans le salon, mais le flux vocal n\'a jamais démarré.',
+      '➜ Le serveur vocal ne m\'a même pas été présenté : c\'est en général passager côté Discord.',
+      '➜ Réessayez ; si cela persiste, changez la **région du salon** (Modifier le salon → Région).',
+      noteRegion.trim() ? noteRegion.trimStart() : null
+    );
+  }
+
   if (preuves.intentVocal === false) {
     return conclure(
       'Mon intent vocal est désactivé — je l\'ai vérifié moi-même.',
@@ -190,19 +352,6 @@ function expliquerEchecVocal(etatAtteint, salonVocal, preuves = {}) {
     return conclure(
       'Le salon est plein.',
       '➜ Sa limite d\'utilisateurs est atteinte. Libérez une place, ou augmentez la limite.'
-    );
-  }
-
-  // ── Le témoin décisif ──
-  //
-  // Si Discord m'a placé dans le salon, la passerelle a répondu : le blocage
-  // est APRÈS, dans le flux vocal lui-même. Sinon, elle m'a ignoré.
-  if (preuves.vuDansLeSalon) {
-    return conclure(
-      'Discord m\'a bien placé dans le salon, mais le flux vocal n\'aboutit pas.',
-      '➜ C\'est presque toujours l\'hébergeur qui bloque les ports **UDP** sortants — beaucoup d\'hébergements mutualisés le font. C\'est à lui qu\'il faut le demander.',
-      '➜ En attendant : changez la **région du salon** (Modifier le salon → Région), cela change de serveur vocal.',
-      '-# Mes permissions, mes intents et mes bibliothèques audio sont bons : je viens de les vérifier.'
     );
   }
 
@@ -281,6 +430,7 @@ async function diagnostiquerVocal(interaction, salonVocal, delai = 12000) {
   });
 
   let connexion = null;
+  etapes.reseau = nouveauReleveReseau();
   try {
     connexion = v.joinVoiceChannel({
       channelId: salonVocal.id,
@@ -289,6 +439,7 @@ async function diagnostiquerVocal(interaction, salonVocal, delai = 12000) {
       selfDeaf: true,
       selfMute: false,
     });
+    espionnerReseau(connexion, etapes.reseau);
     await v.entersState(connexion, v.VoiceConnectionStatus.Ready, delai);
     etapes.statutFinal = 'ready';
   } catch (err) {
@@ -335,9 +486,38 @@ function lireDiagnostic(e) {
     };
   }
   if (e.serveurRecu) {
+    const r = e.reseau || {};
+    if (r.fermeture === 4016 || r.etapeMax === 3) {
+      return {
+        verdict: '❌ Discord a refusé le chiffrement de la voix.',
+        suite: 'L\'UDP est passé — la machine s\'arrête au **choix du chiffrement**. Les bibliothèques du bot sont trop anciennes '
+          + 'sur cet hébergement : relancez `npm install`, ou reprenez le dernier exécutable.',
+      };
+    }
+    if (r.etapeMax === 2) {
+      return {
+        verdict: '❌ La découverte d\'adresse UDP n\'obtient jamais de réponse.',
+        suite: `Le WebSocket vocal s'est ouvert et l'identification est passée : seul l'**UDP** ne revient pas${r.udp ? ` (serveur vocal : \`${r.udp}\`)` : ''}. `
+          + 'C\'est la phrase à envoyer à l\'hébergeur : « merci d\'autoriser l\'UDP sortant et ses réponses vers les serveurs vocaux de Discord, ports 50000-65535 ».',
+      };
+    }
+    if (r.etapeMax === 1) {
+      return {
+        verdict: '❌ Le serveur vocal ne répond pas à mon identification.',
+        suite: 'Le WebSocket vocal s\'est ouvert — le pare-feu n\'y est pour rien. Réessayez, puis changez la '
+          + '**région du salon** (Modifier le salon → Région) : cela change de serveur vocal.',
+      };
+    }
+    if (r.etapeMax === 0) {
+      return {
+        verdict: '❌ Le WebSocket vocal ne s\'ouvre pas — l\'UDP n\'y est pour rien.',
+        suite: `La connexion chiffrée vers le serveur vocal${r.endpoint ? ` (\`${r.endpoint}\`)` : ''} n'aboutit pas : `
+          + 'l\'hébergeur doit autoriser le **TLS sortant (port 443)** vers `*.discord.media`.',
+      };
+    }
     return {
       verdict: '❌ Discord m\'a tout donné, mais le flux audio ne s\'ouvre pas.',
-      suite: 'C\'est la seule étape qui utilise l\'**UDP**. Si les ports sortants sont ouverts, il manque alors une brique audio : voyez `/musique sources`.',
+      suite: 'La machine réseau ne s\'est même pas lancée : réessayez, puis regardez `/musique sources` si cela persiste.',
     };
   }
   return {
@@ -391,7 +571,10 @@ async function jouerSuivante(guildId, client) {
     file.ressource = ressource;
     file.debutLecture = Date.now();
     file.lecteur.play(ressource);
-    file.echecs = 0;
+    // 📻 Pour une radio, FFmpeg « démarre » même sur un flux mort : l'échec
+    // n'arrive qu'après. Le compteur ne se remet à zéro qu'une fois le direct
+    // PROUVÉ (15 s de lecture), dans le gestionnaire de fin.
+    if (suivante.source !== 'radio') file.echecs = 0;
     return suivante;
   } catch (err) {
     // ⚠️ Un morceau illisible (vidéo supprimée, restreinte, région bloquée)
@@ -419,6 +602,39 @@ function brancherLecteur(file, client) {
   file.lecteur.on(v.AudioPlayerStatus.Idle, () => {
     const f = fileDe(file.guildId);
     if (!f) return;
+
+    // 📻 Une radio n'a PAS de fin : arriver ici, c'est que son flux est
+    // tombé — sauf si quelqu'un vient de la passer volontairement.
+    const finie = f.encours;
+    if (finie?.source === 'radio' && !f.radioPassee) {
+      const jouee = f.debutLecture ? (Date.now() - f.debutLecture) / 1000 : 0;
+      if (jouee < 15) {
+        // Morte dès l'ouverture. Sans ce compteur, une boucle la remettrait
+        // sans fin — un processus FFmpeg par tour, en silence.
+        f.echecs += 1;
+        if (f.echecs >= MAX_ECHECS) {
+          annoncer(client, f, `⚠️ Le flux de **${finie.titre}** coupe dès l'ouverture : la station semble hors service. J'arrête là.`);
+          return quitter(file.guildId, 'flux radio mort');
+        }
+      } else {
+        // Un direct qui a tenu puis tombe est un accroc réseau : on relance.
+        f.echecs = 0;
+        annoncer(client, f, `📻 Le direct de **${finie.titre}** s'est interrompu — je le relance.`);
+      }
+      f.pistes.unshift(finie);
+      f.encours = null;
+      // Un souffle entre deux tentatives : relancer dans la même seconde
+      // ferait tourner FFmpeg en boucle serrée tant que la panne dure.
+      setTimeout(() => {
+        jouerSuivante(file.guildId, client).catch((err) => {
+          console.warn(`⚠️ Lecture suivante impossible : ${err.message}`);
+          quitter(file.guildId, 'erreur de lecture');
+        });
+      }, 2000);
+      return;
+    }
+    f.radioPassee = false;
+
     // 🔁 Boucles : sur la piste, on la remet devant ; sur la file, en queue.
     if (f.encours) {
       if (f.boucle === 'piste') f.pistes.unshift(f.encours);
@@ -438,8 +654,10 @@ function brancherLecteur(file, client) {
 
 // ── API publique ─────────────────────────────────────────────────
 
-// Ajoute un lien ou une recherche. Renvoie ce qu'il faut pour l'afficher.
-async function ajouter(interaction, requete) {
+// Le tronc commun : vérifier le vocal, obtenir les pistes, ouvrir la
+// connexion s'il le faut, enrôler dans la file. /musique et /radio passent
+// tous deux par ici — une seule mécanique, deux commandes.
+async function enroler(interaction, obtenirPistes) {
   const salonVocal = interaction.member?.voice?.channel;
   if (!salonVocal) throw new Error('Rejoignez d\'abord un salon vocal.');
 
@@ -449,8 +667,12 @@ async function ajouter(interaction, requete) {
     throw new Error(`Il me manque **Se connecter** ou **Parler** dans <#${salonVocal.id}>.`);
   }
 
-  const pistes = await moteur.resoudre(requete);
+  const pistes = await obtenirPistes();
   const introuvables = pistes.introuvables || [];
+
+  // La rotation de région ne se raconte qu'à la connexion qui vient de la
+  // vivre — pas à chaque morceau ajouté des heures plus tard.
+  let nouvelleConnexion = false;
 
   let file = fileDe(interaction.guildId);
   if (file && file.salonVocalId !== salonVocal.id) {
@@ -458,6 +680,7 @@ async function ajouter(interaction, requete) {
   }
 
   if (!file) {
+    nouvelleConnexion = true;
     const v = moteur.voice();
     const connexion = await connecter(interaction, salonVocal);
     const lecteur = v.createAudioPlayer({
@@ -486,9 +709,16 @@ async function ajouter(interaction, requete) {
     introuvables,
     premiere,
     position: premiere ? 1 : file.pistes.length,
+    noteRegion: nouvelleConnexion ? (file.connexion?.noteRegion || null) : null,
     file,
   };
 }
+
+// Ajoute un lien ou une recherche. Renvoie ce qu'il faut pour l'afficher.
+const ajouter = (interaction, requete) => enroler(interaction, () => moteur.resoudre(requete));
+
+// 📻 Enrôle une station de radio déjà résolue (titre + URL de flux).
+const ajouterPiste = (interaction, piste) => enroler(interaction, async () => [piste]);
 
 function quitter(guildId, raison = null) {
   const file = fileDe(guildId);
@@ -507,6 +737,9 @@ function passer(guildId) {
   const file = fileDe(guildId);
   if (!file?.encours) return null;
   const passee = file.encours;
+  // ⏭️ Passer une radio est un choix : le gestionnaire de fin ne doit pas la
+  // prendre pour une panne et la relancer.
+  if (passee.source === 'radio') file.radioPassee = true;
   // ⚠️ La boucle « piste » remettrait le même morceau : passer doit passer.
   const boucle = file.boucle;
   file.boucle = boucle === 'piste' ? 'aucune' : boucle;
@@ -600,7 +833,7 @@ function verifierSolitude(guildId, nombreHumains) {
 
 module.exports = {
   ajouter, quitter, passer, pause, reprendre, volume, boucler, melanger, retirer,
-  expliquerEchecVocal, diagnostiquerVocal, lireDiagnostic, releverPreuves,
+  expliquerEchecVocal, diagnostiquerVocal, lireDiagnostic, releverPreuves, ETAPES_RESEAU, ajouterPiste,
   etat, fileDe, verifierSolitude, files,
   DELAI_SEUL, DELAI_VIDE, MAX_ECHECS, VOLUME_DEFAUT,
   // Conservés pour compatibilité avec l'ancienne interface.

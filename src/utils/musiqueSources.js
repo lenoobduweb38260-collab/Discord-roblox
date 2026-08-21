@@ -45,6 +45,7 @@ const RELAYEES = new Set(['spotify', 'deezer']);
 const NOMS = {
   youtube: 'YouTube', spotify: 'Spotify', deezer: 'Deezer',
   soundcloud: 'SoundCloud', recherche: 'Recherche', inconnu: 'Lien inconnu',
+  radio: 'Radio en direct',
 };
 
 // Une piste, telle que la file d'attente la manipule.

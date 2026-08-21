@@ -14,16 +14,43 @@ const VoiceConnectionStatus = {
 };
 const AudioPlayerStatus = { Idle: 'idle', Buffering: 'buffering', Playing: 'playing', Paused: 'paused' };
 const NoSubscriberBehavior = { Pause: 'pause', Play: 'play', Stop: 'stop' };
+const StreamType = { Arbitrary: 'arbitrary', Opus: 'opus', OggOpus: 'ogg/opus', WebmOpus: 'webm/opus', Raw: 'raw' };
 
 // Réglages du laboratoire, modifiables par chaque test.
 const reglages = {
   connexionPrete: true,   // la connexion atteint-elle l'état « prêt » ?
   fluxCasse: false,       // play.stream lève-t-il ?
   fluxCassePour: null,    // … ou seulement pour cette URL
+  // 🔬 La scène d'échec de l'étape 5 : { etapeMax, endpoint, udp: {ip, port},
+  // fermeture, erreur }. Posée, chaque échec de connexion rejoue cette scène
+  // sur la machine réseau — exactement ce que l'espion doit relever.
+  reseau: null,
+  // La connexion réussit à partir de ce numéro d'essai (null = selon
+  // connexionPrete). Sert à éprouver la rotation de région : échec, rotation,
+  // réussite.
+  pretAuEssai: null,
+  essaisReady: 0,
 };
 
+// La machine réseau de @discordjs/voice, en modèle réduit : un état avec un
+// code de sous-étape, et les événements que l'espion écoute.
+class FauxReseau extends EventEmitter {
+  constructor(scene = {}) {
+    super();
+    this.state = {
+      code: scene.etapeMax ?? 2,
+      connectionOptions: { endpoint: scene.endpoint || 'paris-test.discord.media' },
+      udp: scene.udp ? { remote: scene.udp } : undefined,
+    };
+  }
+}
+
 class FausseConnexion extends EventEmitter {
-  constructor(opts) { super(); this.opts = opts; this.detruite = false; this.abonne = null; }
+  constructor(opts) {
+    super();
+    this.opts = opts; this.detruite = false; this.abonne = null;
+    this.state = { status: VoiceConnectionStatus.Signalling, networking: null };
+  }
   subscribe(lecteur) { this.abonne = lecteur; journal.push(['subscribe']); return { unsubscribe() {} }; }
   destroy() { this.detruite = true; journal.push(['destroy']); }
 }
@@ -39,23 +66,37 @@ class FauxLecteur extends EventEmitter {
 }
 
 const voix = {
-  VoiceConnectionStatus, AudioPlayerStatus, NoSubscriberBehavior,
+  VoiceConnectionStatus, AudioPlayerStatus, NoSubscriberBehavior, StreamType,
   joinVoiceChannel(opts) { journal.push(['join', opts.channelId]); return new FausseConnexion(opts); },
   createAudioPlayer(opts) { journal.push(['createPlayer']); return new FauxLecteur(opts); },
   createAudioResource(flux, opts) {
     journal.push(['resource', opts?.inputType]);
     return {
-      morceau: flux?.morceau || null,
+      morceau: typeof flux === 'string' ? flux : (flux?.morceau || null),
       playbackDuration: 0,
       volume: opts?.inlineVolume ? { valeur: 1, setVolume(v) { this.valeur = v; journal.push(['volume', v]); } } : null,
     };
   },
   async entersState(connexion, etat, delai) {
     journal.push(['entersState', etat]);
-    if (etat === VoiceConnectionStatus.Ready && !reglages.connexionPrete) {
-      throw new Error('délai dépassé');
+    if (etat !== VoiceConnectionStatus.Ready) return connexion;
+    reglages.essaisReady += 1;
+    const reussi = reglages.pretAuEssai !== null
+      ? reglages.essaisReady >= reglages.pretAuEssai
+      : reglages.connexionPrete;
+    if (reussi) return connexion;
+
+    if (reglages.reseau && connexion?.emit) {
+      const reseau = new FauxReseau(reglages.reseau);
+      const ancien = connexion.state;
+      connexion.state = { status: reglages.reseau.statut || VoiceConnectionStatus.Connecting, networking: reseau };
+      connexion.emit('stateChange', ancien, connexion.state);
+      if (reglages.reseau.fermeture) reseau.emit('close', reglages.reseau.fermeture);
+      if (reglages.reseau.erreur) reseau.emit('error', new Error(reglages.reseau.erreur));
+    } else if (connexion?.state) {
+      connexion.state.status = VoiceConnectionStatus.Signalling;
     }
-    return connexion;
+    throw new Error('délai dépassé');
   },
 };
 
@@ -118,6 +159,9 @@ function reinitialiser() {
   reglages.connexionPrete = true;
   reglages.fluxCasse = false;
   reglages.fluxCassePour = null;
+  reglages.reseau = null;
+  reglages.pretAuEssai = null;
+  reglages.essaisReady = 0;
 }
 
-module.exports = { voix, play, journal, reglages, reinitialiser, FauxLecteur, FausseConnexion };
+module.exports = { voix, play, journal, reglages, reinitialiser, FauxLecteur, FausseConnexion, FauxReseau };

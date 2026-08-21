@@ -246,9 +246,64 @@ async function fichesSpotify(url) {
 async function ouvrirFlux(morceau) {
   const p = play();
   const v = voice();
+
+  // 📻 Une radio est un flux MP3/AAC continu servi par la station elle-même.
+  // play-dl n'y comprend rien : c'est FFmpeg qui lit l'URL, suit ses
+  // redirections et décode son format — puis le lecteur ré-encode en Opus.
+  if (morceau.source === 'radio') {
+    const souci = ffmpegManquant();
+    if (souci) throw new Error(souci);
+    return v.createAudioResource(morceau.url, { inputType: v.StreamType.Arbitrary, inlineVolume: true });
+  }
   const flux = await p.stream(morceau.url, { discordPlayerCompatibility: false, quality: 2 });
   const ressource = v.createAudioResource(flux.stream, { inputType: flux.type, inlineVolume: true });
   return ressource;
+}
+
+// ══════════════════════════════════════════════════════════════════
+// 🎛️ FFMPEG — la brique des radios
+// ══════════════════════════════════════════════════════════════════
+//
+// YouTube et SoundCloud arrivent déjà en Opus : pas besoin de FFmpeg. Une
+// RADIO, elle, envoie du MP3 ou de l'AAC en continu : il faut FFmpeg pour la
+// décoder. On le cherche là où prism-media le cherchera aussi — même ordre,
+// donc jamais de « trouvé ici, introuvable là-bas » :
+//
+//  1. FFMPEG_PATH — posé par l'exécutable quand ffmpeg est à côté de lui ;
+//  2. le ffmpeg du système (apt install ffmpeg) ;
+//  3. le paquet ffmpeg-static — INUTILISABLE depuis l'exécutable packagé :
+//     son binaire vit dans l'instantané pkg, qu'on ne peut pas lancer.
+let _ffmpeg;
+function cheminFfmpeg() {
+  if (_ffmpeg !== undefined) return _ffmpeg;
+  const fs = require('fs');
+  const { spawnSync } = require('child_process');
+  _ffmpeg = null;
+  if (process.env.FFMPEG_PATH && fs.existsSync(process.env.FFMPEG_PATH)) {
+    _ffmpeg = process.env.FFMPEG_PATH;
+  } else if (spawnSync('ffmpeg', ['-version'], { stdio: 'ignore', shell: false }).status === 0) {
+    _ffmpeg = 'ffmpeg';
+  } else if (!process.pkg) {
+    try {
+      const statique = require('ffmpeg-static');
+      if (statique && fs.existsSync(statique)) _ffmpeg = statique;
+    } catch { /* pas installé */ }
+  }
+  return _ffmpeg;
+}
+
+// null si FFmpeg est là — sinon la marche à suivre, différente selon qu'on
+// tourne en exécutable (poser le binaire à côté) ou en Node (npm install).
+function ffmpegManquant() {
+  if (cheminFfmpeg()) return null;
+  const lignes = ['La lecture d\'une radio exige **FFmpeg**, introuvable sur cet hébergement.'];
+  if (process.pkg) {
+    lignes.push('➜ Posez `ffmpeg.exe` (Windows) ou `ffmpeg` (Linux) **à côté du bot**, puis redémarrez-le.');
+    lignes.push('➜ Téléchargement officiel : https://ffmpeg.org/download.html');
+  } else {
+    lignes.push('➜ Sur l\'hébergeur : `apt install ffmpeg` — ou `npm install ffmpeg-static` à côté du bot, puis redémarrez-le.');
+  }
+  return lignes.join('\n');
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -287,8 +342,14 @@ function rapportDependances() {
     return null;
   };
   rapport.opus = trouver(['@discordjs/opus', 'opusscript']);
-  rapport.chiffrement = trouver(['sodium-native', 'libsodium-wrappers', 'sodium', 'tweetnacl']);
-  rapport.ffmpeg = trouver(['ffmpeg-static', 'prism-media']);
+  // Depuis les modes de chiffrement de novembre 2024, Node chiffre la voix
+  // TOUT SEUL quand son crypto natif connaît l'AES-256-GCM (Node 18+). Les
+  // bibliothèques sodium ne sont plus qu'une roue de secours.
+  let natif = false;
+  try { natif = require('crypto').getCiphers().includes('aes-256-gcm'); } catch { natif = false; }
+  rapport.chiffrement = (natif ? 'crypto natif de Node' : null)
+    || trouver(['sodium-native', 'libsodium-wrappers', 'sodium', 'tweetnacl']);
+  rapport.ffmpeg = cheminFfmpeg();
   return rapport;
 }
 
@@ -303,5 +364,5 @@ function briquesManquantes() {
 
 module.exports = {
   preparer, etatSources, resoudre, chercherSurYouTube, ouvrirFlux, play, voice,
-  rapportDependances, briquesManquantes,
+  rapportDependances, briquesManquantes, cheminFfmpeg, ffmpegManquant,
 };

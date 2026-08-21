@@ -140,8 +140,15 @@ module.exports = {
       }
 
       if (sub === 'skip') {
+        // Si rien ne suit, « passé. » promettrait une suite qui n'existe pas
+        // — le cas d'une radio seule qu'on coupe au skip.
+        const derniere = !etat?.pistes?.length && etat?.boucle === 'aucune';
         const passee = musique.passer(interaction.guildId);
-        return interaction.reply({ content: passee ? `⏭️ **${passee.titre}** passé.` : '❌ Rien à passer.' });
+        return interaction.reply({
+          content: passee
+            ? (derniere ? `⏭️ **${passee.titre}** passé — plus rien en file : je quitte le vocal dans 30 s.` : `⏭️ **${passee.titre}** passé.`)
+            : '❌ Rien à passer.',
+        });
       }
 
       if (sub === 'pause') {
@@ -236,7 +243,7 @@ module.exports = {
     return mettreAJour(interaction, { embeds: [carteLecture(apres)], components: [boutons(apres)] });
   },
 
-  carteLecture, carteFile, carteSources, mmss, ligneSource,
+  carteLecture, carteFile, carteSources, mmss, ligneSource, boutons,
 };
 
 async function jouer(interaction) {
@@ -244,7 +251,7 @@ async function jouer(interaction) {
   // YouTube : bien plus que les 3 secondes de Discord. `repondreVite` ne
   // diffère qu'à la dernière seconde — un lien direct répond donc en carte.
   return repondreVite(interaction, async () => {
-    const { pistes, introuvables, premiere } = await musique.ajouter(
+    const { pistes, introuvables, premiere, noteRegion } = await musique.ajouter(
       interaction,
       interaction.options.getString('lien')
     );
@@ -270,6 +277,9 @@ async function jouer(interaction) {
         { prefixe: '⚠️', compte: introuvables.length, motCompte: 'titre' }));
     }
     if (!premiere) lignes.push(`-# 📃 Position dans la file : **${etat.pistes.length}**`);
+    if (noteRegion) {
+      lignes.push(`-# 🔁 Le flux vocal n'aboutissait pas : j'ai changé la région du salon (${noteRegion.originale || 'automatique'} → ${noteRegion.nouvelle}), et c'est elle qui a débloqué la connexion.`);
+    }
 
     const embed = new EmbedBuilder()
       .setColor(premiere ? COLORS.SUCCESS : COLORS.INFO)
@@ -321,8 +331,19 @@ async function diagnostic(interaction) {
           `${oui(e.demandeEnvoyee !== false)} 2. Ma demande de connexion vocale est partie`,
           `${oui(e.etatRecu)} 3. Discord m'a dit où je suis`,
           `${oui(e.serveurRecu)} 4. Discord m'a donné le serveur vocal`,
-          `${oui(e.statutFinal === 'ready')} 5. Flux audio ouvert ${e.statutFinal === 'ready' ? '' : '*(seule étape qui utilise l\'UDP)*'}`,
+          `${oui(e.statutFinal === 'ready')} 5. Flux audio ouvert`,
         ], { prefixe: '📶', compte: null }),
+        // 🔬 L'intérieur de l'étape 5 : quatre sous-étapes, quatre coupables
+        // différents — et une seule utilise l'UDP.
+        e.serveurRecu && e.statutFinal !== 'ready' && e.reseau
+          ? M.bloc('Dans l\'étape 5, où ça s\'arrête', musique.ETAPES_RESEAU.map((etape, i) => {
+            const marque = i < e.reseau.etapeMax ? '✅' : (i === e.reseau.etapeMax ? '🛑' : '⬜');
+            return `${marque} ${etape}`;
+          }).concat([
+            e.reseau.udp ? `-# Serveur vocal : \`${e.reseau.udp}\`` : null,
+            e.reseau.fermeture ? `-# Fermeture : code ${e.reseau.fermeture}` : null,
+          ].filter(Boolean)), { prefixe: '🔬', compte: null })
+          : null,
         M.bloc('Constats', [
           `${oui(preuves.membre)} Je suis membre du serveur`,
           `${oui(preuves.intentVocal)} Mon intent vocal est actif`,
@@ -345,7 +366,7 @@ function carteFile(etat) {
   if (etat?.encours) lignes.push(M.bloc('En lecture', [`**${etat.encours.titre}**`], { prefixe: '▶️', compte: null }));
   if (etat?.pistes?.length) {
     lignes.push(M.bloc('À suivre',
-      etat.pistes.slice(0, 20).map((p, i) => `**${i + 1}.** ${p.titre} · ${mmss(p.duree)}`),
+      etat.pistes.slice(0, 20).map((p, i) => `**${i + 1}.** ${p.titre} · ${p.source === 'radio' ? '🔴 direct' : mmss(p.duree)}`),
       { prefixe: '📃', compte: etat.pistes.length, motCompte: 'morceau' }));
     const total = etat.pistes.reduce((n, p) => n + (p.duree || 0), 0);
     if (total) lignes.push(`-# ⏱️ Environ ${mmss(total)} d'attente`);
@@ -368,6 +389,7 @@ function carteSources() {
       M.bloc('Diffusé directement', [
         '▶️ **YouTube** — vidéos et playlists',
         `🔊 **SoundCloud** — pistes et playlists${e.soundcloud ? '' : ' *(clé d\'accès non obtenue)*'}`,
+        '📻 **Radios françaises** — `/radio ecouter` *(exige FFmpeg)*',
       ], { prefixe: '✅', compte: null }),
       M.bloc('Lu, puis rejoué depuis YouTube', [
         `🟢 **Spotify**${e.spotify ? ' — albums et playlists complets' : ' — piste seule *(sans identifiants d\'application)*'}`,
@@ -380,6 +402,7 @@ function carteSources() {
       M.bloc('Briques audio', [
         `${d.opus ? '✅' : '❌'} Encodeur Opus${d.opus ? ` — \`${d.opus}\`` : ' — **manquant**'}`,
         `${d.chiffrement ? '✅' : '❌'} Chiffrement de la voix${d.chiffrement ? ` — \`${d.chiffrement}\`` : ' — **manquant**'}`,
+        `${d.ffmpeg ? '✅' : '❌'} FFmpeg (radios)${d.ffmpeg ? ` — \`${d.ffmpeg}\`` : ' — **manquant** : les radios ne peuvent pas jouer'}`,
       ], { prefixe: '🔧', compte: null }),
       manque
         ? `⚠️ **Il manque ${manque.length === 1 ? 'une brique' : 'des briques'} :**\n${manque.map((m) => `➜ ${m}`).join('\n')}\n`
