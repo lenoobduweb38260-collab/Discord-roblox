@@ -18,6 +18,10 @@ const RACINE = path.join(__dirname, '..', 'src');
 const TECHNIQUE = [
   /^[a-z0-9_:.\-]+$/i,                    // identifiants, clés, routes
   /^(SELECT|INSERT|UPDATE|DELETE|CREATE|ALTER|PRAGMA)\b/i,
+  // Un MORCEAU de requête : `\` = ? WHERE guild_id = ?\`` ne commence par aucun
+  // mot-clé, mais un `= ?` ne s'écrit jamais dans une phrase.
+  /=\s*\?/,
+  /\bSELECT\b[\s\S]*\bFROM\b/i,
   /^https?:\/\//,
   /^#[0-9a-f]{3,8}$/i,
   /^[\s\-─=_*#`|]+$/,                     // décors, séparateurs
@@ -25,6 +29,9 @@ const TECHNIQUE = [
   /^<@?[!&#]?\d*>?$/,
   /^attachment:\/\//,
   /^application\/|^image\/|^video\//,
+  // Le gabarit du fichier .env écrit sur le disque : ce n'est pas un message,
+  // et traduire un nom de variable empêcherait le bot de démarrer.
+  /^[A-Z][A-Z0-9_]{2,}=/m,
 ];
 
 // Ce qui ressemble à une phrase destinée à un lecteur.
