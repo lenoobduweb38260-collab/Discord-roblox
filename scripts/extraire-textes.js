@@ -22,6 +22,9 @@ const TECHNIQUE = [
   // mot-clé, mais un `= ?` ne s'écrit jamais dans une phrase.
   /=\s*\?/,
   /\bSELECT\b[\s\S]*\bFROM\b/i,
+  // Une définition de colonne — `wanted INTEGER NOT NULL DEFAULT 0` —
+  // ressemble à trois mots anglais, et n'est pas un message.
+  /\b(INTEGER|TEXT|REAL|BLOB|BOOLEAN)\b[\s\S]*\b(NOT NULL|DEFAULT|PRIMARY KEY|REFERENCES)\b/i,
   /^https?:\/\//,
   /^#[0-9a-f]{3,8}$/i,
   /^[\s\-─=_*#`|]+$/,                     // décors, séparateurs
