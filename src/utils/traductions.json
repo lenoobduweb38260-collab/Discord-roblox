@@ -5,6 +5,12 @@
   "\n\n➕ Sélectionner un rôle dans un menu **l'ajoute** à la liste (les rôles s'accumulent). 🧹 Utilisez les boutons **Vider** pour repartir de zéro.": {
     "en": "\n\n➕ Picking a role in a menu **adds** it to the list (roles stack up). 🧹 Use the **Clear** buttons to start over."
   },
+  "\n\n➡️ Tu montes à l'**étage ": {
+    "en": "\n\n➡️ You climb to **floor "
+  },
+  "\n\n💰 Total : ": {
+    "en": "\n\n💰 Total: "
+  },
   "\n\n📦 *Sans salon de mises à jour configuré, le bot crée automatiquement **#shadow-logs**, visible uniquement du staff, et y publie les annonces.*": {
     "en": "\n\n📦 *With no update channel configured, the bot automatically creates **#shadow-logs**, visible to staff only, and posts its announcements there.*"
   },
@@ -13,6 +19,9 @@
   },
   "\n\n🔔 Mention des patch notes : ": {
     "en": "\n\n🔔 Patch note mention: "
+  },
+  "\n\n🕊️ Tu as vaincu les 100 boss : te voilà **libéré de Sword Art Online**. Légende vivante !": {
+    "en": "\n\n🕊️ You have beaten all 100 bosses: you are **free of Sword Art Online**. A living legend!"
   },
   "\n\n1️⃣ Choisissez le réglage, 2️⃣ puis le salon.": {
     "en": "\n\n1️⃣ Pick the setting, 2️⃣ then the channel."
@@ -26,6 +35,12 @@
   "\n-# Au-delà de 100 %, le son peut saturer.": {
     "en": "\n-# Above 100%, the sound may distort."
   },
+  "\n-# Envoyé en privé : le balayage a duré plus longtemps que la réponse de la commande.": {
+    "en": "\n-# Sent privately: the sweep lasted longer than the command's reply."
+  },
+  "\n-# Il garde sa barre colorée : seul **mode : Recréer** peut en faire une carte.": {
+    "en": "\n-# It keeps its coloured bar: only **mode: Recréer** can turn it into a card."
+  },
   "\n-# Les textes non traduits restent en français.": {
     "en": "\n-# Text that has no translation stays in French."
   },
@@ -35,8 +50,20 @@
   "\n⚠️ Après un ajout ou une suppression, republiez le panneau : `/ticket panneau-modifier`.": {
     "en": "\n⚠️ After adding or deleting one, publish the panel again: `/ticket panneau-modifier`."
   },
+  "\n⚠️ L'emoji fourni n'était pas valide (utilisez un vrai emoji ou un emoji du serveur) : type créé **sans emoji**.": {
+    "en": "\n⚠️ The emoji you gave was not valid (use a real emoji or a server emoji): the type was created **without an emoji**."
+  },
   "\n⚠️ Non traité(s) :\n": {
     "en": "\n⚠️ Not handled:\n"
+  },
+  "\n⭐ **Niveau ": {
+    "en": "\n⭐ **Level "
+  },
+  "\n🏅 **Nouveau(x) badge(s) :** ": {
+    "en": "\n🏅 **New badge(s):** "
+  },
+  "\n💡 Pensez à republier ou modifier le panneau (`/ticket panneau`) pour afficher le nouveau bouton.": {
+    "en": "\n💡 Remember to publish or edit the panel again (`/ticket panneau`) to show the new button."
   },
   "\n🔔 *Choisissez 📝 **Salon des patch notes** ci-dessous pour régler qui est mentionné. Par défaut : personne.*": {
     "en": "\n🔔 *Pick 📝 **Patch notes channel** below to set who gets mentioned. Default: nobody.*"
@@ -68,6 +95,12 @@
   "  • la passerelle Discord ne relaie pas mes paquets vocaux — un **redémarrage du bot** la remet souvent d'aplomb ;": {
     "en": "  • the Discord gateway isn't relaying my voice packets — **restarting the bot** usually fixes it;"
   },
+  " — 💸 fonds insuffisants": {
+    "en": " — 💸 not enough funds"
+  },
+  " — 🔒 **bloquée**": {
+    "en": " — 🔒 **blocked**"
+  },
   " — 🔒 bloquée": {
     "en": " — 🔒 blocked"
   },
@@ -77,11 +110,29 @@
   " — piste seule *(sans identifiants d'application)*": {
     "en": " — single track only *(no application credentials)*"
   },
+  " : vérifiez la hiérarchie des rôles et la permission **Gérer les rôles** du bot.": {
+    "en": ": check the role hierarchy and the bot's **Manage Roles** permission."
+  },
+  " : vérifiez que le rôle du bot est **au-dessus** de ce rôle et qu'il a la permission **Gérer les rôles**.": {
+    "en": ": check that the bot's role is **above** this one and that it has the **Manage Roles** permission."
+  },
   " · 🔒 **Verrouillé**": {
     "en": " · 🔒 **Locked**"
   },
+  " » du menu ne fait rien : choisissez le rôle ": {
+    "en": "” in the menu does nothing: pick the role "
+  },
   " » existe déjà.": {
     "en": "” already exists."
+  },
+  " » ne fait rien : donnez-lui un lien à ouvrir, ": {
+    "en": "” does nothing: give it a link to open, "
+  },
+  " (⭐ niveau ": {
+    "en": " (⭐ level "
+  },
+  " (unité ": {
+    "en": " (unit "
   },
   " *(clé d'accès non obtenue)*": {
     "en": " *(access key not obtained)*"
@@ -89,11 +140,137 @@
   " **vidés** par <@": {
     "en": " **cleared** by <@"
   },
+  " 💥 CRITIQUE": {
+    "en": " 💥 CRITICAL"
+  },
+  " ATK)\nCoût : **": {
+    "en": " ATK)\nCost: **"
+  },
+  " attendra. Reviens plus fort !": {
+    "en": " will wait. Come back stronger!"
+  },
+  " avaient déjà le rôle.": {
+    "en": " already had the role."
+  },
+  " Col\n\n🛌 Repose-toi puis retente ta chance.": {
+    "en": " Col\n\n🛌 Rest up, then try your luck again."
+  },
+  " Col · ⭐ Niveau ": {
+    "en": " Col · ⭐ Level "
+  },
+  " Col** pour te soigner (tu en as ": {
+    "en": " Col** to heal up (you have "
+  },
+  " Col**, PV restaurés.\n❤️ ": {
+    "en": " Col**, HP restored.\n❤️ "
+  },
+  " Col**. ❤️ PV : ": {
+    "en": " Col**. ❤️ HP: "
+  },
+  " Col**) mais tu réapparais en ville, PV restaurés.\n❤️ PV : ": {
+    "en": " Col**) but you respawn in town, HP restored.\n❤️ HP: "
+  },
+  " Col**). Tu réapparais en ville, PV restaurés.\n\n🔨 Forge une meilleure arme (`/sao forge`) puis retente !": {
+    "en": " Col**). You respawn in town, HP restored.\n\n🔨 Forge a better weapon (`/sao forge`) then try again!"
+  },
+  " commande(s) synchronisées.": {
+    "en": " command(s) synced."
+  },
+  " de plus non affichés": {
+    "en": " more not shown"
+  },
+  " dégâts.": {
+    "en": " damage."
+  },
+  " embed(s) examiné(s) · ": {
+    "en": " embed(s) looked at · "
+  },
+  " employé) par <@": {
+    "en": " employee) by <@"
+  },
   " et de **tous les serveurs du bot**": {
     "en": " and from **every server the bot is on**"
   },
+  " examiné(s)": {
+    "en": " looked at"
+  },
+  " la direction par <@": {
+    "en": " the management by <@"
+  },
+  " lui a été **attribué automatiquement**.": {
+    "en": " was **given automatically**."
+  },
+  " lui a été **retiré**.": {
+    "en": " was **removed**."
+  },
+  " membre(s) mis à jour, ": {
+    "en": " member(s) updated, "
+  },
+  " message(s) du bot · mode **": {
+    "en": " message(s) from the bot · mode **"
+  },
+  " message(s) examiné(s) au maximum par salon": {
+    "en": " message(s) looked at at most per channel"
+  },
+  " message(s) gardent leur barre colorée.** Un embed déjà envoyé ne peut pas devenir une carte : relancez avec **mode : Recréer** si vous acceptez d'en perdre les réactions et les liens.": {
+    "en": " message(s) keep their coloured bar.** An embed already sent can never become a card: run it again with **mode: Recréer** if you accept losing their reactions and links."
+  },
+  " min** (là : ": {
+    "en": " min** (right now: "
+  },
+  " min** hors-ligne, ton personnage a farmé :\n": {
+    "en": " min** offline, your character farmed:\n"
+  },
+  " n'est pas un contrat **véhicule** (statut police sans objet).": {
+    "en": " is not a **vehicle** policy (police status does not apply)."
+  },
+  " n'est pas un rôle métier configuré dans la whitelist (`/whitelist config ajouter`).": {
+    "en": " is not a job role set up in the whitelist (`/whitelist config ajouter`)."
+  },
+  " n'était pas autorisé pour ": {
+    "en": " was not allowed for "
+  },
+  " ne peut plus whitelister ": {
+    "en": " can no longer whitelist "
+  },
+  " nettoyé !": {
+    "en": " cleared!"
+  },
+  " peuvent désormais whitelister : ": {
+    "en": " can now whitelist: "
+  },
+  " refus de Discord": {
+    "en": " refusals from Discord"
+  },
+  " réhabillé(s) sur ": {
+    "en": " restyled out of "
+  },
   " remplace les anciens intitulés. Aucune fiche n'est perdue.": {
     "en": " replaces the old wording. No record is lost."
+  },
+  " résilié (": {
+    "en": " cancelled ("
+  },
+  " résilié par <@": {
+    "en": " cancelled by <@"
+  },
+  " retiré de la whitelist (autorisations et inscriptions supprimées — les rôles Discord déjà attribués ne sont pas retirés).": {
+    "en": " removed from the whitelist (permissions and entries deleted — Discord roles already given are not taken back)."
+  },
+  " s écoulées · le compte rendu arrivera en message privé si l'affichage expire": {
+    "en": " s elapsed · the report will arrive by direct message if the display expires"
+  },
+  " s** avant de rechasser.": {
+    "en": " s** before hunting again."
+  },
+  " serveur(s) de plus.*": {
+    "en": " more server(s).*"
+  },
+  " tolérés": {
+    "en": " tolerated"
+  },
+  " XP serveur** (auto)": {
+    "en": " server XP** (automatic)"
   },
   "_Sélectionnez-le ci-dessous (menu vide = aucun rôle attribué)._": {
     "en": "_Pick it below (empty menu = no role given)._"
@@ -107,8 +284,17 @@
   "-# Change les mots du Module RP. Aucune fiche n'est perdue : on peut revenir en arrière.": {
     "en": "-# Changes the wording of the RP module. No record is lost: you can switch back."
   },
+  "-# Clic droit sur le message → **Copier le lien du message**. Format attendu : `https://discord.com/channels/…/…/…`": {
+    "en": "-# Right-click the message → **Copy Message Link**. Expected format: `https://discord.com/channels/…/…/…`"
+  },
   "-# Détail technique pour l'hébergeur : la connexion reste bloquée en « signalling », aucun `VOICE_SERVER_UPDATE` n'est reçu.": {
     "en": "-# Technical detail for the host: the connection stays stuck in \"signalling\", no `VOICE_SERVER_UPDATE` is received."
+  },
+  "-# Discord ne laisse un bot modifier que ses propres messages — ceux d'un membre ou d'un autre bot sont hors de portée.": {
+    "en": "-# Discord only lets a bot edit its own messages — those of a member or another bot are out of reach."
+  },
+  "-# Je t'envoie le compte rendu ici dès qu'il est terminé — rien n'est interrompu.": {
+    "en": "-# I will send you the report here as soon as it is done — nothing is interrupted."
   },
   "-# La fiche est conservée : l'historique dit qui portait ce numéro.": {
     "en": "-# The record is kept: the history shows who held this number."
@@ -116,11 +302,17 @@
   "-# Langue d'origine : tous les messages sont écrits dedans.": {
     "en": "-# Source language: every message is written in it."
   },
+  "-# Le compte rendu s'affichera ici, ou en message privé si le balayage dure plus que la réponse de la commande.": {
+    "en": "-# The report will appear here, or by direct message if the sweep outlasts the command's reply."
+  },
   "-# Le fichier a été refusé par Discord : voici la conversation en clair.\n": {
     "en": "-# Discord refused the file: here is the conversation in plain text.\n"
   },
   "-# Le salon et toute la conversation disparaissent. Préférez **Fermer le ticket** : la conversation est archivée avant suppression.": {
     "en": "-# The channel and the whole conversation disappear. Prefer **Close the ticket**: the conversation is archived before deletion."
+  },
+  "-# Les messages déjà en carte n'apparaissent pas : ils n'ont rien à refaire.": {
+    "en": "-# Messages that are already cards do not show up: they have nothing to redo."
   },
   "-# Mes permissions, mes intents et mes bibliothèques audio sont bons : je viens de les vérifier.": {
     "en": "-# My permissions, intents and audio libraries are all fine: I just checked them."
@@ -143,8 +335,14 @@
   "-# Vérifiez que j'ai la permission **Gérer les permissions** sur ce salon.": {
     "en": "-# Check that I have the **Manage Permissions** permission on this channel."
   },
+  ", géré par ": {
+    "en": ", handled by "
+  },
   ", plus des emojis classiques.\n": {
     "en": ", plus the usual emojis.\n"
+  },
+  ". L'intention « SERVER MEMBERS » est-elle activée pour le bot ?": {
+    "en": ". Is the “SERVER MEMBERS” intent switched on for the bot?"
   },
   ". Modifiez-le avec `/ticket panneau-modifier`.": {
     "en": ". Edit it with `/ticket panneau-modifier`."
@@ -152,14 +350,56 @@
   "… ou un rôle précis": {
     "en": "… or one specific role"
   },
+  "…ou l'URL de l'image de l'embed": {
+    "en": "…or the URL of the embed image"
+  },
+  "…ou l'URL de la miniature": {
+    "en": "…or the URL of the thumbnail"
+  },
   ") — envoi en texte.": {
     "en": ") — sending as plain text."
+  },
+  "). Va chasser un peu !": {
+    "en": "). Go hunt a little!"
+  },
+  "[Admin] Autoriser un gérant à whitelister un ou plusieurs rôles métier": {
+    "en": "[Admin] Allow a manager to whitelist one or more job roles"
+  },
+  "[Admin] Configurer les autorisations de whitelist": {
+    "en": "[Admin] Set up the whitelist permissions"
+  },
+  "[Admin] Retirer une autorisation (ou tout le rôle métier si gérant omis)": {
+    "en": "[Admin] Remove a permission (or the whole job role if no manager is given)"
+  },
+  "[Assureur] Assigner un contrat d'assurance à un client": {
+    "en": "[Insurer] Assign an insurance policy to a client"
+  },
+  "[Assureur] Résilier un contrat (par son numéro)": {
+    "en": "[Insurer] Cancel a policy (by its number)"
+  },
+  "[Créateur] Refait tous les anciens embeds du bot au style actuel": {
+    "en": "[Creator] Redoes all the bot's old embeds in the current style"
+  },
+  "[Police/Staff] Véhicule recherché et/ou en fourrière": {
+    "en": "[Police/Staff] Vehicle wanted and/or impounded"
+  },
+  "[Staff] Ajouter/retirer un membre à la tête d'une entreprise": {
+    "en": "[Staff] Add/remove a member at the head of a company"
   },
   "[Staff] Attribuer ou modifier un matricule": {
     "en": "[Staff] Assign or change a service number"
   },
+  "[Staff] Changer le média : fichier OU lien (photo/GIF/vidéo/YouTube)": {
+    "en": "[Staff] Change the media: file OR link (photo/GIF/video/YouTube)"
+  },
+  "[Staff] Créer une entreprise (question assurance obligatoire)": {
+    "en": "[Staff] Create a company (the insurance question is required)"
+  },
   "[Staff] Image de fond des cartes de niveau (vide = retirer)": {
     "en": "[Staff] Background image for level cards (empty to remove)"
+  },
+  "[Staff] Modifier une entreprise": {
+    "en": "[Staff] Edit a company"
   },
   "[Staff] Publier le panneau des matricules dans un salon": {
     "en": "[Staff] Post the service-number board in a channel"
@@ -167,14 +407,44 @@
   "[Staff] Retirer le matricule d'un membre": {
     "en": "[Staff] Remove a member's service number"
   },
+  "[Staff] Retirer un membre (patron + employé) de toutes les entreprises": {
+    "en": "[Staff] Remove a member (owner + employee) from every company"
+  },
+  "[Staff] Supprimer une entreprise": {
+    "en": "[Staff] Delete a company"
+  },
+  "[Staff] Système de tickets : types, catégories et panneau": {
+    "en": "[Staff] Ticket system: types, categories and panel"
+  },
   "[Staff] Voir qui est actuellement en service": {
     "en": "[Staff] See who is currently on duty"
+  },
+  "[Staff/Patron] Ajouter/retirer un employé": {
+    "en": "[Staff/Owner] Add/remove an employee"
   },
   "*(seule étape qui utilise l'UDP)*": {
     "en": "*(the only step that uses UDP)*"
   },
+  "**\nQue le duel commence, <@": {
+    "en": "**\nLet the duel begin, <@"
+  },
+  "** — 🔴 identité désactivée": {
+    "en": "** — 🔴 identity disabled"
+  },
   "** — catégorie « ": {
     "en": "** — category “"
+  },
+  "** — catégorie <#": {
+    "en": "** — category <#"
+  },
+  "** — média mis à jour par <@": {
+    "en": "** — media updated by <@"
+  },
+  "** — sélectionnez le(s) nouveau(x) type(s) :": {
+    "en": "** — pick the new type(s):"
+  },
+  "** : média ": {
+    "en": "**: media "
   },
   "** : rôles support réinitialisés par <@": {
     "en": "**: support roles reset by <@"
@@ -191,14 +461,56 @@
   "** » supprimé. Republiez le panneau : `/ticket panneau-modifier`.": {
     "en": "**” deleted. Publish the panel again: `/ticket panneau-modifier`."
   },
+  "** (catégorie ": {
+    "en": "** (category "
+  },
   "** (catégorie <#": {
     "en": "** (category <#"
+  },
+  "** (patron ou employé) pour gérer ses assurances.": {
+    "en": "** (owner or employee) to manage its policies."
+  },
+  "** **bloquée** : plus personne ne peut ouvrir ce type de ticket. Republiez le panneau (`/ticket panneau-modifier`) pour retirer le bouton. Réactivez-la avec `/ticket debloquer`.": {
+    "en": "** **blocked**: nobody can open this ticket type any more. Publish the panel again (`/ticket panneau-modifier`) to drop the button. Bring it back with `/ticket debloquer`."
+  },
+  "** **réactivée** : elle est de nouveau ouvrable. Republiez le panneau (`/ticket panneau-modifier`) pour réafficher le bouton.": {
+    "en": "** **back**: it can be opened again. Publish the panel again (`/ticket panneau-modifier`) to show the button."
   },
   "** • ou « Sans emoji » pour n'en mettre aucun.": {
     "en": "** • or “No emoji” to leave it out."
   },
+  "** cochée.": {
+    "en": "** box ticked."
+  },
+  "** créé → salons dans **": {
+    "en": "** created → channels in **"
+  },
+  "** créée par <@": {
+    "en": "** created by <@"
+  },
+  "** créée.\n📋 **Question obligatoire :** sélectionnez le(s) type(s) d'assurance proposé(s) :": {
+    "en": "** created.\n📋 **Required question:** pick the insurance type(s) it offers:"
+  },
+  "** dégâts et subis **": {
+    "en": "** damage and take **"
+  },
+  "** déjà au bon format": {
+    "en": "** already in the right shape"
+  },
+  "** déjà conformes · **": {
+    "en": "** already in line · **"
+  },
+  "** échec(s)": {
+    "en": "** failure(s)"
+  },
+  "** en cartes sans bordure": {
+    "en": "** as borderless cards"
+  },
   "** est au-dessus de mon rôle : je ne pourrai pas le donner.\n": {
     "en": "** is above my own role: I will not be able to give it.\n"
+  },
+  "** est déjà ": {
+    "en": "** is already "
   },
   "** est géré par une intégration : il ne s'attribue pas à la main.": {
     "en": "** is managed by an integration: it cannot be given by hand."
@@ -206,11 +518,56 @@
   "** est temporairement indisponible. Réessayez plus tard.": {
     "en": "** is temporarily unavailable. Try again later."
   },
+  "** examiné(s)": {
+    "en": "** looked at"
+  },
+  "** existe déjà.": {
+    "en": "** already exists."
+  },
+  "** introuvable. Choisissez un type existant.": {
+    "en": "** not found. Pick a type that exists."
+  },
+  "** message(s) gardaient leur barre colorée au dernier passage": {
+    "en": "** message(s) still had their coloured bar on the last run"
+  },
+  "** message(s) recréé(s) en carte — réactions, réponses et liens vers ces messages sont perdus": {
+    "en": "** message(s) recreated as cards — reactions, replies and links to those messages are lost"
+  },
+  "** message(s) restent des embeds : ils gardent leur barre verticale colorée": {
+    "en": "** message(s) are still embeds: they keep their coloured vertical bar"
+  },
+  "** mis à jour.": {
+    "en": "** updated."
+  },
+  "** n'a pas encore rejoint l'aventure.": {
+    "en": "** has not joined the adventure yet."
+  },
+  "** n'a pas la case **Assurance ": {
+    "en": "** does not have the **Insurance "
+  },
+  "** ne propose pas d'assurances. Activez d'abord l'assurance (champ **assurance** → `oui`).": {
+    "en": "** does not offer insurance. Turn insurance on first (field **assurance** → `oui`)."
+  },
   "** par message et par minute de vocal, cooldown **": {
     "en": "** per message and per minute in voice, cooldown **"
   },
   "** par minute de vocal": {
     "en": "** per minute in voice"
+  },
+  "** peuvent retirer ce contrat.": {
+    "en": "** can remove this policy."
+  },
+  "** poste(s) d'employé.": {
+    "en": "** employee position(s)."
+  },
+  "** propose désormais des assurances. Sélectionnez le(s) type(s) :": {
+    "en": "** now offers insurance. Pick the type(s):"
+  },
+  "** recréé(s) en carte": {
+    "en": "** recreated as cards"
+  },
+  "** retiré (les tickets déjà ouverts restent). Republiez le panneau pour retirer le bouton.": {
+    "en": "** removed (tickets already open stay). Publish the panel again to drop the button."
   },
   "** retiré par <@": {
     "en": "** removed by <@"
@@ -218,8 +575,32 @@
   "** retirée.": {
     "en": "** removed."
   },
+  "** serveur(s) avec l'identité active": {
+    "en": "** server(s) with the identity switched on"
+  },
+  "** supprimée (patrons, employés et véhicules assurés inclus).": {
+    "en": "** deleted (owners, employees and insured vehicles included)."
+  },
+  "** supprimée par <@": {
+    "en": "** deleted by <@"
+  },
+  "** t'a terrassé (perte de **": {
+    "en": "** struck you down (losing **"
+  },
+  "**. Seuls les messages du bot seront proposés.": {
+    "en": "**. Only the bot's own messages will be offered."
+  },
+  "**… l'étage ": {
+    "en": "**… floor "
+  },
   "**/message · 🎙️ **": {
     "en": "**/message · 🎙️ **"
+  },
+  "**Boss de l'étage ": {
+    "en": "**Boss of floor "
+  },
+  "**Expirée** le ": {
+    "en": "**Expired** on "
   },
   "**redémarrez le bot**, cela repart presque toujours. Si cela recommence, c'est l'intent vocal qui n'est pas actif côté hébergeur.": {
     "en": "**restart the bot** — that almost always fixes it. If it keeps happening, the voice intent isn't enabled on the host's side."
@@ -239,6 +620,9 @@
   "*Aucune récompense — le bot ne donne aucun rôle de lui-même.*": {
     "en": "*No reward — the bot gives no role on its own.*"
   },
+  "*Jamais lancée depuis cette version*": {
+    "en": "*Never run since this version*"
+  },
   "*Non configuré — #shadow-logs sera créé automatiquement*": {
     "en": "*Not configured — #shadow-logs will be created automatically*"
   },
@@ -247,6 +631,9 @@
   },
   "*Non configuré*": {
     "en": "*Not configured*"
+  },
+  "*Non renseignée*": {
+    "en": "*Not filled in*"
   },
   "*Personne pour le moment*": {
     "en": "*Nobody yet*"
@@ -257,6 +644,9 @@
   "*Rien d'autre en attente.*": {
     "en": "*Nothing else queued.*"
   },
+  "*types à définir*": {
+    "en": "*types to be set*"
+  },
   "• `/reseaux ajouter plateforme identifiant salon [message]` — suivre une chaîne/un compte\n": {
     "en": "• `/reseaux ajouter plateforme identifiant salon [message]` — follow a channel/account\n"
   },
@@ -265,6 +655,21 @@
   },
   "• `/reseaux retirer flux` — ne plus suivre\n": {
     "en": "• `/reseaux retirer flux` — stop following\n"
+  },
+  "• `/sao afk` — récolter des gains même hors-ligne\n": {
+    "en": "• `/sao afk` — collect earnings even while offline\n"
+  },
+  "• `/sao badges` / `/sao titre` — débloquer et équiper des badges perso\n\n": {
+    "en": "• `/sao badges` / `/sao titre` — unlock and equip your own badges\n\n"
+  },
+  "• `/sao boss` — affronter le boss de ton étage pour monter d'un cran\n": {
+    "en": "• `/sao boss` — take on your floor's boss to climb one step\n"
+  },
+  "• `/sao chasser` — combattre des monstres et gagner de l'XP + des Col\n": {
+    "en": "• `/sao chasser` — fight monsters and earn XP + Col\n"
+  },
+  "• `/sao forge` — forger de meilleures armes\n": {
+    "en": "• `/sao forge` — forge better weapons\n"
   },
   "• `/whitelist ajouter utilisateur:@membre role:@Métier` — whitelister une recrue": {
     "en": "• `/whitelist ajouter utilisateur:@member role:@Job` — whitelist a recruit"
@@ -290,6 +695,9 @@
   "> — Discord a refusé la modification": {
     "en": "> — Discord refused the change"
   },
+  "> — gérants : ": {
+    "en": "> — managers: "
+  },
   "> ! Décrivez votre demande le plus précisément possible.": {
     "en": "> ! Describe your request as precisely as you can."
   },
@@ -301,6 +709,9 @@
   },
   "> ← gérants : ": {
     "en": "> ← managers: "
+  },
+  "> a autorisé <@&": {
+    "en": "> allowed <@&"
   },
   "> a déjà un ticket **": {
     "en": "> already has an open ticket **"
@@ -314,20 +725,65 @@
   "> a été ajouté au ticket.": {
     "en": "> was added to the ticket."
   },
+  "> a été retiré de la whitelist : le rôle ": {
+    "en": "> was taken off the whitelist: the role "
+  },
+  "> a été whitelisté : le rôle ": {
+    "en": "> was whitelisted: the role "
+  },
   "> a libéré ce ticket : il attend un nouveau membre du staff.": {
     "en": "> released this ticket: it is waiting for another staff member."
+  },
+  "> a retiré ": {
+    "en": "> removed "
   },
   "> a ses **messages privés fermés** : je n'ai pas pu le prévenir.\n": {
     "en": "> has **direct messages closed**: I could not let them know.\n"
   },
+  "> a tenté `/whitelist ": {
+    "en": "> tried `/whitelist "
+  },
+  "> à whitelister ": {
+    "en": "> to whitelist "
+  },
   "> ajouté au ticket <#": {
     "en": "> added to ticket <#"
+  },
+  "> assuré chez **": {
+    "en": "> insured with **"
+  },
+  "> est maintenant à la tête de **": {
+    "en": "> is now at the head of **"
+  },
+  "> est maintenant employé de **": {
+    "en": "> is now an employee of **"
   },
   "> mis à jour par <@": {
     "en": "> updated by <@"
   },
+  "> n'est plus à la tête de **": {
+    "en": "> is no longer at the head of **"
+  },
+  "> n'est plus employé de **": {
+    "en": "> is no longer an employee of **"
+  },
+  "> n'était ni patron ni employé d'une entreprise.": {
+    "en": "> was neither owner nor employee of any company."
+  },
+  "> retiré de **": {
+    "en": "> removed from **"
+  },
+  "> retiré de <@&": {
+    "en": "> removed from <@&"
+  },
+  "> retiré de toutes les entreprises du serveur (": {
+    "en": "> removed from every company on the server ("
+  },
   "> s'occupe désormais de ce ticket.": {
     "en": "> is now handling this ticket."
+  },
+  "> whitelisté <@&": {
+    "en": "> whitelisted <@&"
   },
   ">, fermé par <@": {
     "en": ">, closed by <@"
@@ -335,14 +791,29 @@
   ">, le staff attend votre réponse pour avancer sur ce ticket.": {
     "en": ">, staff is waiting for your reply to move this ticket forward."
   },
+  ">, te voilà piégé dans **Sword Art Online**. Pour recouvrer ta liberté, il te faudra vaincre les **100 boss d'étage** de ce château flottant.\n\n": {
+    "en": ">, you are trapped in **Sword Art Online**. To win your freedom back, you will have to defeat the **100 floor bosses** of this floating castle.\n\n"
+  },
   ">.\n-# Les membres qui avaient déjà le rôle le gardent.": {
     "en": ">.\n-# Members who already had the role keep it."
   },
   ">) fermé par <@": {
     "en": ">) closed by <@"
   },
+  "⌛ Ce combat n'est plus actif. Relance `/sao boss`.": {
+    "en": "⌛ This fight is no longer active. Run `/sao boss` again."
+  },
   "⏳ **En attente** de la couronne 👑 du serveur — demandée par <@": {
     "en": "⏳ **Waiting** on the server's crown 👑 — requested by <@"
+  },
+  "⏳ Balayage lancé sur **tous les serveurs** du bot.\n": {
+    "en": "⏳ Sweep started on **every server** the bot is on.\n"
+  },
+  "⏳ Le balayage de `/esthetique` **continue** : il a dépassé la durée de vie de la réponse de la commande.\n": {
+    "en": "⏳ The `/esthetique` sweep is **still running**: it outlived the command's reply.\n"
+  },
+  "⏳ Tu reprends ton souffle… réessaie dans **": {
+    "en": "⏳ You are catching your breath… try again in **"
   },
   "⏹️ File terminée.": {
     "en": "⏹️ Queue finished."
@@ -362,6 +833,21 @@
   "◀ Précédent": {
     "en": "◀ Previous"
   },
+  "♻️ Embeds **reconstruits sur place** : réactions, épingles, réponses et liens conservés.": {
+    "en": "♻️ Embeds **rebuilt in place**: reactions, pins, replies and links kept."
+  },
+  "♻️ Message **recréé en carte**.\n-# Réactions, réponses accrochées et liens vers l'ancien message sont perdus — c'était le prix de la conversion.": {
+    "en": "♻️ Message **recreated as a card**.\n-# Reactions, attached replies and links to the old message are lost — that was the price of the conversion."
+  },
+  "♻️ Messages **recréés en cartes**. Réactions, réponses et liens vers les anciens messages sont perdus — c'était le prix de la conversion.": {
+    "en": "♻️ Messages **recreated as cards**. Reactions, replies and links to the old messages are lost — that was the price of the conversion."
+  },
+  "⚔️ Attaque": {
+    "en": "⚔️ Attack"
+  },
+  "⚔️ Bienvenue dans Aincrad": {
+    "en": "⚔️ Welcome to Aincrad"
+  },
   "⚔️ Module Aventure SAO": {
     "en": "⚔️ SAO adventure module"
   },
@@ -376,6 +862,24 @@
   },
   "⚠️ **Aucun salon d'archives configuré** : la conversation va être perdue.\n": {
     "en": "⚠️ **No archive channel configured**: the conversation will be lost.\n"
+  },
+  "⚠️ /esthetique : compte rendu non remis (réponse expirée et messages privés fermés).": {
+    "en": "⚠️ /esthetique: report not delivered (reply expired and direct messages closed)."
+  },
+  "⚠️ Des refus ont eu lieu : surveillez": {
+    "en": "⚠️ Some were refused: keep an eye on it"
+  },
+  "⚠️ grille de champs": {
+    "en": "⚠️ field grid"
+  },
+  "⚠️ L'identité visuelle est **désactivée** sur ce serveur : rien ne serait appliqué.": {
+    "en": "⚠️ The visual identity is **switched off** on this server: nothing would be applied."
+  },
+  "⚠️ Pourquoi la barre colorée est toujours là": {
+    "en": "⚠️ Why the coloured bar is still there"
+  },
+  "⚠️ Sync commandes : ": {
+    "en": "⚠️ Command sync: "
   },
   "⚠️ Transcript : fichier refusé (": {
     "en": "⚠️ Transcript: file refused ("
@@ -392,11 +896,26 @@
   "⛔ Ce bouton ne fonctionne que sur un serveur, pas en message privé.": {
     "en": "⛔ This button only works on a server, not in direct messages."
   },
+  "⛔ Ce message n'a pas été écrit par le bot.\n": {
+    "en": "⛔ This message was not written by the bot.\n"
+  },
+  "⛔ Ce n'est pas ton aventure — lance la tienne avec `/sao`.": {
+    "en": "⛔ This is not your adventure — start your own with `/sao`."
+  },
   "⛔ Ces actions sont réservées au **staff du serveur** et aux rôles support de ce type de ticket.": {
     "en": "⛔ These actions are reserved for **server staff** and the support roles of this ticket type."
   },
+  "⛔ Le module Aventure SAO est désactivé sur ce serveur.": {
+    "en": "⛔ The SAO adventure module is switched off on this server."
+  },
+  "⛔ Réservé au **créateur du bot** : l'esthétique appartient au bot et s'applique sur tous ses serveurs à la fois.": {
+    "en": "⛔ **Bot creator** only: the look belongs to the bot and applies to all its servers at once."
+  },
   "⛔ Réservé au **staff** du serveur.": {
     "en": "⛔ Reserved for server **staff**."
+  },
+  "⛔ Réservé au créateur du bot.": {
+    "en": "⛔ Bot creator only."
   },
   "⛔ Réservé au staff.": {
     "en": "⛔ Staff only."
@@ -407,6 +926,15 @@
   "⛔ Sécurité : cette sous-commande est réservée au **staff**.": {
     "en": "⛔ Security: this subcommand is reserved for **staff**."
   },
+  "⛔ Sécurité : la configuration de la whitelist est réservée à l'**administration**.": {
+    "en": "⛔ Security: whitelist setup is for the **administration** only."
+  },
+  "⛔ Sécurité : réservé à la **police** ou au **staff**.": {
+    "en": "⛔ Security: **police** or **staff** only."
+  },
+  "⛔ Sécurité : réservé au **staff** ou aux **patrons** de cette entreprise.": {
+    "en": "⛔ Security: **staff** or the **owners** of this company only."
+  },
   "⛔ Sécurité : seul un membre de l'**administration** peut changer le rôle Administration.": {
     "en": "⛔ Security: only a member of the **administration** can change the Administration role."
   },
@@ -415,6 +943,12 @@
   },
   "⛔ Sécurité : seul un membre de l'**administration** peut vider les rôles ": {
     "en": "⛔ Security: only a member of the **administration** can clear the roles "
+  },
+  "⛔ Sécurité : seuls le **staff** ou les membres de **": {
+    "en": "⛔ Security: only **staff** or members of **"
+  },
+  "⛔ Sécurité : vous n'êtes **pas autorisé** à gérer la whitelist du rôle ": {
+    "en": "⛔ Security: you are **not allowed** to manage the whitelist of the role "
   },
   "⛔ Seul le staff peut relancer un ticket.": {
     "en": "⛔ Only staff can nudge a ticket."
@@ -428,14 +962,35 @@
   "⛔ Seuls l'équipe support ou le staff peuvent supprimer le salon.": {
     "en": "⛔ Only the support team or staff can delete the channel."
   },
+  "⛔ Vous devez faire partie de **": {
+    "en": "⛔ You have to be part of **"
+  },
+  "✅ Ce message est **déjà une carte** : il n'y a rien à refaire.": {
+    "en": "✅ This message is **already a card**: there is nothing to redo."
+  },
+  "✅ Entreprise **": {
+    "en": "✅ Company **"
+  },
   "✅ Image des cartes de niveau mise à jour.": {
     "en": "✅ Level card image updated."
   },
   "✅ La connexion vocale fonctionne.": {
     "en": "✅ The voice connection works."
   },
+  "✅ Les membres ayant le rôle ": {
+    "en": "✅ Members with the role "
+  },
   "✅ Liaison validée : vous portez la couronne, il n'y a personne au-dessus à consulter.": {
     "en": "✅ Link confirmed: you wear the crown, there is nobody above to ask."
+  },
+  "✅ Média ": {
+    "en": "✅ Media "
+  },
+  "✅ Média de **": {
+    "en": "✅ Media for **"
+  },
+  "✅ Message **refait sur place** : réactions, épingles et liens conservés.": {
+    "en": "✅ Message **redone in place**: reactions, pins and links kept."
   },
   "✅ Panneau mis à jour dans <#": {
     "en": "✅ Panel updated in <#"
@@ -461,6 +1016,12 @@
   "✅ Type « **": {
     "en": "✅ Type “**"
   },
+  "✅ Type **": {
+    "en": "✅ Type **"
+  },
+  "✅ valide · ❌ expirée · 🔴🚨 recherché · 🔴🅿️ fourrière — détail : /assurance voir <n°>": {
+    "en": "✅ valid · ❌ expired · 🔴🚨 wanted · 🔴🅿️ impounded — details: /assurance voir <no.>"
+  },
   "✅ Votre ticket est ouvert : ": {
     "en": "✅ Your ticket is open: "
   },
@@ -472,6 +1033,12 @@
   },
   "✏️ Modifier les valeurs": {
     "en": "✏️ Change the values"
+  },
+  "❌ @everyone ne peut pas être un rôle gérant.": {
+    "en": "❌ @everyone cannot be a manager role."
+  },
+  "❌ @everyone ne peut pas être un rôle métier.": {
+    "en": "❌ @everyone cannot be a job role."
   },
   "❌ Aucun membre ": {
     "en": "❌ No member "
@@ -485,8 +1052,17 @@
   "❌ Aucune donnée de niveau pour le moment.": {
     "en": "❌ No level data yet."
   },
+  "❌ Aucune entreprise sur ce serveur.": {
+    "en": "❌ No company on this server."
+  },
   "❌ Aucune récompense n'est configurée pour le **niveau ": {
     "en": "❌ No reward is configured for **level "
+  },
+  "❌ Badge inconnu.": {
+    "en": "❌ Unknown badge."
+  },
+  "❌ Ce membre n'est pas sur le serveur.": {
+    "en": "❌ This member is not on the server."
   },
   "❌ Ce salon n'est pas un ticket.": {
     "en": "❌ This channel is not a ticket."
@@ -503,6 +1079,21 @@
   "❌ Cette commande doit être utilisée **dans un salon de ticket ouvert**.": {
     "en": "❌ This command must be used **in an open ticket channel**."
   },
+  "❌ Contrat n°": {
+    "en": "❌ Policy no. "
+  },
+  "❌ Couleur invalide : utilisez un code hex, ex `#5865F2`.": {
+    "en": "❌ Invalid colour: use a hex code, e.g. `#5865F2`."
+  },
+  "❌ Créez d'abord au moins un type (`/ticket type-ajouter`).": {
+    "en": "❌ Create at least one type first (`/ticket type-ajouter`)."
+  },
+  "❌ Date d'expiration invalide (format **JJ/MM/AAAA**).": {
+    "en": "❌ Invalid expiry date (format **DD/MM/YYYY**)."
+  },
+  "❌ Date de délivrance invalide (format **JJ/MM/AAAA**).": {
+    "en": "❌ Invalid issue date (format **DD/MM/YYYY**)."
+  },
   "❌ Déjà en pause, ou rien en lecture.": {
     "en": "❌ Already paused, or nothing playing."
   },
@@ -515,17 +1106,56 @@
   "❌ Discord n'a répondu ni où je suis, ni quel serveur vocal utiliser.": {
     "en": "❌ Discord told me neither where I am, nor which voice server to use."
   },
+  "❌ Entreprise **": {
+    "en": "❌ Company **"
+  },
+  "❌ Entreprise introuvable.": {
+    "en": "❌ Company not found."
+  },
+  "❌ Fournissez un **fichier** (glissez-le) OU un **lien**.": {
+    "en": "❌ Give a **file** (drop it) OR a **link**."
+  },
   "❌ Il faut au moins deux morceaux en attente pour mélanger.": {
     "en": "❌ At least two queued tracks are needed to shuffle."
   },
   "❌ Impossible d'ajouter ce membre (le bot a-t-il **Gérer les permissions** ?).": {
     "en": "❌ Could not add this member (does the bot have **Manage Permissions**?)."
   },
+  "❌ Impossible d'attribuer ": {
+    "en": "❌ Could not give "
+  },
   "❌ Impossible de créer le salon : ": {
     "en": "❌ Could not create the channel: "
   },
+  "❌ Impossible de retirer ": {
+    "en": "❌ Could not remove "
+  },
+  "❌ Indiquez `recherche` et/ou `fourriere`.": {
+    "en": "❌ Give `recherche` and/or `fourriere`."
+  },
+  "❌ Indiquez au moins un rôle métier valide.": {
+    "en": "❌ Give at least one valid job role."
+  },
+  "❌ Indiquez une **valeur** pour ce champ.": {
+    "en": "❌ Give a **value** for this field."
+  },
+  "❌ Indiquez une `entreprise` ou un `client` pour filtrer la liste.": {
+    "en": "❌ Give an `entreprise` or a `client` to filter the list."
+  },
   "❌ Invalide": {
     "en": "❌ Invalid"
+  },
+  "❌ L'entreprise **": {
+    "en": "❌ The company **"
+  },
+  "❌ Le **lien** doit être une URL (http…). Glissez plutôt un fichier si besoin.": {
+    "en": "❌ The **link** has to be a URL (http…). Drop a file instead if you need to."
+  },
+  "❌ Le contrat n°": {
+    "en": "❌ Policy no. "
+  },
+  "❌ Le média doit être un **lien** (http…), ou `non` pour le retirer.": {
+    "en": "❌ The media has to be a **link** (http…), or `non` to remove it."
   },
   "❌ Le message du panneau a été supprimé — republiez-en un avec `/ticket panneau`.": {
     "en": "❌ The panel message was deleted — publish a new one with `/ticket panneau`."
@@ -539,8 +1169,14 @@
   "❌ Le type « ": {
     "en": "❌ The type “"
   },
+  "❌ Le type **": {
+    "en": "❌ The type **"
+  },
   "❌ Les bibliothèques audio ne sont pas installées sur cet hébergement.\n": {
     "en": "❌ The audio libraries aren't installed on this host.\n"
+  },
+  "❌ Lien non reconnu.\n": {
+    "en": "❌ Link not recognised.\n"
   },
   "❌ Ma connexion à Discord n'est pas établie.": {
     "en": "❌ My connection to Discord isn't established."
@@ -548,8 +1184,20 @@
   "❌ Ma demande de connexion vocale n'a même pas pu partir.": {
     "en": "❌ My voice connection request couldn't even be sent."
   },
+  "❌ Maximum 25 types de tickets (limite des boutons Discord).": {
+    "en": "❌ 25 ticket types maximum (Discord's button limit)."
+  },
+  "❌ Message introuvable : il a pu être supprimé entre-temps.": {
+    "en": "❌ Message not found: it may have been deleted in the meantime."
+  },
+  "❌ Message introuvable : supprimé, ou hors de portée du bot.": {
+    "en": "❌ Message not found: deleted, or out of the bot's reach."
+  },
   "❌ Modification impossible : ": {
     "en": "❌ Could not edit: "
+  },
+  "❌ Modification refusée par Discord — le message a peut-être été supprimé entre-temps.": {
+    "en": "❌ Discord refused the edit — the message may have been deleted in the meantime."
   },
   "❌ Non": {
     "en": "❌ No"
@@ -560,8 +1208,17 @@
   "❌ Panneau introuvable.": {
     "en": "❌ Panel not found."
   },
+  "❌ Précisez `oui` ou `non` pour l'assurance.": {
+    "en": "❌ Say `oui` or `non` for the insurance."
+  },
   "❌ Publication impossible dans ": {
     "en": "❌ Could not publish in "
+  },
+  "❌ Raison **": {
+    "en": "❌ Reason **"
+  },
+  "❌ Recréation impossible : vérifiez que le bot peut **écrire** et **supprimer** dans ce salon.": {
+    "en": "❌ Could not recreate: check that the bot can **write** and **delete** in this channel."
   },
   "❌ Rien à passer.": {
     "en": "❌ Nothing to skip."
@@ -575,11 +1232,20 @@
   "❌ Rôle introuvable : « ": {
     "en": "❌ Role not found: “"
   },
+  "❌ Rôle invalide.": {
+    "en": "❌ Invalid role."
+  },
   "❌ Salon du panneau introuvable.": {
     "en": "❌ Panel channel not found."
   },
   "❌ Salon du ticket introuvable.": {
     "en": "❌ Ticket channel not found."
+  },
+  "❌ Salon illisible pour le bot.": {
+    "en": "❌ The bot cannot read this channel."
+  },
+  "❌ Salon introuvable, ou le bot n'y a pas accès.": {
+    "en": "❌ Channel not found, or the bot has no access to it."
   },
   "❌ Session expirée — relancez `/ticket panneau`.": {
     "en": "❌ Session expired — run `/ticket panneau` again."
@@ -590,8 +1256,14 @@
   "❌ Ticket introuvable.": {
     "en": "❌ Ticket not found."
   },
+  "❌ Type **": {
+    "en": "❌ Type **"
+  },
   "❌ Type de ticket introuvable.": {
     "en": "❌ Ticket type not found."
+  },
+  "❌ Une entreprise nommée **": {
+    "en": "❌ A company named **"
   },
   "❌ Une erreur est survenue dans le panneau de configuration.": {
     "en": "❌ Something went wrong in the configuration panel."
@@ -686,6 +1358,15 @@
   "⬅ Retour au panneau": {
     "en": "⬅ Back to the panel"
   },
+  "⭐ Niveau": {
+    "en": "⭐ Level"
+  },
+  "🃏 cartes · barre accent": {
+    "en": "🃏 cards · accent bar"
+  },
+  "🃏 cartes sans bordure": {
+    "en": "🃏 borderless cards"
+  },
   "🌍 Langue du bot": {
     "en": "🌍 Bot language"
   },
@@ -695,11 +1376,20 @@
   "🎂 Date de naissance": {
     "en": "🎂 Date of birth"
   },
+  "🎉 Étage ": {
+    "en": "🎉 Floor "
+  },
   "🎙️ Dont vocal": {
     "en": "🎙️ From voice"
   },
   "🎧 Ce que je sais lire": {
     "en": "🎧 What I can play"
+  },
+  "🎨 Anciens embeds refaits au style actuel": {
+    "en": "🎨 Old embeds redone in the current style"
+  },
+  "🎨 Couleur": {
+    "en": "🎨 Colour"
   },
   "🎫 Choisissez une raison pour ouvrir un ticket…": {
     "en": "🎫 Pick a reason to open a ticket…"
@@ -758,8 +1448,14 @@
   "🎫 Tickets": {
     "en": "🎫 Tickets"
   },
+  "🎫 Type de ticket créé": {
+    "en": "🎫 Ticket type created"
+  },
   "🎫 Type de ticket supprimé": {
     "en": "🎫 Ticket type deleted"
+  },
+  "🎫 Types de tickets (": {
+    "en": "🎫 Ticket types ("
   },
   "🎭 Module RP": {
     "en": "🎭 RP module"
@@ -773,11 +1469,29 @@
   "🎮 Module Interactions": {
     "en": "🎮 Interactions module"
   },
+  "🎮 Tu es déjà un aventurier ! Voici ta fiche :": {
+    "en": "🎮 You are already an adventurer! Here is your sheet:"
+  },
+  "🎯 **Dans quel salon se trouve le message ?**\n": {
+    "en": "🎯 **Which channel is the message in?**\n"
+  },
+  "🎯 **Quel message refaire dans <#": {
+    "en": "🎯 **Which message should be redone in <#"
+  },
   "🎶 File d'attente": {
     "en": "🎶 Queue"
   },
+  "🏃 Fuite": {
+    "en": "🏃 Fled"
+  },
   "🏅 Ajouter une récompense": {
     "en": "🏅 Add a reward"
+  },
+  "🏅 Badge débloqué : 🗡️ **Débutant** — et un petit bonus d'XP serveur pour bien démarrer !": {
+    "en": "🏅 Badge unlocked: 🗡️ **Beginner** — plus a little server XP bonus to get you going!"
+  },
+  "🏅 Badges de ": {
+    "en": "🏅 Badges of "
   },
   "🏅 Niveau **": {
     "en": "🏅 Level **"
@@ -788,8 +1502,44 @@
   "🏅 Récompenses de niveau": {
     "en": "🏅 Level rewards"
   },
+  "🏅 Titre": {
+    "en": "🏅 Title"
+  },
+  "🏅 Titre équipé : ": {
+    "en": "🏅 Title equipped: "
+  },
+  "🏆 Arme ultime": {
+    "en": "🏆 Ultimate weapon"
+  },
+  "🏆 Classement — Aventure SAO": {
+    "en": "🏆 Leaderboard — SAO adventure"
+  },
   "🏆 Classement du serveur": {
     "en": "🏆 Server leaderboard"
+  },
+  "🏙️ Entreprises": {
+    "en": "🏙️ Companies"
+  },
+  "🏠 Bâtiment / Maison": {
+    "en": "🏠 Building / House"
+  },
+  "🏢 Assureur": {
+    "en": "🏢 Insurer"
+  },
+  "🏢 Direction modifiée": {
+    "en": "🏢 Management changed"
+  },
+  "🏢 Entreprise assurée": {
+    "en": "🏢 Insured company"
+  },
+  "🏢 Entreprise créée": {
+    "en": "🏢 Company created"
+  },
+  "🏢 Entreprise modifiée": {
+    "en": "🏢 Company edited"
+  },
+  "🏢 Entreprise supprimée": {
+    "en": "🏢 Company deleted"
   },
   "🏢 Entreprises": {
     "en": "🏢 Companies"
@@ -797,17 +1547,44 @@
   "🏢 Entreprises partagées": {
     "en": "🏢 Shared companies"
   },
+  "🏢 Média modifié": {
+    "en": "🏢 Media changed"
+  },
+  "🏢 Membre retiré des entreprises": {
+    "en": "🏢 Member removed from the companies"
+  },
   "🏢 Relier à une communauté": {
     "en": "🏢 Link to a community"
   },
   "🏢 Relier les entreprises": {
     "en": "🏢 Link the companies"
   },
+  "🏥 Soigné à l'auberge pour **": {
+    "en": "🏥 Healed at the inn for **"
+  },
+  "🏯 Étage ": {
+    "en": "🏯 Floor "
+  },
   "👋 **@here**": {
     "en": "👋 **@here**"
   },
   "👋 Salon des arrivées/départs des membres": {
     "en": "👋 Member joins/leaves channel"
+  },
+  "👑 Aincrad conquis": {
+    "en": "👑 Aincrad conquered"
+  },
+  "👑 AINCRAD VAINCU !": {
+    "en": "👑 AINCRAD DEFEATED!"
+  },
+  "👑 Clear": {
+    "en": "👑 Clear"
+  },
+  "👑 Tu as déjà vaincu les 100 étages d'Aincrad. Bravo, tu es libre !": {
+    "en": "👑 You have already cleared the 100 floors of Aincrad. Well done, you are free!"
+  },
+  "👤 Assuré": {
+    "en": "👤 Policyholder"
   },
   "👤 Nom RP": {
     "en": "👤 RP surname"
@@ -827,17 +1604,38 @@
   "👮 Rôles Staff (plusieurs possibles)": {
     "en": "👮 Staff roles (several allowed)"
   },
+  "💀 Défaite": {
+    "en": "💀 Defeat"
+  },
+  "💀 Vaincu par ": {
+    "en": "💀 Defeated by "
+  },
+  "💚 Tu es déjà en pleine forme.": {
+    "en": "💚 You are already in perfect shape."
+  },
   "💣 **Anti-nuke** : ": {
     "en": "💣 **Anti-nuke**: "
   },
   "💬 Pseudo Discord": {
     "en": "💬 Discord name"
   },
+  "💰 Col": {
+    "en": "💰 Col"
+  },
+  "💸 Il te faut **": {
+    "en": "💸 You need **"
+  },
+  "💸 Il te manque des Col (besoin de **": {
+    "en": "💸 You are short on Col (you need **"
+  },
   "📁 Catégorie des salons de tickets": {
     "en": "📁 Category for ticket channels"
   },
   "📄 Contenu": {
     "en": "📄 Content"
+  },
+  "📄 Contrat n°": {
+    "en": "📄 Policy no. "
   },
   "📄 Salon des transcripts de tickets (défaut : logs)": {
     "en": "📄 Ticket transcript channel (default: logs)"
@@ -863,17 +1661,53 @@
   "📊 Système de niveaux": {
     "en": "📊 Level system"
   },
+  "📋 Aucun contrat d'assurance trouvé.": {
+    "en": "📋 No insurance policy found."
+  },
+  "📋 Aucun rôle métier n'est configuré (`/whitelist config ajouter`).": {
+    "en": "📋 No job role is set up (`/whitelist config ajouter`)."
+  },
+  "📋 Aucun type de ticket (`/ticket type-ajouter`).": {
+    "en": "📋 No ticket type (`/ticket type-ajouter`)."
+  },
+  "📋 Choisissez le(s) type(s) d'assurance (plusieurs choix possibles)": {
+    "en": "📋 Pick the insurance type(s) (several allowed)"
+  },
   "📋 Configuration — Whitelist": {
     "en": "📋 Configuration — Whitelist"
   },
+  "📋 Menu déroulant (sélecteur de raison)": {
+    "en": "📋 Drop-down (reason picker)"
+  },
+  "📋 Modifier les types d'assurance de **": {
+    "en": "📋 Change the insurance types of **"
+  },
   "📋 Personne n'est en service actuellement.": {
     "en": "📋 Nobody is on duty right now."
+  },
+  "📋 Rôles que vous pouvez whitelister": {
+    "en": "📋 Roles you can whitelist"
+  },
+  "📋 Vous n'êtes autorisé à whitelister **aucun** rôle métier.": {
+    "en": "📋 You are allowed to whitelist **no** job role."
+  },
+  "📋 Whitelist": {
+    "en": "📋 Whitelist"
+  },
+  "📋 Whitelist : configuration complète": {
+    "en": "📋 Whitelist: full setup"
+  },
+  "📋 Whitelist configurée": {
+    "en": "📋 Whitelist set up"
   },
   "📋 Whitelist métiers": {
     "en": "📋 Job whitelist"
   },
   "📛 Statut": {
     "en": "📛 Status"
+  },
+  "📜 Dernier tour": {
+    "en": "📜 Last turn"
   },
   "📝 Salon des patch notes": {
     "en": "📝 Patch notes channel"
@@ -905,6 +1739,9 @@
   "📤 Salon des départs (sinon = arrivées)": {
     "en": "📤 Leaves channel (otherwise = joins)"
   },
+  "📦 embeds classiques": {
+    "en": "📦 classic embeds"
+  },
   "📦 Salon des annonces de mise à jour": {
     "en": "📦 Update announcement channel"
   },
@@ -913,6 +1750,9 @@
   },
   "📨 Demande envoyée à <@": {
     "en": "📨 Request sent to <@"
+  },
+  "📭 Aucun aventurier sur ce serveur. Sois le premier avec `/sao start` !": {
+    "en": "📭 No adventurer on this server. Be the first with `/sao start`!"
   },
   "📭 Je ne joue rien pour le moment.": {
     "en": "📭 I'm not playing anything right now."
@@ -932,8 +1772,14 @@
   "🔂 Ce morceau tournera en boucle.": {
     "en": "🔂 This track will repeat."
   },
+  "🔄 Module RP ": {
+    "en": "🔄 RP module "
+  },
   "🔄 Un seul rôle à la fois": {
     "en": "🔄 One role at a time"
+  },
+  "🔌 API locale du gestionnaire prête (port ": {
+    "en": "🔌 Local manager API ready (port "
   },
   "🔎 Aucune correspondance exacte": {
     "en": "🔎 No exact match"
@@ -956,11 +1802,26 @@
   "🔒 La raison **": {
     "en": "🔒 The reason **"
   },
+  "🔒 Raison **": {
+    "en": "🔒 Reason **"
+  },
+  "🔒 Raison de ticket bloquée": {
+    "en": "🔒 Ticket reason blocked"
+  },
   "🔒 Réglage **verrouillé par l'administrateur du bot** — modifiable uniquement depuis le gestionnaire.": {
     "en": "🔒 Setting **locked by the bot administrator** — it can only be changed from the manager."
   },
   "🔒 Ticket fermé": {
     "en": "🔒 Ticket closed"
+  },
+  "🔒 Tu n'as pas encore débloqué ce badge.": {
+    "en": "🔒 You have not unlocked this badge yet."
+  },
+  "🔓 Raison **": {
+    "en": "🔓 Reason **"
+  },
+  "🔓 Raison de ticket réactivée": {
+    "en": "🔓 Ticket reason brought back"
   },
   "🔓 Ticket libéré": {
     "en": "🔓 Ticket released"
@@ -983,6 +1844,9 @@
   "🔗 Changer de communauté": {
     "en": "🔗 Change community"
   },
+  "🔘 Boutons": {
+    "en": "🔘 Buttons"
+  },
   "🔢 ID Discord": {
     "en": "🔢 Discord ID"
   },
@@ -991,6 +1855,15 @@
   },
   "🔢 Matricule retiré": {
     "en": "🔢 Service number removed"
+  },
+  "🔢 Plaque": {
+    "en": "🔢 Plate"
+  },
+  "🔨 Forge": {
+    "en": "🔨 Forge"
+  },
+  "🔨 Tu as forgé **": {
+    "en": "🔨 You forged **"
   },
   "🔬 Diagnostic de la connexion vocale": {
     "en": "🔬 Voice connection diagnostic"
@@ -1001,17 +1874,41 @@
   "🔬 Rejoignez d'abord un salon vocal : le test a besoin d'un salon où essayer.": {
     "en": "🔬 Join a voice channel first: the test needs a channel to try in."
   },
+  "🔴 **Abandonnées** après ": {
+    "en": "🔴 **Given up** after "
+  },
   "🔴 **Désactivé**": {
     "en": "🔴 **Disabled**"
   },
   "🔴 **Désactivé** — les commandes RP sont masquées sur ce serveur": {
     "en": "🔴 **Disabled** — the RP commands are hidden on this server"
   },
+  "🔴 🚨 **Recherché par les services de police**": {
+    "en": "🔴 🚨 **Wanted by the police**"
+  },
+  "🔴 🚨 recherché": {
+    "en": "🔴 🚨 wanted"
+  },
   "🔴 Fin de service": {
     "en": "🔴 Off duty"
   },
   "🔴 Module RP **désactivé** — les commandes RP ont été retirées du serveur.": {
     "en": "🔴 RP module **disabled** — the RP commands were removed from the server."
+  },
+  "🔴 🅿️ **En fourrière**": {
+    "en": "🔴 🅿️ **Impounded**"
+  },
+  "🔴 🅿️ en fourrière": {
+    "en": "🔴 🅿️ impounded"
+  },
+  "🕹️ Fais `/sao start` d'abord.": {
+    "en": "🕹️ Run `/sao start` first."
+  },
+  "🕹️ Tu n'as pas encore de personnage. Fais `/sao start` !": {
+    "en": "🕹️ You have no character yet. Run `/sao start`!"
+  },
+  "🕹️ Tu n'as pas encore de personnage. Fais `/sao start` pour commencer !": {
+    "en": "🕹️ You have no character yet. Run `/sao start` to begin!"
   },
   "🖼️ Salon des preuves (staff du bot)": {
     "en": "🖼️ Evidence channel (bot staff)"
@@ -1022,6 +1919,12 @@
   "🗑️ Ce salon va être **supprimé automatiquement**…": {
     "en": "🗑️ This channel will be **deleted automatically**…"
   },
+  "🗑️ Contrat n°": {
+    "en": "🗑️ Policy no. "
+  },
+  "🗑️ Entreprise **": {
+    "en": "🗑️ Company **"
+  },
   "🗑️ Message supprimé": {
     "en": "🗑️ Message deleted"
   },
@@ -1031,6 +1934,9 @@
   "🗑 Retirer une récompense": {
     "en": "🗑 Remove a reward"
   },
+  "🗑️ Rôle métier ": {
+    "en": "🗑️ Job role "
+  },
   "🗑 Supprimer ce type": {
     "en": "🗑 Delete this type"
   },
@@ -1039,6 +1945,18 @@
   },
   "🗑 Type « **": {
     "en": "🗑 Type “**"
+  },
+  "🗑️ Type **": {
+    "en": "🗑️ Type **"
+  },
+  "🗡️ Arme": {
+    "en": "🗡️ Weapon"
+  },
+  "🗡️ Arme actuelle": {
+    "en": "🗡️ Current weapon"
+  },
+  "🗡️ Victoire contre ": {
+    "en": "🗡️ Victory over "
   },
   "🤖 **Captcha à l'arrivée** : ": {
     "en": "🤖 **Captcha on join**: "
@@ -1079,8 +1997,20 @@
   "🧹 Image des cartes de niveau retirée.": {
     "en": "🧹 Level card image removed."
   },
+  "🧹 Titre retiré.": {
+    "en": "🧹 Title removed."
+  },
+  "🩺 État de l'esthétique du bot": {
+    "en": "🩺 State of the bot's look"
+  },
   "😀 Choisissez un emoji…": {
     "en": "😀 Pick an emoji…"
+  },
+  "😴 Gains AFK récoltés": {
+    "en": "😴 AFK earnings collected"
+  },
+  "😴 Reviens dans un moment : le farm AFK doit accumuler au moins **": {
+    "en": "😴 Come back in a while: AFK farming needs to build up at least **"
   },
   "🙂 C'est votre propre ticket : la relance sert à réveiller quelqu'un d'autre.": {
     "en": "🙂 This is your own ticket: a nudge is meant to wake someone else up."
@@ -1094,8 +2024,20 @@
   "🚓 Rôles Police (plusieurs possibles)": {
     "en": "🚓 Police roles (several allowed)"
   },
+  "🚓 Statut police": {
+    "en": "🚓 Police status"
+  },
+  "🚓 Statut véhicule modifié": {
+    "en": "🚓 Vehicle status changed"
+  },
+  "🚗 Véhicule": {
+    "en": "🚗 Vehicle"
+  },
   "🚨 **Anti-spam + filtre anti-injection** : ": {
     "en": "🚨 **Anti-spam + injection filter**: "
+  },
+  "🚪 Unité": {
+    "en": "🚪 Unit"
   },
   "🚫 **Refusée** par le propriétaire.": {
     "en": "🚫 **Refused** by the owner."
@@ -1103,11 +2045,29 @@
   "🛎️ Rôles support de « ": {
     "en": "🛎️ Support roles for “"
   },
+  "🛑 Whitelist : accès refusé": {
+    "en": "🛑 Whitelist: access denied"
+  },
   "🛡️ Assurance": {
     "en": "🛡️ Insurance"
   },
+  "🛡️ Assurance ": {
+    "en": "🛡️ Insurance "
+  },
+  "🛡️ Assurance résiliée": {
+    "en": "🛡️ Insurance cancelled"
+  },
   "🛡️ Configuration — Sécurité": {
     "en": "🛡️ Configuration — Security"
+  },
+  "🛡️ Contrat d'assurance ": {
+    "en": "🛡️ Insurance policy "
+  },
+  "🛡️ Contrats d'assurance chez ": {
+    "en": "🛡️ Insurance policies with "
+  },
+  "🛡️ Contrats d'assurance de ": {
+    "en": "🛡️ Insurance policies of "
   },
   "🛡️ Message du bot supprimé": {
     "en": "🛡️ Bot message deleted"
@@ -1121,6 +2081,9 @@
   "🛡️ Rôles Administration (plusieurs possibles)": {
     "en": "🛡️ Administration roles (several allowed)"
   },
+  "🟢 **Acceptées** — ": {
+    "en": "🟢 **Accepted** — "
+  },
   "🟢 **Activé**": {
     "en": "🟢 **Enabled**"
   },
@@ -1130,8 +2093,14 @@
   "🟢 Module RP **activé** — les commandes RP sont maintenant visibles sur le serveur.": {
     "en": "🟢 RP module **enabled** — the RP commands are now visible on the server."
   },
+  "🟢 Non recherché": {
+    "en": "🟢 Not wanted"
+  },
   "🟢 Ouvert": {
     "en": "🟢 Open"
+  },
+  "🟢 Pas en fourrière": {
+    "en": "🟢 Not impounded"
   },
   "🟢 Prise de service": {
     "en": "🟢 On duty"
@@ -1142,14 +2111,35 @@
   "1️⃣ Quel salon voulez-vous configurer ?": {
     "en": "1️⃣ Which channel do you want to configure?"
   },
+  "2e rôle métier (facultatif)": {
+    "en": "2nd job role (optional)"
+  },
+  "2ᵉ rôle support (facultatif)": {
+    "en": "2nd support role (optional)"
+  },
   "3️⃣ Qui mentionner à chaque note ?": {
     "en": "3️⃣ Who should be mentioned on each note?"
+  },
+  "3e rôle métier (facultatif)": {
+    "en": "3rd job role (optional)"
+  },
+  "3ᵉ rôle support (facultatif)": {
+    "en": "3rd support role (optional)"
+  },
+  "4e rôle métier (facultatif)": {
+    "en": "4th job role (optional)"
   },
   "a été": {
     "en": "was"
   },
   "À qui": {
     "en": "To whom"
+  },
+  "À savoir : la recréation **perd** réactions, réponses accrochées, liens partagés et date d'origine": {
+    "en": "Note: recreating **loses** reactions, attached replies, shared links and the original date"
+  },
+  "À savoir : la recréation perd réactions, réponses accrochées, liens et date d'origine": {
+    "en": "Note: recreating loses reactions, attached replies, links and the original date"
   },
   "À suivre": {
     "en": "Up next"
@@ -1178,8 +2168,17 @@
   "activés": {
     "en": "enabled"
   },
+  "Afficher une entreprise": {
+    "en": "Show a company"
+  },
+  "Affronter le boss de ton étage actuel": {
+    "en": "Take on the boss of your current floor"
+  },
   "ajouté": {
     "en": "added"
+  },
+  "ajouté à": {
+    "en": "added to"
   },
   "ajouté(s) au": {
     "en": "added to the"
@@ -1190,8 +2189,17 @@
   "Ajouter un membre": {
     "en": "Add a member"
   },
+  "Ajouter un membre au ticket courant (à utiliser dans le salon du ticket)": {
+    "en": "Add a member to the current ticket (use it inside the ticket channel)"
+  },
+  "Ajouter un type de ticket (relié à une catégorie Discord)": {
+    "en": "Add a ticket type (tied to a Discord category)"
+  },
   "Ajoutés à la file": {
     "en": "Added to the queue"
+  },
+  "Ajoutez d'abord au moins une raison de ticket.": {
+    "en": "Add at least one ticket reason first."
   },
   "Allô ? La Terre appelle 🛰️": {
     "en": "Hello? Earth calling 🛰️"
@@ -1205,11 +2213,44 @@
   "Anti-spam, anti-nuke, captcha": {
     "en": "Anti-spam, anti-nuke, captcha"
   },
+  "Application du statut impossible : ": {
+    "en": "Could not apply the status: "
+  },
   "Arrêter et quitter le vocal": {
     "en": "Stop and leave the voice channel"
   },
+  "Assigné par un assureur • le ": {
+    "en": "Assigned by an insurer • on "
+  },
+  "Assurance proposée": {
+    "en": "Insurance offered"
+  },
+  "Assurance santé d'un client (Assurance Maladie requise)": {
+    "en": "Health cover for a client (Health Insurance required)"
+  },
+  "Assurances des entreprises : véhicule, maison, entreprise, santé": {
+    "en": "Company insurance: vehicle, house, business, health"
+  },
+  "Assurer un véhicule (Assurance Véhicule requise)": {
+    "en": "Insure a vehicle (Vehicle Insurance required)"
+  },
+  "Assurer une entreprise (Assurance Entreprise requise)": {
+    "en": "Insure a business (Business Insurance required)"
+  },
+  "Assurer une maison / un bâtiment (Assurance Habitation requise)": {
+    "en": "Insure a house / building (Home Insurance required)"
+  },
+  "Aucun refus depuis le démarrage": {
+    "en": "No refusal since start-up"
+  },
+  "Aucun rôle automatique configuré.": {
+    "en": "No automatic role configured."
+  },
   "Aucune cause identifiable.": {
     "en": "No identifiable cause."
+  },
+  "Aucune pour le moment": {
+    "en": "None for now"
   },
   "Aucune récompense configurée": {
     "en": "No rewards configured"
@@ -1226,8 +2267,32 @@
   "Autorisations des gérants": {
     "en": "Manager permissions"
   },
+  "Aventure SAO : gravis les 100 étages d'Aincrad": {
+    "en": "SAO adventure: climb the 100 floors of Aincrad"
+  },
+  "Aventure SAO · /sao chasser · /sao boss · /sao afk": {
+    "en": "SAO adventure · /sao chasser · /sao boss · /sao afk"
+  },
   "Avez-vous toujours besoin de ce ticket ?": {
     "en": "Do you still need this ticket?"
+  },
+  "Badge à équiper": {
+    "en": "Badge to equip"
+  },
+  "bannière": {
+    "en": "banner"
+  },
+  "Bâtiment / Maison": {
+    "en": "Building / House"
+  },
+  "bloquée": {
+    "en": "blocked"
+  },
+  "Bornes manquantes pour « ": {
+    "en": "Missing bounds for “"
+  },
+  "bot introuvable sur ce serveur": {
+    "en": "bot not found on this server"
   },
   "Boutons = activer/désactiver • Menus = rôle vérifié et salon du captcha": {
     "en": "Buttons = enable/disable • Menus = verified role and captcha channel"
@@ -1247,8 +2312,26 @@
   "Carte de résident": {
     "en": "Resident card"
   },
+  "Cartes sans bordure": {
+    "en": "Borderless cards"
+  },
+  "Catégorie invalide.": {
+    "en": "Invalid category."
+  },
+  "Catégorie où créer les salons de ce type": {
+    "en": "Category where channels of this type are created"
+  },
+  "Ce membre n'est pas dans le staff du bot.": {
+    "en": "This member is not part of the bot's staff."
+  },
+  "Ce membre n'est pas sur ce serveur.": {
+    "en": "This member is not on this server."
+  },
   "Ce que le bot sait lire, et comment": {
     "en": "What the bot can play, and how"
+  },
+  "Ce qui a été refait": {
+    "en": "What was redone"
   },
   "Ce qui joue en ce moment": {
     "en": "What's playing right now"
@@ -1256,14 +2339,50 @@
   "Ce ticket fait la sieste depuis un moment 😴": {
     "en": "This ticket has been napping for a while 😴"
   },
+  "Ce type existe déjà.": {
+    "en": "This type already exists."
+  },
+  "Champs d'embed → **sections** ◆ / ➜": {
+    "en": "Embed fields → **sections** ◆ / ➜"
+  },
   "Chaque palier atteint s'ajoute aux précédents.": {
     "en": "Every tier reached is added to the previous ones."
+  },
+  "Chasser un monstre sur ton étage actuel": {
+    "en": "Hunt a monster on your current floor"
+  },
+  "Chemin hors du dossier d'archives.": {
+    "en": "Path outside the archive folder."
+  },
+  "Choisissez le message…": {
+    "en": "Pick the message…"
   },
   "Choisissez un ou plusieurs membres": {
     "en": "Pick one or more members"
   },
+  "Choisissez un salon textuel du serveur.": {
+    "en": "Pick a text channel on the server."
+  },
+  "Choisissez un salon…": {
+    "en": "Pick a channel…"
+  },
+  "Classement des aventuriers du serveur": {
+    "en": "Leaderboard of the server's adventurers"
+  },
   "Clic droit sur le serveur → Copier l'identifiant": {
     "en": "Right-click the server → Copy ID"
+  },
+  "Client assuré": {
+    "en": "Insured client"
+  },
+  "Comment ouvrir un ticket : menu déroulant de raisons ou boutons": {
+    "en": "How a ticket is opened: a drop-down of reasons, or buttons"
+  },
+  "Comment traiter ce message ?": {
+    "en": "How should this message be handled?"
+  },
+  "Comment traiter les anciens messages ?": {
+    "en": "How should the old messages be handled?"
   },
   "Comté de naissance": {
     "en": "County of birth"
@@ -1271,14 +2390,41 @@
   "Cooldown XP texte en secondes (5 à 3600)": {
     "en": "Text XP cooldown in seconds (5 to 3600)"
   },
+  "Couleur de l'embed (hex, ex : #5865F2)": {
+    "en": "Embed colour (hex, e.g. #5865F2)"
+  },
+  "Couleur du véhicule": {
+    "en": "Vehicle colour"
+  },
+  "Couleurs **uniformisées**": {
+    "en": "Colours **made uniform**"
+  },
+  "Couleurs porteuses de sens **conservées**": {
+    "en": "Colours that carry meaning **kept**"
+  },
   "Coup de cœur": {
     "en": "Shout-out"
+  },
+  "Créateur": {
+    "en": "Creator"
   },
   "Création": {
     "en": "Creation"
   },
+  "Création de l'invitation impossible.": {
+    "en": "Could not create the invite."
+  },
+  "Date d'expiration (JJ/MM/AAAA)": {
+    "en": "Expiry date (DD/MM/YYYY)"
+  },
+  "Date de délivrance (JJ/MM/AAAA, défaut : aujourd'hui)": {
+    "en": "Issue date (DD/MM/YYYY, default: today)"
+  },
   "déconnecté du salon vocal": {
     "en": "disconnected from the voice channel"
+  },
+  "Déjà claim.": {
+    "en": "Already claimed."
   },
   "Délivré le": {
     "en": "Issued on"
@@ -1294,6 +2440,9 @@
   },
   "Département des véhicules à moteur — San Andreas": {
     "en": "Department of Motor Vehicles — San Andreas"
+  },
+  "Dernier passage de la commande": {
+    "en": "Last run of the command"
   },
   "Désactivé, ces commandes sont **retirées de la liste du serveur** — seules les commandes de base du bot restent visibles. ": {
     "en": "When disabled, these commands are **removed from the server list** — only the bot's core commands stay visible. "
@@ -1322,11 +2471,20 @@
   "Description — Entrée = saut de ligne": {
     "en": "Description — Enter = line break"
   },
+  "Description de l'entreprise": {
+    "en": "Company description"
+  },
+  "Description de la raison (affichée dans le menu déroulant)": {
+    "en": "Description of the reason (shown in the drop-down)"
+  },
   "Détenteur": {
     "en": "Holder"
   },
   "Diffusé directement": {
     "en": "Streamed directly"
+  },
+  "Discord **fige** la famille de composants d'un message à sa création — aucune modification ne transforme un embed en carte": {
+    "en": "Discord **freezes** a message's component family at creation — no edit turns an embed into a card"
   },
   "Discord a ignoré ma demande, deux fois de suite.": {
     "en": "Discord ignored my request, twice in a row."
@@ -1337,8 +2495,20 @@
   "discord.js a refusé de l'envoyer à la passerelle. C'est un défaut interne au bot : signalez-le à son créateur avec cette fiche.": {
     "en": "discord.js refused to send it to the gateway. That's an internal bot fault: report it to its creator with this report."
   },
+  "Durée indéterminée": {
+    "en": "No end date"
+  },
+  "échec : ": {
+    "en": "failure: "
+  },
   "Écrit et vocal réunis en un seul niveau.": {
     "en": "Chat and voice combined into a single level."
+  },
+  "embed examiné": {
+    "en": "embed looked at"
+  },
+  "Emoji du bouton/du sélecteur (ex : 🛠️)": {
+    "en": "Emoji for the button/picker (e.g. 🛠️)"
   },
   "Emojis du **serveur**": {
     "en": "Emojis from the **server**"
@@ -1348,6 +2518,24 @@
   },
   "Employés": {
     "en": "Employees"
+  },
+  "Empreinte SHA-256 invalide.": {
+    "en": "Invalid SHA-256 fingerprint."
+  },
+  "En fourrière ?": {
+    "en": "Impounded?"
+  },
+  "Entreprise à assurer": {
+    "en": "Company to insure"
+  },
+  "Entreprise à modifier": {
+    "en": "Company to edit"
+  },
+  "Entreprise à supprimer": {
+    "en": "Company to delete"
+  },
+  "Équiper un badge comme titre (vide = retirer)": {
+    "en": "Equip a badge as your title (empty = remove)"
   },
   "Erreur constructeur de panneau :": {
     "en": "Panel builder error:"
@@ -1361,6 +2549,9 @@
   "et les **nouvelles vidéos/publications** (YouTube, TikTok, X, Reddit) dans le salon choisi.": {
     "en": "and **new videos/posts** (YouTube, TikTok, X, Reddit) in the chosen channel."
   },
+  "étage ": {
+    "en": "floor "
+  },
   "État": {
     "en": "Status"
   },
@@ -1373,14 +2564,44 @@
   "États de service": {
     "en": "Service record"
   },
+  "Faites un choix…": {
+    "en": "Make a choice…"
+  },
   "Fermé par <@": {
     "en": "Closed by <@"
   },
   "Fermer le ticket": {
     "en": "Close the ticket"
   },
+  "Fermer temporairement une raison de ticket (plus ouvrable)": {
+    "en": "Temporarily close a ticket reason (no longer openable)"
+  },
+  "Fichier effacé (rétention ou budget disque).": {
+    "en": "File deleted (retention or disk budget)."
+  },
   "file terminée": {
     "en": "queue finished"
+  },
+  "Filet, bannière, signature et ligne d'auteur **remis à la version du jour**": {
+    "en": "Rule, banner, signature and author line **brought back to today's version**"
+  },
+  "Filtrer par assuré": {
+    "en": "Filter by policyholder"
+  },
+  "Filtrer par entreprise": {
+    "en": "Filter by company"
+  },
+  "Forger / améliorer ton arme avec des Col": {
+    "en": "Forge / upgrade your weapon with Col"
+  },
+  "Format du message du panneau": {
+    "en": "Format of the panel message"
+  },
+  "Garder celle qui a un sens (rouge = sanction…)": {
+    "en": "Keep it if it carries meaning (red = sanction…)"
+  },
+  "Garder celles qui ont un sens (rouge = sanction…)": {
+    "en": "Keep the ones that carry meaning (red = sanction…)"
   },
   "Garry's Mod (DarkRP)": {
     "en": "Garry's Mod (DarkRP)"
@@ -1391,6 +2612,9 @@
   "Gestion des entreprises RP": {
     "en": "RP company management"
   },
+  "Glissez un fichier (photo/GIF/vidéo)": {
+    "en": "Drop a file (photo/GIF/video)"
+  },
   "Grade, unité, remarque…": {
     "en": "Rank, unit, note…"
   },
@@ -1400,8 +2624,26 @@
   "Hommes de main": {
     "en": "Hands"
   },
+  "hors fourrière": {
+    "en": "out of the pound"
+  },
+  "ℹ️ Aucun message du bot avec un embed dans <#": {
+    "en": "ℹ️ No message from the bot with an embed in <#"
+  },
+  "ℹ️ Ce message ne contient aucun embed — il n'y a pas d'habillage à reprendre.": {
+    "en": "ℹ️ This message holds no embed — there is no styling to redo."
+  },
+  "ℹ️ Ce message porte déjà le style actuel.": {
+    "en": "ℹ️ This message already carries the current style."
+  },
+  "ℹ️ Ce message porte déjà le style actuel.\n-# Il garde sa barre colorée car un embed déjà envoyé ne peut pas devenir une carte : utilisez **mode : Recréer**.": {
+    "en": "ℹ️ This message already carries the current style.\n-# It keeps its coloured bar because an embed already sent can never become a card: use **mode: Recréer**."
+  },
   "ℹ️ Ce ticket n'est pris en charge par personne.": {
     "en": "ℹ️ Nobody is handling this ticket."
+  },
+  "ℹ️ Rien à changer : les messages examinés portent déjà le style actuel. Ceux écrits par **un membre** ou **un autre bot** ne sont pas modifiables — Discord ne l'autorise pas.": {
+    "en": "ℹ️ Nothing to change: the messages looked at already carry the current style. Those written by **a member** or **another bot** cannot be edited — Discord does not allow it."
   },
   "ℹ️ Vous avez déjà pris ce ticket en charge.": {
     "en": "ℹ️ You have already claimed this ticket."
@@ -1409,8 +2651,20 @@
   "ID de la carte": {
     "en": "Card ID"
   },
+  "ID Discord invalide (clic droit sur le membre → Copier l'identifiant).": {
+    "en": "Invalid Discord ID (right-click the member → Copy ID)."
+  },
+  "ID Discord invalide.": {
+    "en": "Invalid Discord ID."
+  },
+  "ID utilisateur requis.": {
+    "en": "User ID required."
+  },
   "Idée / suggestion": {
     "en": "Idea / suggestion"
+  },
+  "Identifiant de membre invalide.": {
+    "en": "Invalid member ID."
   },
   "Identifiant du serveur principal": {
     "en": "ID of the main server"
@@ -1418,8 +2672,17 @@
   "Identité": {
     "en": "Identity"
   },
+  "identité désactivée": {
+    "en": "identity switched off"
+  },
   "Il manque une brique audio sur l'hébergeur.": {
     "en": "An audio component is missing on the host."
+  },
+  "Image/GIF de l'embed — uploadée depuis votre PC": {
+    "en": "Embed image/GIF — uploaded from your computer"
+  },
+  "Impossible de lister les membres : ": {
+    "en": "Could not list the members: "
   },
   "Inviter le bot sur votre serveur Discord": {
     "en": "Invite the bot to your Discord server"
@@ -1448,11 +2711,35 @@
   "Laisser vide pour le prochain numéro libre": {
     "en": "Leave empty for the next free number"
   },
+  "Le bot a besoin de « Gérer les webhooks » dans ce salon pour envoyer sous un profil.": {
+    "en": "The bot needs “Manage Webhooks” in this channel to post under a profile."
+  },
+  "Le bot a besoin de la permission « Gérer les webhooks » dans ce salon pour envoyer sous un profil.": {
+    "en": "The bot needs the “Manage Webhooks” permission in this channel to post under a profile."
+  },
+  "Le bot n'a pas le droit d'écrire dans #": {
+    "en": "The bot is not allowed to write in #"
+  },
+  "Le bot n'est plus sur ce serveur.": {
+    "en": "The bot is no longer on this server."
+  },
+  "Le bot n'est sur aucun serveur": {
+    "en": "The bot is on no server"
+  },
+  "Le bot ne peut pas créer d'invitation ici.": {
+    "en": "The bot cannot create an invite here."
+  },
+  "Le créateur du bot ne peut pas être blacklisté.": {
+    "en": "The bot's creator cannot be blacklisted."
+  },
   "Le Module RP regroupe :\n🪪 `/carte` · 🚗 `/permis` · 🏢 `/entreprise` · 🛡️ `/assurance` · 🧑‍💼 `/service` · ⏱️ `/temps`\n\n": {
     "en": "The RP module brings together:\n🪪 `/carte` · 🚗 `/permis` · 🏢 `/entreprise` · 🛡️ `/assurance` · 🧑‍💼 `/service` · ⏱️ `/temps`\n\n"
   },
   "Le palier atteint remplace le précédent.": {
     "en": "The tier reached replaces the previous one."
+  },
+  "le rôle métier": {
+    "en": "the job role"
   },
   "Le salon est plein.": {
     "en": "The channel is full."
@@ -1475,8 +2762,17 @@
   "Licence de port d'arme": {
     "en": "Firearm licence"
   },
+  "Lien du message (clic droit → Copier le lien). Vide = choisir dans une liste": {
+    "en": "Message link (right-click → Copy Link). Empty = pick from a list"
+  },
   "Lien ou recherche": {
     "en": "Link or search"
+  },
+  "Liste des entreprises du serveur": {
+    "en": "List of the server's companies"
+  },
+  "Lister les contrats d'assurance": {
+    "en": "List the insurance policies"
   },
   "Logs sécurité : ": {
     "en": "Security logs: "
@@ -1502,11 +2798,29 @@
   "Matricules RP : relie matricule, pseudo du jeu et compte Discord": {
     "en": "RP service numbers: links number, in-game name and Discord account"
   },
+  "Maximum 25 types (limite des boutons Discord).": {
+    "en": "25 types maximum (Discord's button limit)."
+  },
+  "media (photo/GIF/vidéo)": {
+    "en": "media (photo/GIF/video)"
+  },
   "Mélanger la file d'attente": {
     "en": "Shuffle the queue"
   },
   "Membre (défaut : vous)": {
     "en": "Member (defaults to you)"
+  },
+  "Membre à ajouter au ticket": {
+    "en": "Member to add to the ticket"
+  },
+  "Membre à mettre à la tête de l'entreprise": {
+    "en": "Member to put in charge of the company"
+  },
+  "Membre à retirer de toutes les entreprises": {
+    "en": "Member to remove from every company"
+  },
+  "Membre pour qui ouvrir le ticket": {
+    "en": "Member the ticket is opened for"
   },
   "Message envoyé depuis un pigeon voyageur 🐦": {
     "en": "Message sent by carrier pigeon 🐦"
@@ -1514,11 +2828,47 @@
   "Message personnalisé : variables `{nom}`, `{titre}`, `{lien}`": {
     "en": "Custom message: variables `{nom}`, `{titre}`, `{lien}`"
   },
+  "Message publié dans #": {
+    "en": "Message published in #"
+  },
+  "Message sans titre": {
+    "en": "Message with no title"
+  },
+  "Message vide : écrivez un texte ou remplissez un embed.": {
+    "en": "Empty message: write some text or fill in an embed."
+  },
+  "Message vide : remplissez au moins un champ.": {
+    "en": "Empty message: fill in at least one field."
+  },
+  "Messages à examiner par salon (défaut 100, max 500)": {
+    "en": "Messages to look at per channel (default 100, max 500)"
+  },
   "Mettre en pause": {
     "en": "Pause"
   },
+  "Miniature de l'embed — uploadée depuis votre PC": {
+    "en": "Embed thumbnail — uploaded from your computer"
+  },
+  "mis à jour": {
+    "en": "updated"
+  },
   "Mises à jour : ": {
     "en": "Updates: "
+  },
+  "Modérateur": {
+    "en": "Moderator"
+  },
+  "modifié": {
+    "en": "changed"
+  },
+  "Modifier le dernier panneau publié (texte, embed, boutons)": {
+    "en": "Edit the last published panel (text, embed, buttons)"
+  },
+  "Modifier sur place — garde réactions, épingles et liens": {
+    "en": "Edit in place — keeps reactions, pins and links"
+  },
+  "Modifiés **sur place** : réactions, épingles et liens conservés": {
+    "en": "Edited **in place**: reactions, pins and links kept"
   },
   "Module RP réglé sur ": {
     "en": "RP module set to "
@@ -1544,14 +2894,44 @@
   "Niveau de la récompense à retirer": {
     "en": "Level of the reward to remove"
   },
+  "Nom de grade requis.": {
+    "en": "Rank name required."
+  },
   "Nom de hors-la-loi": {
     "en": "Outlaw name"
+  },
+  "Nom de l'entreprise": {
+    "en": "Company name"
+  },
+  "Nom du profil requis.": {
+    "en": "Profile name required."
+  },
+  "Nom du type (ex : Support, Plainte, Recrutement)": {
+    "en": "Type name (e.g. Support, Complaint, Recruitment)"
   },
   "Nom du type (ex : Support)": {
     "en": "Type name (e.g. Support)"
   },
+  "Nom du type requis.": {
+    "en": "Type name required."
+  },
+  "Non blacklisté.": {
+    "en": "Not blacklisted."
+  },
+  "non recherché": {
+    "en": "not wanted"
+  },
+  "Nouvelle valeur (assurance : oui/non ; type d'assurance : laisser vide)": {
+    "en": "New value (insurance: oui/non; insurance type: leave empty)"
+  },
   "Numéro": {
     "en": "Number"
+  },
+  "Numéro du contrat": {
+    "en": "Policy number"
+  },
+  "Numéro du contrat (voir /assurance liste)": {
+    "en": "Policy number (see /assurance liste)"
   },
   "On ne vous oublie pas… mais vous, si ? 🤔": {
     "en": "We haven't forgotten you… have you forgotten us? 🤔"
@@ -1562,11 +2942,29 @@
   "ont été": {
     "en": "were"
   },
+  "Où en est l'esthétique du bot : réglages, cartes, dernier passage": {
+    "en": "Where the bot's look stands: settings, cards, last run"
+  },
+  "Ou un lien (imgur, GIF, vidéo, YouTube…)": {
+    "en": "Or a link (imgur, GIF, video, YouTube…)"
+  },
+  "ou un rôle à attribuer. Un bouton sans action affiche « Échec de l'interaction » à chaque clic.": {
+    "en": "or a role to give. A button with no action shows “This interaction failed” on every click."
+  },
+  "Ouvrir un ticket au nom d'un membre": {
+    "en": "Open a ticket on a member's behalf"
+  },
+  "Panneau publié dans #": {
+    "en": "Panel published in #"
+  },
   "Panneau publié dans <#": {
     "en": "Panel published in <#"
   },
   "Paramètres": {
     "en": "Settings"
+  },
+  "Pas encore active (du ": {
+    "en": "Not active yet (from "
   },
   "Passer au morceau suivant": {
     "en": "Skip to the next track"
@@ -1577,17 +2975,38 @@
   "Permis délivré par les services de l'État RP": {
     "en": "Licence issued by the RP state authorities"
   },
+  "Permission 🎫 Tickets du QG requise.": {
+    "en": "🎫 HQ Tickets permission required."
+  },
+  "Permission 🚫 Blacklist requise.": {
+    "en": "🚫 Blacklist permission required."
+  },
   "Personne (défaut)": {
     "en": "Nobody (default)"
   },
+  "Personne pour le moment": {
+    "en": "Nobody for now"
+  },
+  "Photo/GIF/vidéo (fichier)": {
+    "en": "Photo/GIF/video (file)"
+  },
+  "Plaque d'immatriculation RP": {
+    "en": "RP number plate"
+  },
   "plus personne dans le salon": {
     "en": "nobody left in the channel"
+  },
+  "Pour les convertir : `/esthetique appliquer mode:Recréer`": {
+    "en": "To convert them: `/esthetique appliquer mode:Recréer`"
   },
   "Prendre votre service RP": {
     "en": "Start your RP duty"
   },
   "Prénom RP": {
     "en": "RP first name"
+  },
+  "Preuves obligatoires pour appliquer une blacklist.": {
+    "en": "Evidence is required to apply a blacklist."
   },
   "Prise en charge": {
     "en": "Claimed by"
@@ -1598,8 +3017,26 @@
   "Publié dans #": {
     "en": "Published in #"
   },
+  "Publié le ": {
+    "en": "Posted on "
+  },
+  "Publier le panneau de tickets dans un salon": {
+    "en": "Publish the ticket panel in a channel"
+  },
   "puis republiez le panneau : `/ticket panneau-modifier`.": {
     "en": "then publish the panel again: `/ticket panneau-modifier`."
+  },
+  "qu'elle doit donner. Une option sans action affiche « Échec de l'interaction ».": {
+    "en": "it should give. An option with no action shows “This interaction failed”."
+  },
+  "Que faire de la couleur existante ?": {
+    "en": "What should be done with the existing colour?"
+  },
+  "Que faire des couleurs existantes ?": {
+    "en": "What should be done with the existing colours?"
+  },
+  "Question obligatoire : l'entreprise propose-t-elle des assurances ?": {
+    "en": "Required question: does the company offer insurance?"
   },
   "Qui vous répond": {
     "en": "Who answers you"
@@ -1607,14 +3044,62 @@
   "Quoi répéter": {
     "en": "What to repeat"
   },
+  "Raison à bloquer": {
+    "en": "Reason to block"
+  },
+  "Raison à réactiver": {
+    "en": "Reason to bring back"
+  },
+  "Rattrapage des rôles automatiques": {
+    "en": "Catching up on the automatic roles"
+  },
+  "réactivée": {
+    "en": "brought back"
+  },
+  "Réactiver une raison de ticket bloquée": {
+    "en": "Bring a blocked ticket reason back"
+  },
+  "Recherché par la police ?": {
+    "en": "Wanted by the police?"
+  },
   "Réclamation": {
     "en": "Complaint"
+  },
+  "Récompenses :\n• **+": {
+    "en": "Rewards:\n• **+"
+  },
+  "Reconstruit les anciens embeds au style actuel, sur TOUS les serveurs": {
+    "en": "Rebuilds the old embeds in the current style, on EVERY server"
+  },
+  "recréer": {
+    "en": "recreate"
+  },
+  "Recréer en carte sans bordure — perd réactions et liens": {
+    "en": "Recreate as a borderless card — loses reactions and links"
+  },
+  "Recréer en cartes sans bordure — perd réactions et liens": {
+    "en": "Recreate as borderless cards — loses reactions and links"
+  },
+  "Recrue à whitelister": {
+    "en": "Recruit to whitelist"
+  },
+  "Récupérer les gains accumulés hors-ligne (AFK)": {
+    "en": "Collect what you earned while offline (AFK)"
   },
   "Red Dead Redemption RP": {
     "en": "Red Dead Redemption RP"
   },
+  "Redémarrez le bot pour réessayer — et vérifiez que sa bibliothèque est à jour": {
+    "en": "Restart the bot to try again — and check that its library is up to date"
+  },
+  "Refaire UN message précis, par lien ou par sélection": {
+    "en": "Redo ONE specific message, by link or by picking it"
+  },
   "Registre de citoyen": {
     "en": "Citizen registry"
+  },
+  "Réglage inconnu : ": {
+    "en": "Unknown setting: "
   },
   "Réglée sur ": {
     "en": "Set to "
@@ -1625,8 +3110,14 @@
   "Rejoignez d'abord un salon vocal.": {
     "en": "Join a voice channel first."
   },
+  "Rejoindre Aincrad et créer ton personnage": {
+    "en": "Join Aincrad and create your character"
+  },
   "Relancé par ": {
     "en": "Nudged by "
+  },
+  "Rendu valide — rien n'a été publié.": {
+    "en": "Render is valid — nothing was published."
   },
   "Répéter le morceau ou toute la file": {
     "en": "Repeat the track or the whole queue"
@@ -1634,17 +3125,38 @@
   "Reprendre la lecture": {
     "en": "Resume playback"
   },
+  "Republiez le panneau (/ticket panneau) pour afficher la nouvelle raison.": {
+    "en": "Publish the panel again (/ticket panneau) to show the new reason."
+  },
   "Réputation": {
     "en": "Reputation"
   },
   "Réseaux sociaux": {
     "en": "Social networks"
   },
+  "Réservé au créateur du bot.": {
+    "en": "Bot creator only."
+  },
+  "Reste à convertir": {
+    "en": "Still to convert"
+  },
+  "Résultat global": {
+    "en": "Overall result"
+  },
+  "Résumé": {
+    "en": "Summary"
+  },
   "retiré": {
     "en": "removed"
   },
+  "retiré de": {
+    "en": "removed from"
+  },
   "retiré(s) du": {
     "en": "removed from the"
+  },
+  "Retirer quelqu'un de la whitelist : le bot lui retire le rôle métier": {
+    "en": "Take someone off the whitelist: the bot removes their job role"
   },
   "Retirer quelqu'un du ticket": {
     "en": "Remove someone from the ticket"
@@ -1655,6 +3167,15 @@
   "Retirer un morceau de la file": {
     "en": "Remove a track from the queue"
   },
+  "Retirer un type de ticket": {
+    "en": "Remove a ticket type"
+  },
+  "Retrait de la whitelist par ": {
+    "en": "Taken off the whitelist by "
+  },
+  "Retrait du ban global via le dashboard": {
+    "en": "Global ban lifted from the dashboard"
+  },
   "Retrouver quelqu'un par matricule, pseudo du jeu ou pseudo Discord": {
     "en": "Find someone by service number, in-game name or Discord name"
   },
@@ -1663,6 +3184,30 @@
   },
   "Rôle donné automatiquement quand le staff whiteliste RP quelqu'un (`/whitelistrp ajouter`) : ": {
     "en": "Role given automatically when staff RP-whitelists someone (`/whitelistrp ajouter`): "
+  },
+  "Rôle gérant à retirer (omis = tout supprimer)": {
+    "en": "Manager role to remove (leave out = remove everything)"
+  },
+  "Rôle gérant autorisé (ex : @Gérant Police)": {
+    "en": "Manager role allowed (e.g. @Police manager)"
+  },
+  "Rôle invalide.": {
+    "en": "Invalid role."
+  },
+  "Rôle métier": {
+    "en": "Job role"
+  },
+  "Rôle métier (ex : @Policier)": {
+    "en": "Job role (e.g. @Police officer)"
+  },
+  "Rôle métier à attribuer (ex : @Policier)": {
+    "en": "Job role to give (e.g. @Police officer)"
+  },
+  "Rôle métier à retirer": {
+    "en": "Job role to remove"
+  },
+  "Rôle qui voit et gère ces tickets": {
+    "en": "Role that sees and handles these tickets"
   },
   "Rôles": {
     "en": "Roles"
@@ -1676,11 +3221,23 @@
   "Salon du panneau": {
     "en": "Board channel"
   },
+  "Salon du panneau (défaut : ici)": {
+    "en": "Panel channel (default: here)"
+  },
   "Sans équivalent trouvé": {
     "en": "No match found"
   },
+  "Santé": {
+    "en": "Health"
+  },
   "Sécurité": {
     "en": "Security"
+  },
+  "Serveur introuvable (le bot y est-il ?).": {
+    "en": "Server not found (is the bot on it?)."
+  },
+  "Serveur introuvable (le bot y est-il encore ?).": {
+    "en": "Server not found (is the bot still on it?)."
   },
   "Seul le **propriétaire** du serveur peut l'accepter — un administrateur peut être nommé le matin et parti le soir.": {
     "en": "Only the server **owner** can accept it — an administrator can be appointed in the morning and gone by the evening."
@@ -1730,14 +3287,23 @@
   "Système de prise/fin de service RP": {
     "en": "RP duty clock-in / clock-out"
   },
+  "Te soigner à l'auberge (coûte des Col)": {
+    "en": "Heal up at the inn (costs Col)"
+  },
   "Terminer votre service RP": {
     "en": "End your RP duty"
   },
   "Tester la connexion vocale et dire précisément où elle bloque": {
     "en": "Test the voice connection and pinpoint where it fails"
   },
+  "Texte affiché dans le menu déroulant": {
+    "en": "Text shown in the drop-down"
+  },
   "Théâtre d'opérations": {
     "en": "Theatre of operations"
+  },
+  "Ticket déjà traité.": {
+    "en": "Ticket already handled."
   },
   "Ticket fermé — suppression automatique": {
     "en": "Ticket closed — automatic deletion"
@@ -1751,6 +3317,9 @@
   "Ticket supprimé": {
     "en": "Ticket deleted"
   },
+  "Titre équipé : ": {
+    "en": "Title equipped: "
+  },
   "Top 10 du serveur": {
     "en": "Server top 10"
   },
@@ -1763,6 +3332,12 @@
   "Tout le serveur": {
     "en": "The whole server"
   },
+  "Tout repart en **embed classique**, barre colorée comprise": {
+    "en": "Everything falls back to a **classic embed**, coloured bar included"
+  },
+  "Tout uniformiser sur la couleur d'accent": {
+    "en": "Bring everything to the accent colour"
+  },
   "Toute la file": {
     "en": "The whole queue"
   },
@@ -1772,8 +3347,23 @@
   "trop d'échecs de lecture": {
     "en": "too many playback failures"
   },
+  "Tu possèdes déjà **l'arme la plus puissante** d'Aincrad !": {
+    "en": "You already own **the most powerful weapon** in Aincrad!"
+  },
+  "Tu tombes au combat (perte de **": {
+    "en": "You fall in battle (losing **"
+  },
+  "Type / raison du ticket": {
+    "en": "Ticket type / reason"
+  },
+  "Type à retirer": {
+    "en": "Type to remove"
+  },
   "Types de tickets, catégories, rôles support": {
     "en": "Ticket types, categories, support roles"
+  },
+  "Un embed déjà envoyé ne peut pas devenir une carte : `/esthetique appliquer mode:Recréer`": {
+    "en": "An embed already sent can never become a card: `/esthetique appliquer mode:Recréer`"
   },
   "Un petit signe de vie ? 👋": {
     "en": "Any sign of life? 👋"
@@ -1781,14 +3371,38 @@
   "Une minute passée en vocal rapporte autant qu'un message écrit : il n'y a qu'**un seul niveau**.\n": {
     "en": "A minute spent in voice is worth as much as a written message: there is only **one level**.\n"
   },
+  "Uniformiser sur la couleur d'accent": {
+    "en": "Bring it to the accent colour"
+  },
   "Unité": {
     "en": "Unit"
+  },
+  "Unité (n° d'appartement, étage…)": {
+    "en": "Unit (flat number, floor…)"
   },
   "Unité de rattachement": {
     "en": "Assigned unit"
   },
+  "URL d'avatar invalide.": {
+    "en": "Invalid avatar URL."
+  },
   "URL de l'image (laisser vide pour retirer)": {
     "en": "Image URL (leave empty to remove)"
+  },
+  "URL photo/GIF/vidéo": {
+    "en": "Photo/GIF/video URL"
+  },
+  "Utilisateur immunisé — blacklist refusée.": {
+    "en": "Immune user — blacklist refused."
+  },
+  "Utilisateur immunisé (créateur ou liste d'immunité) — blacklist refusée.": {
+    "en": "Immune user (creator or immunity list) — blacklist refused."
+  },
+  "Valeur numérique attendue.": {
+    "en": "A number was expected."
+  },
+  "Véhicule (marque/modèle)": {
+    "en": "Vehicle (make/model)"
   },
   "Ville de naissance": {
     "en": "City of birth"
@@ -1799,14 +3413,35 @@
   "Voir le niveau d'un membre": {
     "en": "View a member's level"
   },
+  "Voir les badges d'aventurier": {
+    "en": "See the adventurer badges"
+  },
   "Voir les détails du ticket": {
     "en": "View the ticket details"
   },
   "Voir les informations d'un membre (visible uniquement par vous)": {
     "en": "View a member's information (only visible to you)"
   },
+  "Voir les membres whitelistés d'un rôle métier": {
+    "en": "See the whitelisted members of a job role"
+  },
+  "Voir les rôles métier que vous êtes autorisé à attribuer": {
+    "en": "See the job roles you are allowed to give out"
+  },
+  "Voir les types de tickets configurés": {
+    "en": "See the ticket types that are set up"
+  },
+  "Voir ta fiche d'aventurier (ou celle d'un membre)": {
+    "en": "See your adventurer sheet (or a member's)"
+  },
+  "Voir un contrat d'assurance (validité, photo, statut police)": {
+    "en": "View an insurance policy (validity, photo, police status)"
+  },
   "Votre connexion a dû tomber dans un ravin 📉": {
     "en": "Your connection must have fallen off a cliff 📉"
+  },
+  "Votre entreprise d'assurance": {
+    "en": "Your insurance company"
   },
   "Votre ticket prend la poussière 🧹": {
     "en": "Your ticket is gathering dust 🧹"
@@ -1814,8 +3449,17 @@
   "Vue d'ensemble de la configuration. Choisissez une **catégorie** dans le menu ci-dessous pour la modifier.": {
     "en": "An overview of the configuration. Pick a **category** in the menu below to change it."
   },
+  "Whitelist métier : attribution des rôles par les gérants autorisés": {
+    "en": "Job whitelist: roles given out by the managers who are allowed to"
+  },
   "Whitelist métiers": {
     "en": "Job whitelist"
+  },
+  "whitelisté": {
+    "en": "whitelisted"
+  },
+  "Whitelister une recrue : le bot lui attribue le rôle métier": {
+    "en": "Whitelist a recruit: the bot gives them the job role"
   },
   "XP par message et par minute de vocal (1 à 1000)": {
     "en": "XP per message and per minute in voice (1 to 1000)"
