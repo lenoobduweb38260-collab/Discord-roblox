@@ -33,8 +33,55 @@ function table() {
 // tableau de bord, sans redémarrer le bot.
 function recharger() {
   _table = null;
+  _motifs.clear();
   try { delete require.cache[require.resolve('./traductions.json')]; } catch {}
   return Object.keys(table()).length;
+}
+
+// Un texte construit par morceaux — `✅ ${membre} a été ajouté au ticket.` —
+// n'apparaît JAMAIS entier dans le dictionnaire : à l'exécution il porte un
+// pseudo au milieu, et il change à chaque envoi. La recherche exacte le rate
+// donc systématiquement, et c'est la moitié des phrases du bot.
+//
+// On rattrape ces textes en remplaçant les MORCEAUX connus. Ce sont
+// exactement les morceaux fixes que le relevé extrait des gabarits : ils
+// arrivent à l'écran tels quels, séparés par des valeurs.
+//
+// Deux garde-fous :
+//  • On n'essaie qu'après l'échec de la recherche exacte — une phrase connue
+//    entièrement est toujours traduite d'un bloc, jamais recousue.
+//  • Les morceaux d'un seul mot court sont écartés : « Aucun » ou « Piste »
+//    se retrouveraient dans le texte écrit par un membre. Un morceau doit
+//    porter un espace, ou faire au moins dix signes.
+const MIN_MORCEAU = 4;
+const _motifs = new Map();
+
+function motifDe(langue) {
+  if (_motifs.has(langue)) return _motifs.get(langue);
+  const t = table();
+  const morceaux = Object.keys(t)
+    .filter((k) => {
+      const v = t[k]?.[langue];
+      if (typeof v !== 'string' || !v.trim()) return false;
+      const l = k.length;
+      return l >= MIN_MORCEAU && (l >= 10 || /\s/.test(k));
+    })
+    // Le plus long d'abord : une alternance d'expression régulière retient
+    // la PREMIÈRE branche qui marche, pas la plus longue. Sans ce tri,
+    // « a été » gagnerait contre « a été ajouté au ticket. ».
+    .sort((a, b) => b.length - a.length);
+  const motif = morceaux.length
+    ? new RegExp(morceaux.map((m) => m.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|'), 'g')
+    : null;
+  _motifs.set(langue, motif);
+  return motif;
+}
+
+function traduireMorceaux(texte, langue) {
+  const motif = motifDe(langue);
+  if (!motif) return texte;
+  motif.lastIndex = 0;
+  return texte.replace(motif, (m) => table()[m]?.[langue] || m);
 }
 
 // Traduit UNE chaîne. Renvoie l'original si rien n'est connu : un texte
@@ -44,7 +91,8 @@ function traduireTexte(texte, langue) {
   if (langue === DEFAUT || !texte) return texte;
   const t = table()[texte];
   const trouve = t?.[langue];
-  return typeof trouve === 'string' && trouve.trim() ? trouve : texte;
+  if (typeof trouve === 'string' && trouve.trim()) return trouve;
+  return traduireMorceaux(texte, langue);
 }
 
 // Les champs qu'on visite. Tout le reste — identifiants, valeurs, URL,
@@ -105,4 +153,4 @@ function couverture() {
   return { total: textes.length, parLangue };
 }
 
-module.exports = { traduireCorps, traduireTexte, traduireEmbed, traduireComposants, couverture, recharger, table, langueDe };
+module.exports = { traduireCorps, traduireMorceaux, traduireTexte, traduireEmbed, traduireComposants, couverture, recharger, table, langueDe };

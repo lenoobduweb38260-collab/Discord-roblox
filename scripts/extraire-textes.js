@@ -44,24 +44,134 @@ function estAffiche(texte) {
 }
 
 // Découpe un fichier en chaînes littérales, en gardant la ligne d'origine.
+//
+// ⚠️ On lit CARACTÈRE PAR CARACTÈRE, pas avec des expressions régulières.
+// Trois raisons, toutes déjà payées :
+//
+//  • Un gabarit `… ${x} …` échappe à une expression régulière qui refuse le
+//    `$`. La règle des apostrophes prend alors le relais et relève le morceau
+//    ENTRE deux apostrophes : dans « c'est le demandeur : … plutôt que de
+//    l'en sortir » elle sortait « est le demandeur : … plutôt que de l ».
+//    Un texte qui n'existe pas, à faire traduire pour rien.
+//  • Les morceaux FIXES d'un gabarit sont du vrai texte affiché. « a été
+//    ajouté au ticket. » doit être relevé : c'est ainsi qu'il arrive à
+//    l'écran, et donc ainsi qu'il faut le chercher dans le dictionnaire.
+//  • `\n` dans le code est un VRAI saut de ligne à l'exécution. Le garder
+//    sous forme de deux caractères donnait une clé qui ne correspondait à
+//    aucun message réel : la traduction ne sortait jamais.
+
+const ECHAPPES = { n: '\n', t: '\t', r: '\r', b: '\b', f: '\f', v: '\v', 0: '\0' };
+// Ce qui peut précéder une expression régulière. Ni `)` ni `]` ni une lettre :
+// après eux, `/` est une division.
+const AVANT_REGEX = /[(,=:[!&|?{};+\-*%~^<>]/;
+// … ou un mot-clé : `return /…/` est une expression régulière, pas une division.
+const MOTS_REGEX = new Set(['return', 'typeof', 'case', 'in', 'of', 'do', 'else', 'void', 'delete', 'instanceof', 'yield', 'await']);
+
+// Le mot qui précède la position donnée, espaces sautés.
+function motAvant(source, i) {
+  let j = i - 1;
+  while (j >= 0 && /\s/.test(source[j])) j -= 1;
+  let fin = j + 1;
+  while (j >= 0 && /[A-Za-z]/.test(source[j])) j -= 1;
+  return source.slice(j + 1, fin);
+}
+
 function chainesDe(source) {
   const trouvees = [];
-  const lignes = source.split('\n');
-  lignes.forEach((ligne, i) => {
-    // On saute les commentaires : ils ne s'affichent pas.
-    if (/^\s*(\/\/|\*|\/\*)/.test(ligne)) return;
-    const motifs = [
-      /'((?:[^'\\]|\\.)*)'/g,
-      /"((?:[^"\\]|\\.)*)"/g,
-      /`((?:[^`\\$]|\\.)*)`/g,
-    ];
-    for (const re of motifs) {
-      for (const m of ligne.matchAll(re)) {
-        const brut = m[1].replace(/\\'/g, "'").replace(/\\"/g, '"');
-        if (estAffiche(brut)) trouvees.push({ texte: brut, ligne: i + 1 });
+  const n = source.length;
+  let i = 0;
+  let ligne = 1;
+  let precedent = '';
+  // Le bas de pile est le code du fichier ; chaque gabarit ouvert empile un
+  // cadre, et chaque `${` empile à son tour un cadre de code.
+  const pile = [{ mode: 'code', profondeur: 0 }];
+
+  const emettre = (texte, l) => { if (estAffiche(texte)) trouvees.push({ texte, ligne: l }); };
+
+  while (i < n) {
+    const cadre = pile[pile.length - 1];
+    const c = source[i];
+
+    // ── Dans un gabarit : on accumule jusqu'au ` ou au ${
+    if (cadre.mode === 'gabarit') {
+      if (c === '\\') {
+        if (source[i + 1] === '\n') ligne += 1;
+        cadre.texte += ECHAPPES[source[i + 1]] ?? source[i + 1];
+        i += 2; continue;
       }
+      if (c === '`') { emettre(cadre.texte, cadre.ligne); pile.pop(); precedent = '`'; i += 1; continue; }
+      if (c === '$' && source[i + 1] === '{') {
+        emettre(cadre.texte, cadre.ligne);
+        cadre.texte = '';
+        pile.push({ mode: 'code', profondeur: 0 });
+        precedent = '{'; i += 2; continue;
+      }
+      if (c === '\n') ligne += 1;
+      cadre.texte += c; i += 1; continue;
     }
-  });
+
+    // ── Dans du code
+    if (c === '\n') { ligne += 1; i += 1; continue; }
+    if (c === ' ' || c === '\t' || c === '\r') { i += 1; continue; }
+
+    if (c === '/' && source[i + 1] === '/') { while (i < n && source[i] !== '\n') i += 1; continue; }
+    if (c === '/' && source[i + 1] === '*') {
+      i += 2;
+      while (i < n && !(source[i] === '*' && source[i + 1] === '/')) { if (source[i] === '\n') ligne += 1; i += 1; }
+      i += 2; continue;
+    }
+
+    // Une expression régulière : son contenu n'est pas du texte, et ses
+    // apostrophes ne doivent surtout pas ouvrir une fausse chaîne.
+    if (c === '/' && (precedent === '' || AVANT_REGEX.test(precedent) || MOTS_REGEX.has(motAvant(source, i)))) {
+      i += 1;
+      let classe = false;
+      while (i < n && source[i] !== '\n') {
+        if (source[i] === '\\') { i += 2; continue; }
+        if (source[i] === '[') classe = true;
+        else if (source[i] === ']') classe = false;
+        else if (source[i] === '/' && !classe) { i += 1; break; }
+        i += 1;
+      }
+      while (i < n && /[a-z]/.test(source[i])) i += 1;
+      precedent = '/'; continue;
+    }
+
+    if (c === "'" || c === '"') {
+      const debut = ligne;
+      let texte = '';
+      i += 1;
+      while (i < n) {
+        const d = source[i];
+        if (d === '\\') {
+          if (source[i + 1] === '\n') ligne += 1;
+          texte += ECHAPPES[source[i + 1]] ?? source[i + 1];
+          i += 2; continue;
+        }
+        if (d === c) { i += 1; break; }
+        if (d === '\n') { ligne += 1; i += 1; break; } // chaîne non close : on abandonne
+        texte += d; i += 1;
+      }
+      emettre(texte, debut);
+      precedent = c; continue;
+    }
+
+    if (c === '`') { pile.push({ mode: 'gabarit', ligne, texte: '' }); i += 1; continue; }
+
+    if (c === '{') { cadre.profondeur += 1; precedent = '{'; i += 1; continue; }
+    if (c === '}') {
+      if (cadre.profondeur === 0 && pile.length > 1) {
+        pile.pop();
+        const gabarit = pile[pile.length - 1];
+        gabarit.ligne = ligne;      // le morceau suivant commence ici
+        precedent = '}'; i += 1; continue;
+      }
+      cadre.profondeur = Math.max(0, cadre.profondeur - 1);
+      precedent = '}'; i += 1; continue;
+    }
+
+    precedent = c; i += 1;
+  }
   return trouvees;
 }
 
@@ -77,7 +187,10 @@ const USAGES_RISQUES = [
   (t) => new RegExp(`===\\s*['"\`]${echapper(t)}['"\`]`),
   (t) => new RegExp(`['"\`]${echapper(t)}['"\`]\\s*===`),
   (t) => new RegExp(`\\.(?:includes|has|get|set|startsWith|endsWith)\\(\\s*['"\`]${echapper(t)}['"\`]`),
-  (t) => new RegExp(`['"\`]${echapper(t)}['"\`]\\s*:`),
+  // ⚠️ Une clé d'objet, PAS un ternaire. `ajout ? 'ajouté(s) au' : 'retiré(s) du'`
+  // finit lui aussi par un deux-points : sans l'accroche `{` ou `,`, ces deux
+  // morceaux de phrase étaient déclarés « valeur technique, ne pas traduire ».
+  (t) => new RegExp(`(?:^|[{,])\\s*['"\`]${echapper(t)}['"\`]\\s*:`, 'm'),
   (t) => new RegExp(`case\\s+['"\`]${echapper(t)}['"\`]`),
 ];
 const echapper = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -107,7 +220,16 @@ function relever() {
   const catalogue = [];
   // manager/index.js embarque une page web entière : ses chaînes sont du HTML,
   // pas des messages du bot.
-  const ecartes = new Set(['manager/index.js', 'utils/patchNotes.js']);
+  // utils/langues.js et traductions.json SONT le dictionnaire : les relever
+  // reviendrait à demander de traduire les traductions.
+  // commands/interact.js porte ses propres traductions et suit la langue
+  // Discord de chaque membre, pas celle du serveur : le relever ferait
+  // retraduire des phrases déjà écrites en anglais, en espagnol et en
+  // allemand dans le fichier lui-même.
+  const ecartes = new Set([
+    'manager/index.js', 'utils/patchNotes.js', 'utils/langues.js',
+    'utils/traduire.js', 'commands/interact.js',
+  ]);
   for (const fichier of parcourir(RACINE).sort()) {
     const rel = path.relative(RACINE, fichier).replace(/\\/g, '/');
     if (ecartes.has(rel)) continue;

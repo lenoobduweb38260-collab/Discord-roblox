@@ -16,7 +16,13 @@ const { repondreVite, mettreAJour, suivre } = require('../utils/reponse');
 // « Rendre » / « Rejeter », badges par paliers envoyés en MP, et textes
 // TRADUITS AUTOMATIQUEMENT selon la langue Discord de chaque utilisateur.
 
-// ----- Traductions (fr / en / es / de, repli anglais) -----
+// ----- Traductions (fr / en / es / de / ru, repli anglais) -----
+//
+// ⚠️ Ce fichier porte ses PROPRES traductions, et il suit la langue Discord
+// de chaque membre — pas la langue du serveur. Deux personnes lisent donc le
+// même message dans deux langues. Le dictionnaire commun
+// (`src/utils/traductions.json`) ne le concerne pas : le relevé l'écarte,
+// sans quoi on ferait retraduire des phrases déjà traduites ici.
 const LOCALES = {
   fr: {
     actions: {
@@ -110,6 +116,29 @@ const LOCALES = {
     badgesEmpty: 'Noch keine Abzeichen — nutze `/interact`, um welche freizuschalten (Stufen: 10, 50, 100, 250, 500)!',
     uses: 'Nutzungen',
   },
+  ru: {
+    actions: {
+      kiss: { name: 'Поцелуи', phrase: (a, b) => `💋 **${a}** целует **${b}**!`, count: (n) => `💞 Они целовались **${n}** раз.`, back: '💋 Поцеловать в ответ' },
+      peck: { name: 'Поцелуи', phrase: (a, b) => `😚 **${a}** целует **${b}** в щёку!`, count: (n) => `💞 Они целовались **${n}** раз.`, back: '😚 Поцеловать в ответ' },
+      hug: { name: 'Объятия', phrase: (a, b) => `🤗 **${a}** обнимает **${b}**!`, count: (n) => `🫂 Они обнялись **${n}** раз.`, back: '🤗 Обнять в ответ' },
+      pat: { name: 'Поглаживания', phrase: (a, b) => `🖐️ **${a}** нежно гладит **${b}** по голове.`, count: (n) => `✨ **${n}** поглаживаний.`, back: '🖐️ Погладить в ответ' },
+      bite: { name: 'Укусы', phrase: (a, b) => `😬 **${a}** игриво кусает **${b}**!`, count: (n) => `🦷 **${n}** укусов.`, back: '😬 Укусить в ответ' },
+      lick: { name: 'Облизывания', phrase: (a, b) => `👅 **${a}** облизывает **${b}**… шалун!`, count: (n) => `👅 **${n}** облизываний.`, back: '👅 Облизать в ответ' },
+    },
+    reject: 'Отказать',
+    rejected: (a, b) => `💔 ${a} отклонил(а) действие от ${b}… ай.`,
+    onlyTarget: '⛔ Ответить на это действие может только тот, к кому оно обращено.',
+    self: '😅 В одиночку так не получится… выберите кого-нибудь другого!',
+    otherBot: '🤖 У других ботов нет чувств… кажется.',
+    botAccept: '😳 *краснеет* … принято!',
+    noGif: '⚠️ GIF временно недоступен',
+    anime: 'Аниме: ',
+    badgeTitle: '🏅 Новый значок получен!',
+    badgeDesc: (emoji, nom, action, n) => `${emoji} Значок **${nom}** — категория **${action}**\nВы использовали это действие **${n}** раз. Так держать!`,
+    badgesTitle: '🏅 Ваши значки взаимодействий',
+    badgesEmpty: 'Пока значков нет — используйте `/interact`, чтобы их открыть (рубежи: 10, 50, 100, 250, 500)!',
+    uses: 'использований',
+  },
 };
 
 function resolveLang(locale) {
@@ -117,16 +146,17 @@ function resolveLang(locale) {
   if (code.startsWith('fr')) return 'fr';
   if (code.startsWith('es')) return 'es';
   if (code.startsWith('de')) return 'de';
+  if (code.startsWith('ru')) return 'ru';
   return 'en';
 }
 
 // ----- Badges par paliers d'utilisation (envoyés en MP) -----
 const BADGE_LEVELS = [
-  { seuil: 10, emoji: '🥉', noms: { fr: 'Bronze', en: 'Bronze', es: 'Bronce', de: 'Bronze' } },
-  { seuil: 50, emoji: '🥈', noms: { fr: 'Argent', en: 'Silver', es: 'Plata', de: 'Silber' } },
-  { seuil: 100, emoji: '🥇', noms: { fr: 'Or', en: 'Gold', es: 'Oro', de: 'Gold' } },
-  { seuil: 250, emoji: '💎', noms: { fr: 'Platine', en: 'Platinum', es: 'Platino', de: 'Platin' } },
-  { seuil: 500, emoji: '👑', noms: { fr: 'Légende', en: 'Legend', es: 'Leyenda', de: 'Legende' } },
+  { seuil: 10, emoji: '🥉', noms: { fr: 'Bronze', en: 'Bronze', es: 'Bronce', de: 'Bronze', ru: 'Бронза' } },
+  { seuil: 50, emoji: '🥈', noms: { fr: 'Argent', en: 'Silver', es: 'Plata', de: 'Silber', ru: 'Серебро' } },
+  { seuil: 100, emoji: '🥇', noms: { fr: 'Or', en: 'Gold', es: 'Oro', de: 'Gold', ru: 'Золото' } },
+  { seuil: 250, emoji: '💎', noms: { fr: 'Platine', en: 'Platinum', es: 'Platino', de: 'Platin', ru: 'Платина' } },
+  { seuil: 500, emoji: '👑', noms: { fr: 'Légende', en: 'Legend', es: 'Leyenda', de: 'Legende', ru: 'Легенда' } },
 ];
 
 const bumpPair = db.prepare(`

@@ -162,6 +162,49 @@ console.log('\n9) Branchements');
   V('… et des images en pièce jointe', /addAttachmentOption/.test(an));
 }
 
+console.log('\n10) Le relevé lit vraiment le JavaScript');
+{
+  // Les trois pièges qui faisaient relever de faux textes — et en rater de vrais.
+  const BT = String.fromCharCode(96);
+  const gabarit = 'const a = ' + BT + '<@${id}> — c\'est le **demandeur** : fermez le ticket plutôt que de l\'en sortir' + BT + ';';
+  const vus = extracteur.chainesDe(gabarit).map((c) => c.texte);
+  V('une apostrophe dans un gabarit n\'ouvre pas une fausse chaîne',
+    !vus.some((t) => t.startsWith('est le **demandeur**')), vus.join(' | '));
+  V('… le morceau fixe du gabarit, lui, est relevé',
+    vus.some((t) => t.includes('c\'est le **demandeur**')), vus.join(' | '));
+
+  const saut = extracteur.chainesDe('const b = "Première ligne.\\nSeconde ligne.";').map((c) => c.texte);
+  V('\\n est décodé en vrai saut de ligne', saut.some((t) => t.includes('\n')), JSON.stringify(saut));
+  V('… et pas laissé en deux caractères', !saut.some((t) => t.includes('\\n')));
+
+  const gab2 = 'const c = ' + BT + '✅ ${qui} a été ajouté au salon réservé.' + BT + ';';
+  const morceaux = extracteur.chainesDe(gab2).map((c) => c.texte);
+  V('les morceaux fixes d\'un gabarit sont relevés',
+    morceaux.some((t) => t.includes('a été ajouté au salon')), morceaux.join(' | '));
+
+  const ternaire = 'const d = ajout ? \'ajouté(s) au\' : \'retiré(s) du\';';
+  V('une branche de ternaire n\'est pas prise pour une clé d\'objet',
+    !extracteur.estRisque('ajouté(s) au', ternaire));
+  V('… mais une vraie clé d\'objet reste protégée',
+    extracteur.estRisque('Rôle staff', 'const e = { \'Rôle staff\': 1 };'));
+}
+
+console.log('\n11) Les phrases construites par morceaux');
+{
+  // `✅ ${membre} a été ajouté au ticket.` ne figure jamais entier dans le
+  // dictionnaire : sans le rattrapage par morceaux, il resterait en français.
+  const phrase = '✅ <@42> a été ajouté au ticket.';
+  const en = TR.traduireTexte(phrase, 'en');
+  V('une phrase à trous est traduite morceau par morceau', /was added to the ticket/.test(en), en);
+  V('… la valeur au milieu reste intacte', en.includes('<@42>'), en);
+  V('… et le français n\'y survit pas', !/a été ajouté/.test(en), en);
+
+  V('un texte inconnu revient tel quel',
+    TR.traduireTexte('phrase absolument inconnue du dictionnaire', 'en') === 'phrase absolument inconnue du dictionnaire');
+  V('la langue source ne passe jamais par le dictionnaire',
+    TR.traduireTexte('🎫 Contenu du panneau', 'fr') === '🎫 Contenu du panneau');
+}
+
 fs.rmSync(RACINE, { recursive: true, force: true });
 console.log(`\n${ko === 0 ? '✅' : '❌'} ${ok} réussis, ${ko} échoués`);
 process.exit(ko === 0 ? 0 : 1);
