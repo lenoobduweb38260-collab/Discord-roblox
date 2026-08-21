@@ -20,6 +20,7 @@ const { isCreator } = require('./botTeam');
 const { mettreAJour, suivre } = require('./reponse');
 const { diagnostiquerRecompenses, definirRecompense, effacerRecompense } = require('./levels');
 const { themeParCle, listeThemes, CLES } = require('./rpThemes');
+const LG = require('./langues');
 const { lien: lienCommunaute, demanderLiaison, delier } = require('./communaute');
 const M = require('./miseEnPage');
 
@@ -509,6 +510,28 @@ function rpView(guild) {
       + '-# Relier fait des entreprises RP un bien commun aux serveurs d\'une même communauté. '
       + 'Seul le **propriétaire** du serveur peut l\'accepter — un administrateur peut être nommé le matin et parti le soir.',
   });
+  // 🌍 Langue du bot. Le français est la langue SOURCE : tout est écrit dedans,
+  // et une traduction manquante y retombe. Le compte affiché ne triche pas —
+  // un bot à moitié traduit ment davantage qu'un bot resté en français.
+  const langue = LG.langueDe(guild.id);
+  const T2 = LG.LANGUES[langue];
+  let couv = null;
+  try { couv = require('./traduire').couverture(); } catch { couv = null; }
+  embed.addFields({
+    name: '🌍 Langue du bot',
+    value: `${T2.drapeau} **${T2.nom}**\n`
+      + (langue === LG.DEFAUT
+        ? '-# Langue d\'origine : tous les messages sont écrits dedans.'
+        : `-# ${couv ? `${couv.parLangue[langue] || 0} texte(s) traduit(s)` : 'Traductions chargées'} — le reste s'affiche en français.`),
+  });
+  const rowLangue = new ActionRowBuilder().addComponents(
+    new StringSelectMenuBuilder()
+      .setCustomId('cfglangue')
+      .setPlaceholder(`🌍 Langue du bot — actuellement ${T2.nom}`)
+      .addOptions(LG.liste().map((l) => ({
+        label: l.nom, value: l.cle, emoji: l.drapeau, default: l.cle === langue,
+      })))
+  );
   const rowLien = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('cfgcomm').setLabel(L?.statut === 'valide' ? '🔗 Changer de communauté' : '🏢 Relier à une communauté').setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId('cfgcommoff').setLabel('🔒 Garder les entreprises ici').setStyle(ButtonStyle.Secondary).setDisabled(!L)
@@ -529,7 +552,7 @@ function rpView(guild) {
     new ButtonBuilder().setCustomId('cfgsaoon').setLabel('Activer l\'Aventure SAO').setEmoji('⚔️').setStyle(ButtonStyle.Success).setDisabled(saoOn),
     new ButtonBuilder().setCustomId('cfgsaooff').setLabel('Désactiver').setEmoji('🔴').setStyle(ButtonStyle.Danger).setDisabled(!saoOn)
   );
-  return { embeds: [embed], components: [row, rowLien, rowJeu, rowInteract, backRow()] };
+  return { embeds: [embed], components: [row, rowLangue, rowJeu, rowLien, backRow()] };
 }
 
 // ----- Catégorie : réseaux sociaux (annonces lives / nouvelles vidéos) -----
@@ -951,6 +974,19 @@ async function handleConfigInteraction(interaction) {
         interaction.guild,
         logEmbed('🎮 Module Interactions', `Interactions ${enable ? 'activées' : 'désactivées'} par <@${interaction.user.id}>.`, enable ? COLORS.SUCCESS : COLORS.DANGER)
       );
+      return;
+    }
+
+    // 🌍 Langue du bot.
+    if (id === 'cfglangue') {
+      const choix = LG.CLES.includes(interaction.values?.[0]) ? interaction.values[0] : LG.DEFAUT;
+      setGuildConfig(interaction.guildId, 'bot_langue', choix);
+      await mettreAJour(interaction, rpView(interaction.guild));
+      const L2 = LG.LANGUES[choix];
+      await sendLog(interaction.guild, logEmbed('🌍 Langue du bot',
+        `Réglée sur ${L2.drapeau} **${L2.nom}** par <@${interaction.user.id}>.`
+        + (choix === LG.DEFAUT ? '' : '\n-# Les textes non traduits restent en français.'),
+        COLORS.INFO));
       return;
     }
 

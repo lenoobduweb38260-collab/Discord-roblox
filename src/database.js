@@ -537,6 +537,8 @@ for (const column of [
   // 🎮 Jeu du serveur : change le vocabulaire du Module RP (carte d'identité,
   // permis, entreprise). NULL = roblox, le jeu d'origine du bot.
   'rp_jeu TEXT',
+  // 🌍 Langue du bot sur ce serveur : fr (source), en, de, ru, es.
+  'bot_langue TEXT',
   // 🎭 Rôles automatiques à l'arrivée (liste JSON d'identifiants de rôles)
   'autorole_role_ids TEXT',
   // 👋 Apparence des messages d'arrivée / de départ, réglée depuis le site
@@ -790,6 +792,7 @@ const DEFAULT_CONFIG = {
   levels_enabled: 1,
   level_rewards_stack: 1,
   rp_jeu: 'roblox',
+  bot_langue: 'fr',
   level_image_url: null,
   xp_text: 20,
   xp_voice: 20,

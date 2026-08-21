@@ -1189,6 +1189,22 @@ const RELEASES = [
     fix: [],
     retrait: [],
   },
+  {
+    id: 'langues-annonce-2026-08bf',
+    title: 'Le bot parle cinq langues, et une commande d\'annonce 🌍',
+    ajout: [
+      '🌍 **Langue du bot, par serveur** : Francais, English, Deutsch, Русский, Espanol. Cela se choisit dans `/config` → 🎭 Module RP',
+      '📣 **`/annonce`** (createur) : ecrire un message au nom du bot et le publier ou l\'on veut, avec apercu en direct. Embed ou message simple, image, vignette, couleur — et `/annonce modifier` pour le corriger plus tard',
+      '📄 **Un fichier pour les traducteurs** : `traductions.csv`, 1 871 lignes, une colonne par langue. Il s\'ouvre dans Excel ou Google Sheets, et plusieurs personnes peuvent s\'y partager le travail',
+    ],
+    amelioration: [
+      '🔤 **La traduction est posee sur la couche reseau**, la ou l\'identite visuelle l\'est deja. Aucune ligne de code a modifier pour ajouter une langue, et **aucun risque de casser le bot** : seuls les champs d\'affichage sont traduits, jamais un identifiant de bouton, une valeur d\'option ou une URL',
+      '⚠️ **87 chaines sont signalees « a ne pas traduire »** dans le fichier : ce sont des valeurs comparees par le code, pas des phrases. « aucune », « piste » et « file » sont les trois modes de repetition de la musique — les traduire couperait la fonction sans le moindre message d\'erreur. L\'import les refuse meme si la case est remplie',
+      '🇬🇧 **163 textes deja traduits en anglais**, les plus vus par les membres. Le reste s\'affiche en francais tant qu\'il n\'est pas traduit : mieux vaut une ligne en francais qu\'une ligne fausse',
+    ],
+    fix: [],
+    retrait: [],
+  },
 ];
 
 // Construit l'embed d'une note à partir d'une entrée { title, ajout, fix,

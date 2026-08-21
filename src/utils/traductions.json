@@ -1,0 +1,419 @@
+{
+  "Système de carte d'identité RP": {
+    "en": "RP ID card system"
+  },
+  "Prénom RP": {
+    "en": "RP first name"
+  },
+  "Membre (défaut : vous)": {
+    "en": "Member (defaults to you)"
+  },
+  "⛔ Sécurité : cette sous-commande est réservée au **staff**.": {
+    "en": "⛔ Security: this subcommand is reserved for **staff**."
+  },
+  "Gestion des entreprises RP": {
+    "en": "RP company management"
+  },
+  "Voir les informations d'un membre (visible uniquement par vous)": {
+    "en": "View a member's information (only visible to you)"
+  },
+  "Inviter le bot sur votre serveur Discord": {
+    "en": "Invite the bot to your Discord server"
+  },
+  "Matricules RP : relie matricule, pseudo du jeu et compte Discord": {
+    "en": "RP service numbers: links number, in-game name and Discord account"
+  },
+  "Retrouver quelqu'un par matricule, pseudo du jeu ou pseudo Discord": {
+    "en": "Find someone by service number, in-game name or Discord name"
+  },
+  "Matricule, pseudo Roblox, pseudo Discord, mention ou identifiant": {
+    "en": "Service number, Roblox name, Discord name, mention or ID"
+  },
+  "Voir la fiche d'un membre": {
+    "en": "View a member's record"
+  },
+  "Tous les matricules du serveur": {
+    "en": "Every service number on the server"
+  },
+  "[Staff] Attribuer ou modifier un matricule": {
+    "en": "[Staff] Assign or change a service number"
+  },
+  "À qui": {
+    "en": "To whom"
+  },
+  "Son pseudo dans le jeu": {
+    "en": "Their in-game name"
+  },
+  "Laisser vide pour le prochain numéro libre": {
+    "en": "Leave empty for the next free number"
+  },
+  "Grade, unité, remarque…": {
+    "en": "Rank, unit, note…"
+  },
+  "[Staff] Retirer le matricule d'un membre": {
+    "en": "[Staff] Remove a member's service number"
+  },
+  "[Staff] Publier le panneau des matricules dans un salon": {
+    "en": "[Staff] Post the service-number board in a channel"
+  },
+  "Salon du panneau": {
+    "en": "Board channel"
+  },
+  "⛔ Réservé au **staff** du serveur.": {
+    "en": "⛔ Reserved for server **staff**."
+  },
+  "🔎 Aucune correspondance exacte": {
+    "en": "🔎 No exact match"
+  },
+  "❌ Vous n'avez pas encore de matricule sur ce serveur.": {
+    "en": "❌ You don't have a service number on this server yet."
+  },
+  "🔢 Matricule attribué": {
+    "en": "🔢 Service number assigned"
+  },
+  "🔢 Matricule retiré": {
+    "en": "🔢 Service number removed"
+  },
+  "-# La fiche est conservée : l'historique dit qui portait ce numéro.": {
+    "en": "-# The record is kept: the history shows who held this number."
+  },
+  "🔎 Chercher un matricule": {
+    "en": "🔎 Find a service number"
+  },
+  "Matricule, pseudo du jeu, @ ou identifiant": {
+    "en": "Service number, in-game name, @ or ID"
+  },
+  "Identité": {
+    "en": "Identity"
+  },
+  "▶️ Lecture en cours": {
+    "en": "▶️ Now playing"
+  },
+  "À suivre": {
+    "en": "Up next"
+  },
+  "Musique en vocal — YouTube, SoundCloud, Spotify, Deezer": {
+    "en": "Voice music — YouTube, SoundCloud, Spotify, Deezer"
+  },
+  "Jouer un lien (YouTube, SoundCloud, Spotify, Deezer) ou chercher un titre": {
+    "en": "Play a link (YouTube, SoundCloud, Spotify, Deezer) or search for a track"
+  },
+  "Lien ou recherche": {
+    "en": "Link or search"
+  },
+  "Ce qui joue en ce moment": {
+    "en": "What's playing right now"
+  },
+  "La file d'attente": {
+    "en": "The queue"
+  },
+  "Passer au morceau suivant": {
+    "en": "Skip to the next track"
+  },
+  "Mettre en pause": {
+    "en": "Pause"
+  },
+  "Reprendre la lecture": {
+    "en": "Resume playback"
+  },
+  "Arrêter et quitter le vocal": {
+    "en": "Stop and leave the voice channel"
+  },
+  "Mélanger la file d'attente": {
+    "en": "Shuffle the queue"
+  },
+  "Retirer un morceau de la file": {
+    "en": "Remove a track from the queue"
+  },
+  "Sa position dans la file": {
+    "en": "Its position in the queue"
+  },
+  "Répéter le morceau ou toute la file": {
+    "en": "Repeat the track or the whole queue"
+  },
+  "Quoi répéter": {
+    "en": "What to repeat"
+  },
+  "Régler le volume (0 à 200 %)": {
+    "en": "Set the volume (0 to 200%)"
+  },
+  "Ce que le bot sait lire, et comment": {
+    "en": "What the bot can play, and how"
+  },
+  "Tester la connexion vocale et dire précisément où elle bloque": {
+    "en": "Test the voice connection and pinpoint where it fails"
+  },
+  "📭 Je ne joue rien pour le moment.": {
+    "en": "📭 I'm not playing anything right now."
+  },
+  "📭 Rien en lecture.": {
+    "en": "📭 Nothing playing."
+  },
+  "📭 La file est vide.": {
+    "en": "📭 The queue is empty."
+  },
+  "❌ Rien à passer.": {
+    "en": "❌ Nothing to skip."
+  },
+  "❌ Rien en lecture.": {
+    "en": "❌ Nothing playing."
+  },
+  "❌ Il faut au moins deux morceaux en attente pour mélanger.": {
+    "en": "❌ At least two queued tracks are needed to shuffle."
+  },
+  "❌ Aucun morceau à cette position.": {
+    "en": "❌ No track at that position."
+  },
+  "➡️ Plus de répétition.": {
+    "en": "➡️ Repeat off."
+  },
+  "🔂 Ce morceau tournera en boucle.": {
+    "en": "🔂 This track will repeat."
+  },
+  "🔁 Toute la file tournera en boucle.": {
+    "en": "🔁 The whole queue will repeat."
+  },
+  "➕ Ajouté à la file": {
+    "en": "➕ Added to the queue"
+  },
+  "🔬 Diagnostic de la connexion vocale": {
+    "en": "🔬 Voice connection diagnostic"
+  },
+  "*Rien d'autre en attente.*": {
+    "en": "*Nothing else queued.*"
+  },
+  "🎶 File d'attente": {
+    "en": "🎶 Queue"
+  },
+  "🎧 Ce que je sais lire": {
+    "en": "🎧 What I can play"
+  },
+  "Diffusé directement": {
+    "en": "Streamed directly"
+  },
+  "Lu, puis rejoué depuis YouTube": {
+    "en": "Read, then replayed from YouTube"
+  },
+  "Système de niveaux (écrit et vocal réunis)": {
+    "en": "Level system (text and voice combined)"
+  },
+  "Voir le niveau d'un membre": {
+    "en": "View a member's level"
+  },
+  "Top 10 du serveur": {
+    "en": "Server top 10"
+  },
+  "Les rôles à débloquer par niveau sur ce serveur": {
+    "en": "Roles unlocked by level on this server"
+  },
+  "[Staff] Image de fond des cartes de niveau (vide = retirer)": {
+    "en": "[Staff] Background image for level cards (empty to remove)"
+  },
+  "URL de l'image (laisser vide pour retirer)": {
+    "en": "Image URL (leave empty to remove)"
+  },
+  "🏅 Récompenses de niveau": {
+    "en": "🏅 Level rewards"
+  },
+  "Aucune récompense configurée": {
+    "en": "No rewards configured"
+  },
+  "⛔ Réservé au staff.": {
+    "en": "⛔ Staff only."
+  },
+  "❌ URL invalide (doit commencer par http).": {
+    "en": "❌ Invalid URL (must start with http)."
+  },
+  "✅ Image des cartes de niveau mise à jour.": {
+    "en": "✅ Level card image updated."
+  },
+  "🧹 Image des cartes de niveau retirée.": {
+    "en": "🧹 Level card image removed."
+  },
+  "✍️ Dont écrit": {
+    "en": "✍️ From chatting"
+  },
+  "🎙️ Dont vocal": {
+    "en": "🎙️ From voice"
+  },
+  "❌ Aucune donnée de niveau pour le moment.": {
+    "en": "❌ No level data yet."
+  },
+  "🏆 Classement du serveur": {
+    "en": "🏆 Server leaderboard"
+  },
+  "Écrit et vocal réunis en un seul niveau.": {
+    "en": "Chat and voice combined into a single level."
+  },
+  "Système de permis de conduire RP": {
+    "en": "RP driving licence system"
+  },
+  "Signaler un utilisateur à l'équipe du bot": {
+    "en": "Report a user to the bot team"
+  },
+  "Système de prise/fin de service RP": {
+    "en": "RP duty clock-in / clock-out"
+  },
+  "Prendre votre service RP": {
+    "en": "Start your RP duty"
+  },
+  "Terminer votre service RP": {
+    "en": "End your RP duty"
+  },
+  "[Staff] Voir qui est actuellement en service": {
+    "en": "[Staff] See who is currently on duty"
+  },
+  "📋 Personne n'est en service actuellement.": {
+    "en": "📋 Nobody is on duty right now."
+  },
+  "❌ Vous êtes déjà en service (`/service fin` pour terminer).": {
+    "en": "❌ You're already on duty (`/service fin` to end)."
+  },
+  "🟢 Prise de service": {
+    "en": "🟢 On duty"
+  },
+  "✅ Prise de service enregistrée et annoncée.": {
+    "en": "✅ Duty start recorded and announced."
+  },
+  "❌ Vous n'êtes pas en service (`/service prise` pour commencer).": {
+    "en": "❌ You're not on duty (`/service prise` to start)."
+  },
+  "🔴 Fin de service": {
+    "en": "🔴 Off duty"
+  },
+  "🧑‍💼 Service terminé": {
+    "en": "🧑‍💼 Duty ended"
+  },
+  "🔢 ID Discord": {
+    "en": "🔢 Discord ID"
+  },
+  "⛔ Ce bouton ne fonctionne que sur un serveur, pas en message privé.": {
+    "en": "⛔ This button only works on a server, not in direct messages."
+  },
+  "❌ Cette action a échoué. Réessayez ; si cela recommence, prévenez le staff.": {
+    "en": "❌ That action failed. Try again; if it keeps happening, tell the staff."
+  },
+  "📄 Contenu": {
+    "en": "📄 Content"
+  },
+  "🗑️ Message supprimé": {
+    "en": "🗑️ Message deleted"
+  },
+  "🛡️ Message du bot supprimé": {
+    "en": "🛡️ Bot message deleted"
+  },
+  "❌ Ticket introuvable.": {
+    "en": "❌ Ticket not found."
+  },
+  "Rôles": {
+    "en": "Roles"
+  },
+  "👤 Nom RP": {
+    "en": "👤 RP surname"
+  },
+  "⚧ Sexe": {
+    "en": "⚧ Gender"
+  },
+  "🎂 Date de naissance": {
+    "en": "🎂 Date of birth"
+  },
+  "💬 Pseudo Discord": {
+    "en": "💬 Discord name"
+  },
+  "📛 Statut": {
+    "en": "📛 Status"
+  },
+  "❌ Invalide": {
+    "en": "❌ Invalid"
+  },
+  "🛡️ Assurance": {
+    "en": "🛡️ Insurance"
+  },
+  "❌ Non": {
+    "en": "❌ No"
+  },
+  "🔒 Ticket fermé": {
+    "en": "🔒 Ticket closed"
+  },
+  "🗑️ Ce salon va être **supprimé automatiquement**…": {
+    "en": "🗑️ This channel will be **deleted automatically**…"
+  },
+  "Rejoignez d'abord un salon vocal.": {
+    "en": "Join a voice channel first."
+  },
+  "⏹️ Terminé, je quitte le vocal.": {
+    "en": "⏹️ Done — leaving the voice channel."
+  },
+  "Prise en charge": {
+    "en": "Claimed by"
+  },
+  "🎫 Ticket ouvert": {
+    "en": "🎫 Ticket opened"
+  },
+  "🎫 Ticket fermé & archivé": {
+    "en": "🎫 Ticket closed & archived"
+  },
+  "🎫 Ticket fermé": {
+    "en": "🎫 Ticket closed"
+  },
+  "🔔 Relance envoyée.": {
+    "en": "🔔 Reminder sent."
+  },
+  "Ticket pris en charge": {
+    "en": "Ticket claimed"
+  },
+  "M'assigner ce ticket": {
+    "en": "Assign this ticket to me"
+  },
+  "Ticket libéré": {
+    "en": "Ticket released"
+  },
+  "Désassigner ce ticket": {
+    "en": "Unassign this ticket"
+  },
+  "Ajouter un membre": {
+    "en": "Add a member"
+  },
+  "Ajouter quelqu'un au ticket": {
+    "en": "Add someone to the ticket"
+  },
+  "Retirer un membre": {
+    "en": "Remove a member"
+  },
+  "Retirer quelqu'un du ticket": {
+    "en": "Remove someone from the ticket"
+  },
+  "Avez-vous toujours besoin de ce ticket ?": {
+    "en": "Do you still need this ticket?"
+  },
+  "Demander si le ticket est encore actif": {
+    "en": "Ask whether the ticket is still active"
+  },
+  "Voir les détails du ticket": {
+    "en": "View the ticket details"
+  },
+  "Supprimer le ticket": {
+    "en": "Delete the ticket"
+  },
+  "Supprimer définitivement ce salon": {
+    "en": "Permanently delete this channel"
+  },
+  "🚀 Ticket pris en charge": {
+    "en": "🚀 Ticket claimed"
+  },
+  "🔓 Ticket libéré": {
+    "en": "🔓 Ticket released"
+  },
+  "*Personne pour le moment*": {
+    "en": "*Nobody yet*"
+  },
+  "État": {
+    "en": "Status"
+  },
+  "❌ Salon du ticket introuvable.": {
+    "en": "❌ Ticket channel not found."
+  },
+  "➖ Membre(s) retiré(s)": {
+    "en": "➖ Member(s) removed"
+  }
+}

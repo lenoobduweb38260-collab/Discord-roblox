@@ -104,6 +104,25 @@ function listesDEmbeds(body) {
   return listes;
 }
 
+// 🌍 Traduction, au même passage obligé que l'identité.
+//
+// Le bot écrit ses textes à 88 endroits ; les reprendre un par un raterait
+// forcément des cas. Ici, tout ce qui part est traduit — et seuls les champs
+// d'AFFICHAGE sont visités, jamais un identifiant ni une valeur.
+function traduire(client, options) {
+  try {
+    const guild = guildeDe(client, options.fullRoute);
+    if (!guild) return;
+    const { traduireCorps, langueDe } = require('./traduire');
+    const langue = langueDe(guild.id);
+    if (langue === 'fr') return; // langue source : rien à faire
+    traduireCorps(options.body, langue);
+  } catch (err) {
+    // Une traduction ratée ne doit jamais empêcher un message de partir.
+    console.warn(`⚠️ Traduction non appliquée : ${err.message}`);
+  }
+}
+
 function appliquer(client, options) {
   const listes = listesDEmbeds(options?.body);
   if (!listes.length) return;
@@ -221,6 +240,10 @@ function installer(client) {
     // Jamais d'exception ici : elle empêcherait l'envoi du message.
     try {
       appliquer(client, options);
+      // ⚠️ APRÈS l'identité, AVANT la conversion en cartes : l'identité pose
+      // des textes (signature, ligne d'auteur) qui doivent être traduits eux
+      // aussi, et la carte fige la mise en forme.
+      traduire(client, options);
       origine = preparerCartes(client, options);
     } catch (err) {
       console.warn(`⚠️ Identité des embeds non appliquée : ${err.message}`);
@@ -250,5 +273,5 @@ function installer(client) {
 module.exports = {
   installer, appliquer, styliserUn, reglages, versEntier, guildeDe, listesDEmbeds, noterInteraction,
   couleurNeutre, COULEURS_NEUTRES, DEFAUT_ACCENT, FILET, filetDe, FILET_DEFAUT,
-  preparerCartes, routeDEnvoi, refusDeCartes, etatCartes, DRAPEAU_V2, tousLesFichiersSontCites,
+  preparerCartes, routeDEnvoi, refusDeCartes, etatCartes, DRAPEAU_V2, tousLesFichiersSontCites, traduire,
 };
