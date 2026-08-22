@@ -137,10 +137,12 @@ module.exports = {
 
     // ----- Absences : le bouton du panneau, la modale, le retour -----
     if ((interaction.isButton() && interaction.customId?.startsWith('abs:'))
+      || (interaction.isChannelSelectMenu?.() && interaction.customId?.startsWith('abs:sel:'))
       || (interaction.isModalSubmit() && interaction.customId === 'abs:decl')) {
       if (!interaction.inGuild()) return horsServeur(interaction);
       const absences = require('../utils/absences');
       if (interaction.isModalSubmit()) return absences.handleModal(interaction);
+      if (interaction.isChannelSelectMenu?.()) return absences.handleMenu(interaction);
       return absences.handleBouton(interaction);
     }
 

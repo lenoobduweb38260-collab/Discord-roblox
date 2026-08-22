@@ -35,6 +35,9 @@
   "\n-# 🏷️ En début de ligne : ": {
     "en": "\n-# 🏷️ At the start of a line: "
   },
+  "\n-# 25 par passage — relancez la commande pour continuer.": {
+    "en": "\n-# 25 per pass — run the command again to keep going."
+  },
   "\n-# Annoncée dans ": {
     "en": "\n-# Announced in "
   },
@@ -61,6 +64,12 @@
   },
   "\n-# Mode sans cadre : ajoutez une image en collant son lien dans le texte.": {
     "en": "\n-# Frameless mode: add an image by pasting its link into the text."
+  },
+  "\n-# Relancez `/absence salons ajouter` pour en ajouter d'autres (25 par passage).": {
+    "en": "\n-# Run `/absence salons ajouter` again to add more (25 per pass)."
+  },
+  "\n-# Sans liste, l'annonce part dans le salon où le bouton est cliqué.": {
+    "en": "\n-# With no list, the announcement goes to the channel where the button is clicked."
   },
   "\n… (début tronqué)": {
     "en": "\n… (beginning cut off)"
@@ -89,11 +98,17 @@
   "\n❌ **Permis invalidé** (plus aucun point).": {
     "en": "\n❌ **Licence invalidated** (no points left)."
   },
+  "\n➜ Aucun salon d'annonces configuré : ajoutez-en avec `/absence salons ajouter` ou `/absence salons categorie`.": {
+    "en": "\n➜ No announcement channel configured: add some with `/absence salons ajouter` or `/absence salons categorie`."
+  },
   "\n➜ Donnez-moi **Voir le salon** et **Envoyer des messages**, puis relancez.": {
     "en": "\n➜ Give me **View Channel** and **Send Messages**, then run it again."
   },
   "\n➜ Les annonces partiront dans : ": {
     "en": "\n➜ Announcements will go to: "
+  },
+  "\n➜ Les annonces partiront dans les **": {
+    "en": "\n➜ Announcements will go to the **"
   },
   "\n⭐ **Niveau ": {
     "en": "\n⭐ **Level "
@@ -572,6 +587,12 @@
   " s** avant de rechasser.": {
     "en": " s** before hunting again."
   },
+  " salon(s) ajouté(s) — **": {
+    "en": " channel(s) added — **"
+  },
+  " salon(s) retiré(s) — il en reste **": {
+    "en": " channel(s) removed — **"
+  },
   " salon(s). L'annonce se supprimera toute seule ; sinon, cliquez **✅ Je suis de retour**.": {
     "en": " channel(s). The announcement will delete itself; otherwise, click **✅ I am back**."
   },
@@ -598,6 +619,9 @@
   },
   " XP** au total — encore **": {
     "en": " XP** in total — **"
+  },
+  " y étai(en)t déjà.": {
+    "en": " already were on it."
   },
   "_Ce message disparaîtra automatiquement une fois la mise à jour installée._": {
     "en": "_This message will disappear on its own once the update is installed._"
@@ -881,6 +905,12 @@
   "[Propriétaire du bot] Éteint complètement le bot, depuis n'importe quel serveur": {
     "en": "[Bot owner] Shuts the bot down completely, from any server"
   },
+  "[Staff] Ajouter d'un coup tous les salons textuels d'une catégorie": {
+    "en": "[Staff] Add every text channel of a category at once"
+  },
+  "[Staff] Ajouter des salons d'annonces — 25 à la fois, rejouable": {
+    "en": "[Staff] Add announcement channels — 25 at a time, repeatable"
+  },
   "[Staff] Ajouter/retirer un membre à la tête d'une entreprise": {
     "en": "[Staff] Add/remove a member at the head of a company"
   },
@@ -926,6 +956,9 @@
   "[Staff] Invalider un permis (suspension/annulation RP)": {
     "en": "[Staff] Invalidate a licence (RP suspension/revocation)"
   },
+  "[Staff] Les salons où chaque absence est annoncée": {
+    "en": "[Staff] The channels where every absence is announced"
+  },
   "[Staff] Modifier un champ d'une carte": {
     "en": "[Staff] Change one field of a card"
   },
@@ -949,6 +982,9 @@
   },
   "[Staff] Réponses types que le bot peut envoyer dans un ticket": {
     "en": "[Staff] Canned replies the bot can send in a ticket"
+  },
+  "[Staff] Retirer des salons d'annonces": {
+    "en": "[Staff] Remove announcement channels"
   },
   "[Staff] Retirer le matricule d'un membre": {
     "en": "[Staff] Remove a member's service number"
@@ -979,6 +1015,12 @@
   },
   "[Staff] Système de tickets : types, catégories et panneau": {
     "en": "[Staff] Ticket system: types, categories and panel"
+  },
+  "[Staff] Vider la liste des salons d'annonces": {
+    "en": "[Staff] Clear the announcement channel list"
+  },
+  "[Staff] Voir les salons d'annonces configurés": {
+    "en": "[Staff] See the configured announcement channels"
   },
   "[Staff] Voir qui est actuellement en service": {
     "en": "[Staff] See who is currently on duty"
@@ -1066,6 +1108,12 @@
   },
   "** ajouté au roster (total : ": {
     "en": "** added to the roster (total: "
+  },
+  "** ajouté(s) — **": {
+    "en": "** added — **"
+  },
+  "** au total.": {
+    "en": "** in total."
   },
   "** blacklisté (ticket n°": {
     "en": "** blacklisted (ticket no. "
@@ -1172,6 +1220,9 @@
   "** n'est pas activé sur ce serveur. Un staff peut l'activer via `/config` → 🎭 Modules.": {
     "en": "** module is not switched on for this server. A staff member can switch it on with `/config` → 🎭 Modules."
   },
+  "** ne contient aucun salon textuel.": {
+    "en": "** holds no text channel."
+  },
   "** ne propose pas d'assurances. Activez d'abord l'assurance (champ **assurance** → `oui`).": {
     "en": "** does not offer insurance. Turn insurance on first (field **assurance** → `oui`)."
   },
@@ -1231,6 +1282,15 @@
   },
   "** s'est interrompu — je le relance.": {
     "en": "** got interrupted — restarting it."
+  },
+  "** salon(s) configurés (`/absence salons liste`).": {
+    "en": "** configured channel(s) (`/absence salons liste`)."
+  },
+  "** salon(s) de la catégorie **": {
+    "en": "** channel(s) from the category **"
+  },
+  "** salon(s) retiré(s).\n-# Sans liste, l'annonce part dans le salon où le bouton est cliqué.": {
+    "en": "** channel(s) removed.\n-# With no list, the announcement goes to the channel where the button is clicked."
   },
   "** serveur(s) — il sera re-banni automatiquement à chaque arrivée.": {
     "en": "** server(s) — they will be re-banned automatically on every join."
@@ -1318,6 +1378,9 @@
   },
   "*Aucun rôle métier configuré*": {
     "en": "*No job role configured*"
+  },
+  "*Aucun salon configuré — l'annonce part dans le salon où le bouton est cliqué.*\n➜ `/absence salons ajouter`, ou `/absence salons categorie` pour une catégorie entière.": {
+    "en": "*No channel configured — the announcement goes to the channel where the button is clicked.*\n➜ `/absence salons ajouter`, or `/absence salons categorie` for a whole category."
   },
   "*Aucun type de ticket configuré*": {
     "en": "*No ticket type configured*"
@@ -2183,6 +2246,9 @@
   "⛔ Il vous manque la permission 🚫 Blacklist pour cette décision.": {
     "en": "⛔ You are missing the 🚫 Blacklist permission for this decision."
   },
+  "⛔ La **configuration des absences** est réservée au staff — la déclaration, elle, est ouverte à tout le monde.": {
+    "en": "⛔ **Configuring absences** is staff only — declaring one is open to everyone."
+  },
   "⛔ La **publication du panneau** est réservée au staff — la déclaration, elle, est ouverte à tout le monde.": {
     "en": "⛔ **Publishing the panel** is staff only — declaring an absence is open to everyone."
   },
@@ -2801,6 +2867,9 @@
   "❌ Je ne peux pas écrire dans ": {
     "en": "❌ I cannot write in "
   },
+  "❌ Je ne peux pas écrire dans <#": {
+    "en": "❌ I cannot write in <#"
+  },
   "❌ Je ne peux réécrire que **mes propres** messages. Celui-ci est d'un autre auteur.": {
     "en": "❌ I can only rewrite **my own** messages. This one is someone else's."
   },
@@ -2818,6 +2887,9 @@
   },
   "❌ L'entreprise **": {
     "en": "❌ The company **"
+  },
+  "❌ La catégorie **": {
+    "en": "❌ The category **"
   },
   "❌ La connexion s'est arrêtée à l'état « ": {
     "en": "❌ The connection stopped at state “"
@@ -3899,8 +3971,14 @@
   "📣 Annonces dans ": {
     "en": "📣 Announcements in "
   },
+  "📣 Choisissez les salons à **ajouter** aux annonces d'absence (actuellement : **": {
+    "en": "📣 Pick the channels to **add** to the absence announcements (currently: **"
+  },
   "📣 Salon des arrivées/départs staff": {
     "en": "📣 Staff joins/leaves channel"
+  },
+  "📣 Salons des annonces d'absence": {
+    "en": "📣 Absence announcement channels"
   },
   "📤 Départ d'un membre": {
     "en": "📤 A member left"
@@ -4253,6 +4331,9 @@
   "🗑️ Ce salon va être **supprimé automatiquement**…": {
     "en": "🗑️ This channel will be **deleted automatically**…"
   },
+  "🗑️ Choisissez les salons à **retirer** des annonces d'absence (actuellement : **": {
+    "en": "🗑️ Pick the channels to **remove** from the absence announcements (currently: **"
+  },
   "🗑️ Contrat n°": {
     "en": "🗑️ Policy no. "
   },
@@ -4264,6 +4345,9 @@
   },
   "🗑️ Entreprise **": {
     "en": "🗑️ Company **"
+  },
+  "🗑️ Liste vidée : **": {
+    "en": "🗑️ List cleared: **"
   },
   "🗑️ Matricule `": {
     "en": "🗑️ Badge number `"
@@ -5135,6 +5219,9 @@
   "Champs d'embed → **sections** ◆ / ➜": {
     "en": "Embed fields → **sections** ◆ / ➜"
   },
+  "Chaque absence y est copiée": {
+    "en": "Every absence is copied there"
+  },
   "Chaque palier atteint s'ajoute aux précédents.": {
     "en": "Every tier reached is added to the previous ones."
   },
@@ -5696,6 +5783,9 @@
   "ℹ️ Ce ticket n'est pris en charge par personne.": {
     "en": "ℹ️ Nobody is handling this ticket."
   },
+  "ℹ️ La liste était déjà vide.": {
+    "en": "ℹ️ The list was already empty."
+  },
   "ℹ️ Les jeux de commandes par serveur se synchronisent automatiquement au démarrage du bot.": {
     "en": "ℹ️ The per-server command sets sync automatically when the bot starts."
   },
@@ -5842,6 +5932,9 @@
   },
   "L'UDP est passé — la machine s'arrête au **choix du chiffrement**. Les bibliothèques du bot sont trop anciennes ": {
     "en": "UDP went through — the machine stops at **choosing the encryption**. The bot's libraries are too old "
+  },
+  "La catégorie dont les salons deviennent des salons d'annonces": {
+    "en": "The category whose channels become announcement channels"
   },
   "La connexion chiffrée vers le serveur vocal": {
     "en": "The encrypted connection to the voice server"
@@ -6898,6 +6991,12 @@
   },
   "salon non choisi": {
     "en": "no channel picked"
+  },
+  "Salons à ajouter (25 max par passage)…": {
+    "en": "Channels to add (25 max per pass)…"
+  },
+  "Salons à retirer…": {
+    "en": "Channels to remove…"
   },
   "Sanction / peine (facultatif)": {
     "en": "Sanction / sentence (optional)"

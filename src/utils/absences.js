@@ -19,8 +19,10 @@ const { getGrade, GRADES } = require('./permissions');
 //  • absences            — la déclaration (début, fin ou NULL, raison) ;
 //  • absence_messages    — les copies publiées, une ligne par salon : c'est
 //    elles que le balayage supprime à l'échéance ;
-//  • absence_channels    — les salons d'annonce du serveur, choisis à la
-//    publication du panneau. Vide = le salon du panneau fait l'affaire.
+//  • absence_channels    — les salons d'annonce du serveur. Il peut y en
+//    avoir TRENTE : la liste se remplit par /absence salons (un menu de 25
+//    à la fois, rejouable, ou une catégorie entière d'un coup). Vide = le
+//    salon où le bouton est cliqué fait l'affaire.
 
 const inserer = db.prepare(
   'INSERT INTO absences (guild_id, user_id, debut, fin, raison, at) VALUES (?, ?, ?, ?, ?, ?)'
@@ -43,6 +45,7 @@ const effacerMessages = db.prepare('DELETE FROM absence_messages WHERE absence_i
 const viderSalons = db.prepare('DELETE FROM absence_channels WHERE guild_id = ?');
 const insererSalon = db.prepare('INSERT OR IGNORE INTO absence_channels (guild_id, channel_id) VALUES (?, ?)');
 const salonsDe = db.prepare('SELECT channel_id FROM absence_channels WHERE guild_id = ?');
+const retirerSalon = db.prepare('DELETE FROM absence_channels WHERE guild_id = ? AND channel_id = ?');
 
 // ── Lire ce que la modale rapporte ───────────────────────────────
 //
@@ -101,15 +104,31 @@ const rangeePanneau = () => new ActionRowBuilder().addComponents(
   new ButtonBuilder().setCustomId('abs:ouvrir').setLabel('Déclarer une absence').setEmoji('📅').setStyle(ButtonStyle.Primary)
 );
 
-// Publie le panneau et retient les salons d'annonce choisis.
+// Publie le panneau. Les salons donnés s'AJOUTENT à la liste — republier
+// le panneau ne détruit pas une liste de trente salons montée à la main.
 async function publierPanneau(salonPanneau, salonsAnnonce) {
   const envoi = await salonPanneau.send({ embeds: [cartePanneau()], components: [rangeePanneau()] });
-  viderSalons.run(String(salonPanneau.guildId || salonPanneau.guild?.id));
-  for (const salon of salonsAnnonce || []) {
-    insererSalon.run(String(salonPanneau.guildId || salonPanneau.guild?.id), String(salon.id));
-  }
+  ajouterSalons(salonPanneau.guildId || salonPanneau.guild?.id, (salonsAnnonce || []).map((s2) => s2.id));
   return envoi;
 }
+
+// ── La liste des salons d'annonce, sans plafond ──────────────────
+function ajouterSalons(guildId, ids) {
+  let n = 0;
+  for (const id of ids || []) {
+    if (insererSalon.run(String(guildId), String(id)).changes) n += 1;
+  }
+  return n;
+}
+function retirerSalons(guildId, ids) {
+  let n = 0;
+  for (const id of ids || []) {
+    if (retirerSalon.run(String(guildId), String(id)).changes) n += 1;
+  }
+  return n;
+}
+const listeSalons = (guildId) => salonsDe.all(String(guildId)).map((l) => l.channel_id);
+const viderTousSalons = (guildId) => viderSalons.run(String(guildId)).changes;
 
 // ── La modale ────────────────────────────────────────────────────
 
@@ -213,28 +232,34 @@ async function handleModal(interaction) {
   );
   const absence = parId.get(ligne.lastInsertRowid);
 
-  // L'annonce part dans TOUS les salons retenus : une copie chacun, et le
-  // balayage les supprimera toutes. Un salon en échec n'empêche pas l'autre.
+  // ⏱️ Trente salons = trente envois : bien plus que les 3 secondes que
+  // Discord accorde. On diffère la confirmation (éphémère) AVANT l'éventail.
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral }).catch(() => null);
+
+  // Une copie par salon, toutes en parallèle : les salons sont des routes
+  // indépendantes, et un échec n'empêche pas les autres.
   const salons = await salonsAnnonce(interaction);
+  const envois = await Promise.all(salons.map((salon) =>
+    salon.send({ embeds: [carteAbsence(absence)], components: [rangeeAbsence()] })
+      .then((envoi) => ({ salon, envoi }))
+      .catch(() => null)));
   let copies = 0;
-  for (const salon of salons) {
-    const envoi = await salon.send({ embeds: [carteAbsence(absence)], components: [rangeeAbsence()] }).catch(() => null);
-    if (envoi) { insererMessage.run(absence.id, String(salon.id), String(envoi.id)); copies += 1; }
+  for (const fait of envois.filter(Boolean)) {
+    insererMessage.run(absence.id, String(fait.salon.id), String(fait.envoi.id));
+    copies += 1;
   }
   if (!copies) {
     effacer.run(absence.id);
-    return interaction.reply({
+    return interaction.editReply({
       content: '❌ Je n\'ai pu publier l\'annonce dans **aucun salon**.\n➜ Vérifiez que je peux écrire dans les salons d\'annonce, puis réessayez.',
-      flags: MessageFlags.Ephemeral,
-    });
+    }).catch(() => null);
   }
 
   const secondes = Math.floor((fin || 0) / 1000);
-  return interaction.reply({
+  return interaction.editReply({
     content: `✅ Absence déclarée${fin ? ` jusqu'au <t:${secondes}:f>` : ' — durée indéterminée'}.`
       + `\n-# Annoncée dans ${copies} salon(s). L'annonce se supprimera toute seule ; sinon, cliquez **✅ Je suis de retour**.`,
-    flags: MessageFlags.Ephemeral,
-  });
+  }).catch(() => null);
 }
 
 // « Je suis de retour » — la personne concernée, ou le staff.
@@ -292,8 +317,36 @@ function demarrer(client) {
 
 const enCours = (guildId) => duServeur.all(String(guildId), Date.now());
 
+// Le choix des salons passe par un MENU, pas par des options de commande :
+// une commande plafonne à 25 options, un menu se rejoue autant de fois
+// qu'il faut — trente salons se montent en deux passages.
+function handleMenu(interaction) {
+  const mettreAJour = require('./reponse').mettreAJour;
+  const geste = interaction.customId.split(':')[2];
+  const ids = (interaction.values || []).map(String);
+  if (geste === 'ajouter') {
+    const n = ajouterSalons(interaction.guildId, ids);
+    const total = listeSalons(interaction.guildId).length;
+    return mettreAJour(interaction, {
+      content: `✅ ${n} salon(s) ajouté(s) — **${total}** au total.`
+        + '\n-# Relancez `/absence salons ajouter` pour en ajouter d\'autres (25 par passage).',
+      components: [],
+    });
+  }
+  if (geste === 'retirer') {
+    const n = retirerSalons(interaction.guildId, ids);
+    const total = listeSalons(interaction.guildId).length;
+    return mettreAJour(interaction, {
+      content: `🗑️ ${n} salon(s) retiré(s) — il en reste **${total}**.`,
+      components: [],
+    });
+  }
+  return null;
+}
+
 module.exports = {
   lireDate, lireFin, cartePanneau, rangeePanneau, publierPanneau, modale,
-  carteAbsence, rangeeAbsence, handleBouton, handleModal, terminer,
+  carteAbsence, rangeeAbsence, handleBouton, handleModal, handleMenu, terminer,
   balayer, demarrer, enCours, supprimerCopies,
+  ajouterSalons, retirerSalons, listeSalons, viderTousSalons,
 };

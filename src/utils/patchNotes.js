@@ -1254,7 +1254,7 @@ const RELEASES = [
     title: 'Les absences se declarent en un clic, et s\'effacent toutes seules 📅',
     ajout: [
       '📅 **Le panneau d\'absences** : un staff le publie avec `/absence panneau`, et n\'importe qui declare son absence en un clic — date de debut (vide = maintenant), date de fin, duree (`5j`, `12h`, `2sem`)… ou rien du tout pour une absence sans date de fin',
-      '📣 **L\'annonce part dans plusieurs salons a la fois** — jusqu\'a trois, choisis a la publication du panneau — pour que personne ne puisse la manquer',
+      '📣 **L\'annonce part dans plusieurs salons a la fois** — pour que personne ne puisse la manquer',
       '🧹 **Chaque annonce disparait toute seule a la fin de l\'absence**, dans tous les salons a la fois. Une absence sans date de fin s\'efface d\'un clic sur **✅ Je suis de retour** — la personne concernee, ou le staff',
       '📋 **`/absence liste`** : qui manque en ce moment, avec la date de retour de chacun',
     ],
@@ -1262,6 +1262,21 @@ const RELEASES = [
       '⏰ **Les horaires s\'affichent a l\'heure de chaque lecteur** (horodatages Discord) : « retour dans 3 jours » se lit pareil a Paris et a Montreal',
       '🛡️ **Une seule absence a la fois** : en declarer une seconde renvoie vers l\'annonce en cours, au lieu d\'empiler des doublons',
       '🔁 **Le rattrapage au demarrage** : les absences arrivees a echeance pendant que le bot etait eteint sont nettoyees des qu\'il revient',
+    ],
+    fix: [],
+    retrait: [],
+  },
+  {
+    id: 'absences-trente-salons-2026-08bj',
+    title: 'Les salons d\'absences, sans plafond 📣',
+    ajout: [
+      '📣 **Autant de salons d\'annonces qu\'il en faut — trente, ou plus.** Une commande plafonne a 25 options : la liste se gere donc en ADDITIF. `/absence salons ajouter` ouvre un menu de 25 salons a la fois, rejouable autant de fois que necessaire',
+      '🗂️ **`/absence salons categorie`** ajoute d\'un coup tous les salons textuels d\'une categorie entiere',
+      '🧰 **`/absence salons liste` / `retirer` / `vider`** : voir, elaguer, repartir de zero',
+    ],
+    amelioration: [
+      '🛡️ **Republier le panneau ne detruit plus la liste** : trente salons montes a la main ne disparaissent pas parce qu\'on a redeploye le panneau',
+      '⏱️ **Trente envois depassent les 3 secondes que Discord accorde** : la confirmation de declaration est differee (en ephemere) avant l\'eventail, et les copies partent en parallele',
     ],
     fix: [],
     retrait: [],

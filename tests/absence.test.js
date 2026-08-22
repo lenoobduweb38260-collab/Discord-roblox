@@ -56,7 +56,10 @@ function fausseInteraction(monde, { user = 'U1', salon = 'C1', membreStaff = fal
     message: messageId ? { id: messageId, async delete() { return true; } } : null,
     fields: { getTextInputValue: (id) => champs[id] ?? '' },
     customId: null,
-    async reply(m) { reponses.push(m); return {}; },
+    async reply(m) { reponses.push(m); this.replied = true; return {}; },
+    async deferReply(m) { this.deferred = true; this.differe = m; return {}; },
+    async editReply(m) { reponses.push(m); return {}; },
+    values: [],
     async showModal(m) { reponses.push({ modale: m }); return {}; },
     reponses,
   };
@@ -104,7 +107,8 @@ function fausseInteraction(monde, { user = 'U1', salon = 'C1', membreStaff = fal
     await absences.handleModal(decl);
     V('une copie dans chaque salon d\'annonces', annonces1.envois.length === 1 && annonces2.envois.length === 1);
     V('… pas dans le salon du panneau (non retenu)', panneau.envois.length === 1);
-    V('la confirmation est éphémère et compte les salons', /2 salon/.test(decl.reponses[0]?.content) && decl.reponses[0]?.flags);
+    V('la confirmation compte les salons', /2 salon/.test(decl.reponses[0]?.content), decl.reponses[0]?.content);
+    V('… et le report est éphémère (trente salons dépassent les 3 s)', decl.deferred && Boolean(decl.differe?.flags));
     const encours = absences.enCours('G1');
     V('l\'absence est en base', encours.length === 1 && encours[0].raison === 'Examens');
 
@@ -170,6 +174,44 @@ function fausseInteraction(monde, { user = 'U1', salon = 'C1', membreStaff = fal
     V('une absence indéterminée n\'est JAMAIS balayée', absences.enCours('G1').some((a) => a.user_id === 'U5'));
   }
 
+  console.log('\n4 bis) Trente salons : la liste se monte en additif, sans plafond');
+  {
+    const monde = fauxMonde();
+    const panneau = monde.creerSalon('P1');
+    panneau.guildId = 'G2';
+
+    // Deux passages de menu (25 + 5), comme le fera le staff.
+    absences.viderTousSalons('G2');
+    const premierLot = Array.from({ length: 25 }, (_, i) => 'S' + (i + 1));
+    const secondLot = Array.from({ length: 5 }, (_, i) => 'S' + (i + 26));
+    V('le premier passage ajoute 25 salons', absences.ajouterSalons('G2', premierLot) === 25);
+    V('le second en ajoute 5 de plus', absences.ajouterSalons('G2', secondLot) === 5);
+    V('la liste en compte 30', absences.listeSalons('G2').length === 30);
+    V('un doublon ne compte pas deux fois', absences.ajouterSalons('G2', ['S1']) === 0);
+
+    // Republier le panneau ne détruit RIEN.
+    await absences.publierPanneau(panneau, []);
+    V('republier le panneau garde les 30 salons', absences.listeSalons('G2').length === 30);
+
+    // La déclaration part dans les trente.
+    for (const id of [...premierLot, ...secondLot]) monde.creerSalon(id);
+    const decl = fausseInteraction(monde, { user: 'U30', champs: { 'abs:fin': '1j' } });
+    decl.guildId = 'G2';
+    decl.member.guild.id = 'G2';
+    await absences.handleModal(decl);
+    const copies = [...premierLot, ...secondLot].filter((id) => monde.salons.get(id).envois.length === 1);
+    V('une copie dans CHACUN des 30 salons', copies.length === 30, String(copies.length));
+    V('la confirmation les compte', /30 salon/.test(decl.reponses[0]?.content), decl.reponses[0]?.content);
+
+    // Le retrait et le vidage, en additif aussi.
+    V('retirer en enlève', absences.retirerSalons('G2', ['S1', 'S2']) === 2 && absences.listeSalons('G2').length === 28);
+    V('vider remet à zéro', absences.viderTousSalons('G2') === 28 && absences.listeSalons('G2').length === 0);
+
+    // Nettoyage pour les sections suivantes.
+    const { db } = require('../src/database');
+    db.prepare('DELETE FROM absences WHERE guild_id = ?').run('G2');
+  }
+
   console.log('\n5) Une fin déjà passée est refusée avant d\'écrire quoi que ce soit');
   {
     const monde = fauxMonde();
@@ -189,7 +231,7 @@ function fausseInteraction(monde, { user = 'U1', salon = 'C1', membreStaff = fal
     const cmd = fs.readFileSync(`${__dirname}/../src/commands/absence.js`, 'utf8');
     V('la déclaration est ouverte à tous, la publication au staff',
       /GRADES\.EVERYONE/.test(cmd) && /GRADES\.STAFF/.test(cmd));
-    V('jusqu\'à trois salons d\'annonces', /annonces3/.test(cmd));
+    V('la liste des salons se gère en additif (menus + catégorie)', /abs:sel:/.test(cmd) && /GuildCategory/.test(cmd) && /setMaxValues\(25\)/.test(cmd));
   }
 
   fs.rmSync(RACINE, { recursive: true, force: true });
