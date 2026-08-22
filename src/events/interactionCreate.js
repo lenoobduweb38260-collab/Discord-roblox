@@ -135,6 +135,15 @@ module.exports = {
       return require('../utils/rolesAuClic').handleButton(interaction);
     }
 
+    // ----- Absences : le bouton du panneau, la modale, le retour -----
+    if ((interaction.isButton() && interaction.customId?.startsWith('abs:'))
+      || (interaction.isModalSubmit() && interaction.customId === 'abs:decl')) {
+      if (!interaction.inGuild()) return horsServeur(interaction);
+      const absences = require('../utils/absences');
+      if (interaction.isModalSubmit()) return absences.handleModal(interaction);
+      return absences.handleBouton(interaction);
+    }
+
     // ----- Menu déroulant de rôles (constructeur de messages du site) -----
     if (interaction.isStringSelectMenu() && interaction.customId?.startsWith('rrm')) {
       if (!interaction.inGuild()) return horsServeur(interaction);

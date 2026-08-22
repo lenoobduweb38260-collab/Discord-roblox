@@ -35,6 +35,9 @@
   "\n-# 🏷️ En début de ligne : ": {
     "en": "\n-# 🏷️ At the start of a line: "
   },
+  "\n-# Annoncée dans ": {
+    "en": "\n-# Announced in "
+  },
   "\n-# Au-delà de 100 %, le son peut saturer.": {
     "en": "\n-# Above 100%, the sound may distort."
   },
@@ -85,6 +88,12 @@
   },
   "\n❌ **Permis invalidé** (plus aucun point).": {
     "en": "\n❌ **Licence invalidated** (no points left)."
+  },
+  "\n➜ Donnez-moi **Voir le salon** et **Envoyer des messages**, puis relancez.": {
+    "en": "\n➜ Give me **View Channel** and **Send Messages**, then run it again."
+  },
+  "\n➜ Les annonces partiront dans : ": {
+    "en": "\n➜ Announcements will go to: "
   },
   "\n⭐ **Niveau ": {
     "en": "\n⭐ **Level "
@@ -170,6 +179,9 @@
   " — démarrage en l'état.": {
     "en": " — starting as is."
   },
+  " — durée indéterminée": {
+    "en": " — no end date"
+  },
   " — État-major": {
     "en": " — Command staff"
   },
@@ -235,6 +247,12 @@
   },
   " » existe déjà.": {
     "en": "” already exists."
+  },
+  " » n'est pas une date **JJ/MM/AAAA** (exemple : 25/08/2026).": {
+    "en": "” is not a **DD/MM/YYYY** date (example: 25/08/2026)."
+  },
+  " » n'existe pas dans le calendrier.": {
+    "en": "” does not exist in the calendar."
   },
   " » ne fait rien : donnez-lui un lien à ouvrir, ": {
     "en": "” does nothing: give it a link to open, "
@@ -554,6 +572,9 @@
   " s** avant de rechasser.": {
     "en": " s** before hunting again."
   },
+  " salon(s). L'annonce se supprimera toute seule ; sinon, cliquez **✅ Je suis de retour**.": {
+    "en": " channel(s). The announcement will delete itself; otherwise, click **✅ I am back**."
+  },
   " serveur(s) de plus.*": {
     "en": " more server(s).*"
   },
@@ -616,6 +637,9 @@
   },
   "-# 🔴 En direct — la radio joue jusqu'à `/radio stop` ou `/musique skip`.": {
     "en": "-# 🔴 Live — the radio plays until `/radio stop` or `/musique skip`."
+  },
+  "-# Ce message disparaîtra tout seul à la fin de l'absence.": {
+    "en": "-# This message will disappear on its own when the absence ends."
   },
   "-# Ce n'est pas un réglage du portail développeur : il est écrit dans le code de démarrage.": {
     "en": "-# This isn't a developer portal setting: it's written in the startup code."
@@ -910,6 +934,9 @@
   },
   "[Staff] Panneau central de configuration : rôles, salons, XP, whitelist métiers": {
     "en": "[Staff] Central configuration panel: roles, channels, XP, job whitelist"
+  },
+  "[Staff] Publier le panneau de déclaration d'absence": {
+    "en": "[Staff] Publish the absence declaration panel"
   },
   "[Staff] Publier le panneau des matricules dans un salon": {
     "en": "[Staff] Post the service-number board in a channel"
@@ -1331,6 +1358,9 @@
   "*Non renseignée*": {
     "en": "*Not filled in*"
   },
+  "*Personne n'est absent en ce moment.*": {
+    "en": "*Nobody is away right now.*"
+  },
   "*Personne n'est blacklisté.*": {
     "en": "*Nobody is blacklisted.*"
   },
@@ -1483,6 +1513,9 @@
   },
   "> — numéro : `": {
     "en": "> — number: `"
+  },
+  "> — ou le staff — peut clore cette absence.": {
+    "en": "> — or the staff — can close this absence."
   },
   "> ! Cliquez sur le bouton pour prouver que vous n'êtes pas un robot ": {
     "en": ">! Click the button to prove you are not a robot "
@@ -1718,6 +1751,9 @@
   "> s'occupe désormais de ce ticket.": {
     "en": "> is now handling this ticket."
   },
+  "> sera absent(e).": {
+    "en": "> will be away."
+  },
   "> supprimé par <@": {
     "en": "> deleted by <@"
   },
@@ -1897,6 +1933,12 @@
   },
   "⚠️ Attention": {
     "en": "⚠️ Careful"
+  },
+  "⚠️ Balayage des absences : ": {
+    "en": "⚠️ Absence sweep: "
+  },
+  "⚠️ Balayage des absences non démarré : ": {
+    "en": "⚠️ Absence sweep not started: "
   },
   "⚠️ Bannière d'arrivée : jimp indisponible, bannière ignorée.": {
     "en": "⚠️ Welcome banner: jimp unavailable, banner skipped."
@@ -2141,6 +2183,9 @@
   "⛔ Il vous manque la permission 🚫 Blacklist pour cette décision.": {
     "en": "⛔ You are missing the 🚫 Blacklist permission for this decision."
   },
+  "⛔ La **publication du panneau** est réservée au staff — la déclaration, elle, est ouverte à tout le monde.": {
+    "en": "⛔ **Publishing the panel** is staff only — declaring an absence is open to everyone."
+  },
   "⛔ Le **module ": {
     "en": "⛔ The **"
   },
@@ -2246,6 +2291,9 @@
   "⛔ Sécurité : vous n'êtes pas gérant du métier **": {
     "en": "⛔ Security: you are not a manager of the job **"
   },
+  "⛔ Seul <@": {
+    "en": "⛔ Only <@"
+  },
   "⛔ Seul le **propriétaire** de ce serveur peut répondre à cette demande.": {
     "en": "⛔ Only this server's **owner** can answer this request."
   },
@@ -2275,6 +2323,12 @@
   },
   "✅ **Traité — aucune sanction**": {
     "en": "✅ **Handled — no sanction**"
+  },
+  "✅ Absence close : ses annonces sont supprimées.": {
+    "en": "✅ Absence closed: its announcements have been deleted."
+  },
+  "✅ Absence déclarée": {
+    "en": "✅ Absence declared"
   },
   "✅ accès débloqué": {
     "en": "✅ access granted"
@@ -2389,6 +2443,9 @@
   },
   "✅ Panneau **": {
     "en": "✅ Panel **"
+  },
+  "✅ Panneau d'absences publié dans <#": {
+    "en": "✅ Absence panel published in <#"
   },
   "✅ Panneau des matricules publié : ": {
     "en": "✅ Badge number panel published: "
@@ -2564,6 +2621,9 @@
   "❌ Ce type de ticket n'existe plus.": {
     "en": "❌ This ticket type no longer exists."
   },
+  "❌ Cette absence serait **déjà finie** : sa fin est dans le passé. Vérifiez la date.": {
+    "en": "❌ This absence would be **already over**: its end is in the past. Check the date."
+  },
   "❌ Cette action a échoué. Réessayez ; si cela recommence, prévenez le staff.": {
     "en": "❌ That action failed. Try again; if it keeps happening, tell the staff."
   },
@@ -2734,6 +2794,12 @@
   },
   "❌ Je n'ai pas réussi à ouvrir <#": {
     "en": "❌ I could not open <#"
+  },
+  "❌ Je n'ai pu publier l'annonce dans **aucun salon**.\n➜ Vérifiez que je peux écrire dans les salons d'annonce, puis réessayez.": {
+    "en": "❌ I could not publish the announcement in **any channel**.\n➜ Check that I can write in the announcement channels, then try again."
+  },
+  "❌ Je ne peux pas écrire dans ": {
+    "en": "❌ I cannot write in "
   },
   "❌ Je ne peux réécrire que **mes propres** messages. Celui-ci est d'un autre auteur.": {
     "en": "❌ I can only rewrite **my own** messages. This one is someone else's."
@@ -2971,6 +3037,9 @@
   },
   "❌ Un matricule ne contient que des lettres, des chiffres, un point ou un tiret (20 signes au plus).": {
     "en": "❌ A badge number only holds letters, digits, a dot or a dash (20 characters at most)."
+  },
+  "❌ Une durée de zéro ne dit rien : laissez le champ **vide** pour une absence sans date de fin.": {
+    "en": "❌ A duration of zero says nothing: leave the field **empty** for an absence with no end date."
   },
   "❌ Une entreprise nommée **": {
     "en": "❌ A company named **"
@@ -3485,6 +3554,9 @@
   "👋 **@here**": {
     "en": "👋 **@here**"
   },
+  "👋 Bon retour ! Votre annonce d'absence est supprimée partout.": {
+    "en": "👋 Welcome back! Your absence announcement has been deleted everywhere."
+  },
   "👋 Le bot quitte **": {
     "en": "👋 The bot is leaving **"
   },
@@ -3638,11 +3710,29 @@
   "📄 Transcript envoyé dans <#": {
     "en": "📄 Transcript sent to <#"
   },
+  "📅 Absence déclarée": {
+    "en": "📅 Absence declared"
+  },
+  "📅 Absences": {
+    "en": "📅 Absences"
+  },
+  "📅 Absences en cours": {
+    "en": "📅 Absences under way"
+  },
   "📅 Avait rejoint le serveur": {
     "en": "📅 Had joined the server"
   },
+  "📅 Cette absence était déjà terminée.": {
+    "en": "📅 This absence was already over."
+  },
   "📅 Compte créé le": {
     "en": "📅 Account created on"
+  },
+  "📅 Vous avez **déjà une absence en cours** — cliquez **✅ Je suis de retour** sur son annonce d'abord.": {
+    "en": "📅 You **already have an absence running** — click **✅ I am back** on its announcement first."
+  },
+  "📅 Vous avez **déjà une absence en cours**.\n➜ Cliquez **✅ Je suis de retour** sur son annonce avant d'en déclarer une nouvelle.": {
+    "en": "📅 You **already have an absence running**.\n➜ Click **✅ I am back** on its announcement before declaring a new one."
   },
   "📈 Configuration — XP & niveaux": {
     "en": "📈 Configuration — XP & levels"
@@ -4580,6 +4670,9 @@
   "1. Ouvrez le fichier .env ici : ": {
     "en": "1. Open the .env file here: "
   },
+  "1er salon où publier les annonces d'absence (défaut : le salon du panneau)": {
+    "en": "1st channel for the absence announcements (default: the panel's channel)"
+  },
   "2. Collez le token de votre bot (Portail développeur Discord > Bot > Reset Token)\n": {
     "en": "2. Paste your bot token (Discord Developer Portal > Bot > Reset Token)\n"
   },
@@ -4588,6 +4681,9 @@
   },
   "2ᵉ rôle support (facultatif)": {
     "en": "2nd support role (optional)"
+  },
+  "2e salon d'annonces (facultatif)": {
+    "en": "2nd announcement channel (optional)"
   },
   "3️⃣ Qui mentionner à chaque note ?": {
     "en": "3️⃣ Who should be mentioned on each note?"
@@ -4600,6 +4696,9 @@
   },
   "3ᵉ rôle support (facultatif)": {
     "en": "3rd support role (optional)"
+  },
+  "3e salon d'annonces (facultatif)": {
+    "en": "3rd announcement channel (optional)"
   },
   "4e rôle métier (facultatif)": {
     "en": "4th job role (optional)"
@@ -4624,6 +4723,9 @@
   },
   "À suivre": {
     "en": "Up next"
+  },
+  "Absences : le panneau de déclaration, et qui manque en ce moment": {
+    "en": "Absences: the declaration panel, and who is away right now"
   },
   "activé": {
     "en": "on"
@@ -5081,8 +5183,14 @@
   "Cliquez pour réclamer !": {
     "en": "Click to claim!"
   },
+  "Cliquez sur **Déclarer une absence**": {
+    "en": "Click **Declare an absence**"
+  },
   "Colonne de configuration inconnue : ": {
     "en": "Unknown configuration column: "
+  },
+  "Comment faire": {
+    "en": "How it works"
   },
   "Comment ouvrir un ticket : menu déroulant de raisons ou boutons": {
     "en": "How a ticket is opened: a drop-down of reasons, or buttons"
@@ -5159,8 +5267,14 @@
   "Date de naissance (JJ/MM/AAAA)": {
     "en": "Date of birth (DD/MM/YYYY)"
   },
+  "Début (JJ/MM/AAAA) — vide = maintenant": {
+    "en": "Start (DD/MM/YYYY) — empty = now"
+  },
   "Débutant": {
     "en": "Beginner"
+  },
+  "Déclarer une absence": {
+    "en": "Declare an absence"
   },
   "déconnecté du salon vocal": {
     "en": "disconnected from the voice channel"
@@ -5206,6 +5320,9 @@
   },
   "Département des véhicules à moteur — San Andreas": {
     "en": "Department of Motor Vehicles — San Andreas"
+  },
+  "Depuis : <t:": {
+    "en": "Since: <t:"
   },
   "Dernier passage de la commande": {
     "en": "Last run of the command"
@@ -5303,11 +5420,20 @@
   "Donner ou retirer une permission à un membre du staff": {
     "en": "Give or take away a permission from a staff member"
   },
+  "Donnez la date de fin — ou laissez vide si vous ne savez pas encore": {
+    "en": "Give the end date — or leave it empty if you do not know yet"
+  },
   "Donnez-lui ses permissions : `/botstaff permission utilisateur permission état`.": {
     "en": "Give them their permissions: `/botstaff permission utilisateur permission état`."
   },
+  "Durée : **indéterminée**": {
+    "en": "Duration: **open-ended**"
+  },
   "Durée en minutes (max 40320 = 28 jours)": {
     "en": "Duration in minutes (max 40320 = 28 days)"
+  },
+  "durée indéterminée": {
+    "en": "no end date"
   },
   "Durée indéterminée": {
     "en": "No end date"
@@ -5476,6 +5602,9 @@
   },
   "Filtrer par entreprise": {
     "en": "Filter by company"
+  },
+  "Fin : date, durée (5j, 12h)… ou vide": {
+    "en": "End: date, duration (5j, 12h)… or empty"
   },
   "Flux à retirer": {
     "en": "Feed to remove"
@@ -5684,6 +5813,9 @@
   "Je ne suis pas un robot": {
     "en": "I am not a robot"
   },
+  "Je suis de retour": {
+    "en": "I am back"
+  },
   "Jouer un lien (YouTube, SoundCloud, Spotify, Deezer) ou chercher un titre": {
     "en": "Play a link (YouTube, SoundCloud, Spotify, Deezer) or search for a track"
   },
@@ -5692,6 +5824,9 @@
   },
   "Joueurs whitelistés": {
     "en": "Whitelisted players"
+  },
+  "jusqu'au <t:": {
+    "en": "until <t:"
   },
   "L'annuaire des radios ne répond pas (": {
     "en": "The radio directory is not answering ("
@@ -5827,6 +5962,9 @@
   },
   "Les **entreprises RP** deviennent communes aux serveurs de cette communauté.": {
     "en": "The **RP companies** become common to the servers of this community."
+  },
+  "Les absences en cours sur le serveur": {
+    "en": "The absences currently running on the server"
   },
   "Les actions du staff, les messages supprimés/modifiés, le vocal et les transcripts de tickets ": {
     "en": "Staff actions, deleted/edited messages, voice activity and ticket transcripts "
@@ -6239,6 +6377,9 @@
   "Patch note (côté utilisateurs)": {
     "en": "Patch note (user side)"
   },
+  "Période": {
+    "en": "Period"
+  },
   "Permis de conduire": {
     "en": "Driving licence"
   },
@@ -6391,6 +6532,9 @@
   },
   "Question obligatoire : l'entreprise propose-t-elle des assurances ?": {
     "en": "Required question: does the company offer insurance?"
+  },
+  "Qui manque": {
+    "en": "Who is away"
   },
   "Qui vous répond": {
     "en": "Who answers you"
@@ -6613,6 +6757,12 @@
   },
   "Retirer un type de ticket": {
     "en": "Remove a ticket type"
+  },
+  "Retour : <t:": {
+    "en": "Back: <t:"
+  },
+  "retour <t:": {
+    "en": "back <t:"
   },
   "Retrait de la blacklist du bot": {
     "en": "Taken off the bot blacklist"
@@ -7070,6 +7220,9 @@
   "Utilisateur immunisé (créateur ou liste d'immunité) — blacklist refusée.": {
     "en": "Immune user (creator or immunity list) — blacklist refused."
   },
+  "Vacances, examens, déménagement…": {
+    "en": "Holidays, exams, moving house…"
+  },
   "Vaincre un boss d'étage": {
     "en": "Beat a floor boss"
   },
@@ -7108,6 +7261,9 @@
   },
   "Vgache : gacha de VTubeuses Twitch FR (façon Mudae)": {
     "en": "Vgache: a gacha of French Twitch VTubers (Mudae style)"
+  },
+  "vide = durée indéterminée": {
+    "en": "empty = no end date"
   },
   "Ville de naissance": {
     "en": "City of birth"
@@ -7175,6 +7331,9 @@
   "Voir une collection": {
     "en": "See a collection"
   },
+  "Votre annonce se supprime toute seule à votre retour": {
+    "en": "Your announcement deletes itself when you are back"
+  },
   "Votre connexion a dû tomber dans un ravin 📉": {
     "en": "Your connection must have fallen off a cliff 📉"
   },
@@ -7198,6 +7357,9 @@
   },
   "Vous êtes reconnu comme le **créateur** de ce bot. Cliquez ci-dessous pour le prouver publiquement.": {
     "en": "You are recognised as the **creator** of this bot. Click below to prove it publicly."
+  },
+  "Vous partez quelques jours ? Dites-le ici : tout le monde le saura, personne ne vous cherchera.": {
+    "en": "Away for a few days? Say it here: everyone will know, nobody will come looking for you."
   },
   "Vous recevez ce message parce que vous êtes **propriétaire** de ce serveur.": {
     "en": "You are getting this message because you are the **owner** of this server."

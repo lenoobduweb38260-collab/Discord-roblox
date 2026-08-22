@@ -494,6 +494,30 @@ CREATE TABLE IF NOT EXISTS role_actions (
   position   INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_role_actions_msg ON role_actions (message_id);
+
+CREATE TABLE IF NOT EXISTS absences (
+  id       INTEGER PRIMARY KEY AUTOINCREMENT,
+  guild_id TEXT NOT NULL,
+  user_id  TEXT NOT NULL,
+  debut    INTEGER NOT NULL,
+  fin      INTEGER,
+  raison   TEXT,
+  at       TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_absences_fin ON absences (fin);
+
+CREATE TABLE IF NOT EXISTS absence_messages (
+  absence_id INTEGER NOT NULL,
+  channel_id TEXT NOT NULL,
+  message_id TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_absence_messages_msg ON absence_messages (message_id);
+
+CREATE TABLE IF NOT EXISTS absence_channels (
+  guild_id   TEXT NOT NULL,
+  channel_id TEXT NOT NULL,
+  PRIMARY KEY (guild_id, channel_id)
+);
 `);
 
 // Migration : ajoute les colonnes manquantes aux bases créées avant leur

@@ -24,6 +24,14 @@ module.exports = {
       console.warn(`⚠️ Musique : diagnostic audio impossible (${err.message}).`);
     }
 
+    // 📅 Les annonces d'absence expirées s'effacent toutes seules — y
+    // compris celles arrivées à échéance pendant que le bot était éteint.
+    try {
+      require('../utils/absences').demarrer(client);
+    } catch (err) {
+      console.warn(`⚠️ Balayage des absences non démarré : ${err.message}`);
+    }
+
     // XP vocal : chaque minute, chaque membre connecté en vocal (non muet
     // serveur, hors salon AFK, hors bots) gagne l'XP vocal configuré.
     setInterval(() => {

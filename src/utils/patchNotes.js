@@ -1249,6 +1249,23 @@ const RELEASES = [
     ],
     retrait: [],
   },
+  {
+    id: 'absences-2026-08bi',
+    title: 'Les absences se declarent en un clic, et s\'effacent toutes seules 📅',
+    ajout: [
+      '📅 **Le panneau d\'absences** : un staff le publie avec `/absence panneau`, et n\'importe qui declare son absence en un clic — date de debut (vide = maintenant), date de fin, duree (`5j`, `12h`, `2sem`)… ou rien du tout pour une absence sans date de fin',
+      '📣 **L\'annonce part dans plusieurs salons a la fois** — jusqu\'a trois, choisis a la publication du panneau — pour que personne ne puisse la manquer',
+      '🧹 **Chaque annonce disparait toute seule a la fin de l\'absence**, dans tous les salons a la fois. Une absence sans date de fin s\'efface d\'un clic sur **✅ Je suis de retour** — la personne concernee, ou le staff',
+      '📋 **`/absence liste`** : qui manque en ce moment, avec la date de retour de chacun',
+    ],
+    amelioration: [
+      '⏰ **Les horaires s\'affichent a l\'heure de chaque lecteur** (horodatages Discord) : « retour dans 3 jours » se lit pareil a Paris et a Montreal',
+      '🛡️ **Une seule absence a la fois** : en declarer une seconde renvoie vers l\'annonce en cours, au lieu d\'empiler des doublons',
+      '🔁 **Le rattrapage au demarrage** : les absences arrivees a echeance pendant que le bot etait eteint sont nettoyees des qu\'il revient',
+    ],
+    fix: [],
+    retrait: [],
+  },
 ];
 
 // Construit l'embed d'une note à partir d'une entrée { title, ajout, fix,
