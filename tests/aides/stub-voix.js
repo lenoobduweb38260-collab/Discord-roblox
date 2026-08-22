@@ -146,6 +146,8 @@ const play = {
   },
   async stream(url) {
     play.appels.push(`stream:${url}`);
+    // Simule un flux lent à ouvrir : le temps qu'un /musique stop se glisse.
+    if (reglages.fluxDelaiMs) await new Promise((r) => setTimeout(r, reglages.fluxDelaiMs));
     if (reglages.fluxCasse || (reglages.fluxCassePour && url === reglages.fluxCassePour)) {
       throw new Error('flux indisponible');
     }
@@ -162,6 +164,7 @@ function reinitialiser() {
   reglages.reseau = null;
   reglages.pretAuEssai = null;
   reglages.essaisReady = 0;
+  reglages.fluxDelaiMs = 0;
 }
 
 module.exports = { voix, play, journal, reglages, reinitialiser, FauxLecteur, FausseConnexion, FauxReseau };

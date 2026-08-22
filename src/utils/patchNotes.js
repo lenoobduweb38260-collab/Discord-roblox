@@ -1281,6 +1281,24 @@ const RELEASES = [
     fix: [],
     retrait: [],
   },
+  {
+    id: 'refonte-moteur-musique-2026-08bk',
+    title: 'Le moteur de musique, refait de fond en comble 🧱',
+    ajout: [],
+    amelioration: [
+      '🧱 **Le moteur de musique est retape en trois modules nets** : la LECTURE (une session par serveur : file, lecteur, boucles, volume, radios), la CONNEXION (deux essais, rotation de region, l\'espion des sous-etapes reseau, les diagnostics) et les SOURCES (YouTube, SoundCloud, Spotify, Deezer, radios). L\'ancien fichier melangait les trois — chaque correctif rajoutait une piece au puzzle',
+      '⏲️ **Les minuteries de lecture sont NOMMEES** (solitude, file terminee, relance d\'une radio tombee) : on n\'annule plus que celle qu\'on vise, au lieu de tout couper d\'un coup',
+      '🎛️ Aucune commande ne change : /musique et /radio fonctionnent exactement pareil — seuls les murs porteurs ont ete refaits',
+    ],
+    fix: [
+      '🩹 **Deux demandes lancees en meme temps** (deux membres qui tapent /musique a 100 ms d\'ecart) ne se sabotaient plus proprement : la seconde detruisait la connexion que la premiere etait en train d\'ouvrir, et deux lectures fantomes se marchaient dessus. La creation de session passe sous un verrou par serveur',
+      '🩹 **Un /musique stop pendant l\'ouverture d\'un flux** laissait la lecture demarrer dans le vide — un processus FFmpeg que plus personne ne pouvait arreter. La session verifie qu\'elle est toujours vivante avant de jouer, et avant d\'annoncer un echec',
+      '🩹 **Un morceau demande pendant la relance d\'une radio tombee** passait DERRIERE elle : la carte annoncait le morceau, la radio repartait a sa place, et le morceau ne jouait jamais (coince derriere un flux sans fin). Il passe desormais devant, et le direct reprend apres lui',
+      '🩹 **Le compte a rebours de solitude repartait de zero a chaque evenement vocal** (un autre bot qui se mute suffisait) : arme une fois, il court desormais jusqu\'au bout',
+      '🧹 L\'arrivee de quelqu\'un dans le salon n\'annule plus TOUTES les minuteries — seule celle de solitude ; la relance d\'une radio tombee y survit',
+    ],
+    retrait: [],
+  },
 ];
 
 // Construit l'embed d'une note à partir d'une entrée { title, ajout, fix,

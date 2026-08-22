@@ -509,9 +509,92 @@ console.log('\n13 quinquies) Une radio morte ne fait pas tourner FFmpeg en boucl
   labo.reinitialiser();
 }
 
+console.log('\n13 sexies) Les minuteries sont nommées : on n\'annule que ce qu\'on vise');
+{
+  // L'ancien code coupait TOUTES les minuteries quand quelqu'un entrait dans
+  // le salon — y compris la relance d'une radio tombée : la session restait
+  // suspendue, sans piste et sans minuterie.
+  labo.reinitialiser();
+  const sc = scene();
+  const S3 = require('../src/utils/musiqueSources');
+  await musique.ajouterPiste(sc, S3.piste({ titre: '📻 Direct FM', url: 'http://flux/direct', source: 'radio' }));
+  const session = musique.fileDe('G1');
+  session.debutLecture = Date.now() - 60000; // le direct tenait depuis une minute
+  session.lecteur.terminer();                // … puis tombe : relance armée
+  V('la relance de la radio est programmée', session.minuteurs.has('relance-radio'), [...session.minuteurs.keys()].join(','));
+  musique.verifierSolitude('G1', 2);         // quelqu'un entre dans le salon
+  V('l\'arrivée de quelqu\'un ne tue PAS la relance', session.minuteurs.has('relance-radio'));
+  musique.verifierSolitude('G1', 0);
+  V('la solitude s\'ajoute sans écraser le reste', session.minuteurs.has('solitude') && session.minuteurs.has('relance-radio'));
+  musique.verifierSolitude('G1', 1);
+  V('… et se retire seule', !session.minuteurs.has('solitude') && session.minuteurs.has('relance-radio'));
+  musique.quitter('G1', 'fin de test');
+  V('quitter coupe tout', session.minuteurs.size === 0);
+  labo.reinitialiser();
+}
+
+console.log('\n13 septies) La refonte ferme les courses héritées');
+{
+  const S4 = require('../src/utils/musiqueSources');
+
+  // 1. Deux demandes simultanées, aucune session : UNE seule connexion.
+  labo.reinitialiser();
+  const scA = scene();
+  const scB = scene();
+  await Promise.all([
+    musique.ajouterPiste(scA, S4.piste({ titre: 'A', url: 'uA', source: 'youtube' })),
+    musique.ajouterPiste(scB, S4.piste({ titre: 'B', url: 'uB', source: 'youtube' })),
+  ]);
+  const joins = labo.journal.filter(([q]) => q === 'join').length;
+  V('deux demandes simultanées → UNE connexion', joins === 1, String(joins));
+  const s1 = musique.fileDe('G1');
+  V('… une seule session, les deux pistes dedans',
+    s1 && s1.encours?.titre === 'A' && s1.pistes.length === 1 && s1.pistes[0].titre === 'B',
+    JSON.stringify({ encours: s1?.encours?.titre, file: s1?.pistes?.map((p) => p.titre) }));
+  musique.quitter('G1', 'fin de test');
+
+  // 2. /musique stop pendant l'ouverture du flux : rien ne joue après.
+  labo.reinitialiser();
+  labo.reglages.fluxDelaiMs = 120;
+  const scC = scene();
+  const enCours = musique.ajouterPiste(scC, S4.piste({ titre: 'Lent', url: 'uLent', source: 'youtube' }));
+  await new Promise((r) => setTimeout(r, 30));
+  musique.quitter('G1', 'stop pendant l\'ouverture');
+  await enCours;
+  V('un stop pendant l\'ouverture du flux ne lance RIEN',
+    !labo.journal.some(([q]) => q === 'play'), JSON.stringify(labo.journal.filter(([q]) => q === 'play')));
+  V('… et aucune session ne traîne', musique.fileDe('G1') === null);
+  labo.reinitialiser();
+
+  // 3. Un morceau demandé pendant la relance d'une radio passe DEVANT elle.
+  const scD = scene();
+  await musique.ajouterPiste(scD, S4.piste({ titre: '📻 Direct FM', url: 'http://flux/direct', source: 'radio' }));
+  const s2 = musique.fileDe('G1');
+  s2.debutLecture = Date.now() - 60000;
+  s2.lecteur.terminer(); // le direct tombe : relance armée, radio en tête
+  await musique.ajouterPiste(scD, S4.piste({ titre: 'Morceau demandé', url: 'uX', source: 'youtube' }));
+  V('le morceau demandé joue tout de suite', s2.encours?.titre === 'Morceau demandé', s2.encours?.titre);
+  V('… la radio attend juste derrière', s2.pistes[0]?.source === 'radio', JSON.stringify(s2.pistes.map((p) => p.titre)));
+  V('… et la relance programmée est levée', !s2.minuteurs.has('relance-radio'));
+  musique.quitter('G1', 'fin de test');
+  labo.reinitialiser();
+
+  // 4. La solitude ne repart pas de zéro à chaque événement vocal.
+  const scE = scene();
+  await musique.ajouterPiste(scE, S4.piste({ titre: 'T', url: 'uT', source: 'youtube' }));
+  const s3 = musique.fileDe('G1');
+  musique.verifierSolitude('G1', 0);
+  const minuterie = s3.minuteurs.get('solitude');
+  musique.verifierSolitude('G1', 0);
+  V('un second constat de solitude ne réarme pas le compte à rebours',
+    s3.minuteurs.get('solitude') === minuterie);
+  musique.quitter('G1', 'fin de test');
+  labo.reinitialiser();
+}
+
 console.log('\n13 bis) Une seconde tentative avant de renoncer');
 {
-  const mu = require('fs').readFileSync(`${__dirname}/../src/utils/music.js`, 'utf8');
+  const mu = require('fs').readFileSync(`${__dirname}/../src/utils/musiqueVocal.js`, 'utf8');
   // Discord laisse parfois tomber le premier « voice server update » : rien
   // ne revient jamais, et la connexion reste en « signalling ».
   V('deux essais', /for \(let essai = 1; essai <= 2; essai\+\+\)/.test(mu));
@@ -581,7 +664,7 @@ console.log('\n13 ter) Le diagnostic dit à QUELLE étape ça s\'arrête');
   V('la commande /musique diagnostic existe', /setName\('diagnostic'\)/.test(cmd3));
   V('… elle refuse hors vocal', /le test a besoin d'un salon où essayer/.test(cmd3));
   V('… et ne relance rien si la musique joue déjà', /la connexion vocale fonctionne donc/.test(cmd3));
-  const mu2 = require('fs').readFileSync(`${__dirname}/../src/utils/music.js`, 'utf8').replace(/\\'/g, "'");
+  const mu2 = require('fs').readFileSync(`${__dirname}/../src/utils/musiqueVocal.js`, 'utf8').replace(/\\'/g, "'");
   V('l\'adaptateur est instrumenté', /onVoiceServerUpdate\(donnees\) \{ etapes\.serveurRecu = true/.test(mu2));
   V('… et la connexion de test est toujours refermée', /finally \{\s*\n\s*try \{ connexion\?\.destroy/.test(mu2));
   V('le fait que l\'UDP n\'intervient qu\'à la fin est écrit', /Aucune de ces étapes n'utilise l'UDP/.test(mu2));
@@ -595,7 +678,7 @@ console.log('\n14) Branchements');
     const vs = fs.readFileSync(`${__dirname}/../src/events/voiceStateUpdate.js`, 'utf8');
     V('la solitude est surveillée', /verifierSolitude\(guild\.id, humains\)/.test(vs));
     V('… en comptant les HUMAINS, pas les bots', /filter\(\(m\) => !m\.user\.bot\)/.test(vs));
-    const mu = fs.readFileSync(`${__dirname}/../src/utils/music.js`, 'utf8');
+    const mu = fs.readFileSync(`${__dirname}/../src/utils/musiqueSession.js`, 'utf8');
     V('la déconnexion distingue un changement de région', /Signalling[\s\S]{0,120}Connecting/.test(mu));
     const rd = fs.readFileSync(`${__dirname}/../src/events/ready.js`, 'utf8');
     V('les briques manquantes sont signalées au démarrage', /briquesManquantes\(\)/.test(rd));
