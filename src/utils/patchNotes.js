@@ -1299,6 +1299,18 @@ const RELEASES = [
     ],
     retrait: [],
   },
+  {
+    id: 'mentions-silencieuses-2026-08bl',
+    title: 'Les mentions des cartes ne sonnent plus 🔕',
+    ajout: [],
+    amelioration: [
+      '🔕 **Une mention ecrite dans une carte s\'affiche sans notifier.** Un embed n\'a jamais fait sonner personne — mais converti en carte, son texte devenait du contenu ordinaire et chaque @mention s\'etait mise a notifier : les annonces d\'absence pinguaient leurs membres, les journaux pinguaient le staff. La conversion restaure la regle d\'origine',
+      '🔔 **Les tickets, eux, sonnent toujours** : leur ping part dans le message lui-meme (pas dans l\'embed), exactement comme du temps des embeds — l\'ouverture d\'un ticket et la relance continuent de notifier la personne et les roles support',
+      '🎛️ Un envoi qui regle explicitement ses mentions autorisees garde son reglage : la regle ne comble que le vide',
+    ],
+    fix: [],
+    retrait: [],
+  },
 ];
 
 // Construit l'embed d'une note à partir d'une entrée { title, ajout, fix,

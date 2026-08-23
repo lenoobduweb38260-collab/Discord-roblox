@@ -217,6 +217,29 @@ function longueurTexte(composants) {
 // Renvoie le nouveau corps, ou null si la conversion ne s'applique pas ou ne
 // tiendrait pas dans les limites — auquel cas l'appelant envoie le message
 // d'origine, inchangé.
+// 🔕 Ce qu'un message a le droit de faire SONNER.
+//
+// Un embed n'a JAMAIS notifié personne : Discord n'avertit pas pour les
+// mentions écrites dedans. Converti en carte, son texte devient du contenu
+// ordinaire — et chaque @mention d'embed s'était mise à sonner (les annonces
+// d'absence, les journaux, les fiches…). On restaure la sémantique d'origine :
+// seules les mentions du CONTENU du message — le champ qui notifiait déjà du
+// temps des embeds, celui des tickets par exemple — gardent leur notification.
+// Celles issues des embeds s'affichent, en silence.
+function mentionsDuContenu(contenu) {
+  const t = String(contenu || '');
+  const uniques = (motif) => {
+    const vus = [];
+    for (const m of t.matchAll(motif)) if (!vus.includes(m[1])) vus.push(m[1]);
+    return vus.slice(0, 100); // la limite de l'API
+  };
+  return {
+    parse: /@everyone|@here/.test(t) ? ['everyone'] : [],
+    users: uniques(/<@!?(\d+)>/g),
+    roles: uniques(/<@&(\d+)>/g),
+  };
+}
+
 function convertirCorps(corps, options = {}) {
   if (!corps || typeof corps !== 'object') return null;
   if (!Array.isArray(corps.embeds) || !corps.embeds.length) return null;
@@ -264,6 +287,11 @@ function convertirCorps(corps, options = {}) {
   // `content` et `embeds` sont refusés par l'API quand le drapeau est posé.
   delete sortie.content;
   delete sortie.embeds;
+  // 🔕 Un envoi qui a déjà réglé ses mentions autorisées n'est pas touché ;
+  // pour les autres, seules les mentions du contenu d'origine sonnent.
+  if (sortie.allowed_mentions === undefined) {
+    sortie.allowed_mentions = mentionsDuContenu(contenu);
+  }
   return sortie;
 }
 
@@ -276,7 +304,7 @@ function convertirCorps(corps, options = {}) {
 {
   const API = {
     T, DRAPEAU_V2, MAX_TEXTE_TOTAL, MAX_COMPOSANTS, MAX_DANS_CONTENEUR,
-    enBlocs, enCarte, convertirCorps, compter, longueurTexte, estFilet, dateDiscord,
+    enBlocs, enCarte, convertirCorps, compter, longueurTexte, estFilet, dateDiscord, mentionsDuContenu,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = API;
   else if (typeof globalThis !== 'undefined') globalThis.Cartes = API;
