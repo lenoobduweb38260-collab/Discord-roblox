@@ -1377,6 +1377,16 @@ const RELEASES = [
     fix: [],
     retrait: [],
   },
+  {
+    id: 'annonces-maj-silencieuses-2026-08bq',
+    title: 'Les annonces de mise à jour ne sonnent plus 🔕',
+    ajout: [],
+    amelioration: [
+      '🔕 **Plus aucune mention du staff a chaque mise a jour du bot.** L\'annonce arrive toujours dans le salon des mises a jour (ou #shadow-logs, deja reserve au staff) — mais elle n\'y sonne plus personne : la carte suffit, la notification etait du bruit',
+    ],
+    fix: [],
+    retrait: [],
+  },
 ];
 
 // Construit l'embed d'une note à partir d'une entrée { title, ajout, fix,

@@ -3125,27 +3125,27 @@ Check that the bot has **Manage Channels**.";"";"";""
 "utils.tickets.143";"utils/tickets.js";"1029";"";"➕ Membre(s) ajouté(s)";"➕ Member(s) added";"";"";""
 "utils.tickets.144";"utils/tickets.js";"1029";"";"➖ Membre(s) retiré(s)";"➖ Member(s) removed";"";"";""
 "utils.tickets.145";"utils/tickets.js";"1073";"";"❌ Une erreur est survenue sur ce ticket.";"❌ Something went wrong with this ticket.";"";"";""
-"utils.updateAnnounce.001";"utils/updateAnnounce.js";"55";"";"Salon des annonces de mise à jour du bot (créé automatiquement, visible du staff uniquement)";"Channel for the bot's update announcements (created automatically, staff-only)";"";"";""
-"utils.updateAnnounce.002";"utils/updateAnnounce.js";"60";"";"⚠️ Création de #shadow-logs impossible sur ";"⚠️ Could not create #shadow-logs on ";"";"";""
-"utils.updateAnnounce.003";"utils/updateAnnounce.js";"82";"";"⚠️ Annonce de mise à jour impossible sur ";"⚠️ Could not announce the update on ";"";"";""
-"utils.updateAnnounce.004";"utils/updateAnnounce.js";"120";"";"📦 Mise à jour prête !";"📦 Update ready!";"";"";""
-"utils.updateAnnounce.005";"utils/updateAnnounce.js";"122";"";"Une nouvelle version du bot est disponible : **";"A new version of the bot is available: **";"";"";""
-"utils.updateAnnounce.006";"utils/updateAnnounce.js";"123";"";"• `/update` (ou `/forceupdate`) — installer et redémarrer **maintenant**
+"utils.updateAnnounce.001";"utils/updateAnnounce.js";"56";"";"Salon des annonces de mise à jour du bot (créé automatiquement, visible du staff uniquement)";"Channel for the bot's update announcements (created automatically, staff-only)";"";"";""
+"utils.updateAnnounce.002";"utils/updateAnnounce.js";"61";"";"⚠️ Création de #shadow-logs impossible sur ";"⚠️ Could not create #shadow-logs on ";"";"";""
+"utils.updateAnnounce.003";"utils/updateAnnounce.js";"79";"";"⚠️ Annonce de mise à jour impossible sur ";"⚠️ Could not announce the update on ";"";"";""
+"utils.updateAnnounce.004";"utils/updateAnnounce.js";"117";"";"📦 Mise à jour prête !";"📦 Update ready!";"";"";""
+"utils.updateAnnounce.005";"utils/updateAnnounce.js";"119";"";"Une nouvelle version du bot est disponible : **";"A new version of the bot is available: **";"";"";""
+"utils.updateAnnounce.006";"utils/updateAnnounce.js";"120";"";"• `/update` (ou `/forceupdate`) — installer et redémarrer **maintenant**
 ";"• `/update` (or `/forceupdate`) — install and restart **now**
 ";"";"";""
-"utils.updateAnnounce.007";"utils/updateAnnounce.js";"124";"";"• Sinon, elle sera installée automatiquement au **prochain redémarrage** du bot.
+"utils.updateAnnounce.007";"utils/updateAnnounce.js";"121";"";"• Sinon, elle sera installée automatiquement au **prochain redémarrage** du bot.
 
 ";"• Otherwise it will be installed automatically at the bot's **next restart**.
 
 ";"";"";""
-"utils.updateAnnounce.008";"utils/updateAnnounce.js";"125";"";"_Ce message disparaîtra automatiquement une fois la mise à jour installée._";"_This message will disappear on its own once the update is installed._";"";"";""
-"utils.updateAnnounce.009";"utils/updateAnnounce.js";"130";"";"📦 Mise à jour ";"📦 Update ";"";"";""
-"utils.updateAnnounce.010";"utils/updateAnnounce.js";"130";"";" annoncée au staff de chaque serveur.";" announced to the staff of every server.";"";"";""
-"utils.updateAnnounce.011";"utils/updateAnnounce.js";"132";"";"⚠️ Vérification des mises à jour : ";"⚠️ Update check: ";"";"";""
-"utils.updateAnnounce.012";"utils/updateAnnounce.js";"147";"";"✅ Mise à jour installée";"✅ Update installed";"";"";""
-"utils.updateAnnounce.013";"utils/updateAnnounce.js";"148";"";"Le bot vient d'être mis à jour : **";"The bot has just been updated: **";"";"";""
-"utils.updateAnnounce.014";"utils/updateAnnounce.js";"148";"";"**. Tout est en ligne !";"**. Everything is up!";"";"";""
-"utils.updateAnnounce.015";"utils/updateAnnounce.js";"151";"";"✅ Installation de ";"✅ Installing ";"";"";""
+"utils.updateAnnounce.008";"utils/updateAnnounce.js";"122";"";"_Ce message disparaîtra automatiquement une fois la mise à jour installée._";"_This message will disappear on its own once the update is installed._";"";"";""
+"utils.updateAnnounce.009";"utils/updateAnnounce.js";"127";"";"📦 Mise à jour ";"📦 Update ";"";"";""
+"utils.updateAnnounce.010";"utils/updateAnnounce.js";"127";"";" annoncée au staff de chaque serveur.";" announced to the staff of every server.";"";"";""
+"utils.updateAnnounce.011";"utils/updateAnnounce.js";"129";"";"⚠️ Vérification des mises à jour : ";"⚠️ Update check: ";"";"";""
+"utils.updateAnnounce.012";"utils/updateAnnounce.js";"144";"";"✅ Mise à jour installée";"✅ Update installed";"";"";""
+"utils.updateAnnounce.013";"utils/updateAnnounce.js";"145";"";"Le bot vient d'être mis à jour : **";"The bot has just been updated: **";"";"";""
+"utils.updateAnnounce.014";"utils/updateAnnounce.js";"145";"";"**. Tout est en ligne !";"**. Everything is up!";"";"";""
+"utils.updateAnnounce.015";"utils/updateAnnounce.js";"148";"";"✅ Installation de ";"✅ Installing ";"";"";""
 "utils.vocalAlerte.001";"utils/vocalAlerte.js";"63";"";"> attend de l'aide en vocal.";"> is waiting for help in voice.";"";"";""
 "utils.vocalAlerte.002";"utils/vocalAlerte.js";"64";"";"En attente depuis <t:";"Waiting since <t:";"";"";""
 "utils.vocalAlerte.003";"utils/vocalAlerte.js";"65";"";"Pris en charge par <@";"Claimed by <@";"";"";""

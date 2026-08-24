@@ -4,10 +4,11 @@ const { currentVersion, REPO, HEADERS } = require('../updater');
 const { staffRoleIds, adminRoleIds } = require('./permissions');
 
 // Annonces de mise à jour : quand une nouvelle release GitHub est prête, le
-// bot l'annonce sur chaque serveur en mentionnant le rôle staff. Le salon
-// d'annonce se configure dans /config → Salons ; sans salon configuré, le bot
-// crée automatiquement #shadow-logs, visible uniquement du staff (les membres
-// avec la permission Administrateur voient le salon dans tous les cas).
+// bot l'annonce sur chaque serveur. SANS mention : le salon est déjà réservé
+// au staff, la carte suffit — sonner tout le staff à chaque version était du
+// bruit. Le salon d'annonce se configure dans /config → Salons ; sans salon
+// configuré, le bot crée automatiquement #shadow-logs, visible uniquement du
+// staff (les membres avec la permission Administrateur le voient toujours).
 
 const getState = db.prepare('SELECT value FROM app_state WHERE key = ?');
 const setState = db.prepare(
@@ -62,7 +63,8 @@ async function resolveUpdateChannel(guild) {
   }
 }
 
-// Envoie l'embed sur tous les serveurs, avec mention du rôle staff configuré.
+// Envoie l'embed sur tous les serveurs — sans mention : personne ne sonne
+// pour une mise à jour, le salon réservé au staff suffit.
 // Avec { track: true }, renvoie les références des messages envoyés (pour les
 // supprimer une fois la mise à jour installée).
 async function broadcast(client, embed, { track = false } = {}) {
@@ -71,12 +73,7 @@ async function broadcast(client, embed, { track = false } = {}) {
     try {
       const channel = await resolveUpdateChannel(guild);
       if (!channel) continue;
-      const cfg = getGuildConfig(guild.id);
-      const ping = staffRoleIds(cfg)
-        .filter((id) => guild.roles.cache.has(id))
-        .map((id) => `<@&${id}>`)
-        .join(' ');
-      const msg = await channel.send({ content: ping || undefined, embeds: [embed] });
+      const msg = await channel.send({ embeds: [embed] });
       if (track && msg) sent.push({ c: channel.id, m: msg.id });
     } catch (err) {
       console.warn(`⚠️ Annonce de mise à jour impossible sur ${guild.name} : ${err.message}`);
