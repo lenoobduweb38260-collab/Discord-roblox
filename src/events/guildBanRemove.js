@@ -1,6 +1,7 @@
 const { Events, AuditLogEvent } = require('discord.js');
 const { sendLog, logEmbed, COLORS } = require('../utils/embeds');
 const { auditExecutor } = require('../utils/audit');
+const { etiquetteMembre } = require('../utils/journal');
 
 module.exports = {
   name: Events.GuildBanRemove,
@@ -10,7 +11,7 @@ module.exports = {
       ban.guild,
       logEmbed(
         '🔓 Bannissement levé',
-        `➜ Membre : **${ban.user.tag}** (<@${ban.user.id}>)${by ? `\n➜ Débanni par : ${by}` : ''}`,
+        `➜ Membre : ${etiquetteMembre(ban.user)}${by ? `\n➜ Débanni par : ${by}` : ''}`,
         COLORS.SUCCESS
       )
     );

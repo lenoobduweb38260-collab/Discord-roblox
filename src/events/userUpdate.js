@@ -1,5 +1,6 @@
 const { Events } = require('discord.js');
 const { sendLog, logEmbed, COLORS } = require('../utils/embeds');
+const { etiquetteMembre } = require('../utils/journal');
 
 // Pseudo global, nom d'utilisateur, avatar : l'événement est GLOBAL, on le
 // journalise dans chaque serveur commun où le membre est en cache.
@@ -19,7 +20,7 @@ module.exports = {
       if (!guild.members.cache.has(newUser.id)) continue;
       await sendLog(
         guild,
-        logEmbed('👤 Profil modifié', `<@${newUser.id}> a changé de profil :\n${changes.join('\n')}`, COLORS.INFO)
+        logEmbed('👤 Profil modifié', `${etiquetteMembre(newUser)} a changé de profil :\n${changes.join('\n')}`, COLORS.INFO)
       );
     }
   },

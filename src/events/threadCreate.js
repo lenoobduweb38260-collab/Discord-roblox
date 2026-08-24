@@ -1,5 +1,6 @@
 const { Events } = require('discord.js');
 const { sendLog, logEmbed, COLORS } = require('../utils/embeds');
+const { mentionAvecId } = require('../utils/journal');
 
 module.exports = {
   name: Events.ThreadCreate,
@@ -9,7 +10,7 @@ module.exports = {
       `➜ Fil : <#${thread.id}> (**${thread.name}**)`,
       `➜ Dans : <#${thread.parentId}>`,
     ];
-    if (thread.ownerId) details.push(`➜ Ouvert par : <@${thread.ownerId}>`);
+    if (thread.ownerId) details.push(`➜ Ouvert par : ${mentionAvecId(thread.ownerId)}`);
     await sendLog(
       thread.guild,
       logEmbed('🧵 Fil créé', details.join('\n'), COLORS.SUCCESS)

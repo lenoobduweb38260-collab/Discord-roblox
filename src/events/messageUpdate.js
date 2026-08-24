@@ -1,5 +1,6 @@
 const { Events } = require('discord.js');
 const { sendLog, logEmbed, COLORS } = require('../utils/embeds');
+const { etiquetteMembre } = require('../utils/journal');
 const { getGuildConfig } = require('../database');
 const { record } = require('../utils/snipe');
 
@@ -45,7 +46,7 @@ module.exports = {
       newMessage.guild,
       logEmbed(
         '✏️ Message modifié',
-        `**Auteur :** <@${newMessage.author.id}>\n**Salon :** <#${newMessage.channelId}> — [aller au message](${newMessage.url})`,
+        `**Auteur :** ${etiquetteMembre(newMessage.author)}\n**Salon :** <#${newMessage.channelId}> — [aller au message](${newMessage.url})`,
         COLORS.WARNING,
         [
           { name: '📝 Avant', value: before.slice(0, 1024), inline: false },

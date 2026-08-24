@@ -1387,6 +1387,18 @@ const RELEASES = [
     fix: [],
     retrait: [],
   },
+  {
+    id: 'journal-noms-et-ids-2026-08br',
+    title: 'Fini les « @utilisateur-inconnu » dans les logs 🪪',
+    ajout: [],
+    amelioration: [
+      '🪪 **Chaque personne des logs est nommee EN CLAIR, avec son identifiant** : « **Bayouss** (@mention · 123456789) ». Une mention seule s\'affichait « @utilisateur-inconnu » des que le client Discord du lecteur ne connaissait pas ce membre — desormais, quoi qu\'affiche la mention, le nom et l\'ID restent lisibles',
+      '🎭 **Les roles ajoutes/retires aussi** : nom en clair + ID a cote de la mention — un role supprime depuis reste identifiable',
+      '🔎 Partout ou le journal d\'audit donne l\'auteur d\'une action (« par… »), il est nomme et identifie de la meme facon — vocal, messages, purges, invitations, fils et evenements compris',
+    ],
+    fix: [],
+    retrait: [],
+  },
 ];
 
 // Construit l'embed d'une note à partir d'une entrée { title, ajout, fix,

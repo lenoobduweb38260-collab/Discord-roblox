@@ -1,7 +1,7 @@
 const { Events, AuditLogEvent } = require('discord.js');
 const { sendLog, logEmbed, COLORS } = require('../utils/embeds');
 const { auditExecutor } = require('../utils/audit');
-const { diffMembre } = require('../utils/journal');
+const { diffMembre, etiquetteMembre } = require('../utils/journal');
 
 // Surnom, rôles, exclusion temporaire, boost, avatar de serveur : chaque
 // changement d'un membre laisse une trace.
@@ -21,7 +21,7 @@ module.exports = {
       newMember.guild,
       logEmbed(
         '👤 Membre modifié',
-        `<@${newMember.id}> a été modifié${by ? ` par ${by}` : ''} :\n${changes.join('\n')}`.slice(0, 4000),
+        `${etiquetteMembre(newMember)} a été modifié${by ? ` par ${by}` : ''} :\n${changes.join('\n')}`.slice(0, 4000),
         COLORS.INFO
       )
     );

@@ -23,6 +23,22 @@ const AUCUNE = '*(aucune)*';
 // Les noms de permissions d'un bitfield discord.js — [] si l'objet n'en est pas un.
 const nomsPermissions = (bits) => (bits && typeof bits.toArray === 'function' ? bits.toArray() : []);
 
+// 👤 Un membre ou un utilisateur, TOUJOURS lisible dans un log.
+//
+// Une mention `<@id>` seule s'affiche « @utilisateur-inconnu » dès que le
+// client Discord du lecteur n'a pas ce membre sous la main — fréquent dans
+// les embeds. On écrit donc le nom en clair d'abord, la mention ensuite, et
+// l'identifiant en dernier : quoi qu'affiche le client, on sait de qui on parle.
+function etiquetteMembre(membreOuUser) {
+  const user = membreOuUser?.user ?? membreOuUser;
+  const id = membreOuUser?.id ?? user?.id ?? '?';
+  const nom = membreOuUser?.displayName ?? user?.globalName ?? user?.username ?? user?.tag ?? null;
+  return nom ? `**${nom}** (<@${id}> · \`${id}\`)` : `<@${id}> (\`${id}\`)`;
+}
+
+// La même chose quand on n'a QUE l'identifiant sous la main.
+const mentionAvecId = (id) => `<@${id}> (\`${id}\`)`;
+
 // ── Salons ────────────────────────────────────────────────────────
 
 function diffSalon(ancien, nouveau) {
@@ -116,8 +132,14 @@ function diffMembre(ancien, nouveau) {
   const apres = nouveau?.roles?.cache ?? new Map();
   const ajoutes = [...apres.keys()].filter((id) => !avant.has(id));
   const retires = [...avant.keys()].filter((id) => !apres.has(id));
-  if (ajoutes.length) lignes.push(`➜ Rôles ajoutés : ${ajoutes.map((id) => `<@&${id}>`).join(' ')}`);
-  if (retires.length) lignes.push(`➜ Rôles retirés : ${retires.map((id) => `<@&${id}>`).join(' ')}`);
+  // Le nom du rôle en clair à côté de la mention : un rôle supprimé depuis
+  // s'afficherait « @rôle-supprimé », et l'ID permet de le retrouver.
+  const nomRole = (id, depuis) => {
+    const role = depuis?.get?.(id);
+    return role?.name ? `<@&${id}> (**${role.name}** · \`${id}\`)` : `<@&${id}> (\`${id}\`)`;
+  };
+  if (ajoutes.length) lignes.push(`➜ Rôles ajoutés : ${ajoutes.map((id) => nomRole(id, apres)).join(' · ')}`);
+  if (retires.length) lignes.push(`➜ Rôles retirés : ${retires.map((id) => nomRole(id, avant)).join(' · ')}`);
   const exclAvant = ancien?.communicationDisabledUntilTimestamp ?? null;
   const exclApres = nouveau?.communicationDisabledUntilTimestamp ?? null;
   if (exclAvant !== exclApres) {
@@ -150,7 +172,7 @@ function diffGuilde(ancienne, nouvelle) {
     lignes.push(`➜ URL personnalisée : ${ancienne?.vanityURLCode || AUCUNE} → ${nouvelle?.vanityURLCode || AUCUNE}`);
   }
   if ((ancienne?.ownerId ?? null) !== (nouvelle?.ownerId ?? null)) {
-    lignes.push(`➜ 👑 Propriétaire : <@${ancienne?.ownerId}> → <@${nouvelle?.ownerId}>`);
+    lignes.push(`➜ 👑 Propriétaire : ${mentionAvecId(ancienne?.ownerId)} → ${mentionAvecId(nouvelle?.ownerId)}`);
   }
   if ((ancienne?.verificationLevel ?? null) !== (nouvelle?.verificationLevel ?? null)) {
     const mot = (n) => NIVEAUX_VERIF[n] ?? n;
@@ -201,6 +223,6 @@ function diffEvenement(ancien, nouveau) {
 }
 
 module.exports = {
-  typeSalon, TYPES_SALON,
+  typeSalon, TYPES_SALON, etiquetteMembre, mentionAvecId,
   diffSalon, diffPermissionsSalon, diffFil, diffMembre, diffGuilde, diffEvenement,
 };

@@ -377,6 +377,15 @@
   " 5. Flux audio ouvert ": {
     "en": " 5. Audio stream open "
   },
+  " a changé de profil :\n": {
+    "en": " changed their profile:\n"
+  },
+  " a été modifié": {
+    "en": " was updated"
+  },
+  " a quitté <#": {
+    "en": " left <#"
+  },
   " annoncée au staff de chaque serveur.": {
     "en": " announced to the staff of every server."
   },
@@ -478,6 +487,9 @@
   },
   " erreurs**, vous serez expulsé du serveur.": {
     "en": " mistakes**, you will be kicked from the server."
+  },
+  " est passé de <#": {
+    "en": " moved from <#"
   },
   " et de **tous les serveurs du bot**": {
     "en": " and from **every server the bot is on**"
@@ -3476,6 +3488,9 @@
   "➖ Retrait": {
     "en": "➖ Removal"
   },
+  "➜ 👑 Propriétaire : ": {
+    "en": "➜ 👑 Owner: "
+  },
   "➜ 👑 Propriétaire : <@": {
     "en": "➜ 👑 Owner: <@"
   },
@@ -3536,8 +3551,14 @@
   "➜ Couleur : `": {
     "en": "➜ Colour: `"
   },
+  "➜ Créé par : ": {
+    "en": "➜ Created by: "
+  },
   "➜ Créé par : <@": {
     "en": "➜ Created by: <@"
+  },
+  "➜ Créée par : ": {
+    "en": "➜ Created by: "
   },
   "➜ Créée par : <@": {
     "en": "➜ Created by: <@"
@@ -3644,6 +3665,9 @@
   "➜ Limite de membres : ": {
     "en": "➜ Member limit: "
   },
+  "➜ Membre : ": {
+    "en": "➜ Member: "
+  },
   "➜ Membre : **": {
     "en": "➜ Member: **"
   },
@@ -3664,6 +3688,9 @@
   },
   "➜ Nom d'utilisateur : **": {
     "en": "➜ Username: **"
+  },
+  "➜ Ouvert par : ": {
+    "en": "➜ Opened by: "
   },
   "➜ Ouvert par : <@": {
     "en": "➜ Opened by: <@"
@@ -4210,6 +4237,9 @@
   },
   "👤 Nom RP": {
     "en": "👤 RP surname"
+  },
+  "👤 Par ": {
+    "en": "👤 By "
   },
   "👤 Par <@": {
     "en": "👤 By <@"

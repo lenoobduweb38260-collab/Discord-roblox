@@ -142,10 +142,29 @@ const bits = (...noms) => ({ toArray: () => noms });
     ]);
     messages.size = 3;
     await bulk.execute({ size: 3, values: () => messages.values() }, { guild, id: 'C1' });
-    V('une purge dit le compte et les auteurs humains', envois.length === 3
+    V('une purge dit le compte et les auteurs humains, ID compris', envois.length === 3
       && /\*\*3\*\* messages/.test(envois[2].embeds[0].data.description)
-      && /<@U1> \(2\)/.test(envois[2].embeds[0].data.description)
-      && !/<@B1>/.test(envois[2].embeds[0].data.description), envois[2]?.embeds[0].data.description);
+      && /`U1` · 2/.test(envois[2].embeds[0].data.description)
+      && !/B1/.test(envois[2].embeds[0].data.description), envois[2]?.embeds[0].data.description);
+
+    // Un membre modifié se lit MÊME quand le client ne résout pas la mention.
+    const memberUpdate = require('../src/events/guildMemberUpdate');
+    await memberUpdate.execute(
+      { guild, id: 'U8', user: { bot: false }, displayName: 'Bayouss', roles: { cache: new Map() } },
+      { guild, id: 'U8', user: { bot: false }, displayName: 'Bayouss', roles: { cache: new Map([['R5', { name: 'Membre' }]]) } }
+    );
+    const desc = envois[3]?.embeds[0].data.description || '';
+    V('le membre est nommé en clair, avec son ID', /\*\*Bayouss\*\* \(<@U8> · `U8`\)/.test(desc), desc);
+    V('le rôle ajouté est nommé en clair, avec son ID', /\*\*Membre\*\* · `R5`/.test(desc), desc);
+  }
+
+  console.log('\n4 bis) L\'étiquette : nom en clair, mention, ID');
+  {
+    V('un membre avec surnom', J.etiquetteMembre({ id: 'U1', displayName: 'Bayouss', user: { username: 'bay' } })
+      === '**Bayouss** (<@U1> · `U1`)', J.etiquetteMembre({ id: 'U1', displayName: 'Bayouss', user: { username: 'bay' } }));
+    V('un utilisateur nu', J.etiquetteMembre({ id: 'U2', username: 'leen' }) === '**leen** (<@U2> · `U2`)');
+    V('sans le moindre nom, la mention et l\'ID restent', J.etiquetteMembre({ id: 'U3' }) === '<@U3> (`U3`)');
+    V('avec juste un ID', J.mentionAvecId('U4') === '<@U4> (`U4`)');
   }
 
   console.log('\n5) Les états vocaux fins : micro, caméra, stream — même salon');

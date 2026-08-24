@@ -1,5 +1,6 @@
 const { Events } = require('discord.js');
 const { sendLog, logEmbed, COLORS } = require('../utils/embeds');
+const { etiquetteMembre } = require('../utils/journal');
 
 // Logs des connexions vocales : arrivée, départ et changement de salon.
 module.exports = {
@@ -57,19 +58,19 @@ module.exports = {
     if (!oldState.channelId && newState.channelId) {
       await sendLog(
         guild,
-        logEmbed('🎙️ Connexion vocale', `<@${member.id}> a rejoint <#${newState.channelId}>.`, COLORS.SUCCESS)
+        logEmbed('🎙️ Connexion vocale', `${etiquetteMembre(member)} a rejoint <#${newState.channelId}>.`, COLORS.SUCCESS)
       );
     } else if (oldState.channelId && !newState.channelId) {
       await sendLog(
         guild,
-        logEmbed('🎙️ Déconnexion vocale', `<@${member.id}> a quitté <#${oldState.channelId}>.`, COLORS.WARNING)
+        logEmbed('🎙️ Déconnexion vocale', `${etiquetteMembre(member)} a quitté <#${oldState.channelId}>.`, COLORS.WARNING)
       );
     } else if (oldState.channelId && newState.channelId && oldState.channelId !== newState.channelId) {
       await sendLog(
         guild,
         logEmbed(
           '🎙️ Changement de salon vocal',
-          `<@${member.id}> est passé de <#${oldState.channelId}> à <#${newState.channelId}>.`,
+          `${etiquetteMembre(member)} est passé de <#${oldState.channelId}> à <#${newState.channelId}>.`,
           COLORS.INFO
         )
       );
@@ -98,7 +99,7 @@ module.exports = {
       if (etats.length) {
         await sendLog(
           guild,
-          logEmbed('🎚️ État vocal modifié', `<@${member.id}> dans <#${newState.channelId}> : ${etats.join(' · ')}.`, COLORS.INFO)
+          logEmbed('🎚️ État vocal modifié', `${etiquetteMembre(member)} dans <#${newState.channelId}> : ${etats.join(' · ')}.`, COLORS.INFO)
         );
       }
     }

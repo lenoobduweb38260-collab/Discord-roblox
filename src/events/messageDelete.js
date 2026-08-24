@@ -5,6 +5,7 @@ const { record } = require('../utils/snipe');
 const { sauvegarder } = require('../utils/piecesJointes');
 const { quiAEfface, reconnaitre, republier } = require('../utils/messagesDuBot');
 const M = require('../utils/miseEnPage');
+const { etiquetteMembre } = require('../utils/journal');
 
 // Log des messages supprimés (contenu disponible si le message était en cache).
 //
@@ -68,7 +69,7 @@ module.exports = {
       authorId: message.author?.id,
     });
 
-    const auteur = message.author ? `<@${message.author.id}> (\`${message.author.id}\`)` : '*Auteur inconnu*';
+    const auteur = message.author ? etiquetteMembre(message.author) : '*Auteur inconnu*';
     const contenu = message.content
       ? M.borner(message.content, 1000)
       : '*Contenu indisponible (message non mis en cache)*';
@@ -127,7 +128,7 @@ async function protegerMessageDuBot(message) {
 
     const lignes = [
       `Un **${quoi.genre}** a été supprimé dans <#${message.channelId}>.`,
-      auteur ? `👤 Par <@${auteur.id}> (\`${auteur.id}\`)` : '👤 Auteur inconnu — je n\'ai pas accès au journal d\'audit.',
+      auteur ? `👤 Par ${etiquetteMembre(auteur)}` : '👤 Auteur inconnu — je n\'ai pas accès au journal d\'audit.',
       remis || '⚠️ Il n\'a **pas** pu être republié : republiez-le à la main.',
     ];
     if (!auteur) {
