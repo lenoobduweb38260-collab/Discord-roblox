@@ -235,6 +235,11 @@ async function start() {
       // déclenche rien du tout. Il ne demande aucune autorisation
       // privilégiée sur le portail développeur.
       GatewayIntentBits.GuildMessageReactions,
+      // 📖 Le journal exhaustif : émojis et stickers, invitations,
+      // événements planifiés. Aucun des trois n'est privilégié.
+      GatewayIntentBits.GuildExpressions,
+      GatewayIntentBits.GuildInvites,
+      GatewayIntentBits.GuildScheduledEvents,
     ],
     // Reaction et User : un panneau publié avant le dernier redémarrage n'est
     // pas en cache. Sans ces partiels, Discord n'envoie tout simplement pas

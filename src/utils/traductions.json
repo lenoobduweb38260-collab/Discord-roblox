@@ -122,6 +122,9 @@
   "\n➜ Aucun salon d'annonces configuré : ajoutez-en avec `/absence salons ajouter` ou `/absence salons categorie`.": {
     "en": "\n➜ No announcement channel configured: add some with `/absence salons ajouter` or `/absence salons categorie`."
   },
+  "\n➜ Débanni par : ": {
+    "en": "\n➜ Unbanned by: "
+  },
   "\n➜ Déplacer la personne vers ": {
     "en": "\n➜ Moving the person to "
   },
@@ -136,6 +139,9 @@
   },
   "\n➜ Les annonces partiront dans les **": {
     "en": "\n➜ Announcements will go to the **"
+  },
+  "\n➜ Par : ": {
+    "en": "\n➜ By: "
   },
   "\n⭐ **Niveau ": {
     "en": "\n⭐ **Level "
@@ -488,6 +494,9 @@
   " Je suis membre du serveur": {
     "en": " I am a member of the server"
   },
+  " kbps → ": {
+    "en": " kbps → "
+  },
   " la direction par <@": {
     "en": " the management by <@"
   },
@@ -517,6 +526,9 @@
   },
   " message(s) gardent leur barre colorée.** Un embed déjà envoyé ne peut pas devenir une carte : relancez avec **mode : Recréer** si vous acceptez d'en perdre les réactions et les liens.": {
     "en": " message(s) keep their coloured bar.** An embed already sent can never become a card: run it again with **mode: Recréer** if you accept losing their reactions and links."
+  },
+  " min → ": {
+    "en": " min → "
   },
   " min** (là : ": {
     "en": " min** (right now: "
@@ -1283,6 +1295,9 @@
   "** message(s) restent des embeds : ils gardent leur barre verticale colorée": {
     "en": "** message(s) are still embeds: they keep their coloured vertical bar"
   },
+  "** messages supprimés d'un coup dans <#": {
+    "en": "** messages deleted at once in <#"
+  },
   "** mis à jour pour <@": {
     "en": "** updated for <@"
   },
@@ -1592,6 +1607,9 @@
   "• Sinon, elle sera installée automatiquement au **prochain redémarrage** du bot.\n\n": {
     "en": "• Otherwise it will be installed automatically at the bot's **next restart**.\n\n"
   },
+  "`\n➜ Salon : <#": {
+    "en": "`\n➜ Channel: <#"
+  },
   "` — entreprises partagées.": {
     "en": "` — companies are shared."
   },
@@ -1621,6 +1639,9 @@
   },
   "` retiré par <@": {
     "en": "` removed by <@"
+  },
+  "`)\n➜ Était dans : <#": {
+    "en": "`)\n➜ Was in: <#"
   },
   "`) a effectué **": {
     "en": "`) carried out **"
@@ -1727,6 +1748,9 @@
   "> a autorisé <@&": {
     "en": "> allowed <@&"
   },
+  "> a changé de profil :\n": {
+    "en": "> changed their profile:\n"
+  },
   "> a déjà un ticket **": {
     "en": "> already has an open ticket **"
   },
@@ -1747,6 +1771,9 @@
   },
   "> a été déplacé dans <#": {
     "en": "> has been moved to <#"
+  },
+  "> a été modifié": {
+    "en": "> was updated"
   },
   "> a été retiré de la whitelist : le rôle ": {
     "en": "> was taken off the whitelist: the role "
@@ -1867,6 +1894,9 @@
   },
   "> modifié": {
     "en": "> edited"
+  },
+  "> modifié :\n": {
+    "en": "> updated:\n"
   },
   "> n'a pas de carte d'identité.": {
     "en": "> has no ID card."
@@ -2801,6 +2831,12 @@
   "✅ Whitelisté(s) sur le salon : ": {
     "en": "✅ Whitelisted on the channel: "
   },
+  "✉️ Invitation créée": {
+    "en": "✉️ Invite created"
+  },
+  "✉️ Invitation supprimée": {
+    "en": "✉️ Invite deleted"
+  },
   "✍️ Agent": {
     "en": "✍️ Officer"
   },
@@ -2809,6 +2845,12 @@
   },
   "✏️ Absence mise à jour": {
     "en": "✏️ Absence updated"
+  },
+  "✏️ Émoji renommé": {
+    "en": "✏️ Emoji renamed"
+  },
+  "✏️ Fil modifié": {
+    "en": "✏️ Thread updated"
   },
   "✏️ Message modifié": {
     "en": "✏️ Message edited"
@@ -2824,6 +2866,12 @@
   },
   "✏️ Rôle modifié": {
     "en": "✏️ Role edited"
+  },
+  "✏️ Salon modifié": {
+    "en": "✏️ Channel updated"
+  },
+  "✏️ Sticker modifié": {
+    "en": "✏️ Sticker updated"
   },
   "✨ Amélioration": {
     "en": "✨ Improvement"
@@ -3428,14 +3476,50 @@
   "➖ Retrait": {
     "en": "➖ Removal"
   },
+  "➜ 👑 Propriétaire : <@": {
+    "en": "➜ 👑 Owner: <@"
+  },
+  "➜ 💎 A commencé à booster le serveur": {
+    "en": "➜ 💎 Started boosting the server"
+  },
+  "➜ 💎 Ne booste plus le serveur": {
+    "en": "➜ 💎 No longer boosts the server"
+  },
+  "➜ 💎 Palier de boost : ": {
+    "en": "➜ 💎 Boost tier: "
+  },
   "➜ Affiché séparément : ": {
     "en": "➜ Shown separately: "
+  },
+  "➜ Âge restreint (NSFW) : ": {
+    "en": "➜ Age restricted (NSFW): "
+  },
+  "➜ Archivage automatique : ": {
+    "en": "➜ Auto-archive: "
+  },
+  "➜ Auteurs touchés : ": {
+    "en": "➜ Affected authors: "
+  },
+  "➜ Avatar de serveur modifié": {
+    "en": "➜ Server avatar changed"
+  },
+  "➜ Avatar modifié": {
+    "en": "➜ Avatar changed"
   },
   "➜ Banni sur **": {
     "en": "➜ Banned on **"
   },
+  "➜ Bannière du serveur modifiée": {
+    "en": "➜ Server banner changed"
+  },
   "➜ C'est presque toujours l'hébergeur qui bloque les ports **UDP** sortants — beaucoup d'hébergements mutualisés le font. C'est à lui qu'il faut le demander.": {
     "en": "➜ It's almost always the host blocking outbound **UDP** ports — many shared hosts do. That's who to ask."
+  },
+  "➜ Catégorie : ": {
+    "en": "➜ Category: "
+  },
+  "➜ Catégorie : <#": {
+    "en": "➜ Category: <#"
   },
   "➜ Clic droit sur le message → **Copier le lien**, puis collez-le ici.": {
     "en": "➜ Right-click the message → **Copy Link**, then paste it here."
@@ -3443,11 +3527,29 @@
   "➜ Clic droit sur le message → **Copier le lien**, puis collez-le ici.\n": {
     "en": "➜ Right-click the message → **Copy Link**, then paste it here.\n"
   },
+  "➜ Code : `": {
+    "en": "➜ Code: `"
+  },
   "➜ Collez son **identifiant**, sa **mention** (`@Rôle`), ou son **nom exact**.": {
     "en": "➜ Paste its **ID**, its **mention** (`@Role`), or its **exact name**."
   },
   "➜ Couleur : `": {
     "en": "➜ Colour: `"
+  },
+  "➜ Créé par : <@": {
+    "en": "➜ Created by: <@"
+  },
+  "➜ Créée par : <@": {
+    "en": "➜ Created by: <@"
+  },
+  "➜ Dans : <#": {
+    "en": "➜ In: <#"
+  },
+  "➜ Début : <t:": {
+    "en": "➜ Starts: <t:"
+  },
+  "➜ Délai AFK : ": {
+    "en": "➜ AFK timeout: "
   },
   "➜ Demandez au propriétaire de lancer lui-même la liaison.": {
     "en": "➜ Ask the owner to start the link themselves."
@@ -3455,14 +3557,41 @@
   "➜ Demandez-lui de lancer lui-même `/config` → 🎭 Module RP → 🏢 Entreprises.": {
     "en": "➜ Ask them to run `/config` → 🎭 RP module → 🏢 Companies themselves."
   },
+  "➜ Description : ": {
+    "en": "➜ Description: "
+  },
+  "➜ Description modifiée": {
+    "en": "➜ Description changed"
+  },
   "➜ En attendant : changez la **région du salon** (Modifier le salon → Région), cela change de serveur vocal.": {
     "en": "➜ In the meantime: change the **channel region** (Edit Channel → Region), which switches voice server."
   },
   "➜ Essayez le **matricule**, le **pseudo du jeu**, une **mention** ou un **identifiant Discord**.\n": {
     "en": "➜ Try the **badge number**, the **in-game name**, a **mention** or a **Discord ID**.\n"
   },
+  "➜ Exclusion temporaire jusqu'au <t:": {
+    "en": "➜ Timed out until <t:"
+  },
+  "➜ Exclusion temporaire levée": {
+    "en": "➜ Timeout lifted"
+  },
+  "➜ Expire <t:": {
+    "en": "➜ Expires <t:"
+  },
+  "➜ Fil : **": {
+    "en": "➜ Thread: **"
+  },
+  "➜ Fil : <#": {
+    "en": "➜ Thread: <#"
+  },
+  "➜ Icône du serveur modifiée": {
+    "en": "➜ Server icon changed"
+  },
   "➜ Il reste deux causes possibles, toutes deux hors du bot :": {
     "en": "➜ Two possible causes remain, both outside the bot:"
+  },
+  "➜ Image d'invitation modifiée": {
+    "en": "➜ Invite splash changed"
   },
   "➜ Indiquez celui du serveur **principal** de la communauté. Si c'est lui le principal, les autres serveurs doivent pointer vers lui.": {
     "en": "➜ Give the ID of the community's **main** server. If this one is the main server, the others have to point to it."
@@ -3509,17 +3638,53 @@
   "➜ Libérez un salon, ou déplacez la personne dès que possible.": {
     "en": "➜ Free up a channel, or move the person as soon as possible."
   },
+  "➜ Lieu : ": {
+    "en": "➜ Location: "
+  },
+  "➜ Limite de membres : ": {
+    "en": "➜ Member limit: "
+  },
+  "➜ Membre : **": {
+    "en": "➜ Member: **"
+  },
   "➜ Mentionnable : ": {
     "en": "➜ Mentionable: "
+  },
+  "➜ Mode lent : ": {
+    "en": "➜ Slowmode: "
+  },
+  "➜ N'expire jamais": {
+    "en": "➜ Never expires"
+  },
+  "➜ Niveau de vérification : ": {
+    "en": "➜ Verification level: "
   },
   "➜ Nom : **": {
     "en": "➜ Name: **"
   },
+  "➜ Nom d'utilisateur : **": {
+    "en": "➜ Username: **"
+  },
+  "➜ Ouvert par : <@": {
+    "en": "➜ Opened by: <@"
+  },
+  "➜ Par : ": {
+    "en": "➜ By: "
+  },
   "➜ Permissions ajoutées : ": {
     "en": "➜ Permissions added: "
   },
+  "➜ Permissions ajoutées pour ": {
+    "en": "➜ Permissions added for "
+  },
+  "➜ Permissions de ": {
+    "en": "➜ Permissions of "
+  },
   "➜ Permissions retirées : ": {
     "en": "➜ Permissions removed: "
+  },
+  "➜ Permissions retirées pour ": {
+    "en": "➜ Permissions removed for "
   },
   "➜ Phrase exacte à envoyer à l'hébergeur : « merci d'autoriser l'UDP **sortant et ses réponses** vers les serveurs vocaux de Discord": {
     "en": "➜ The exact sentence to send the host: “please allow **outbound UDP and its replies** to Discord's voice servers"
@@ -3530,11 +3695,20 @@
   "➜ Posez `ffmpeg.exe` (Windows) ou `ffmpeg` (Linux) **à côté du bot**, puis redémarrez-le.": {
     "en": "➜ Put `ffmpeg.exe` (Windows) or `ffmpeg` (Linux) **next to the bot**, then restart it."
   },
+  "➜ Pseudo global : ": {
+    "en": "➜ Display name: "
+  },
+  "➜ Qualité audio : ": {
+    "en": "➜ Audio quality: "
+  },
   "➜ Réessayez ; si cela persiste, changez la **région du salon** (Modifier le salon → Région).": {
     "en": "➜ Try again; if it keeps happening, change the **channel region** (Edit Channel → Region)."
   },
   "➜ Réessayez, puis changez la **région du salon** (Modifier le salon → Région) : cela change de serveur vocal.": {
     "en": "➜ Try again, then change the **channel region** (Edit Channel → Region): that switches voice servers."
+  },
+  "➜ Région vocale : ": {
+    "en": "➜ Voice region: "
   },
   "➜ Relancez la commande, ou demandez au staff de republier le panneau.": {
     "en": "➜ Run the command again, or ask the staff to publish the panel again."
@@ -3542,20 +3716,59 @@
   "➜ Remontez mon rôle au-dessus dans **Paramètres du serveur → Rôles**, puis réessayez.": {
     "en": "➜ Move my role above it in **Server Settings → Roles**, then try again."
   },
+  "➜ Rôles ajoutés : ": {
+    "en": "➜ Roles added: "
+  },
+  "➜ Rôles retirés : ": {
+    "en": "➜ Roles removed: "
+  },
   "➜ Sa limite d'utilisateurs est atteinte. Libérez une place, ou augmentez la limite.": {
     "en": "➜ Its user limit has been reached. Free up a slot, or raise the limit."
+  },
+  "➜ Salon : **": {
+    "en": "➜ Channel: **"
+  },
+  "➜ Salon : <#": {
+    "en": "➜ Channel: <#"
+  },
+  "➜ Salon AFK : ": {
+    "en": "➜ AFK channel: "
+  },
+  "➜ Salon du règlement : ": {
+    "en": "➜ Rules channel: "
+  },
+  "➜ Salon système : ": {
+    "en": "➜ System channel: "
   },
   "➜ Sont acceptés : **YouTube**, **SoundCloud**, **Spotify**, **Deezer**, ou une simple recherche.": {
     "en": "➜ Accepted: **YouTube**, **SoundCloud**, **Spotify**, **Deezer**, or just a search."
   },
+  "➜ Statut : ": {
+    "en": "➜ Status: "
+  },
+  "➜ Sujet : ": {
+    "en": "➜ Topic: "
+  },
   "➜ Sur l'hébergeur : `apt install ffmpeg` — ou `npm install ffmpeg-static` à côté du bot, puis redémarrez-le.": {
     "en": "➜ On the host: `apt install ffmpeg` — or `npm install ffmpeg-static` next to the bot, then restart it."
+  },
+  "➜ Surnom : ": {
+    "en": "➜ Nickname: "
   },
   "➜ Téléchargement officiel : https://ffmpeg.org/download.html": {
     "en": "➜ Official download: https://ffmpeg.org/download.html"
   },
+  "➜ Type : ": {
+    "en": "➜ Type: "
+  },
   "➜ Un staff peut le réactiver via `/config` → 📈 XP & niveaux.": {
     "en": "➜ A staff member can switch it back on with `/config` → 📈 XP & levels."
+  },
+  "➜ URL personnalisée : ": {
+    "en": "➜ Vanity URL: "
+  },
+  "➜ Utilisations max : ": {
+    "en": "➜ Max uses: "
   },
   "➡️ Plus de répétition.": {
     "en": "➡️ Repeat off."
@@ -3626,8 +3839,17 @@
   "🎙️ Le vocal « créateur » des salons perso": {
     "en": "🎙️ The \"creator\" voice channel for personal rooms"
   },
+  "🎙️ micro coupé": {
+    "en": "🎙️ mic muted"
+  },
+  "🎙️ micro réactivé": {
+    "en": "🎙️ mic unmuted"
+  },
   "🎙️ Salon créateur des salons perso": {
     "en": "🎙️ Creator channel for personal rooms"
+  },
+  "🎚️ État vocal modifié": {
+    "en": "🎚️ Voice state changed"
   },
   "🎥 **Caméras & streams** — les couper ou les rautoriser *(une seule permission chez Discord)*": {
     "en": "🎥 **Cameras & streams** — cut them off or allow them again *(a single permission on Discord's side)*"
@@ -3640,6 +3862,12 @@
   },
   "🎥 Caméras et streams **réautorisés** dans ce salon.": {
     "en": "🎥 Cameras and streams **allowed again** in this channel."
+  },
+  "🎧 casque coupé": {
+    "en": "🎧 deafened"
+  },
+  "🎧 casque réactivé": {
+    "en": "🎧 undeafened"
   },
   "🎧 Ce que je sais lire": {
     "en": "🎧 What I can play"
@@ -3905,8 +4133,17 @@
   "🏯 Étage ": {
     "en": "🏯 Floor "
   },
+  "🏰 Serveur modifié": {
+    "en": "🏰 Server updated"
+  },
+  "🏷️ Sticker ajouté": {
+    "en": "🏷️ Sticker added"
+  },
   "🐦 Nouveau post de **{nom}** sur X !": {
     "en": "🐦 New post from **{nom}** on X!"
+  },
+  "👂 audition serveur rétablie": {
+    "en": "👂 server deafen lifted"
   },
   "👅 Léchouilles": {
     "en": "👅 Licks"
@@ -3968,6 +4205,9 @@
   "👤 Installer sur mon compte": {
     "en": "👤 Install on my account"
   },
+  "👤 Membre modifié": {
+    "en": "👤 Member updated"
+  },
   "👤 Nom RP": {
     "en": "👤 RP surname"
   },
@@ -3976,6 +4216,9 @@
   },
   "👤 Personne": {
     "en": "👤 Person"
+  },
+  "👤 Profil modifié": {
+    "en": "👤 Profile changed"
   },
   "👤 Utilisateur concerné": {
     "en": "👤 User concerned"
@@ -4103,6 +4346,12 @@
   "📅 Vous avez **déjà une absence en cours**.\n➜ Cliquez **✅ Je suis de retour** sur son annonce avant d'en déclarer une nouvelle.": {
     "en": "📅 You **already have an absence running**.\n➜ Click **✅ I am back** on its announcement before declaring a new one."
   },
+  "📆 Événement planifié créé": {
+    "en": "📆 Scheduled event created"
+  },
+  "📆 Événement planifié modifié": {
+    "en": "📆 Scheduled event updated"
+  },
   "📈 Configuration — XP & niveaux": {
     "en": "📈 Configuration — XP & levels"
   },
@@ -4204,6 +4453,9 @@
   },
   "📌 Avant de commencer, merci de prendre connaissance du <#": {
     "en": "📌 Before you get started, please have a read of <#"
+  },
+  "📌 Épingles modifiées": {
+    "en": "📌 Pins changed"
   },
   "📌 Statut": {
     "en": "📌 Status"
@@ -4340,6 +4592,12 @@
   "📴 Le système de niveaux est **désactivé** sur ce serveur.\n": {
     "en": "📴 The level system is **switched off** on this server.\n"
   },
+  "📷 caméra allumée": {
+    "en": "📷 camera turned on"
+  },
+  "📷 caméra éteinte": {
+    "en": "📷 camera turned off"
+  },
   "📻 **Radios françaises** — `/radio ecouter` *(exige FFmpeg)*": {
     "en": "📻 **French radios** — `/radio ecouter` *(requires FFmpeg)*"
   },
@@ -4391,6 +4649,9 @@
   "🔄 Update": {
     "en": "🔄 Update"
   },
+  "🔇 mis en sourdine par le serveur": {
+    "en": "🔇 server muted"
+  },
   "🔇 Mute": {
     "en": "🔇 Mute"
   },
@@ -4399,6 +4660,9 @@
   },
   "🔊 **SoundCloud** — pistes et playlists": {
     "en": "🔊 **SoundCloud** — tracks and playlists"
+  },
+  "🔊 sourdine serveur levée": {
+    "en": "🔊 server mute lifted"
   },
   "🔊 Unmute": {
     "en": "🔊 Unmute"
@@ -4462,6 +4726,9 @@
   },
   "🔒 Tu n'as pas encore débloqué ce badge.": {
     "en": "🔒 You have not unlocked this badge yet."
+  },
+  "🔓 Bannissement levé": {
+    "en": "🔓 Ban lifted"
   },
   "🔓 Blacklist de <@": {
     "en": "🔓 Blacklist on <@"
@@ -4634,6 +4901,12 @@
   "🖐️ Caresses": {
     "en": "🖐️ Pats"
   },
+  "🖥️ partage d'écran arrêté": {
+    "en": "🖥️ screen share stopped"
+  },
+  "🖥️ partage d'écran lancé": {
+    "en": "🖥️ screen share started"
+  },
   "🖱️ Rôles : bouton": {
     "en": "🖱️ Roles: button"
   },
@@ -4661,11 +4934,20 @@
   "🗑️ Échantillon n°": {
     "en": "🗑️ Sample no. "
   },
+  "🗑️ Émoji supprimé": {
+    "en": "🗑️ Emoji deleted"
+  },
   "🗑️ Entrée n°": {
     "en": "🗑️ Entry no. "
   },
   "🗑️ Entreprise **": {
     "en": "🗑️ Company **"
+  },
+  "🗑️ Événement planifié supprimé": {
+    "en": "🗑️ Scheduled event deleted"
+  },
+  "🗑️ Fil supprimé": {
+    "en": "🗑️ Thread deleted"
   },
   "🗑️ Liste vidée : **": {
     "en": "🗑️ List cleared: **"
@@ -4696,6 +4978,12 @@
   },
   "🗑️ Rôle supprimé": {
     "en": "🗑️ Role deleted"
+  },
+  "🗑️ Salon supprimé": {
+    "en": "🗑️ Channel deleted"
+  },
+  "🗑️ Sticker supprimé": {
+    "en": "🗑️ Sticker deleted"
   },
   "🗑 Supprimer ce type": {
     "en": "🗑 Delete this type"
@@ -4796,6 +5084,9 @@
   "🧱 Les rôles s'ajoutent": {
     "en": "🧱 Roles stack up"
   },
+  "🧵 Fil créé": {
+    "en": "🧵 Thread created"
+  },
   "🧹 Image des cartes de niveau retirée.": {
     "en": "🧹 Level card image removed."
   },
@@ -4805,11 +5096,17 @@
   "🧹 rôle d'attente retiré": {
     "en": "🧹 waiting role removed"
   },
+  "🧹 Suppression en masse": {
+    "en": "🧹 Bulk deletion"
+  },
   "🧹 Titre retiré.": {
     "en": "🧹 Title removed."
   },
   "🩺 État de l'esthétique du bot": {
     "en": "🩺 State of the bot's look"
+  },
+  "🪝 Webhooks modifiés": {
+    "en": "🪝 Webhooks changed"
   },
   "🪧 **Statuts** — empêcher (ou permettre) de poser un statut sur le salon": {
     "en": "🪧 **Statuses** — prevent (or allow) setting a status on the channel"
@@ -4832,6 +5129,9 @@
   "😀 Choisissez un emoji…": {
     "en": "😀 Pick an emoji…"
   },
+  "😀 Émoji ajouté": {
+    "en": "😀 Emoji added"
+  },
   "😄 Humour": {
     "en": "😄 Humour"
   },
@@ -4846,6 +5146,9 @@
   },
   "🙂 C'est votre propre ticket : la relance sert à réveiller quelqu'un d'autre.": {
     "en": "🙂 This is your own ticket: a nudge is meant to wake someone else up."
+  },
+  "🙉 rendu sourd par le serveur": {
+    "en": "🙉 server deafened"
   },
   "🙋 **Claim par <@": {
     "en": "🙋 **Claimed by <@"
@@ -5246,6 +5549,9 @@
   "Annonces des lives et nouvelles vidéos": {
     "en": "Announcements for lives and new videos"
   },
+  "annulé": {
+    "en": "cancelled"
+  },
   "Antécédents": {
     "en": "Prior record"
   },
@@ -5272,6 +5578,9 @@
   },
   "Araignée géante": {
     "en": "Giant Spider"
+  },
+  "Archivé": {
+    "en": "Archived"
   },
   "Arrêt demandé par le propriétaire <@": {
     "en": "Shutdown requested by the owner <@"
@@ -5495,6 +5804,9 @@
   "Cartes sans bordure": {
     "en": "Borderless cards"
   },
+  "catégorie": {
+    "en": "category"
+  },
   "Catégorie invalide.": {
     "en": "Invalid category."
   },
@@ -5653,6 +5965,9 @@
   },
   "Comté de naissance": {
     "en": "County of birth"
+  },
+  "conférence": {
+    "en": "stage"
   },
   "Cooldown XP texte en secondes (5 à 3600)": {
     "en": "Text XP cooldown in seconds (5 to 3600)"
@@ -5813,6 +6128,9 @@
   "désactivés": {
     "en": "disabled"
   },
+  "Désarchivé": {
+    "en": "Unarchived"
+  },
   "Désassigner ce ticket": {
     "en": "Unassign this ticket"
   },
@@ -5830,6 +6148,9 @@
   },
   "Détenteur": {
     "en": "Holder"
+  },
+  "Déverrouillé": {
+    "en": "Unlocked"
   },
   "Diffusé directement": {
     "en": "Streamed directly"
@@ -6047,6 +6368,9 @@
   "Fichier effacé (rétention ou budget disque).": {
     "en": "File deleted (retention or disk budget)."
   },
+  "fil privé": {
+    "en": "private thread"
+  },
   "File d'attente, salons d'assistance, salons perso": {
     "en": "Waiting queue, assistance channels, personal rooms"
   },
@@ -6227,6 +6551,12 @@
   "Illfang le Seigneur Kobold": {
     "en": "Illfang the Kobold Lord"
   },
+  "illimitée": {
+    "en": "unlimited"
+  },
+  "illimitées": {
+    "en": "unlimited"
+  },
   "Image scam détectée (échantillon n°": {
     "en": "Scam image caught (sample no. "
   },
@@ -6398,6 +6728,9 @@
   "Le salon est plein.": {
     "en": "The channel is full."
   },
+  "Le serveur a été modifié": {
+    "en": "The server was updated"
+  },
   "le serveur RP 🎭": {
     "en": "the RP server 🎭"
   },
@@ -6544,6 +6877,9 @@
   },
   "Maximum 25 types (limite des boutons Discord).": {
     "en": "25 types maximum (Discord's button limit)."
+  },
+  "média": {
+    "en": "media"
   },
   "media (photo/GIF/vidéo)": {
     "en": "media (photo/GIF/video)"
@@ -6721,6 +7057,9 @@
   },
   "neutre et factuel": {
     "en": "neutral and factual"
+  },
+  "🆕 Salon créé": {
+    "en": "🆕 Channel created"
   },
   "Night Sky Sword": {
     "en": "Night Sky Sword"
@@ -6922,6 +7261,9 @@
   },
   "Pied de page (facultatif)": {
     "en": "Footer (optional)"
+  },
+  "planifié": {
+    "en": "scheduled"
   },
   "Plaque d'immatriculation RP": {
     "en": "RP number plate"
@@ -7192,6 +7534,9 @@
   },
   "Rendu valide — rien n'a été publié.": {
     "en": "Render is valid — nothing was published."
+  },
+  "répertoire": {
+    "en": "directory"
   },
   "Répéter le morceau ou toute la file": {
     "en": "Repeat the track or the whole queue"
@@ -7559,6 +7904,9 @@
   "Te soigner à l'auberge (coûte des Col)": {
     "en": "Heal up at the inn (costs Col)"
   },
+  "terminé": {
+    "en": "completed"
+  },
   "Terminé": {
     "en": "Done"
   },
@@ -7673,6 +8021,9 @@
   "Un embed déjà envoyé ne peut pas devenir une carte : `/esthetique appliquer mode:Recréer`": {
     "en": "An embed already sent can never become a card: `/esthetique appliquer mode:Recréer`"
   },
+  "Un message a été épinglé ou désépinglé dans <#": {
+    "en": "A message was pinned or unpinned in <#"
+  },
   "Un petit signe de vie ? 👋": {
     "en": "Any sign of life? 👋"
   },
@@ -7682,11 +8033,20 @@
   "un retour à la ligne": {
     "en": "a line break"
   },
+  "Un salon a été créé": {
+    "en": "A channel was created"
+  },
+  "Un salon a été supprimé": {
+    "en": "A channel was deleted"
+  },
   "Un salon vocal d'assistance": {
     "en": "An assistance voice channel"
   },
   "Un troisième salon d'assistance": {
     "en": "A third assistance channel"
+  },
+  "Un webhook a été créé, modifié ou supprimé sur <#": {
+    "en": "A webhook was created, updated or deleted on <#"
   },
   "une **bibliothèque de chiffrement** (`npm install libsodium-wrappers`)": {
     "en": "an **encryption library** (`npm install libsodium-wrappers`)"
@@ -7807,6 +8167,9 @@
   },
   "Vérifiez le DISCORD_TOKEN dans ": {
     "en": "Check the DISCORD_TOKEN in "
+  },
+  "Verrouillé": {
+    "en": "Locked"
   },
   "Vétéran": {
     "en": "Veteran"

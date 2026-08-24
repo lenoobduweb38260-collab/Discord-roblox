@@ -73,6 +73,34 @@ module.exports = {
           COLORS.INFO
         )
       );
+    } else if (oldState.channelId && newState.channelId) {
+      // 🎚️ Même salon : c'est un ÉTAT qui a changé — micro, casque, partage
+      // d'écran, caméra, sourdine serveur. Le moindre geste laisse sa ligne.
+      const etats = [];
+      if (Boolean(oldState.serverMute) !== Boolean(newState.serverMute)) {
+        etats.push(newState.serverMute ? '🔇 mis en sourdine par le serveur' : '🔊 sourdine serveur levée');
+      }
+      if (Boolean(oldState.serverDeaf) !== Boolean(newState.serverDeaf)) {
+        etats.push(newState.serverDeaf ? '🙉 rendu sourd par le serveur' : '👂 audition serveur rétablie');
+      }
+      if (Boolean(oldState.selfMute) !== Boolean(newState.selfMute)) {
+        etats.push(newState.selfMute ? '🎙️ micro coupé' : '🎙️ micro réactivé');
+      }
+      if (Boolean(oldState.selfDeaf) !== Boolean(newState.selfDeaf)) {
+        etats.push(newState.selfDeaf ? '🎧 casque coupé' : '🎧 casque réactivé');
+      }
+      if (Boolean(oldState.streaming) !== Boolean(newState.streaming)) {
+        etats.push(newState.streaming ? '🖥️ partage d\'écran lancé' : '🖥️ partage d\'écran arrêté');
+      }
+      if (Boolean(oldState.selfVideo) !== Boolean(newState.selfVideo)) {
+        etats.push(newState.selfVideo ? '📷 caméra allumée' : '📷 caméra éteinte');
+      }
+      if (etats.length) {
+        await sendLog(
+          guild,
+          logEmbed('🎚️ État vocal modifié', `<@${member.id}> dans <#${newState.channelId}> : ${etats.join(' · ')}.`, COLORS.INFO)
+        );
+      }
     }
   },
 };

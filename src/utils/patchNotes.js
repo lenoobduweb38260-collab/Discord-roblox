@@ -1359,6 +1359,24 @@ const RELEASES = [
     fix: [],
     retrait: [],
   },
+  {
+    id: 'journal-exhaustif-2026-08bp',
+    title: 'Le journal voit tout : le moindre changement laisse sa ligne 📖',
+    ajout: [
+      '📢 **Les salons** : creation, suppression, et CHAQUE reglage modifie — nom, sujet, mode lent, categorie, NSFW, qualite audio, limite, region… et chaque surcharge de permissions, cible par cible, permission par permission',
+      '🧵 **Les fils** : crees, supprimes, renommes, archives, verrouilles',
+      '👤 **Les membres** : surnom, roles ajoutes/retires, exclusion temporaire (posee ET levee), boost, avatar de serveur — et les changements de profil (pseudo, avatar) dans chaque serveur commun',
+      '😀 **Emojis, stickers, invitations, webhooks, epingles, evenements planifies** : ajouts, retraits, renommages — tout se journalise, avec l\'auteur quand le journal d\'audit le dit',
+      '🏰 **Le serveur lui-meme** : nom, icone, banniere, proprietaire, niveau de verification, salon AFK/systeme/reglement, palier de boost',
+      '🔓 **Les debans** et 🧹 **les suppressions en masse** (avec le compte et les auteurs touches)',
+      '🎚️ **Les etats vocaux fins** : micro, casque, sourdine serveur, partage d\'ecran, camera — chaque geste en vocal laisse sa ligne',
+    ],
+    amelioration: [
+      '🧭 Une exception assumee : la POSITION des salons n\'est pas journalisee — glisser un salon decale tous ceux d\'en dessous, un seul geste ferait vingt lignes',
+    ],
+    fix: [],
+    retrait: [],
+  },
 ];
 
 // Construit l'embed d'une note à partir d'une entrée { title, ajout, fix,
