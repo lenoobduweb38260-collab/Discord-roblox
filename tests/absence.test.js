@@ -30,8 +30,17 @@ function fauxMonde() {
       envois: [],
       supprimes: [],
       isTextBased: () => true,
-      async send(m) { const msg = { id: `M${++compteurMessage}`, ...m }; salon.envois.push(msg); return msg; },
-      messages: { async delete(mid) { salon.supprimes.push(mid); return true; } },
+      async send(m) {
+        const msg = { id: `M${++compteurMessage}`, flags: 0, editions: [], ...m };
+        msg.edit = async (e) => { msg.editions.push(e); return msg; };
+        salon.envois.push(msg);
+        return msg;
+      },
+      messages: {
+        async delete(mid) { salon.supprimes.push(mid); return true; },
+        async fetch(mid) { return salon.envois.find((m) => m.id === mid) || null; },
+      },
+      guild: { id: 'G1' },
       permissionsFor: () => ({ has: () => true }),
     };
     salons.set(id, salon);
@@ -53,7 +62,7 @@ function fausseInteraction(monde, { user = 'U1', salon = 'C1', membreStaff = fal
     },
     channel: monde.salons.get(salon),
     client: monde.client,
-    message: messageId ? { id: messageId, async delete() { return true; } } : null,
+    message: messageId ? { id: messageId, flags: 0, editions: [], async delete() { return true; }, async edit(m) { this.editions.push(m); return {}; } } : null,
     fields: { getTextInputValue: (id) => champs[id] ?? '' },
     customId: null,
     async reply(m) { reponses.push(m); this.replied = true; return {}; },
@@ -222,7 +231,67 @@ function fausseInteraction(monde, { user = 'U1', salon = 'C1', membreStaff = fal
     V('rien en base', absences.enCours('G1').filter((a) => a.user_id === 'U6').length === 0);
   }
 
-  console.log('\n6) Branchements');
+console.log('\n5 bis) Modifier son absence sans la clôturer');
+  {
+    const monde = fauxMonde();
+    const a1 = monde.creerSalon('A1');
+    const a2 = monde.creerSalon('A2');
+    const panneau = monde.creerSalon('C1');
+    panneau.guildId = 'G1';
+    await absences.publierPanneau(panneau, [a1, a2]);
+    const decl = fausseInteraction(monde, { user: 'U7', champs: { 'abs:fin': '2j', 'abs:raison': 'Examens' } });
+    await absences.handleModal(decl);
+    const idMessage = a1.envois[0].id;
+
+    // Le clic ✏️ ouvre une modale PRÉREMPLIE.
+    const clic = fausseInteraction(monde, { user: 'U7', messageId: idMessage });
+    clic.customId = 'abs:editer';
+    await absences.handleBouton(clic);
+    const modale = clic.reponses[0]?.modale;
+    V('le clic ouvre la modale de modification', Boolean(modale));
+    const json = JSON.stringify(modale?.toJSON?.() ?? modale?.d ?? modale);
+    V('… préremplie avec la raison actuelle', /Examens/.test(json), json?.slice(0, 200));
+
+    // Un tiers, lui, est refusé.
+    const tiers = fausseInteraction(monde, { user: 'U8', messageId: idMessage });
+    tiers.customId = 'abs:editer';
+    await absences.handleBouton(tiers);
+    V('un tiers ne modifie pas l\'absence d\'un autre', /⛔/.test(tiers.reponses[0]?.content), tiers.reponses[0]?.content);
+
+    // La soumission corrige la déclaration et réédite TOUTES les copies.
+    const soumission = fausseInteraction(monde, {
+      user: 'U7', messageId: idMessage,
+      champs: { 'abs:debut': '', 'abs:fin': '5j', 'abs:raison': 'Examens prolongés' },
+    });
+    soumission.customId = 'abs:modif';
+    await absences.handleModal(soumission);
+    V('la confirmation annonce la mise à jour', /mise à jour/.test(soumission.reponses[0]?.content), soumission.reponses[0]?.content);
+    const enBase = absences.enCours('G1').find((a) => a.user_id === 'U7');
+    V('la déclaration est corrigée en base', enBase?.raison === 'Examens prolongés');
+    V('… le début d\'origine est GARDÉ quand le champ reste vide', Math.abs(enBase.debut - Date.now()) < 60_000);
+    V('chaque copie est rééditée sur place — jamais supprimée',
+      a1.envois[0].editions.length === 1 && a2.envois[0].editions.length === 1
+      && a1.supprimes.length === 0 && a2.supprimes.length === 0,
+      JSON.stringify({ e1: a1.envois[0].editions.length, e2: a2.envois[0].editions.length }));
+    const edition = JSON.stringify(a1.envois[0].editions[0]);
+    V('… avec le nouveau texte', /Examens prolongés/.test(edition));
+
+    // Une fin déjà passée est refusée — l'absence reste intacte.
+    const ratee = fausseInteraction(monde, {
+      user: 'U7', messageId: idMessage,
+      champs: { 'abs:debut': '01/01/2020', 'abs:fin': '02/01/2020' },
+    });
+    ratee.customId = 'abs:modif';
+    await absences.handleModal(ratee);
+    V('une fin passée est refusée en pointant « Je suis de retour »',
+      /Je suis de retour/.test(ratee.reponses[0]?.content), ratee.reponses[0]?.content);
+    V('… et rien n\'a bougé', absences.enCours('G1').find((a) => a.user_id === 'U7')?.raison === 'Examens prolongés');
+
+    const { db } = require('../src/database');
+    db.prepare('DELETE FROM absences WHERE user_id = ?').run('U7');
+  }
+
+    console.log('\n6) Branchements');
   {
     const ic = fs.readFileSync(`${__dirname}/../src/events/interactionCreate.js`, 'utf8');
     V('les boutons abs: et la modale sont routés', /abs:/.test(ic) && /abs:decl/.test(ic));
@@ -231,6 +300,9 @@ function fausseInteraction(monde, { user = 'U1', salon = 'C1', membreStaff = fal
     const cmd = fs.readFileSync(`${__dirname}/../src/commands/absence.js`, 'utf8');
     V('la déclaration est ouverte à tous, la publication au staff',
       /GRADES\.EVERYONE/.test(cmd) && /GRADES\.STAFF/.test(cmd));
+    const util = fs.readFileSync(`${__dirname}/../src/utils/absences.js`, 'utf8');
+    V('l\'annonce porte le bouton ✏️ Modifier', /abs:editer/.test(util) && /Modifier/.test(util));
+    V('la réédition passe par la reconstruction en composants', /enComposants/.test(util) && /estCarte/.test(util));
     V('la liste des salons se gère en additif (menus + catégorie)', /abs:sel:/.test(cmd) && /GuildCategory/.test(cmd) && /setMaxValues\(25\)/.test(cmd));
   }
 

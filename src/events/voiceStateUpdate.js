@@ -31,7 +31,29 @@ module.exports = {
 
     if (!member || member.user.bot) return;
 
+    // 🎧 Salons personnels : entrer dans le créateur fabrique son salon,
+    // quitter un salon perso vide le fait disparaître.
+    try {
+      const perso = require('../utils/salonsPerso');
+      if (newState.channelId && newState.channelId !== oldState.channelId) {
+        await perso.accueillir(newState);
+      }
+      if (oldState.channelId && oldState.channelId !== newState.channelId) {
+        await perso.verifierDepart(oldState);
+      }
+    } catch (err) {
+      console.warn(`⚠️ Salons perso : ${err.message}`);
+    }
+
     if (!oldState.channelId && newState.channelId) {
+      // 🎙️ L'alerte au staff — sur les CONNEXIONS fraîches seulement : un
+      // changement de salon (ou le déplacement vers un salon perso) ne
+      // ferait que doubler le bruit.
+      try {
+        await require('../utils/vocalAlerte').signaler(newState);
+      } catch (err) {
+        console.warn(`⚠️ Alerte vocale : ${err.message}`);
+      }
       await sendLog(
         guild,
         logEmbed('🎙️ Connexion vocale', `<@${member.id}> a rejoint <#${newState.channelId}>.`, COLORS.SUCCESS)

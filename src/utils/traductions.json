@@ -50,6 +50,9 @@
   "\n-# Il garde sa barre colorée : seul **mode : Recréer** peut en faire une carte.": {
     "en": "\n-# It keeps its coloured bar: only **mode: Recréer** can turn it into a card."
   },
+  "\n-# Il me faut **Gérer les salons** et **Déplacer les membres** pour fabriquer et remplir ces salons.": {
+    "en": "\n-# I need **Manage Channels** and **Move Members** to build and fill those channels."
+  },
   "\n-# Il se met à jour tout seul à chaque attribution.": {
     "en": "\n-# It updates itself every time one is given out."
   },
@@ -64,6 +67,9 @@
   },
   "\n-# Mode sans cadre : ajoutez une image en collant son lien dans le texte.": {
     "en": "\n-# Frameless mode: add an image by pasting its link into the text."
+  },
+  "\n-# Réglez vos rôles staff dans `/config` → 👮 Rôles pour que la mention parte au bon endroit.": {
+    "en": "\n-# Set your staff roles in `/config` → 👮 Roles so the mention reaches the right people."
   },
   "\n-# Relancez `/absence salons ajouter` pour en ajouter d'autres (25 par passage).": {
     "en": "\n-# Run `/absence salons ajouter` again to add more (25 per pass)."
@@ -218,11 +224,17 @@
   " — repli sur le lien public.": {
     "en": " — falling back on the public link."
   },
+  " — retour <t:": {
+    "en": " — back <t:"
+  },
   " — téléchargement (": {
     "en": " — downloading ("
   },
   " — visite du staff du bot": {
     "en": " — visit from the bot staff"
+  },
+  " : il me faut « Gérer les salons » et « Déplacer les membres ».": {
+    "en": ": I need “Manage Channels” and “Move Members”."
   },
   " : vérifiez la hiérarchie des rôles et la permission **Gérer les rôles** du bot.": {
     "en": ": check the role hierarchy and the bot's **Manage Roles** permission."
@@ -731,6 +743,9 @@
   "-# Sans elle, la connexion vocale est acceptée puis n'aboutit jamais.": {
     "en": "-# Without it, the voice connection is accepted but never completes."
   },
+  "-# Seuls vous et le staff pouvez utiliser ces boutons.": {
+    "en": "-# Only you and the staff can use these buttons."
+  },
   "-# Si la personne n'a pas encore de matricule, un staff peut lui en attribuer un : `/matricule attribuer`.": {
     "en": "-# If the person has no badge number yet, a staff member can give them one: `/matricule attribuer`."
   },
@@ -769,6 +784,9 @@
   },
   ". Modifiez-le avec `/ticket panneau-modifier`.": {
     "en": ". Edit it with `/ticket panneau-modifier`."
+  },
+  ". Toutes les annonces sont corrigées.": {
+    "en": ". Every announcement has been corrected."
   },
   "… ou un rôle précis": {
     "en": "… or one specific role"
@@ -914,6 +932,9 @@
   "[Staff] Ajouter/retirer un membre à la tête d'une entreprise": {
     "en": "[Staff] Add/remove a member at the head of a company"
   },
+  "[Staff] Alerte vocale au staff, et salons vocaux personnels": {
+    "en": "[Staff] Voice alerts to the staff, and personal voice channels"
+  },
   "[Staff] Annoncer votre arrivée en poste": {
     "en": "[Staff] Announce the start of your shift"
   },
@@ -938,11 +959,20 @@
   "[Staff] Composer ou modifier un message/embed avec aperçu en direct": {
     "en": "[Staff] Compose or edit a message/embed with a live preview"
   },
+  "[Staff] Couper les alertes de connexion vocale": {
+    "en": "[Staff] Turn off the voice connection alerts"
+  },
+  "[Staff] Couper les salons vocaux personnels": {
+    "en": "[Staff] Turn off personal voice channels"
+  },
   "[Staff] Créer la carte d'identité d'un membre": {
     "en": "[Staff] Create a member's ID card"
   },
   "[Staff] Créer une entreprise (question assurance obligatoire)": {
     "en": "[Staff] Create a company (the insurance question is required)"
+  },
+  "[Staff] Définir le salon créateur des salons vocaux personnels": {
+    "en": "[Staff] Set the creator channel for personal voice channels"
   },
   "[Staff] Délivrer un permis (numéro généré, 12 points, daté du jour)": {
     "en": "[Staff] Issue a licence (number generated, 12 points, dated today)"
@@ -967,6 +997,9 @@
   },
   "[Staff] Panneau central de configuration : rôles, salons, XP, whitelist métiers": {
     "en": "[Staff] Central configuration panel: roles, channels, XP, job whitelist"
+  },
+  "[Staff] Prévenir le staff à chaque connexion vocale, dans ce salon": {
+    "en": "[Staff] Warn the staff on every voice connection, in this channel"
   },
   "[Staff] Publier le panneau de déclaration d'absence": {
     "en": "[Staff] Publish the absence declaration panel"
@@ -1289,6 +1322,9 @@
   "** salon(s) de la catégorie **": {
     "en": "** channel(s) from the category **"
   },
+  "** salon(s) déjà créés disparaîtront en se vidant.": {
+    "en": "** channel(s) already created will disappear as they empty."
+  },
   "** salon(s) retiré(s).\n-# Sans liste, l'annonce part dans le salon où le bouton est cliqué.": {
     "en": "** channel(s) removed.\n-# With no list, the announcement goes to the channel where the button is clicked."
   },
@@ -1562,6 +1598,9 @@
   "> — c'est le **demandeur** : fermez le ticket plutôt que de l'en sortir": {
     "en": "> — this is the **requester**: close the ticket rather than removing them from it"
   },
+  "> — c'est le propriétaire du salon": {
+    "en": "> — that is the channel's owner"
+  },
   "> — Discord a refusé la modification": {
     "en": "> — Discord refused the change"
   },
@@ -1574,11 +1613,20 @@
   "> — lui seul peut agir.": {
     "en": "> — they alone can act."
   },
+  "> — membre du staff": {
+    "en": "> — staff member"
+  },
   "> — numéro : `": {
     "en": "> — number: `"
   },
   "> — ou le staff — peut clore cette absence.": {
     "en": "> — or the staff — can close this absence."
+  },
+  "> — ou le staff — peut gérer ce salon.": {
+    "en": "> — or the staff — can manage this channel."
+  },
+  "> — ou le staff — peut modifier cette absence.": {
+    "en": "> — or the staff — can edit this absence."
   },
   "> ! Cliquez sur le bouton pour prouver que vous n'êtes pas un robot ": {
     "en": ">! Click the button to prove you are not a robot "
@@ -1684,6 +1732,9 @@
   },
   "> assuré chez **": {
     "en": "> insured with **"
+  },
+  "> crée son propre vocal, avec sa carte de gestion.": {
+    "en": "> builds your own voice channel, with its control card."
   },
   "> démute par <@": {
     "en": "> unmuted by <@"
@@ -1829,14 +1880,23 @@
   "> supprimée.": {
     "en": "> deleted."
   },
+  "> vient de se connecter à <#": {
+    "en": "> has just connected to <#"
+  },
   "> whitelisté <@&": {
     "en": "> whitelisted <@&"
+  },
+  ">, ce salon est à vous : il disparaîtra tout seul quand il se videra.": {
+    "en": ">, this channel is yours: it will disappear on its own once it empties."
   },
   ">, fermé par <@": {
     "en": ">, closed by <@"
   },
   ">, le staff attend votre réponse pour avancer sur ce ticket.": {
     "en": ">, staff is waiting for your reply to move this ticket forward."
+  },
+  ">, staff mentionné.": {
+    "en": ">, staff mentioned."
   },
   ">, te voilà piégé dans **Sword Art Online**. Pour recouvrer ta liberté, il te faudra vaincre les **100 boss d'étage** de ce château flottant.\n\n": {
     "en": ">, you are trapped in **Sword Art Online**. To win your freedom back, you will have to defeat the **100 floor bosses** of this floating castle.\n\n"
@@ -1979,6 +2039,9 @@
   "⚠️ /esthetique : compte rendu non remis (réponse expirée et messages privés fermés).": {
     "en": "⚠️ /esthetique: report not delivered (reply expired and direct messages closed)."
   },
+  "⚠️ Alerte vocale : ": {
+    "en": "⚠️ Voice alert: "
+  },
   "⚠️ Alignement de l'XP vocal impossible (": {
     "en": "⚠️ Could not bring voice XP in line ("
   },
@@ -2002,6 +2065,12 @@
   },
   "⚠️ Balayage des absences non démarré : ": {
     "en": "⚠️ Absence sweep not started: "
+  },
+  "⚠️ Balayage des salons perso : ": {
+    "en": "⚠️ Personal channel sweep: "
+  },
+  "⚠️ Balayage des salons perso non démarré : ": {
+    "en": "⚠️ Personal channel sweep not started: "
   },
   "⚠️ Bannière d'arrivée : jimp indisponible, bannière ignorée.": {
     "en": "⚠️ Welcome banner: jimp unavailable, banner skipped."
@@ -2038,6 +2107,9 @@
   },
   "⚠️ Création du salon de logs à l'arrivée impossible : ": {
     "en": "⚠️ Could not create the log channel on arrival: "
+  },
+  "⚠️ Création du salon perso impossible : ": {
+    "en": "⚠️ Could not create the personal channel: "
   },
   "⚠️ Déjà claim par <@": {
     "en": "⚠️ Already claimed by <@"
@@ -2111,6 +2183,9 @@
   "⚠️ Musique : diagnostic audio impossible (": {
     "en": "⚠️ Music: audio diagnosis not possible ("
   },
+  "⚠️ Non traité(s) : ": {
+    "en": "⚠️ Not handled: "
+  },
   "⚠️ Notes de mise à jour non publiées : ": {
     "en": "⚠️ Patch notes not published: "
   },
@@ -2146,6 +2221,12 @@
   },
   "⚠️ Rôles automatiques non attribués sur ": {
     "en": "⚠️ Automatic roles not given on "
+  },
+  "⚠️ Salon perso impossible sur ": {
+    "en": "⚠️ Personal channel not possible on "
+  },
+  "⚠️ Salons perso : ": {
+    "en": "⚠️ Personal channels: "
   },
   "⚠️ Snipe non enregistré : ": {
     "en": "⚠️ Snipe not recorded: "
@@ -2390,6 +2471,9 @@
   "✅ **Traité — aucune sanction**": {
     "en": "✅ **Handled — no sanction**"
   },
+  "✅ **Whitelist** — garantir la connexion à quelqu'un, même en privé": {
+    "en": "✅ **Whitelist** — guarantee someone's connection, even in private mode"
+  },
   "✅ Absence close : ses annonces sont supprimées.": {
     "en": "✅ Absence closed: its announcements have been deleted."
   },
@@ -2428,6 +2512,9 @@
   },
   "✅ Champ **": {
     "en": "✅ Field **"
+  },
+  "✅ Choisissez qui **whitelister** : la connexion lui sera garantie, même en mode privé.": {
+    "en": "✅ Pick who to **whitelist**: their connection will be guaranteed, even in private mode."
   },
   "✅ Code correct, mais vous n'êtes plus sur le serveur.": {
     "en": "✅ Right code, but you are no longer on the server."
@@ -2591,11 +2678,17 @@
   "✅ Whitelist RP (": {
     "en": "✅ RP whitelist ("
   },
+  "✅ Whitelisté(s) sur le salon : ": {
+    "en": "✅ Whitelisted on the channel: "
+  },
   "✍️ Agent": {
     "en": "✍️ Officer"
   },
   "✍️ Dont écrit": {
     "en": "✍️ From chatting"
+  },
+  "✏️ Absence mise à jour": {
+    "en": "✏️ Absence updated"
   },
   "✏️ Message modifié": {
     "en": "✏️ Message edited"
@@ -2675,6 +2768,9 @@
   "❌ Ce salon est introuvable, hors de ce serveur, ou je n'y ai pas accès.": {
     "en": "❌ That channel is not found, is outside this server, or I have no access to it."
   },
+  "❌ Ce salon n'est pas (ou plus) un salon personnel.": {
+    "en": "❌ This channel is not (or no longer) a personal channel."
+  },
   "❌ Ce salon n'est pas un ticket.": {
     "en": "❌ This channel is not a ticket."
   },
@@ -2686,6 +2782,9 @@
   },
   "❌ Ce type de ticket n'existe plus.": {
     "en": "❌ This ticket type no longer exists."
+  },
+  "❌ Cette absence serait **déjà finie** : sa fin est dans le passé. Vérifiez la date — ou cliquez **✅ Je suis de retour** pour la clore.": {
+    "en": "❌ This absence would be **already over**: its end is in the past. Check the date — or click **✅ I am back** to close it."
   },
   "❌ Cette absence serait **déjà finie** : sa fin est dans le passé. Vérifiez la date.": {
     "en": "❌ This absence would be **already over**: its end is in the past. Check the date."
@@ -3377,6 +3476,9 @@
   "🎉 Étage ": {
     "en": "🎉 Floor "
   },
+  "🎙️ Alertes vocales **activées** : chaque connexion sera annoncée dans <#": {
+    "en": "🎙️ Voice alerts **on**: every connection will be announced in <#"
+  },
   "🎙️ Changement de salon vocal": {
     "en": "🎙️ Moved voice channel"
   },
@@ -3389,8 +3491,26 @@
   "🎙️ Dont vocal": {
     "en": "🎙️ From voice"
   },
+  "🎥 **Caméras & streams** — les couper ou les rautoriser *(une seule permission chez Discord)*": {
+    "en": "🎥 **Cameras & streams** — cut them off or allow them again *(a single permission on Discord's side)*"
+  },
+  "🎥 **Caméras & streams** — les couper ou les réautoriser *(une seule permission chez Discord)*": {
+    "en": "🎥 **Cameras & streams** — cut them off or allow them again *(a single permission on Discord's side)*"
+  },
+  "🎥 Caméras et streams **coupés** dans ce salon.\n-# Chez Discord, une seule permission (« Vidéo ») couvre les deux.": {
+    "en": "🎥 Cameras and streams **cut off** in this channel.\n-# On Discord's side, a single permission (“Video”) covers both."
+  },
+  "🎥 Caméras et streams **réautorisés** dans ce salon.": {
+    "en": "🎥 Cameras and streams **allowed again** in this channel."
+  },
   "🎧 Ce que je sais lire": {
     "en": "🎧 What I can play"
+  },
+  "🎧 Salons personnels **activés** : se connecter à <#": {
+    "en": "🎧 Personal channels **on**: connecting to <#"
+  },
+  "🎧 Votre salon personnel": {
+    "en": "🎧 Your personal channel"
   },
   "🎨 Anciens embeds refaits au style actuel": {
     "en": "🎨 Old embeds redone in the current style"
@@ -4091,6 +4211,9 @@
   "🔇 Mute": {
     "en": "🔇 Mute"
   },
+  "🔇 Salons personnels **coupés**.": {
+    "en": "🔇 Personal channels **off**."
+  },
   "🔊 **SoundCloud** — pistes et playlists": {
     "en": "🔊 **SoundCloud** — tracks and playlists"
   },
@@ -4124,6 +4247,9 @@
   "🔐 Salon des logs de sécurité": {
     "en": "🔐 Security log channel"
   },
+  "🔒 **Mode privé** — tout le monde voit le salon, seuls le staff et votre whitelist s'y connectent": {
+    "en": "🔒 **Private mode** — everyone sees the channel, only staff and your whitelist can connect"
+  },
   "🔒 **Non liée** — les entreprises de ce serveur restent chez lui.": {
     "en": "🔒 **Not linked** — this server's companies stay here."
   },
@@ -4135,6 +4261,9 @@
   },
   "🔒 La raison **": {
     "en": "🔒 The reason **"
+  },
+  "🔒 Mode privé **activé** : le salon reste visible, mais seuls vous, le staff et votre whitelist peuvent s'y connecter.": {
+    "en": "🔒 Private mode **on**: the channel stays visible, but only you, the staff and your whitelist can connect."
   },
   "🔒 Raison **": {
     "en": "🔒 Reason **"
@@ -4153,6 +4282,9 @@
   },
   "🔓 Blacklist de <@": {
     "en": "🔓 Blacklist on <@"
+  },
+  "🔓 Mode privé **coupé** : tout le monde peut se reconnecter.": {
+    "en": "🔓 Private mode **off**: everyone can connect again."
   },
   "🔓 Raison **": {
     "en": "🔓 Reason **"
@@ -4180,6 +4312,9 @@
   },
   "🔕 **Personne** *(défaut)*": {
     "en": "🔕 **Nobody** *(default)*"
+  },
+  "🔕 Alertes vocales **coupées**.": {
+    "en": "🔕 Voice alerts **off**."
   },
   "🔗 **Liée** à la communauté `": {
     "en": "🔗 **Linked** to community `"
@@ -4487,6 +4622,15 @@
   "🩺 État de l'esthétique du bot": {
     "en": "🩺 State of the bot's look"
   },
+  "🪧 **Statuts** — empêcher (ou permettre) de poser un statut sur le salon": {
+    "en": "🪧 **Statuses** — prevent (or allow) setting a status on the channel"
+  },
+  "🪧 Les statuts du salon sont **de nouveau permis**.": {
+    "en": "🪧 Channel statuses are **allowed again**."
+  },
+  "🪧 Plus personne ne peut poser de **statut** sur ce salon.": {
+    "en": "🪧 Nobody can set a **status** on this channel any more."
+  },
   "🪪 Carte créée": {
     "en": "🪪 Card created"
   },
@@ -4577,6 +4721,9 @@
   "🚪 Unité": {
     "en": "🚪 Unit"
   },
+  "🚫 **Blacklist** — cacher le salon à quelqu'un et lui couper la connexion": {
+    "en": "🚫 **Blacklist** — hide the channel from someone and cut their connection"
+  },
   "🚫 **Blacklisté** — ": {
     "en": "🚫 **Blacklisted** — "
   },
@@ -4600,6 +4747,12 @@
   },
   "🚫 Blacklist RP (": {
     "en": "🚫 RP blacklist ("
+  },
+  "🚫 Blacklisté(s) du salon : ": {
+    "en": "🚫 Blacklisted from the channel: "
+  },
+  "🚫 Choisissez qui **blacklister** : le salon lui sera caché, connexion coupée — et la personne est déconnectée si elle s'y trouve.": {
+    "en": "🚫 Pick who to **blacklist**: the channel will be hidden from them, connection cut — and they are disconnected if inside."
   },
   "🚫 Le propriétaire de **": {
     "en": "🚫 The owner of **"
@@ -5120,6 +5273,9 @@
   "C'est une panne côté Discord, souvent liée à la **région du salon**. Changez-la (Modifier le salon → Région), puis réessayez.": {
     "en": "That's a Discord-side fault, often tied to the **channel region**. Change it (Edit Channel → Region), then try again."
   },
+  "Caméras & streams": {
+    "en": "Cameras & streams"
+  },
   "Captcha de vérification à l'arrivée": {
     "en": "Verification captcha on join"
   },
@@ -5345,6 +5501,9 @@
   "Dans l'étape 5, où ça s'arrête": {
     "en": "Inside step 5: where it stops"
   },
+  "Dans le salon": {
+    "en": "In the channel"
+  },
   "Date d'expiration (JJ/MM/AAAA)": {
     "en": "Expiry date (DD/MM/YYYY)"
   },
@@ -5407,6 +5566,9 @@
   },
   "Département des véhicules à moteur — San Andreas": {
     "en": "Department of Motor Vehicles — San Andreas"
+  },
+  "Déplacement impossible": {
+    "en": "Move failed"
   },
   "Depuis : <t:": {
     "en": "Since: <t:"
@@ -5795,6 +5957,9 @@
   "ℹ️ Rien à changer : les messages examinés portent déjà le style actuel. Ceux écrits par **un membre** ou **un autre bot** ne sont pas modifiables — Discord ne l'autorise pas.": {
     "en": "ℹ️ Nothing to change: the messages looked at already carry the current style. Those written by **a member** or **another bot** cannot be edited — Discord does not allow it."
   },
+  "ℹ️ Rien à faire.": {
+    "en": "ℹ️ Nothing to do."
+  },
   "ℹ️ Vous avez déjà pris ce ticket en charge.": {
     "en": "ℹ️ You have already claimed this ticket."
   },
@@ -6041,6 +6206,9 @@
   "Le staff vous répondra dès que possible": {
     "en": "Staff will get back to you as soon as possible"
   },
+  "Le vocal « créateur » : s'y connecter fabrique son propre salon": {
+    "en": "The “creator” voice channel: connecting to it builds your own channel"
+  },
   "Le WebSocket vocal ne s'ouvre pas — l'UDP n'y est pour RIEN.": {
     "en": "The voice WebSocket does not open — UDP has NOTHING to do with it."
   },
@@ -6061,6 +6229,9 @@
   },
   "Les actions du staff, les messages supprimés/modifiés, le vocal et les transcripts de tickets ": {
     "en": "Staff actions, deleted/edited messages, voice activity and ticket transcripts "
+  },
+  "Les commandes du salon": {
+    "en": "The channel's controls"
   },
   "Les membres connectés": {
     "en": "Members who are online"
@@ -6260,6 +6431,9 @@
   "mode de chiffrement refusé par Discord": {
     "en": "encryption mode refused by Discord"
   },
+  "Mode privé": {
+    "en": "Private mode"
+  },
   "Modérateur": {
     "en": "Moderator"
   },
@@ -6269,8 +6443,14 @@
   "modifié": {
     "en": "changed"
   },
+  "Modifier": {
+    "en": "Edit"
+  },
   "Modifier le dernier panneau publié (texte, embed, boutons)": {
     "en": "Edit the last published panel (text, embed, buttons)"
+  },
+  "Modifier mon absence": {
+    "en": "Edit my absence"
   },
   "Modifier sur place — garde réactions, épingles et liens": {
     "en": "Edit in place — keeps reactions, pins and links"
@@ -6626,11 +6806,17 @@
   "Question obligatoire : l'entreprise propose-t-elle des assurances ?": {
     "en": "Required question: does the company offer insurance?"
   },
+  "Qui blacklister de ce salon ?": {
+    "en": "Who should be blacklisted from this channel?"
+  },
   "Qui manque": {
     "en": "Who is away"
   },
   "Qui vous répond": {
     "en": "Who answers you"
+  },
+  "Qui whitelister sur ce salon ?": {
+    "en": "Who should be whitelisted on this channel?"
   },
   "Quoi répéter": {
     "en": "What to repeat"
@@ -6991,6 +7177,18 @@
   },
   "salon non choisi": {
     "en": "no channel picked"
+  },
+  "Salon personnel de ": {
+    "en": "Personal channel of "
+  },
+  "Salon personnel vidé": {
+    "en": "Personal channel emptied"
+  },
+  "Salon personnel vidé (rattrapage)": {
+    "en": "Personal channel emptied (catch-up)"
+  },
+  "Salon texte où poster les alertes": {
+    "en": "Text channel where alerts are posted"
   },
   "Salons à ajouter (25 max par passage)…": {
     "en": "Channels to add (25 max per pass)…"

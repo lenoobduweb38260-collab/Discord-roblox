@@ -135,6 +135,15 @@ module.exports = {
       return require('../utils/rolesAuClic').handleButton(interaction);
     }
 
+    // ----- Salons vocaux personnels : la carte de gestion -----
+    if ((interaction.isButton() && interaction.customId?.startsWith('vp:'))
+      || (interaction.isUserSelectMenu?.() && interaction.customId?.startsWith('vp:'))) {
+      if (!interaction.inGuild()) return horsServeur(interaction);
+      const perso = require('../utils/salonsPerso');
+      if (interaction.isUserSelectMenu?.()) return perso.handleMenu(interaction);
+      return perso.handleBouton(interaction);
+    }
+
     // ----- Absences : le bouton du panneau, la modale, le retour -----
     if ((interaction.isButton() && interaction.customId?.startsWith('abs:'))
       || (interaction.isChannelSelectMenu?.() && interaction.customId?.startsWith('abs:sel:'))

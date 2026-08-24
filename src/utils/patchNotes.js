@@ -1311,6 +1311,22 @@ const RELEASES = [
     fix: [],
     retrait: [],
   },
+  {
+    id: 'vocal-perso-alerte-absences-2026-08bm',
+    title: 'Salons vocaux personnels, alerte vocale au staff, absences modifiables 🎧',
+    ajout: [
+      '🎧 **Les salons vocaux personnels** : un staff definit un vocal « createur » (`/vocal perso`) — s\'y connecter fabrique un salon a votre pseudo, vous y etes deplace, et sa carte de gestion arrive dans le chat du vocal. Le salon disparait tout seul en se vidant (meme si ca s\'est passe pendant que le bot dormait)',
+      '🎛️ **La carte du salon pilote tout par les permissions Discord** : couper cameras & streams *(une seule permission « Video » chez Discord — la carte le dit)*, bloquer les statuts du salon, mode prive (visible par tous, connexion reservee au proprietaire, au staff et a la whitelist), blacklist (salon cache, connexion coupee, deconnexion immediate) et whitelist (connexion garantie meme en prive)',
+      '🎙️ **L\'alerte vocale** (`/vocal alerte`) : a chaque connexion en vocal, une carte part dans le salon choisi — qui vient d\'arriver, qui est present — et les roles staff sont mentionnes dans le message lui-meme, donc ils SONNENT (c\'est le seul champ dont les mentions notifient encore)',
+      '✏️ **Le bouton « Modifier » sur les annonces d\'absence** : la modale revient preremplie, la declaration est corrigee sans etre cloturee, et CHAQUE copie de l\'annonce est reeditee sur place — reactions et liens intacts',
+    ],
+    amelioration: [
+      '🛡️ Le proprietaire d\'un salon perso garde TOUJOURS sa porte : ni le mode prive ni une blacklist ne peuvent l\'enfermer dehors — et blacklister le proprietaire ou un membre du staff est refuse, avec la raison',
+      '📝 Dans la modale de modification d\'absence, un debut laisse vide GARDE la date d\'origine — « vide = maintenant » vaut pour une declaration, pas pour une correction',
+    ],
+    fix: [],
+    retrait: [],
+  },
 ];
 
 // Construit l'embed d'une note à partir d'une entrée { title, ajout, fix,

@@ -32,6 +32,7 @@ const active = db.prepare(
 );
 const parId = db.prepare('SELECT * FROM absences WHERE id = ?');
 const effacer = db.prepare('DELETE FROM absences WHERE id = ?');
+const corriger = db.prepare('UPDATE absences SET debut = ?, fin = ?, raison = ? WHERE id = ?');
 const echues = db.prepare('SELECT * FROM absences WHERE fin IS NOT NULL AND fin <= ?');
 const duServeur = db.prepare('SELECT * FROM absences WHERE guild_id = ? AND (fin IS NULL OR fin > ?) ORDER BY debut');
 
@@ -51,6 +52,14 @@ const retirerSalon = db.prepare('DELETE FROM absence_channels WHERE guild_id = ?
 //
 // Discord n'a pas de sélecteur de date dans une modale : on lit du texte, et
 // chaque refus dit exactement quoi corriger — jamais « format invalide ».
+
+// L'inverse de lireDate : un instant → « JJ/MM/AAAA », pour préremplir.
+function versJJMMAAAA(ms) {
+  if (!ms) return '';
+  const d = new Date(ms);
+  const deux = (n) => String(n).padStart(2, '0');
+  return `${deux(d.getDate())}/${deux(d.getMonth() + 1)}/${d.getFullYear()}`;
+}
 
 // « JJ/MM/AAAA » → l'instant minuit, heure du serveur. Null si vide.
 function lireDate(texte) {
@@ -132,19 +141,21 @@ const viderTousSalons = (guildId) => viderSalons.run(String(guildId)).changes;
 
 // ── La modale ────────────────────────────────────────────────────
 
-function modale() {
-  const champ = (id, label, placeholder, requis = false) => new ActionRowBuilder().addComponents(
-    new TextInputBuilder().setCustomId(id).setLabel(label).setPlaceholder(placeholder)
+function modale(customId = 'abs:decl', valeurs = null) {
+  const champ = (id, label, placeholder, valeur = '') => {
+    const entree = new TextInputBuilder().setCustomId(id).setLabel(label).setPlaceholder(placeholder)
       .setStyle(id === 'abs:raison' ? TextInputStyle.Paragraph : TextInputStyle.Short)
-      .setRequired(requis).setMaxLength(id === 'abs:raison' ? 400 : 20)
-  );
+      .setRequired(false).setMaxLength(id === 'abs:raison' ? 400 : 20);
+    if (valeur) entree.setValue(String(valeur).slice(0, id === 'abs:raison' ? 400 : 20));
+    return new ActionRowBuilder().addComponents(entree);
+  };
   return new ModalBuilder()
-    .setCustomId('abs:decl')
-    .setTitle('Déclarer une absence')
+    .setCustomId(customId)
+    .setTitle(customId === 'abs:modif' ? 'Modifier mon absence' : 'Déclarer une absence')
     .addComponents(
-      champ('abs:debut', 'Début (JJ/MM/AAAA) — vide = maintenant', '25/08/2026'),
-      champ('abs:fin', 'Fin : date, durée (5j, 12h)… ou vide', 'vide = durée indéterminée'),
-      champ('abs:raison', 'Raison (facultatif)', 'Vacances, examens, déménagement…')
+      champ('abs:debut', 'Début (JJ/MM/AAAA) — vide = maintenant', '25/08/2026', valeurs ? versJJMMAAAA(valeurs.debut) : ''),
+      champ('abs:fin', 'Fin : date, durée (5j, 12h)… ou vide', 'vide = durée indéterminée', valeurs?.fin ? versJJMMAAAA(valeurs.fin) : ''),
+      champ('abs:raison', 'Raison (facultatif)', 'Vacances, examens, déménagement…', valeurs?.raison || '')
     );
 }
 
@@ -168,6 +179,7 @@ function carteAbsence(a) {
 }
 
 const rangeeAbsence = () => new ActionRowBuilder().addComponents(
+  new ButtonBuilder().setCustomId('abs:editer').setLabel('Modifier').setEmoji('✏️').setStyle(ButtonStyle.Secondary),
   new ButtonBuilder().setCustomId('abs:fin').setLabel('Je suis de retour').setEmoji('✅').setStyle(ButtonStyle.Success)
 );
 
@@ -198,10 +210,28 @@ async function handleBouton(interaction) {
     return interaction.showModal(modale());
   }
   if (interaction.customId === 'abs:fin') return terminer(interaction);
+  if (interaction.customId === 'abs:editer') {
+    const ligne = parMessage.get(String(interaction.message?.id));
+    const absence = ligne ? parId.get(ligne.absence_id) : null;
+    if (!absence) {
+      return interaction.reply({ content: '📅 Cette absence était déjà terminée.', flags: MessageFlags.Ephemeral }).catch(() => null);
+    }
+    const estConcerne = String(interaction.user.id) === absence.user_id;
+    const estStaff = getGrade(interaction.member) >= GRADES.STAFF;
+    if (!estConcerne && !estStaff) {
+      return interaction.reply({
+        content: `⛔ Seul <@${absence.user_id}> — ou le staff — peut modifier cette absence.`,
+        flags: MessageFlags.Ephemeral,
+      });
+    }
+    return interaction.showModal(modale('abs:modif', absence));
+  }
   return null;
 }
 
 async function handleModal(interaction) {
+  if (interaction.customId === 'abs:modif') return modifierAbsence(interaction);
+
   let debut;
   let fin;
   try {
@@ -260,6 +290,71 @@ async function handleModal(interaction) {
     content: `✅ Absence déclarée${fin ? ` jusqu'au <t:${secondes}:f>` : ' — durée indéterminée'}.`
       + `\n-# Annoncée dans ${copies} salon(s). L'annonce se supprimera toute seule ; sinon, cliquez **✅ Je suis de retour**.`,
   }).catch(() => null);
+}
+
+// ✏️ Modifier l'absence sans la clôturer : la déclaration est corrigée, et
+// CHAQUE copie de l'annonce est rééditée sur place — réactions et liens
+// intacts, comme le veut la règle du projet.
+async function modifierAbsence(interaction) {
+  const ligne = parMessage.get(String(interaction.message?.id));
+  const absence = ligne ? parId.get(ligne.absence_id) : null;
+  if (!absence) {
+    return interaction.reply({ content: '📅 Cette absence était déjà terminée.', flags: MessageFlags.Ephemeral }).catch(() => null);
+  }
+  const estConcerne = String(interaction.user.id) === absence.user_id;
+  if (!estConcerne && getGrade(interaction.member) < GRADES.STAFF) {
+    return interaction.reply({
+      content: `⛔ Seul <@${absence.user_id}> — ou le staff — peut modifier cette absence.`,
+      flags: MessageFlags.Ephemeral,
+    });
+  }
+
+  let debut;
+  let fin;
+  try {
+    // Un début laissé vide GARDE l'original : « vide = maintenant » vaut pour
+    // une déclaration, pas pour une correction.
+    debut = lireDate(interaction.fields.getTextInputValue('abs:debut')) ?? absence.debut;
+    fin = lireFin(interaction.fields.getTextInputValue('abs:fin'), debut);
+  } catch (err) {
+    return interaction.reply({ content: err.message, flags: MessageFlags.Ephemeral });
+  }
+  if (fin && fin <= Date.now()) {
+    return interaction.reply({
+      content: '❌ Cette absence serait **déjà finie** : sa fin est dans le passé. Vérifiez la date — ou cliquez **✅ Je suis de retour** pour la clore.',
+      flags: MessageFlags.Ephemeral,
+    });
+  }
+  const raison = String(interaction.fields.getTextInputValue('abs:raison') || '').trim() || null;
+
+  corriger.run(debut, fin, raison, absence.id);
+  const corrige = parId.get(absence.id);
+  await editerCopies(interaction.client, corrige);
+
+  const secondes = Math.floor((fin || 0) / 1000);
+  return interaction.reply({
+    content: `✏️ Absence mise à jour${fin ? ` — retour <t:${secondes}:f>` : ' — durée indéterminée'}. Toutes les annonces sont corrigées.`,
+    flags: MessageFlags.Ephemeral,
+  }).catch(() => null);
+}
+
+// Réédite chaque copie de l'annonce. Une carte se reconstruit en composants
+// (une carte n'accepte pas d'embeds en modification) ; un vieil embed se
+// modifie tel quel. Une copie disparue est simplement oubliée.
+async function editerCopies(client, absence) {
+  const { enComposants, estCarte } = require('./reponse');
+  for (const copie of messagesDe.all(absence.id)) {
+    const salon = await client.channels.fetch(copie.channel_id).catch(() => null);
+    const message = await salon?.messages?.fetch?.(copie.message_id).catch(() => null);
+    if (!message) continue;
+    const contenu = { embeds: [carteAbsence(absence)], components: [rangeeAbsence()] };
+    if (estCarte(message)) {
+      const composants = enComposants(salon.guild, client, contenu);
+      if (composants) await message.edit({ components: composants }).catch(() => null);
+    } else {
+      await message.edit(contenu).catch(() => null);
+    }
+  }
 }
 
 // « Je suis de retour » — la personne concernée, ou le staff.
@@ -346,7 +441,7 @@ function handleMenu(interaction) {
 
 module.exports = {
   lireDate, lireFin, cartePanneau, rangeePanneau, publierPanneau, modale,
-  carteAbsence, rangeeAbsence, handleBouton, handleModal, handleMenu, terminer,
+  carteAbsence, rangeeAbsence, handleBouton, handleModal, handleMenu, terminer, modifierAbsence, editerCopies, versJJMMAAAA,
   balayer, demarrer, enCours, supprimerCopies,
   ajouterSalons, retirerSalons, listeSalons, viderTousSalons,
 };

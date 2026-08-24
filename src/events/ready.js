@@ -32,6 +32,13 @@ module.exports = {
       console.warn(`⚠️ Balayage des absences non démarré : ${err.message}`);
     }
 
+    // 🎧 Les salons perso vidés pendant que le bot dormait disparaissent.
+    try {
+      require('../utils/salonsPerso').demarrer(client);
+    } catch (err) {
+      console.warn(`⚠️ Balayage des salons perso non démarré : ${err.message}`);
+    }
+
     // XP vocal : chaque minute, chaque membre connecté en vocal (non muet
     // serveur, hors salon AFK, hors bots) gagne l'XP vocal configuré.
     setInterval(() => {
