@@ -520,7 +520,8 @@ CREATE TABLE IF NOT EXISTS attentes_vocales (
   message_id TEXT,
   arrivee    INTEGER NOT NULL,
   claim_par  TEXT,
-  claim_a    INTEGER
+  claim_a    INTEGER,
+  clos_a     INTEGER
 );
 CREATE INDEX IF NOT EXISTS idx_attentes_user ON attentes_vocales (guild_id, user_id);
 
@@ -656,6 +657,12 @@ for (const colonne of ['claimed_by TEXT', 'claimed_at TEXT']) {
     db.exec(`ALTER TABLE tickets ADD COLUMN ${colonne}`);
   } catch {}
 }
+
+// 🎧 Clôture d'une attente vocale : la carte finale reste affichée un court
+// instant, puis le ticket est supprimé — clos_a date la clôture.
+try {
+  db.exec('ALTER TABLE attentes_vocales ADD COLUMN clos_a INTEGER');
+} catch {}
 
 // 📊 Le vocal rapporte autant que l'écrit.
 //

@@ -2,11 +2,17 @@
   "\n\n➕ Ajoutez un type, ou sélectionnez-en un pour définir son **rôle support** ou le **supprimer**.": {
     "en": "\n\n➕ Add a type, or pick one to set its **support role** or **delete** it."
   },
+  "\n\n➕ Le premier menu **ajoute** des salons — la liste s'accumule, sans plafond. ➖ Le second en **retire**.": {
+    "en": "\n\n➕ The first menu **adds** channels — the list accumulates, without a cap. ➖ The second **removes** some."
+  },
   "\n\n➕ Sélectionner un rôle dans un menu **l'ajoute** à la liste (les rôles s'accumulent). 🧹 Utilisez les boutons **Vider** pour repartir de zéro.": {
     "en": "\n\n➕ Picking a role in a menu **adds** it to the list (roles stack up). 🧹 Use the **Clear** buttons to start over."
   },
   "\n\n➡️ Tu montes à l'**étage ": {
     "en": "\n\n➡️ You climb to **floor "
+  },
+  "\n\n🎧 Se connecter au vocal d'attente ouvre un ticket dans le salon des tickets, staff mentionné.": {
+    "en": "\n\n🎧 Connecting to the waiting voice channel opens a ticket in the ticket channel, staff mentioned."
   },
   "\n\n💰 Total : ": {
     "en": "\n\n💰 Total: "
@@ -58,6 +64,9 @@
   },
   "\n-# J'ai aussi changé la région du salon (": {
     "en": "\n-# I also changed the channel's region ("
+  },
+  "\n-# Le panneau « Déclarer une absence » se publie avec `/absence panneau`.": {
+    "en": "\n-# The \"Declare an absence\" panel is published with `/absence panneau`."
   },
   "\n-# Le serveur vocal a fermé la connexion : code ": {
     "en": "\n-# The voice server closed the connection: code "
@@ -145,6 +154,9 @@
   },
   "\n🔔 *Choisissez 📝 **Salon des patch notes** ci-dessous pour régler qui est mentionné. Par défaut : personne.*": {
     "en": "\n🔔 *Pick 📝 **Patch notes channel** below to set who gets mentioned. Default: nobody.*"
+  },
+  "\n🧹 Vider un menu **coupe** le réglage correspondant.": {
+    "en": "\n🧹 Clearing a menu **turns off** the matching setting."
   },
   "\n🚓 La **police** peut consulter le casier judiciaire (`/casierjudiciaire`) et retirer des points de permis.": {
     "en": "\n🚓 The **police** can look up criminal records (`/casierjudiciaire`) and take points off a licence."
@@ -334,6 +346,9 @@
   },
   " → retiré": {
     "en": " → removed"
+  },
+  " → tickets dans ": {
+    "en": " → tickets in "
   },
   " 💥 CRITIQUE": {
     "en": " 💥 CRITICAL"
@@ -616,6 +631,12 @@
   },
   " salon(s) ajouté(s) — **": {
     "en": " channel(s) added — **"
+  },
+  " salon(s) d'annonce ajouté(s)": {
+    "en": " announcement channel(s) added"
+  },
+  " salon(s) d'annonce retiré(s)": {
+    "en": " announcement channel(s) removed"
   },
   " salon(s) retiré(s) — il en reste **": {
     "en": " channel(s) removed — **"
@@ -1172,6 +1193,9 @@
   "** ajouté(s) — **": {
     "en": "** added — **"
   },
+  "** attend en vocal depuis **": {
+    "en": "** has been waiting in voice for **"
+  },
   "** au total.": {
     "en": "** in total."
   },
@@ -1367,6 +1391,9 @@
   "** serveur(s), et automatiquement à chaque arrivée future).\n**Raison :** ": {
     "en": "** server(s), and automatically on every future join).\n**Reason:** "
   },
+  "** sont occupés : **": {
+    "en": "** is busy: **"
+  },
   "** supprimée (patrons, employés et véhicules assurés inclus).": {
     "en": "** deleted (owners, employees and insured vehicles included)."
   },
@@ -1447,6 +1474,12 @@
   },
   "*Aucun salon configuré — l'annonce part dans le salon où le bouton est cliqué.*\n➜ `/absence salons ajouter`, ou `/absence salons categorie` pour une catégorie entière.": {
     "en": "*No channel configured — the announcement goes to the channel where the button is clicked.*\n➜ `/absence salons ajouter`, or `/absence salons categorie` for a whole category."
+  },
+  "*Aucun salon d'annonce configuré — les absences déclarées ne partent nulle part.*": {
+    "en": "*No announcement channel configured — declared absences go nowhere.*"
+  },
+  "*Aucun salon d'annonce configuré*": {
+    "en": "*No announcement channel configured*"
   },
   "*Aucun type de ticket configuré*": {
     "en": "*No ticket type configured*"
@@ -1640,6 +1673,9 @@
   "> — gérants : ": {
     "en": "> — managers: "
   },
+  "> — le ticket se clôt tout seul.": {
+    "en": "> — the ticket closes on its own."
+  },
   "> — lui seul peut agir.": {
     "en": "> — they alone can act."
   },
@@ -1709,6 +1745,9 @@
   "> a été ajouté au ticket.": {
     "en": "> was added to the ticket."
   },
+  "> a été déplacé dans <#": {
+    "en": "> has been moved to <#"
+  },
   "> a été retiré de la whitelist : le rôle ": {
     "en": "> was taken off the whitelist: the role "
   },
@@ -1769,6 +1808,9 @@
   "> crée son propre vocal, avec sa carte de gestion.": {
     "en": "> builds your own voice channel, with its control card."
   },
+  "> dans un salon d'assistance pour clore le ticket — le bouton 📥 le fait pour vous.": {
+    "en": "> into an assistance channel to close the ticket — the 📥 button does it for you."
+  },
   "> dans un salon d'assistance pour clore le ticket.": {
     "en": "> into an assistance channel to close the ticket."
   },
@@ -1777,6 +1819,9 @@
   },
   "> doit d'abord avoir une **carte d'identité** (`/carte creer`).": {
     "en": "> needs an **ID card** first (`/carte creer`)."
+  },
+  "> en message privé.": {
+    "en": "> by direct message."
   },
   "> est **banni globalement** (appliqué sur **": {
     "en": "> is **banned globally** (applied on **"
@@ -1852,6 +1897,9 @@
   },
   "> n'est plus à la tête de **": {
     "en": "> is no longer at the head of **"
+  },
+  "> n'est plus dans le salon d'attente : rien à déplacer.": {
+    "en": "> is no longer in the waiting channel: nothing to move."
   },
   "> n'est plus employé de **": {
     "en": "> is no longer an employee of **"
@@ -1939,6 +1987,9 @@
   },
   ">, te voilà piégé dans **Sword Art Online**. Pour recouvrer ta liberté, il te faudra vaincre les **100 boss d'étage** de ce château flottant.\n\n": {
     "en": ">, you are trapped in **Sword Art Online**. To win your freedom back, you will have to defeat the **100 floor bosses** of this floating castle.\n\n"
+  },
+  ">, tiré au sort, a ses messages privés fermés. Voyez directement avec le staff en assistance.": {
+    "en": ">, picked at random, has their direct messages closed. Check directly with the staff in assistance."
   },
   ">.\n-# Les membres qui avaient déjà le rôle le gardent.": {
     "en": ">.\n-# Members who already had the role keep it."
@@ -2099,6 +2150,15 @@
   "⚠️ Attention": {
     "en": "⚠️ Careful"
   },
+  "⚠️ Aucun salon d'assistance configuré : faites `/vocal assistance` (ou `/config` → 🎧 Vocal).": {
+    "en": "⚠️ No assistance channel configured: run `/vocal assistance` (or `/config` → 🎧 Voice)."
+  },
+  "⚠️ Aucun salon d'assistance libre — et <@": {
+    "en": "⚠️ No assistance channel is free — and <@"
+  },
+  "⚠️ Aucun salon d'assistance libre : j'ai prévenu <@": {
+    "en": "⚠️ No assistance channel is free: I notified <@"
+  },
   "⚠️ Balayage des absences : ": {
     "en": "⚠️ Absence sweep: "
   },
@@ -2246,6 +2306,9 @@
   "⚠️ Protection des messages du bot : ": {
     "en": "⚠️ Bot message protection: "
   },
+  "⚠️ Purge des tickets vocaux : ": {
+    "en": "⚠️ Voice ticket purge: "
+  },
   "⚠️ Récupération du message de preuve impossible : ": {
     "en": "⚠️ Could not fetch the evidence message: "
   },
@@ -2302,6 +2365,9 @@
   },
   "⚠️ Ticket QG du ban impossible : ": {
     "en": "⚠️ Could not open the HQ ticket for the ban: "
+  },
+  "⚠️ Tous les salons d'assistance sont occupés, et aucun membre du staff ne s'y trouve à prévenir.": {
+    "en": "⚠️ Every assistance channel is busy, and no staff member is in them to notify."
   },
   "⚠️ Traduction non appliquée : ": {
     "en": "⚠️ Translation not applied: "
@@ -3011,6 +3077,9 @@
   "❌ Je n'ai pas la permission « Gérer les rôles » sur ce serveur.": {
     "en": "❌ I have no “Manage Roles” permission on this server."
   },
+  "❌ Je n'ai pas pu déplacer la personne : il me faut la permission **Déplacer les membres**.": {
+    "en": "❌ I could not move the person: I need the **Move Members** permission."
+  },
   "❌ Je n'ai pas réussi à ouvrir <#": {
     "en": "❌ I could not open <#"
   },
@@ -3320,6 +3389,9 @@
   "➕ Ajouter à un serveur": {
     "en": "➕ Add to a server"
   },
+  "➕ Ajouter des salons d'annonce": {
+    "en": "➕ Add announcement channels"
+  },
   "➕ Ajouter un type": {
     "en": "➕ Add a type"
   },
@@ -3349,6 +3421,9 @@
   },
   "➖ Qui retirer de ce ticket ? *(plusieurs membres possibles)*": {
     "en": "➖ Who should be removed from this ticket? *(several members allowed)*"
+  },
+  "➖ Retirer des salons d'annonce": {
+    "en": "➖ Remove announcement channels"
   },
   "➖ Retrait": {
     "en": "➖ Removal"
@@ -3430,6 +3505,9 @@
   },
   "➜ Les bibliothèques du bot sont trop anciennes sur cet hébergement : relancez `npm install` à côté du bot, ou reprenez le dernier exécutable.": {
     "en": "➜ The bot's libraries are too old on this host: run `npm install` next to the bot again, or grab the latest executable."
+  },
+  "➜ Libérez un salon, ou déplacez la personne dès que possible.": {
+    "en": "➜ Free up a channel, or move the person as soon as possible."
   },
   "➜ Mentionnable : ": {
     "en": "➜ Mentionable: "
@@ -3545,6 +3623,12 @@
   "🎙️ Dont vocal": {
     "en": "🎙️ From voice"
   },
+  "🎙️ Le vocal « créateur » des salons perso": {
+    "en": "🎙️ The \"creator\" voice channel for personal rooms"
+  },
+  "🎙️ Salon créateur des salons perso": {
+    "en": "🎙️ Creator channel for personal rooms"
+  },
   "🎥 **Caméras & streams** — les couper ou les rautoriser *(une seule permission chez Discord)*": {
     "en": "🎥 **Cameras & streams** — cut them off or allow them again *(a single permission on Discord's side)*"
   },
@@ -3560,14 +3644,26 @@
   "🎧 Ce que je sais lire": {
     "en": "🎧 What I can play"
   },
+  "🎧 Configuration — Vocal": {
+    "en": "🎧 Configuration — Voice"
+  },
   "🎧 File d'attente **activée** : se connecter à <#": {
     "en": "🎧 Waiting queue **enabled**: connecting to <#"
+  },
+  "🎧 Le vocal d'attente à surveiller": {
+    "en": "🎧 The waiting voice channel to watch"
   },
   "🎧 Quelqu'un attend en vocal": {
     "en": "🎧 Someone is waiting in voice"
   },
   "🎧 Salons personnels **activés** : se connecter à <#": {
     "en": "🎧 Personal channels **on**: connecting to <#"
+  },
+  "🎧 Vocal": {
+    "en": "🎧 Voice"
+  },
+  "🎧 Vocal d'attente (file d'attente)": {
+    "en": "🎧 Waiting voice channel (queue)"
   },
   "🎧 Votre salon personnel": {
     "en": "🎧 Your personal channel"
@@ -3697,6 +3793,15 @@
   },
   "🎶 File d'attente": {
     "en": "🎶 Queue"
+  },
+  "🏁 Les salons d'assistance (plusieurs possibles)": {
+    "en": "🏁 The assistance channels (several allowed)"
+  },
+  "🏁 Salons d'assistance (y déplacer clôt le ticket) : ": {
+    "en": "🏁 Assistance channels (moving there closes the ticket): "
+  },
+  "🏁 Salons d'assistance → ": {
+    "en": "🏁 Assistance channels → "
   },
   "🏁 Salons d'assistance définis : ": {
     "en": "🏁 Assistance channels set: "
@@ -3974,6 +4079,9 @@
   "📅 Absences": {
     "en": "📅 Absences"
   },
+  "📅 Absences : ": {
+    "en": "📅 Absences: "
+  },
   "📅 Absences en cours": {
     "en": "📅 Absences under way"
   },
@@ -3985,6 +4093,9 @@
   },
   "📅 Compte créé le": {
     "en": "📅 Account created on"
+  },
+  "📅 Configuration — Absences": {
+    "en": "📅 Configuration — Absences"
   },
   "📅 Vous avez **déjà une absence en cours** — cliquez **✅ Je suis de retour** sur son annonce d'abord.": {
     "en": "📅 You **already have an absence running** — click **✅ I am back** on its announcement first."
@@ -4160,8 +4271,14 @@
   "📣 Choisissez les salons à **ajouter** aux annonces d'absence (actuellement : **": {
     "en": "📣 Pick the channels to **add** to the absence announcements (currently: **"
   },
+  "📣 Le salon texte des tickets d'attente": {
+    "en": "📣 The text channel for waiting tickets"
+  },
   "📣 Salon des arrivées/départs staff": {
     "en": "📣 Staff joins/leaves channel"
+  },
+  "📣 Salon des tickets d'attente": {
+    "en": "📣 Waiting ticket channel"
   },
   "📣 Salons des annonces d'absence": {
     "en": "📣 Absence announcement channels"
@@ -4682,6 +4799,9 @@
   "🧹 Image des cartes de niveau retirée.": {
     "en": "🧹 Level card image removed."
   },
+  "🧹 Liste vidée (": {
+    "en": "🧹 List cleared ("
+  },
   "🧹 rôle d'attente retiré": {
     "en": "🧹 waiting role removed"
   },
@@ -4789,6 +4909,9 @@
   },
   "🚨 Signalement de **": {
     "en": "🚨 Report on **"
+  },
+  "🚨 Tous les salons d'assistance de **": {
+    "en": "🚨 Every assistance channel of **"
   },
   "🚪 Unité": {
     "en": "🚪 Unit"
@@ -5648,6 +5771,9 @@
   "Déplacement impossible": {
     "en": "Move failed"
   },
+  "Déplacer en assistance": {
+    "en": "Move to assistance"
+  },
   "Depuis : <t:": {
     "en": "Since: <t:"
   },
@@ -5920,6 +6046,9 @@
   },
   "Fichier effacé (rétention ou budget disque).": {
     "en": "File deleted (retention or disk budget)."
+  },
+  "File d'attente, salons d'assistance, salons perso": {
+    "en": "Waiting queue, assistance channels, personal rooms"
   },
   "file terminée": {
     "en": "queue finished"
@@ -6320,6 +6449,9 @@
   "Les actions du staff, les messages supprimés/modifiés, le vocal et les transcripts de tickets ": {
     "en": "Staff actions, deleted/edited messages, voice activity and ticket transcripts "
   },
+  "Les annonces d'absence partent dans : ": {
+    "en": "Absence announcements go to: "
+  },
   "Les commandes du salon": {
     "en": "The channel's controls"
   },
@@ -6331,6 +6463,9 @@
   },
   "Les rôles à débloquer par niveau sur ce serveur": {
     "en": "Roles unlocked by level on this server"
+  },
+  "Les salons où partent les annonces d'absence": {
+    "en": "The channels where absence announcements go"
   },
   "les serveurs où le système est actif tant que la blacklist n'est pas levée.": {
     "en": "the servers where the system is on, until the blacklist is lifted."
@@ -7298,6 +7433,9 @@
   "Salons à retirer…": {
     "en": "Channels to remove…"
   },
+  "Salons perso (créateur) : ": {
+    "en": "Personal rooms (creator): "
+  },
   "Sanction / peine (facultatif)": {
     "en": "Sanction / sentence (optional)"
   },
@@ -7678,6 +7816,9 @@
   },
   "vide = durée indéterminée": {
     "en": "empty = no end date"
+  },
+  "Vider la liste": {
+    "en": "Clear the list"
   },
   "Ville de naissance": {
     "en": "City of birth"

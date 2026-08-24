@@ -51,6 +51,14 @@ const CHANNEL_COLUMNS = {
   ticket_transcript_channel_id: '📄 Salon des transcripts de tickets (défaut : logs)',
 };
 
+// 🎧 Les réglages vocaux « à un seul salon » — l'assistance (une liste) et
+// les absences (une table) ont leurs menus dédiés dans leurs catégories.
+const VOCAL_COLUMNS = {
+  vocal_attente_channel_id: '🎧 Vocal d\'attente (file d\'attente)',
+  vocal_alerte_channel_id: '📣 Salon des tickets d\'attente',
+  vocal_perso_createur_id: '🎙️ Salon créateur des salons perso',
+};
+
 const show = (id, kind) => (id ? (kind === 'role' ? `<@&${id}>` : `<#${id}>`) : '*Non configuré*');
 
 const listWhitelistMappings = db.prepare(
@@ -145,6 +153,28 @@ function mainView(guild) {
         inline: false,
       },
       {
+        name: '🎧 Vocal',
+        value: (() => {
+          const assistance = require('./vocalAlerte').salonsAssistance(cfg);
+          return [
+            `File d'attente : ${show(cfg.vocal_attente_channel_id, 'channel')} → tickets dans ${show(cfg.vocal_alerte_channel_id, 'channel')}`,
+            `Assistance : ${assistance.length ? assistance.map((id) => `<#${id}>`).join(' ') : '*Non configuré*'}`,
+            `Salons perso (créateur) : ${show(cfg.vocal_perso_createur_id, 'channel')}`,
+          ].join('\n');
+        })(),
+        inline: false,
+      },
+      {
+        name: '📅 Absences',
+        value: (() => {
+          const salons = require('./absences').listeSalons(guild.id);
+          return salons.length
+            ? `Annonces dans : ${salons.map((id) => `<#${id}>`).join(' ')}`
+            : '*Aucun salon d\'annonce configuré*';
+        })(),
+        inline: false,
+      },
+      {
         name: '📡 Réseaux sociaux',
         value: (() => {
           const { PLATFORMS, listGuildFeeds } = require('./socialWatch');
@@ -170,6 +200,8 @@ function mainView(guild) {
         { label: 'Sécurité', value: 'securite', emoji: '🛡️', description: 'Anti-spam, anti-nuke, captcha' },
         { label: 'Whitelist métiers', value: 'whitelist', emoji: '📋', description: 'Autorisations des gérants' },
         { label: 'Tickets', value: 'tickets', emoji: '🎫', description: 'Types de tickets, catégories, rôles support' },
+        { label: 'Vocal', value: 'vocal', emoji: '🎧', description: 'File d\'attente, salons d\'assistance, salons perso' },
+        { label: 'Absences', value: 'absences', emoji: '📅', description: 'Les salons où partent les annonces d\'absence' },
         { label: 'Réseaux sociaux', value: 'reseaux', emoji: '📡', description: 'Annonces des lives et nouvelles vidéos' }
       )
   );
@@ -759,7 +791,97 @@ function ticketEmojiView(pendingLabel, guild, client, creator, page = 0) {
   return { embeds: [embed], components: [new ActionRowBuilder().addComponents(menu), nav] };
 }
 
-const CATEGORY_VIEWS = { rp: rpView, roles: rolesView, salons: salonsView, xp: xpView, securite: securiteView, whitelist: whitelistView, tickets: ticketsView, reseaux: reseauxView };
+// ----- Catégorie : vocal (file d'attente + salons personnels) -----
+function vocalView(guild) {
+  const cfg = getGuildConfig(guild.id);
+  const assistance = require('./vocalAlerte').salonsAssistance(cfg);
+  const embed = new EmbedBuilder()
+    .setColor(COLORS.INFO)
+    .setTitle('🎧 Configuration — Vocal')
+    .setDescription(
+      [
+        `${VOCAL_COLUMNS.vocal_attente_channel_id} : ${show(cfg.vocal_attente_channel_id, 'channel')}`,
+        `${VOCAL_COLUMNS.vocal_alerte_channel_id} : ${show(cfg.vocal_alerte_channel_id, 'channel')}`,
+        `🏁 Salons d'assistance (y déplacer clôt le ticket) : ${assistance.length ? assistance.map((id) => `<#${id}>`).join(' ') : '*Non configuré*'}`,
+        `${VOCAL_COLUMNS.vocal_perso_createur_id} : ${show(cfg.vocal_perso_createur_id, 'channel')}`,
+      ].join('\n')
+        + '\n\n🎧 Se connecter au vocal d\'attente ouvre un ticket dans le salon des tickets, staff mentionné.'
+        + '\n🧹 Vider un menu **coupe** le réglage correspondant.'
+    );
+  const menuAttente = new ChannelSelectMenuBuilder()
+    .setCustomId('cfgvoc:vocal_attente_channel_id')
+    .setPlaceholder('🎧 Le vocal d\'attente à surveiller')
+    .setChannelTypes(ChannelType.GuildVoice)
+    .setMinValues(0).setMaxValues(1);
+  if (cfg.vocal_attente_channel_id) menuAttente.setDefaultChannels(cfg.vocal_attente_channel_id);
+  const menuTickets = new ChannelSelectMenuBuilder()
+    .setCustomId('cfgvoc:vocal_alerte_channel_id')
+    .setPlaceholder('📣 Le salon texte des tickets d\'attente')
+    .setChannelTypes(ChannelType.GuildText)
+    .setMinValues(0).setMaxValues(1);
+  if (cfg.vocal_alerte_channel_id) menuTickets.setDefaultChannels(cfg.vocal_alerte_channel_id);
+  const menuAssistance = new ChannelSelectMenuBuilder()
+    .setCustomId('cfgvocassist')
+    .setPlaceholder('🏁 Les salons d\'assistance (plusieurs possibles)')
+    .setChannelTypes(ChannelType.GuildVoice)
+    .setMinValues(0).setMaxValues(10);
+  if (assistance.length) menuAssistance.setDefaultChannels(assistance.slice(0, 10));
+  const menuPerso = new ChannelSelectMenuBuilder()
+    .setCustomId('cfgvoc:vocal_perso_createur_id')
+    .setPlaceholder('🎙️ Le vocal « créateur » des salons perso')
+    .setChannelTypes(ChannelType.GuildVoice)
+    .setMinValues(0).setMaxValues(1);
+  if (cfg.vocal_perso_createur_id) menuPerso.setDefaultChannels(cfg.vocal_perso_createur_id);
+  return {
+    embeds: [embed],
+    components: [
+      new ActionRowBuilder().addComponents(menuAttente),
+      new ActionRowBuilder().addComponents(menuTickets),
+      new ActionRowBuilder().addComponents(menuAssistance),
+      new ActionRowBuilder().addComponents(menuPerso),
+      backRow(),
+    ],
+  };
+}
+
+// ----- Catégorie : absences (les salons d'annonce, sans plafond) -----
+function absencesView(guild) {
+  const salons = require('./absences').listeSalons(guild.id);
+  const embed = new EmbedBuilder()
+    .setColor(COLORS.INFO)
+    .setTitle('📅 Configuration — Absences')
+    .setDescription(
+      (salons.length
+        ? `Les annonces d'absence partent dans : ${salons.map((id) => `<#${id}>`).join(' ')}`
+        : '*Aucun salon d\'annonce configuré — les absences déclarées ne partent nulle part.*')
+        + '\n\n➕ Le premier menu **ajoute** des salons — la liste s\'accumule, sans plafond. ➖ Le second en **retire**.'
+        + '\n-# Le panneau « Déclarer une absence » se publie avec `/absence panneau`.'
+    );
+  const ajout = new ChannelSelectMenuBuilder()
+    .setCustomId('cfgabsadd')
+    .setPlaceholder('➕ Ajouter des salons d\'annonce')
+    .setChannelTypes(ChannelType.GuildText)
+    .setMinValues(1).setMaxValues(10);
+  const retrait = new ChannelSelectMenuBuilder()
+    .setCustomId('cfgabsdel')
+    .setPlaceholder('➖ Retirer des salons d\'annonce')
+    .setChannelTypes(ChannelType.GuildText)
+    .setMinValues(1).setMaxValues(10);
+  const bas = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('cfgback').setLabel('⬅ Retour').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('cfgabsvider').setLabel('Vider la liste').setEmoji('🧹').setStyle(ButtonStyle.Secondary)
+  );
+  return {
+    embeds: [embed],
+    components: [
+      new ActionRowBuilder().addComponents(ajout),
+      new ActionRowBuilder().addComponents(retrait),
+      bas,
+    ],
+  };
+}
+
+const CATEGORY_VIEWS = { rp: rpView, roles: rolesView, salons: salonsView, xp: xpView, securite: securiteView, whitelist: whitelistView, tickets: ticketsView, vocal: vocalView, absences: absencesView, reseaux: reseauxView };
 const SECURITY_TOGGLES = new Set(['antispam_enabled', 'antinuke_enabled', 'captcha_enabled']);
 
 function xpModal(cfg) {
@@ -1183,6 +1305,54 @@ async function handleConfigInteraction(interaction) {
       await sendLog(
         interaction.guild,
         logEmbed('🎫 Type de ticket supprimé', `**${type.label}**\nPar <@${interaction.user.id}>`, COLORS.WARNING)
+      );
+      return;
+    }
+
+    // 🎧 Vocal : file d'attente et salons perso — un menu vidé coupe le réglage.
+    if (id.startsWith('cfgvoc:')) {
+      const col = id.split(':')[1];
+      if (!(col in VOCAL_COLUMNS)) return;
+      const channelId = interaction.values[0] || null;
+      setGuildConfig(interaction.guildId, col, channelId);
+      await mettreAJour(interaction, vocalView(interaction.guild));
+      await sendLog(
+        interaction.guild,
+        logEmbed('⚙️ Configuration modifiée', `${VOCAL_COLUMNS[col]} → ${channelId ? `<#${channelId}>` : '*retiré*'}\nPar <@${interaction.user.id}>`, COLORS.INFO)
+      );
+      return;
+    }
+
+    // 🏁 Les salons d'assistance : la sélection REMPLACE la liste.
+    if (id === 'cfgvocassist') {
+      const salons = (interaction.values || []).map(String);
+      setGuildConfig(interaction.guildId, 'vocal_assistance_ids', salons.length ? JSON.stringify(salons) : null);
+      await mettreAJour(interaction, vocalView(interaction.guild));
+      await sendLog(
+        interaction.guild,
+        logEmbed('⚙️ Configuration modifiée', `🏁 Salons d'assistance → ${salons.length ? salons.map((s) => `<#${s}>`).join(' ') : '*aucun*'}\nPar <@${interaction.user.id}>`, COLORS.INFO)
+      );
+      return;
+    }
+
+    // 📅 Absences : la liste des salons d'annonce s'ajuste depuis le panneau.
+    if (id === 'cfgabsadd' || id === 'cfgabsdel' || id === 'cfgabsvider') {
+      const abs = require('./absences');
+      let mot;
+      if (id === 'cfgabsadd') {
+        const n = abs.ajouterSalons(interaction.guildId, interaction.values);
+        mot = `➕ ${n} salon(s) d'annonce ajouté(s)`;
+      } else if (id === 'cfgabsdel') {
+        const n = abs.retirerSalons(interaction.guildId, interaction.values);
+        mot = `➖ ${n} salon(s) d'annonce retiré(s)`;
+      } else {
+        const n = abs.viderTousSalons(interaction.guildId);
+        mot = `🧹 Liste vidée (${n} salon(s))`;
+      }
+      await mettreAJour(interaction, absencesView(interaction.guild));
+      await sendLog(
+        interaction.guild,
+        logEmbed('⚙️ Configuration modifiée', `📅 Absences : ${mot}\nPar <@${interaction.user.id}>`, COLORS.INFO)
       );
       return;
     }

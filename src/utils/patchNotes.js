@@ -1344,6 +1344,21 @@ const RELEASES = [
       '🎙️ L\'ancienne alerte « une carte a chaque connexion vocale » disparait au profit de la file : elle annoncait tout le monde, la file n\'annonce que ceux qui demandent de l\'aide',
     ],
   },
+  {
+    id: 'deplacement-config-centrale-2026-08bo',
+    title: 'Le ticket vocal se déplace en un clic, et /config devient la base centrale 🎛️',
+    ajout: [
+      '📥 **Le bouton « Déplacer en assistance »** apparait sur le ticket des qu\'il est pris en charge : un clic cherche un salon d\'assistance VIDE, y deplace la personne, et le ticket se clot tout seul',
+      '📨 **Aucun salon libre ?** Un membre du staff present dans un des salons d\'assistance, tire au sort, est prevenu en message prive — qui attend, et depuis combien de temps',
+      '🎛️ **`/config` → 🎧 Vocal** : le vocal d\'attente, le salon des tickets, les salons d\'assistance et le salon createur des salons perso se reglent desormais au meme endroit — les menus vides coupent le reglage',
+      '🎛️ **`/config` → 📅 Absences** : la liste des salons d\'annonce s\'ajoute, se retire et se vide depuis le panneau — et la vue d\'ensemble de `/config` affiche tout, vocal et absences compris',
+    ],
+    amelioration: [
+      '🧹 **Un ticket clos disparait tout seul** : la carte finale (qui a aide, temps d\'attente) reste affichee une minute — le temps de la lire — puis le message est supprime. Le salon des tickets ne garde que le vif, meme apres un redemarrage',
+    ],
+    fix: [],
+    retrait: [],
+  },
 ];
 
 // Construit l'embed d'une note à partir d'une entrée { title, ajout, fix,

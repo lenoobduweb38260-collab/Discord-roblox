@@ -18,18 +18,25 @@ const M = require('./miseEnPage');
 //     combien de temps la personne a attendu.
 //
 // Quitter l'attente sans être aidé referme aussi le ticket, en le disant.
+// Une fois clos, le ticket reste affiché une minute — le temps de lire le
+// bilan — puis il est SUPPRIMÉ : le salon des annonces ne garde que le vif.
 // Tout survit à un redémarrage : les attentes vivent en base, et le
 // démarrage remet chaque carte en face de la réalité du salon.
+
+// La carte finale reste visible ce temps-là avant que le ticket disparaisse.
+const DELAI_SUPPRESSION = 60_000;
 
 const ouvrir = db.prepare(
   'INSERT INTO attentes_vocales (guild_id, user_id, channel_id, message_id, arrivee) VALUES (?, ?, ?, ?, ?)'
 );
 const poserMessage = db.prepare('UPDATE attentes_vocales SET channel_id = ?, message_id = ? WHERE rowid = ?');
 const poserClaim = db.prepare('UPDATE attentes_vocales SET claim_par = ?, claim_a = ? WHERE rowid = ?');
-const enAttente = db.prepare('SELECT rowid AS id, * FROM attentes_vocales WHERE guild_id = ? AND user_id = ?');
+const enAttente = db.prepare('SELECT rowid AS id, * FROM attentes_vocales WHERE guild_id = ? AND user_id = ? AND clos_a IS NULL');
 const parMessage = db.prepare('SELECT rowid AS id, * FROM attentes_vocales WHERE message_id = ?');
+const clore = db.prepare('UPDATE attentes_vocales SET clos_a = ? WHERE rowid = ?');
 const fermer = db.prepare('DELETE FROM attentes_vocales WHERE rowid = ?');
-const toutes = db.prepare('SELECT rowid AS id, * FROM attentes_vocales');
+const toutes = db.prepare('SELECT rowid AS id, * FROM attentes_vocales WHERE clos_a IS NULL');
+const aPurger = db.prepare('SELECT rowid AS id, * FROM attentes_vocales WHERE clos_a IS NOT NULL AND clos_a <= ?');
 
 // Les salons d'assistance du serveur — un tableau JSON dans la config.
 function salonsAssistance(cfg) {
@@ -77,12 +84,24 @@ function carteAttente(attente, etatFinal = null) {
   return new EmbedBuilder().setColor(couleur).setTitle(titre).setDescription(M.description(lignes));
 }
 
-const rangeeAttente = (claim = false) => new ActionRowBuilder().addComponents(
-  new ButtonBuilder().setCustomId('va:claim')
-    .setLabel(claim ? 'Déjà pris en charge' : 'Prendre en charge')
-    .setEmoji('🙋').setStyle(claim ? ButtonStyle.Secondary : ButtonStyle.Primary)
-    .setDisabled(Boolean(claim))
-);
+// Avant le claim : le seul bouton est « Prendre en charge ». Après : il se
+// grise, et « Déplacer en assistance » apparaît — un clic cherche un salon
+// d'assistance vide et y déplace la personne.
+const rangeeAttente = (claim = false) => {
+  const rangee = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('va:claim')
+      .setLabel(claim ? 'Déjà pris en charge' : 'Prendre en charge')
+      .setEmoji('🙋').setStyle(claim ? ButtonStyle.Secondary : ButtonStyle.Primary)
+      .setDisabled(Boolean(claim))
+  );
+  if (claim) {
+    rangee.addComponents(
+      new ButtonBuilder().setCustomId('va:mv')
+        .setLabel('Déplacer en assistance').setEmoji('📥').setStyle(ButtonStyle.Success)
+    );
+  }
+  return rangee;
+};
 
 // Réédite la carte d'un ticket — reconstruction en composants si c'est une
 // carte, embeds sinon. Une carte disparue est simplement oubliée.
@@ -103,6 +122,28 @@ async function editerCarte(client, attente, etatFinal = null) {
   return message.edit(contenu).catch(() => null);
 }
 
+// Solde un ticket : la carte passe à son état final et la clôture est datée.
+// La purge périodique supprimera le message une fois le délai de lecture passé.
+async function cloturer(client, ligne, issue) {
+  await editerCarte(client, ligne, issue);
+  clore.run(Date.now(), ligne.id);
+}
+
+// 🧹 Les tickets clos depuis plus d'une minute disparaissent — message
+// supprimé, ligne effacée. Périodique plutôt que minuté : rien à retenir,
+// donc rien à perdre quand le bot redémarre entre la clôture et l'effacement.
+async function purgerCloses(client) {
+  let purges = 0;
+  for (const ligne of aPurger.all(Date.now() - DELAI_SUPPRESSION)) {
+    const salon = await client.channels.fetch(ligne.channel_id).catch(() => null);
+    const message = await salon?.messages?.fetch?.(ligne.message_id).catch(() => null);
+    if (message) await message.delete().catch(() => null);
+    fermer.run(ligne.id);
+    purges += 1;
+  }
+  return purges;
+}
+
 // ── Le fil des événements vocaux ──────────────────────────────────
 
 // Chaque mouvement vocal passe par ici : ouverture à l'entrée du salon
@@ -121,8 +162,7 @@ async function surveiller(oldState, newState) {
     const ligne = enAttente.get(String(guild.id), String(membre.id));
     if (ligne) {
       const aide = salonsAssistance(cfg).includes(String(newState.channelId));
-      await editerCarte(oldState.client ?? newState.client ?? membre.client, ligne, aide ? 'aide' : 'parti');
-      fermer.run(ligne.id);
+      await cloturer(oldState.client ?? newState.client ?? membre.client, ligne, aide ? 'aide' : 'parti');
     }
     return null;
   }
@@ -137,8 +177,7 @@ async function surveiller(oldState, newState) {
     // orpheline) : on la referme d'abord — un ticket par attente.
     const restant = enAttente.get(String(guild.id), String(membre.id));
     if (restant) {
-      await editerCarte(newState.client ?? oldState.client ?? membre.client, restant, 'parti');
-      fermer.run(restant.id);
+      await cloturer(newState.client ?? oldState.client ?? membre.client, restant, 'parti');
     }
 
     const attente = {
@@ -159,15 +198,16 @@ async function surveiller(oldState, newState) {
   return null;
 }
 
-// 🙋 Le bouton « Prendre en charge » — staff uniquement.
+// 🙋 Les boutons du ticket — staff uniquement.
 async function handleBouton(interaction) {
   const ligne = parMessage.get(String(interaction.message?.id));
-  if (!ligne) {
+  if (!ligne || ligne.clos_a) {
     return interaction.reply({ content: 'ℹ️ Ce ticket d\'attente est déjà terminé.', flags: MessageFlags.Ephemeral }).catch(() => null);
   }
   if (getGrade(interaction.member) < GRADES.STAFF) {
     return interaction.reply({ content: '⛔ Seul le **staff** peut prendre une attente en charge.', flags: MessageFlags.Ephemeral });
   }
+  if (interaction.customId === 'va:mv') return deplacerEnAssistance(interaction, ligne);
   if (ligne.claim_par) {
     return interaction.reply({ content: `ℹ️ Déjà pris en charge par <@${ligne.claim_par}>.`, flags: MessageFlags.Ephemeral });
   }
@@ -177,7 +217,74 @@ async function handleBouton(interaction) {
   const contenu = { embeds: [carteAttente(corrige)], components: [rangeeAttente(true)] };
   await mettreAJour(interaction, contenu);
   return suivre(interaction, {
-    content: `🙋 C'est noté : déplacez <@${ligne.user_id}> dans un salon d'assistance pour clore le ticket.`,
+    content: `🙋 C'est noté : déplacez <@${ligne.user_id}> dans un salon d'assistance pour clore le ticket — le bouton 📥 le fait pour vous.`,
+    flags: MessageFlags.Ephemeral,
+  });
+}
+
+// 📥 « Déplacer en assistance » : cherche un salon d'assistance VIDE et y
+// déplace la personne — la clôture suit d'elle-même, par le mouvement vocal.
+// Aucun salon libre ? Un membre du staff présent dans un des salons
+// d'assistance, tiré au hasard, est prévenu en message privé.
+async function deplacerEnAssistance(interaction, ligne) {
+  const guild = interaction.guild;
+  const cfg = getGuildConfig(guild.id);
+  const ids = salonsAssistance(cfg);
+  if (!ids.length) {
+    return interaction.reply({
+      content: '⚠️ Aucun salon d\'assistance configuré : faites `/vocal assistance` (ou `/config` → 🎧 Vocal).',
+      flags: MessageFlags.Ephemeral,
+    });
+  }
+
+  const attendant = await guild.members.fetch(ligne.user_id).catch(() => null);
+  if (!attendant || String(attendant.voice?.channelId) !== String(cfg.vocal_attente_channel_id)) {
+    return interaction.reply({
+      content: `ℹ️ <@${ligne.user_id}> n'est plus dans le salon d'attente : rien à déplacer.`,
+      flags: MessageFlags.Ephemeral,
+    });
+  }
+
+  // Les salons d'assistance, avec leurs occupants humains.
+  const salons = [];
+  for (const id of ids) {
+    const salon = await guild.channels.fetch(id).catch(() => null);
+    if (salon) salons.push(salon);
+  }
+  const humains = (salon) => [...(salon.members?.values?.() || [])].filter((m) => !m.user?.bot);
+  const libre = salons.find((salon) => humains(salon).length === 0);
+
+  if (libre) {
+    const fait = await attendant.voice.setChannel(libre).then(() => true).catch(() => false);
+    if (!fait) {
+      return interaction.reply({
+        content: '❌ Je n\'ai pas pu déplacer la personne : il me faut la permission **Déplacer les membres**.',
+        flags: MessageFlags.Ephemeral,
+      });
+    }
+    return interaction.reply({
+      content: `📥 <@${ligne.user_id}> a été déplacé dans <#${libre.id}> — le ticket se clôt tout seul.`,
+      flags: MessageFlags.Ephemeral,
+    });
+  }
+
+  // Tous occupés : on tire au sort un membre du staff présent en assistance.
+  const staffs = salons.flatMap(humains).filter((m) => getGrade(m, cfg) >= GRADES.STAFF);
+  if (!staffs.length) {
+    return interaction.reply({
+      content: '⚠️ Tous les salons d\'assistance sont occupés, et aucun membre du staff ne s\'y trouve à prévenir.',
+      flags: MessageFlags.Ephemeral,
+    });
+  }
+  const elu = staffs[Math.floor(Math.random() * staffs.length)];
+  const mp = await elu.send(
+    `🚨 Tous les salons d'assistance de **${guild.name}** sont occupés : **${attendant.displayName}** attend en vocal depuis **${duree(Date.now() - ligne.arrivee)}**.\n`
+    + '➜ Libérez un salon, ou déplacez la personne dès que possible.'
+  ).then(() => true).catch(() => false);
+  return interaction.reply({
+    content: mp
+      ? `⚠️ Aucun salon d'assistance libre : j'ai prévenu <@${elu.id}> en message privé.`
+      : `⚠️ Aucun salon d'assistance libre — et <@${elu.id}>, tiré au sort, a ses messages privés fermés. Voyez directement avec le staff en assistance.`,
     flags: MessageFlags.Ephemeral,
   });
 }
@@ -193,7 +300,7 @@ async function balayer(client) {
     if (guild && salonActuel === String(cfg.vocal_attente_channel_id)) continue; // il attend toujours
     const aide = cfg ? salonsAssistance(cfg).includes(salonActuel) : false;
     if (guild) await editerCarte(client, ligne, aide ? 'aide' : 'parti');
-    fermer.run(ligne.id);
+    clore.run(Date.now(), ligne.id);
     fermees += 1;
   }
   return fermees;
@@ -201,9 +308,14 @@ async function balayer(client) {
 
 function demarrer(client) {
   balayer(client).catch((err) => console.warn(`⚠️ Balayage des attentes vocales : ${err.message}`));
+  // La purge tourne en fond : elle efface les tickets clos une fois leur
+  // minute de lecture passée — y compris ceux clos avant un redémarrage.
+  setInterval(() => {
+    purgerCloses(client).catch((err) => console.warn(`⚠️ Purge des tickets vocaux : ${err.message}`));
+  }, 30_000);
 }
 
 module.exports = {
-  surveiller, handleBouton, balayer, demarrer,
+  surveiller, handleBouton, balayer, demarrer, purgerCloses, DELAI_SUPPRESSION,
   carteAttente, rangeeAttente, duree, salonsAssistance, enAttente, parMessage,
 };

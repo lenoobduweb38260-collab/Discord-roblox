@@ -16,7 +16,7 @@ Module.prototype.require = function (n) {
 };
 
 const { PermissionFlagsBits } = require(path.join(AIDES, 'stub-discord.js'));
-const { setGuildConfig } = require('../src/database');
+const { db, setGuildConfig } = require('../src/database');
 const alerte = require('../src/utils/vocalAlerte');
 const perso = require('../src/utils/salonsPerso');
 
@@ -69,8 +69,9 @@ function fauxMonde() {
       async send(m) {
         envois.push(m);
         const msg = {
-          id: `MSG${++compteurMessage}`, flags: 0, edits: [],
+          id: `MSG${++compteurMessage}`, flags: 0, edits: [], supprime: false,
           async edit(e) { this.edits.push(e); return this; },
+          async delete() { this.supprime = true; return this; },
         };
         messages.set(msg.id, msg);
         return msg;
@@ -102,6 +103,8 @@ function fauxMonde() {
       roles: { cache: new Map() },
       permissions: { has: () => staff },
       guild,
+      mp: [],
+      async send(m) { this.mp.push(m); return {}; },
       voice: {
         channelId: salon ? String(salon.id) : null,
         async setChannel(cible) {
@@ -226,6 +229,85 @@ function fauxMonde() {
     await alerte.surveiller(etat(null), etat('ATTENTE'));
     V('file coupée = aucun envoi', texte.envois.length === avant && !alerte.enAttente.get('G1', 'U1'));
     await arrivant.voice.setChannel(null);
+  }
+
+  console.log('\n1 bis) Déplacer en assistance, MP de secours, purge des tickets clos');
+  {
+    const monde = fauxMonde();
+    const attente = monde.ajouterSalon('ATTENTE');
+    const aide1 = monde.ajouterSalon('AIDE1');
+    const aide2 = monde.ajouterSalon('AIDE2');
+    const texte = monde.ajouterSalon('ALERTE');
+    setGuildConfig('G1', 'vocal_attente_channel_id', 'ATTENTE');
+    setGuildConfig('G1', 'vocal_alerte_channel_id', 'ALERTE');
+    setGuildConfig('G1', 'vocal_assistance_ids', JSON.stringify(['AIDE1', 'AIDE2']));
+    setGuildConfig('G1', 'staff_role_ids', JSON.stringify(['R1']));
+
+    const arrivant = monde.fauxMembre('U50', { pseudo: 'Attendant' });
+    const staffeur = monde.fauxMembre('S50', { pseudo: 'Staffeur', staff: true });
+    const etat = (channelId) => ({ guild: monde.guild, member: arrivant, channelId, client: monde.client });
+    const clic = (customId, user, msg) => ({
+      guildId: 'G1', guild: monde.guild, customId, message: msg,
+      user: { id: user.id }, member: user, client: monde.client,
+      reponses: [], suites: [],
+      replied: false, deferred: false,
+      async reply(m) { this.reponses.push(m); this.replied = true; return {}; },
+      async followUp(m) { this.suites.push(m); return {}; },
+      async update(m) { msg.edits.push(m); this.replied = true; return {}; },
+      async deferUpdate() { this.deferred = true; return {}; },
+    });
+
+    // Ticket ouvert puis claim : le bouton 📥 apparaît.
+    await arrivant.voice.setChannel(attente);
+    const envoi = await alerte.surveiller(etat(null), etat('ATTENTE'));
+    const message = await texte.messages.fetch(envoi.id);
+    V('avant le claim, pas de bouton de déplacement', !/va:mv/.test(JSON.stringify(texte.envois[0].components || [])));
+    await alerte.handleBouton(clic('va:claim', staffeur, message));
+    V('après le claim, le bouton « Déplacer en assistance » apparaît',
+      /va:mv/.test(JSON.stringify(message.edits[message.edits.length - 1] || {})));
+
+    const quidam = monde.fauxMembre('U51', { pseudo: 'Quidam' });
+    const refus = clic('va:mv', quidam, message);
+    await alerte.handleBouton(refus);
+    V('le déplacement est réservé au staff', /⛔/.test(refus.reponses[0]?.content), refus.reponses[0]?.content);
+
+    // AIDE1 est vide : la personne y est déplacée.
+    const mv = clic('va:mv', staffeur, message);
+    await alerte.handleBouton(mv);
+    V('la personne est déplacée dans le salon d\'assistance vide', arrivant.voice.channelId === 'AIDE1');
+    V('… et la réponse le dit', /AIDE1/.test(mv.reponses[0]?.content), mv.reponses[0]?.content);
+    await alerte.surveiller(etat('ATTENTE'), etat('AIDE1')); // le mouvement vocal suit
+    const ligneClose = alerte.parMessage.get(envoi.id);
+    V('le ticket est clos… mais encore affiché', Boolean(ligneClose?.clos_a) && !alerte.enAttente.get('G1', 'U50'));
+
+    const tard = clic('va:claim', staffeur, message);
+    await alerte.handleBouton(tard);
+    V('un clic sur un ticket clos informe', /déjà terminé/.test(tard.reponses[0]?.content), tard.reponses[0]?.content);
+
+    // La purge n'efface qu'après la minute de lecture.
+    V('la purge attend la minute de lecture', (await alerte.purgerCloses(monde.client)) === 0 && !message.supprime);
+    db.prepare('UPDATE attentes_vocales SET clos_a = ? WHERE rowid = ?')
+      .run(Date.now() - alerte.DELAI_SUPPRESSION - 1000, ligneClose.id);
+    const purges = await alerte.purgerCloses(monde.client);
+    V('… puis supprime le message ET la ligne', purges === 1 && message.supprime && !alerte.parMessage.get(envoi.id));
+
+    // Plus aucun salon libre : le staff en assistance est prévenu en MP.
+    const occupant = monde.fauxMembre('U52', { pseudo: 'Occupant' });
+    await occupant.voice.setChannel(aide2);
+    const staffAssist = monde.fauxMembre('S51', { pseudo: 'StaffAssist', staff: true });
+    await staffAssist.voice.setChannel(aide1);
+    await arrivant.voice.setChannel(attente);
+    const envoi2 = await alerte.surveiller(etat('AIDE1'), etat('ATTENTE'));
+    const message2 = await texte.messages.fetch(envoi2.id);
+    await alerte.handleBouton(clic('va:claim', staffeur, message2));
+    const mv2 = clic('va:mv', staffeur, message2);
+    await alerte.handleBouton(mv2);
+    V('aucun salon libre : personne n\'est déplacé', arrivant.voice.channelId === 'ATTENTE');
+    V('… le staff en assistance reçoit un MP', staffAssist.mp.length === 1 && /Attendant/.test(staffAssist.mp[0]));
+    V('… et la réponse nomme le prévenu', /S51/.test(mv2.reponses[0]?.content), mv2.reponses[0]?.content);
+
+    await arrivant.voice.setChannel(null);
+    await alerte.surveiller(etat('ATTENTE'), etat(null));
   }
 
   console.log('\n2) Salon perso : créé au pseudo, membre déplacé, carte de gestion');
