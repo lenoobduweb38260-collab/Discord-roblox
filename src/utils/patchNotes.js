@@ -1327,6 +1327,23 @@ const RELEASES = [
     fix: [],
     retrait: [],
   },
+  {
+    id: 'file-attente-vocale-2026-08bn',
+    title: 'L\'alerte vocale devient une file d\'attente d\'assistance 🎧',
+    ajout: [
+      '🎧 **La file d\'attente vocale** (`/vocal alerte`) : un vocal d\'ATTENTE est surveille — s\'y connecter ouvre un ticket dans le salon ecrit choisi, avec la personne, DEPUIS QUAND elle attend (l\'horodatage Discord vit tout seul, « il y a 4 minutes ») et les roles staff mentionnes dans le message, donc ils sonnent',
+      '🙋 **Le bouton « Prendre en charge »** : un membre du staff clique, la carte dit qui s\'en occupe et depuis quand — et le second clic informe au lieu d\'ecraser',
+      '🏁 **Les salons d\'assistance** (`/vocal assistance`, jusqu\'a quatre) : deplacer la personne de l\'attente vers l\'un d\'eux clot le ticket tout seul — la carte affiche qui a aide et le temps d\'attente exact',
+    ],
+    amelioration: [
+      '👋 Quitter l\'attente sans etre aide clot aussi le ticket, en le disant — aucun ticket fantome ne reste ouvert',
+      '🔄 Tout survit a un redemarrage : au reveil, chaque attente encore ouverte est remise en face de la realite du salon (toujours la → gardee, deplacee en assistance → aidee, partie → close)',
+    ],
+    fix: [],
+    retrait: [
+      '🎙️ L\'ancienne alerte « une carte a chaque connexion vocale » disparait au profit de la file : elle annoncait tout le monde, la file n\'annonce que ceux qui demandent de l\'aide',
+    ],
+  },
 ];
 
 // Construit l'embed d'une note à partir d'une entrée { title, ajout, fix,

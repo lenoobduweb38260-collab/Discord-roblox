@@ -45,15 +45,16 @@ module.exports = {
       console.warn(`⚠️ Salons perso : ${err.message}`);
     }
 
+    // 🎧 La file d'attente vocale — sur TOUS les mouvements : entrer dans
+    // le vocal d'attente ouvre un ticket, en sortir le clôt (aidé si la
+    // destination est un salon d'assistance, parti sinon).
+    try {
+      await require('../utils/vocalAlerte').surveiller(oldState, newState);
+    } catch (err) {
+      console.warn(`⚠️ File d'attente vocale : ${err.message}`);
+    }
+
     if (!oldState.channelId && newState.channelId) {
-      // 🎙️ L'alerte au staff — sur les CONNEXIONS fraîches seulement : un
-      // changement de salon (ou le déplacement vers un salon perso) ne
-      // ferait que doubler le bruit.
-      try {
-        await require('../utils/vocalAlerte').signaler(newState);
-      } catch (err) {
-        console.warn(`⚠️ Alerte vocale : ${err.message}`);
-      }
       await sendLog(
         guild,
         logEmbed('🎙️ Connexion vocale', `<@${member.id}> a rejoint <#${newState.channelId}>.`, COLORS.SUCCESS)

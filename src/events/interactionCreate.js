@@ -144,6 +144,12 @@ module.exports = {
       return perso.handleBouton(interaction);
     }
 
+    // ----- File d'attente vocale : le bouton « Prendre en charge » -----
+    if (interaction.isButton() && interaction.customId?.startsWith('va:')) {
+      if (!interaction.inGuild()) return horsServeur(interaction);
+      return require('../utils/vocalAlerte').handleBouton(interaction);
+    }
+
     // ----- Absences : le bouton du panneau, la modale, le retour -----
     if ((interaction.isButton() && interaction.customId?.startsWith('abs:'))
       || (interaction.isChannelSelectMenu?.() && interaction.customId?.startsWith('abs:sel:'))

@@ -86,6 +86,12 @@
   "\n⚠️ aucun rôle vérifié défini": {
     "en": "\n⚠️ no verified role set"
   },
+  "\n⚠️ Aucun salon d'assistance défini : faites `/vocal assistance` pour que les tickets se clôturent au déplacement.": {
+    "en": "\n⚠️ No assistance channel set: run `/vocal assistance` so tickets close on move."
+  },
+  "\n⚠️ Aucun vocal d'attente surveillé : faites `/vocal alerte` pour activer la file.": {
+    "en": "\n⚠️ No waiting voice channel watched: run `/vocal alerte` to enable the queue."
+  },
   "\n⚠️ Définissez un **rôle vérifié** pour que le captcha serve à quelque chose.": {
     "en": "\n⚠️ Set a **verified role** so the captcha actually does something."
   },
@@ -106,6 +112,12 @@
   },
   "\n➜ Aucun salon d'annonces configuré : ajoutez-en avec `/absence salons ajouter` ou `/absence salons categorie`.": {
     "en": "\n➜ No announcement channel configured: add some with `/absence salons ajouter` or `/absence salons categorie`."
+  },
+  "\n➜ Déplacer la personne vers ": {
+    "en": "\n➜ Moving the person to "
+  },
+  "\n➜ Déplacer une personne du vocal d'attente vers l'un d'eux clôturera son ticket.": {
+    "en": "\n➜ Moving someone from the waiting voice channel into one of them will close their ticket."
   },
   "\n➜ Donnez-moi **Voir le salon** et **Envoyer des messages**, puis relancez.": {
     "en": "\n➜ Give me **View Channel** and **Send Messages**, then run it again."
@@ -370,6 +382,9 @@
   },
   " Chiffrement de la voix": {
     "en": " Voice encryption"
+  },
+  " clôturera son ticket.": {
+    "en": " will close their ticket."
   },
   " Col\n\n🛌 Repose-toi puis retente ta chance.": {
     "en": " Col\n\n🛌 Rest up, then try your luck again."
@@ -959,6 +974,9 @@
   "[Staff] Composer ou modifier un message/embed avec aperçu en direct": {
     "en": "[Staff] Compose or edit a message/embed with a live preview"
   },
+  "[Staff] Couper la file d'attente vocale": {
+    "en": "[Staff] Turn off the voice waiting queue"
+  },
   "[Staff] Couper les alertes de connexion vocale": {
     "en": "[Staff] Turn off the voice connection alerts"
   },
@@ -974,11 +992,17 @@
   "[Staff] Définir le salon créateur des salons vocaux personnels": {
     "en": "[Staff] Set the creator channel for personal voice channels"
   },
+  "[Staff] Définir les salons d'ASSISTANCE : y déplacer la personne clôt son ticket": {
+    "en": "[Staff] Set the ASSISTANCE channels: moving the person there closes their ticket"
+  },
   "[Staff] Délivrer un permis (numéro généré, 12 points, daté du jour)": {
     "en": "[Staff] Issue a licence (number generated, 12 points, dated today)"
   },
   "[Staff] Expulser un membre du serveur": {
     "en": "[Staff] Kick a member from the server"
+  },
+  "[Staff] File d'attente vocale du staff, et salons vocaux personnels": {
+    "en": "[Staff] Staff voice waiting queue, and personal voice channels"
   },
   "[Staff] Image de fond des cartes de niveau (vide = retirer)": {
     "en": "[Staff] Background image for level cards (empty to remove)"
@@ -1045,6 +1069,9 @@
   },
   "[Staff] Supprimer une entreprise": {
     "en": "[Staff] Delete a company"
+  },
+  "[Staff] Surveiller un vocal d'attente et annoncer chaque arrivée au staff": {
+    "en": "[Staff] Watch a waiting voice channel and announce every arrival to the staff"
   },
   "[Staff] Système de tickets : types, catégories et panneau": {
     "en": "[Staff] Ticket system: types, categories and panel"
@@ -1363,6 +1390,9 @@
   },
   "** vous a été retiré.": {
     "en": "** was taken from you."
+  },
+  "**, puis a quitté l'attente sans prise en charge": {
+    "en": "**, then left the queue without being claimed"
   },
   "**. Seuls les messages du bot seront proposés.": {
     "en": "**. Only the bot's own messages will be offered."
@@ -1733,8 +1763,14 @@
   "> assuré chez **": {
     "en": "> insured with **"
   },
+  "> attend de l'aide en vocal.": {
+    "en": "> is waiting for help in voice."
+  },
   "> crée son propre vocal, avec sa carte de gestion.": {
     "en": "> builds your own voice channel, with its control card."
+  },
+  "> dans un salon d'assistance pour clore le ticket.": {
+    "en": "> into an assistance channel to close the ticket."
   },
   "> démute par <@": {
     "en": "> unmuted by <@"
@@ -1825,6 +1861,9 @@
   },
   "> n'était ni patron ni employé d'une entreprise.": {
     "en": "> was neither owner nor employee of any company."
+  },
+  "> ouvre un ticket dans <#": {
+    "en": "> opens a ticket in <#"
   },
   "> passe au **niveau ": {
     "en": "> reached **level "
@@ -2066,6 +2105,12 @@
   "⚠️ Balayage des absences non démarré : ": {
     "en": "⚠️ Absence sweep not started: "
   },
+  "⚠️ Balayage des attentes vocales : ": {
+    "en": "⚠️ Voice waiting sweep: "
+  },
+  "⚠️ Balayage des attentes vocales non démarré : ": {
+    "en": "⚠️ Voice waiting sweep not started: "
+  },
   "⚠️ Balayage des salons perso : ": {
     "en": "⚠️ Personal channel sweep: "
   },
@@ -2125,6 +2170,9 @@
   },
   "⚠️ Envoi interrompu après ": {
     "en": "⚠️ Sending stopped after "
+  },
+  "⚠️ File d'attente vocale : ": {
+    "en": "⚠️ Voice waiting queue: "
   },
   "⚠️ Flux injoignable pour le moment (la plateforme bloque peut-être les requêtes) — le bot réessaiera toutes les 5 minutes.": {
     "en": "⚠️ Feed unreachable for now (the platform may be blocking requests) — the bot will try again every 5 minutes."
@@ -2444,6 +2492,9 @@
   "⛔ Seul le **propriétaire** de ce serveur peut répondre à cette demande.": {
     "en": "⛔ Only this server's **owner** can answer this request."
   },
+  "⛔ Seul le **staff** peut prendre une attente en charge.": {
+    "en": "⛔ Only the **staff** can claim a waiting ticket."
+  },
   "⛔ Seul le créateur du bot gère le roster Vgache.": {
     "en": "⛔ Only the bot's creator manages the Vgache roster."
   },
@@ -2488,6 +2539,9 @@
   },
   "✅ Après": {
     "en": "✅ After"
+  },
+  "✅ Assistance terminée": {
+    "en": "✅ Assistance complete"
   },
   "✅ Aucune sanction": {
     "en": "✅ No sanction"
@@ -3506,6 +3560,12 @@
   "🎧 Ce que je sais lire": {
     "en": "🎧 What I can play"
   },
+  "🎧 File d'attente **activée** : se connecter à <#": {
+    "en": "🎧 Waiting queue **enabled**: connecting to <#"
+  },
+  "🎧 Quelqu'un attend en vocal": {
+    "en": "🎧 Someone is waiting in voice"
+  },
   "🎧 Salons personnels **activés** : se connecter à <#": {
     "en": "🎧 Personal channels **on**: connecting to <#"
   },
@@ -3638,6 +3698,9 @@
   "🎶 File d'attente": {
     "en": "🎶 Queue"
   },
+  "🏁 Salons d'assistance définis : ": {
+    "en": "🏁 Assistance channels set: "
+  },
   "🏃 Fuite": {
     "en": "🏃 Fled"
   },
@@ -3751,6 +3814,9 @@
   },
   "👋 Le bot quitte **": {
     "en": "👋 The bot is leaving **"
+  },
+  "👋 Parti sans être aidé": {
+    "en": "👋 Left without being helped"
   },
   "👋 Salon des arrivées/départs des membres": {
     "en": "👋 Member joins/leaves channel"
@@ -4316,6 +4382,9 @@
   "🔕 Alertes vocales **coupées**.": {
     "en": "🔕 Voice alerts **off**."
   },
+  "🔕 File d'attente vocale **coupée**.": {
+    "en": "🔕 Voice waiting queue **turned off**."
+  },
   "🔗 **Liée** à la communauté `": {
     "en": "🔗 **Linked** to community `"
   },
@@ -4661,6 +4730,9 @@
   "🙋 **Claim par <@": {
     "en": "🙋 **Claimed by <@"
   },
+  "🙋 C'est noté : déplacez <@": {
+    "en": "🙋 Noted: move <@"
+  },
   "🙋 Claim": {
     "en": "🙋 Claim"
   },
@@ -5005,6 +5077,9 @@
   },
   "Affronter le boss de ton étage actuel": {
     "en": "Take on the boss of your current floor"
+  },
+  "Aidé par <@": {
+    "en": "Helped by <@"
   },
   "ajouté": {
     "en": "added"
@@ -5540,6 +5615,9 @@
   "Déjà claim.": {
     "en": "Already claimed."
   },
+  "Déjà pris en charge": {
+    "en": "Already claimed"
+  },
   "Déjà réclamé": {
     "en": "Already claimed"
   },
@@ -5725,6 +5803,9 @@
   },
   "En attente (non encore annoncées)": {
     "en": "Pending (not announced yet)"
+  },
+  "En attente depuis <t:": {
+    "en": "Waiting since <t:"
   },
   "en écrivant ✍️": {
     "en": "by chatting ✍️"
@@ -5942,8 +6023,14 @@
   "ℹ️ Ce message porte déjà le style actuel.\n-# Il garde sa barre colorée car un embed déjà envoyé ne peut pas devenir une carte : utilisez **mode : Recréer**.": {
     "en": "ℹ️ This message already carries the current style.\n-# It keeps its coloured bar because an embed already sent can never become a card: use **mode: Recréer**."
   },
+  "ℹ️ Ce ticket d'attente est déjà terminé.": {
+    "en": "ℹ️ This waiting ticket is already closed."
+  },
   "ℹ️ Ce ticket n'est pris en charge par personne.": {
     "en": "ℹ️ Nobody is handling this ticket."
+  },
+  "ℹ️ Déjà pris en charge par <@": {
+    "en": "ℹ️ Already claimed by <@"
   },
   "ℹ️ La liste était déjà vide.": {
     "en": "ℹ️ The list was already empty."
@@ -6208,6 +6295,9 @@
   },
   "Le vocal « créateur » : s'y connecter fabrique son propre salon": {
     "en": "The “creator” voice channel: connecting to it builds your own channel"
+  },
+  "Le vocal d'ATTENTE : s'y connecter ouvre un ticket": {
+    "en": "The WAITING voice channel: connecting to it opens a ticket"
   },
   "Le WebSocket vocal ne s'ouvre pas — l'UDP n'y est pour RIEN.": {
     "en": "The voice WebSocket does not open — UDP has NOTHING to do with it."
@@ -6722,6 +6812,9 @@
   "Précédent": {
     "en": "Previous"
   },
+  "Prendre en charge": {
+    "en": "Claim"
+  },
   "Prendre votre service RP": {
     "en": "Start your RP duty"
   },
@@ -6733,6 +6826,12 @@
   },
   "Preuves obligatoires pour appliquer une blacklist.": {
     "en": "Evidence is required to apply a blacklist."
+  },
+  "Pris en charge par <@": {
+    "en": "Claimed by <@"
+  },
+  "Pris en charge sans claim": {
+    "en": "Handled without a claim"
   },
   "Prise en charge": {
     "en": "Claimed by"
@@ -7190,6 +7289,9 @@
   "Salon texte où poster les alertes": {
     "en": "Text channel where alerts are posted"
   },
+  "Salon texte où poster les tickets d'attente": {
+    "en": "Text channel where waiting tickets are posted"
+  },
   "Salons à ajouter (25 max par passage)…": {
     "en": "Channels to add (25 max per pass)…"
   },
@@ -7319,6 +7421,9 @@
   "Te soigner à l'auberge (coûte des Col)": {
     "en": "Heal up at the inn (costs Col)"
   },
+  "Terminé": {
+    "en": "Done"
+  },
   "Terminer l'étage 100 d'Aincrad": {
     "en": "Clear floor 100 of Aincrad"
   },
@@ -7424,14 +7529,26 @@
   "un **encodeur Opus** (`npm install opusscript`)": {
     "en": "an **Opus encoder** (`npm install opusscript`)"
   },
+  "Un deuxième salon d'assistance": {
+    "en": "A second assistance channel"
+  },
   "Un embed déjà envoyé ne peut pas devenir une carte : `/esthetique appliquer mode:Recréer`": {
     "en": "An embed already sent can never become a card: `/esthetique appliquer mode:Recréer`"
   },
   "Un petit signe de vie ? 👋": {
     "en": "Any sign of life? 👋"
   },
+  "Un quatrième salon d'assistance": {
+    "en": "A fourth assistance channel"
+  },
   "un retour à la ligne": {
     "en": "a line break"
+  },
+  "Un salon vocal d'assistance": {
+    "en": "An assistance voice channel"
+  },
+  "Un troisième salon d'assistance": {
+    "en": "A third assistance channel"
   },
   "une **bibliothèque de chiffrement** (`npm install libsodium-wrappers`)": {
     "en": "an **encryption library** (`npm install libsodium-wrappers`)"

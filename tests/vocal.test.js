@@ -1,4 +1,4 @@
-// 🎙️ L'alerte vocale au staff, et les salons vocaux personnels.
+// 🎙️ La file d'attente vocale du staff, et les salons vocaux personnels.
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -32,6 +32,7 @@ const NOMS = new Map([
 ]);
 
 let compteurSalon = 0;
+let compteurMessage = 0;
 function fauxMonde() {
   const salons = new Map();
   const membres = new Map();
@@ -57,13 +58,23 @@ function fauxMonde() {
   function fauxVocal(id, g, opts = {}) {
     const surcharges = new Map();
     const envois = [];
+    const messages = new Map();
     const salon = {
       id, guild: g, name: opts.name || id, parentId: opts.parent ?? null,
       supprime: false,
       members: new Map(),
       envois,
       isTextBased: () => true,
-      async send(m) { envois.push(m); return { id: `M${id}` }; },
+      messages: { fetch: async (mid) => messages.get(String(mid)) || null },
+      async send(m) {
+        envois.push(m);
+        const msg = {
+          id: `MSG${++compteurMessage}`, flags: 0, edits: [],
+          async edit(e) { this.edits.push(e); return this; },
+        };
+        messages.set(msg.id, msg);
+        return msg;
+      },
       async delete() { this.supprime = true; salons.delete(String(id)); return this; },
       permissionOverwrites: {
         cache: surcharges,
@@ -111,29 +122,110 @@ function fauxMonde() {
 }
 
 (async () => {
-  console.log('\n1) L\'alerte vocale : une carte, les présents, et le staff qui SONNE');
+  console.log('\n1) La file d\'attente : le ticket s\'ouvre, sonne, se prend en charge et se clôt');
   {
     const monde = fauxMonde();
-    const vocal = monde.ajouterSalon('VOC1');
+    const attente = monde.ajouterSalon('ATTENTE');
+    const aide1 = monde.ajouterSalon('AIDE1');
+    monde.ajouterSalon('AIDE2');
     const texte = monde.ajouterSalon('ALERTE');
-    const arrivant = monde.fauxMembre('U1', { pseudo: 'Bayouss', salon: vocal });
-    monde.fauxMembre('U2', { pseudo: 'Leen', salon: vocal });
-    monde.fauxMembre('B1', { bot: true, salon: vocal });
+    setGuildConfig('G1', 'vocal_attente_channel_id', 'ATTENTE');
     setGuildConfig('G1', 'vocal_alerte_channel_id', 'ALERTE');
+    setGuildConfig('G1', 'vocal_assistance_ids', JSON.stringify(['AIDE1', 'AIDE2']));
     setGuildConfig('G1', 'staff_role_ids', JSON.stringify(['R1', 'R2']));
 
-    await alerte.signaler({ guild: monde.guild, member: arrivant, channelId: 'VOC1', channel: vocal });
-    const envoi = texte.envois[0];
-    V('la carte part dans le salon d\'alerte', Boolean(envoi?.embeds?.length));
-    const desc = JSON.stringify(envoi.embeds[0].data ?? envoi.embeds[0]);
-    V('… elle nomme l\'arrivant et le salon', /U1/.test(desc) && /VOC1/.test(desc), desc.slice(0, 120));
-    V('… et liste les présents SANS les bots', /U2/.test(desc) && !/B1/.test(desc));
-    V('le staff est mentionné dans le CONTENU — donc il sonne', envoi.content === '<@&R1> <@&R2>', envoi.content);
+    const arrivant = monde.fauxMembre('U1', { pseudo: 'Bayouss' });
+    const etat = (channelId) => ({ guild: monde.guild, member: arrivant, channelId, client: monde.client });
 
-    setGuildConfig('G1', 'vocal_alerte_channel_id', null);
+    // — La mécanique du temps, d'abord : c'est elle que la carte affiche.
+    V('durée : les secondes seules', alerte.duree(12_000) === '12 s', alerte.duree(12_000));
+    V('durée : minutes et secondes', alerte.duree(245_000) === '4 min 05 s', alerte.duree(245_000));
+    V('durée : heures et minutes', alerte.duree(3_845_000) === '1 h 04 min', alerte.duree(3_845_000));
+
+    // — Entrer dans le vocal d'attente ouvre un ticket.
+    await arrivant.voice.setChannel(attente);
+    const envoi = await alerte.surveiller(etat(null), etat('ATTENTE'));
+    V('la carte du ticket part dans le salon des annonces', Boolean(texte.envois[0]?.embeds?.length));
+    const desc = JSON.stringify(texte.envois[0].embeds[0].data ?? texte.envois[0].embeds[0]);
+    V('… elle nomme la personne et dit depuis quand', /U1/.test(desc) && /<t:\d+:R>/.test(desc), desc.slice(0, 140));
+    V('le staff est mentionné dans le CONTENU — donc il sonne', texte.envois[0].content === '<@&R1> <@&R2>', texte.envois[0].content);
+    V('le bouton « Prendre en charge » est sur la carte', JSON.stringify(texte.envois[0].components || []).includes('va:claim'));
+    const ligne = alerte.enAttente.get('G1', 'U1');
+    V('l\'attente vit en base, rattachée à son message', Boolean(ligne) && ligne.message_id === envoi.id);
+
+    // — Le claim : refusé aux membres, noté pour le staff.
+    const message = await texte.messages.fetch(envoi.id);
+    const clicClaim = (user, msg) => ({
+      guildId: 'G1', customId: 'va:claim', message: msg,
+      user: { id: user.id }, member: user, client: monde.client, guild: monde.guild,
+      reponses: [], suites: [],
+      replied: false, deferred: false,
+      async reply(m) { this.reponses.push(m); this.replied = true; return {}; },
+      async followUp(m) { this.suites.push(m); return {}; },
+      async update(m) { msg.edits.push(m); this.replied = true; return {}; },
+      async deferUpdate() { this.deferred = true; return {}; },
+    });
+
+    const quidam = monde.fauxMembre('U2', { pseudo: 'Quidam' });
+    const refuse = clicClaim(quidam, message);
+    await alerte.handleBouton(refuse);
+    V('un membre ordinaire ne prend pas en charge', /⛔/.test(refuse.reponses[0]?.content), refuse.reponses[0]?.content);
+
+    const staffeur = monde.fauxMembre('S1', { pseudo: 'Staffeur', staff: true });
+    const clic = clicClaim(staffeur, message);
+    await alerte.handleBouton(clic);
+    V('le claim du staff est noté en base', alerte.enAttente.get('G1', 'U1')?.claim_par === 'S1');
+    V('… la carte rééditée le dit', /S1/.test(JSON.stringify(message.edits)), JSON.stringify(message.edits).slice(0, 140));
+    V('… et le staffeur sait quoi faire ensuite', /assistance/.test(clic.suites[0]?.content), clic.suites[0]?.content);
+
+    const reclic = clicClaim(staffeur, message);
+    await alerte.handleBouton(reclic);
+    V('un second claim informe sans écraser', /Déjà pris en charge/.test(reclic.reponses[0]?.content), reclic.reponses[0]?.content);
+
+    // — Déplacé dans un salon d'assistance : le ticket se referme en « aidé ».
+    await arrivant.voice.setChannel(aide1);
+    await alerte.surveiller(etat('ATTENTE'), etat('AIDE1'));
+    V('déplacé en assistance : le ticket se clôt', !alerte.enAttente.get('G1', 'U1'));
+    const finale = JSON.stringify(message.edits[message.edits.length - 1] || {});
+    V('… la carte dit l\'assistance terminée', /Assistance terminée/.test(finale), finale.slice(0, 140));
+    V('… avec le temps d\'attente', /Temps d\u2019attente|Temps d'attente/.test(finale));
+    V('… et le bouton est retiré', !/va:claim/.test(finale));
+
+    // — Partir sans être aidé referme aussi, en le disant.
+    await arrivant.voice.setChannel(attente);
+    const envoi2 = await alerte.surveiller(etat(null), etat('ATTENTE'));
+    const message2 = await texte.messages.fetch(envoi2.id);
+    await arrivant.voice.setChannel(null);
+    await alerte.surveiller(etat('ATTENTE'), etat(null));
+    V('parti sans aide : le ticket se clôt aussi', !alerte.enAttente.get('G1', 'U1'));
+    V('… et la carte le dit', /Parti sans être aidé/.test(JSON.stringify(message2.edits)));
+
+    // — Une carte orpheline (sortie ratée) est refermée à la ré-entrée.
+    await arrivant.voice.setChannel(attente);
+    const envoi3 = await alerte.surveiller(etat(null), etat('ATTENTE'));
+    const message3 = await texte.messages.fetch(envoi3.id);
+    const envoi4 = await alerte.surveiller(etat(null), etat('ATTENTE')); // la sortie n'a jamais été vue
+    V('la vieille attente est refermée, une seule reste',
+      Boolean(envoi4) && alerte.enAttente.get('G1', 'U1')?.message_id === envoi4.id);
+    V('… et sa carte est soldée', /Parti sans être aidé/.test(JSON.stringify(message3.edits)));
+
+    // — Le balayage du démarrage remet chaque ticket en face de la réalité.
+    let fermees = await alerte.balayer(monde.client);
+    V('balayage : celui qui attend encore est gardé', fermees === 0 && Boolean(alerte.enAttente.get('G1', 'U1')));
+    await arrivant.voice.setChannel(aide1); // déplacé pendant que le bot dormait
+    fermees = await alerte.balayer(monde.client);
+    const message4 = await texte.messages.fetch(envoi4.id);
+    V('balayage : déplacé en assistance pendant le sommeil = aidé',
+      fermees === 1 && !alerte.enAttente.get('G1', 'U1'));
+    V('… la carte finale le dit', /Assistance terminée/.test(JSON.stringify(message4.edits)));
+
+    // — File coupée = plus aucun ticket.
+    setGuildConfig('G1', 'vocal_attente_channel_id', null);
     const avant = texte.envois.length;
-    await alerte.signaler({ guild: monde.guild, member: arrivant, channelId: 'VOC1', channel: vocal });
-    V('alerte coupée = aucun envoi', texte.envois.length === avant);
+    await arrivant.voice.setChannel(attente);
+    await alerte.surveiller(etat(null), etat('ATTENTE'));
+    V('file coupée = aucun envoi', texte.envois.length === avant && !alerte.enAttente.get('G1', 'U1'));
+    await arrivant.voice.setChannel(null);
   }
 
   console.log('\n2) Salon perso : créé au pseudo, membre déplacé, carte de gestion');

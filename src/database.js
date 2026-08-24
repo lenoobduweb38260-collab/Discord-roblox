@@ -513,6 +513,17 @@ CREATE TABLE IF NOT EXISTS absence_messages (
 );
 CREATE INDEX IF NOT EXISTS idx_absence_messages_msg ON absence_messages (message_id);
 
+CREATE TABLE IF NOT EXISTS attentes_vocales (
+  guild_id   TEXT NOT NULL,
+  user_id    TEXT NOT NULL,
+  channel_id TEXT NOT NULL,
+  message_id TEXT,
+  arrivee    INTEGER NOT NULL,
+  claim_par  TEXT,
+  claim_a    INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_attentes_user ON attentes_vocales (guild_id, user_id);
+
 CREATE TABLE IF NOT EXISTS salons_perso (
   guild_id   TEXT NOT NULL,
   channel_id TEXT NOT NULL PRIMARY KEY,
@@ -571,6 +582,8 @@ for (const column of [
   // 🌍 Langue du bot sur ce serveur : fr (source), en, de, ru, es.
   'bot_langue TEXT',
   'vocal_alerte_channel_id TEXT',
+  'vocal_attente_channel_id TEXT',
+  'vocal_assistance_ids TEXT',
   'vocal_perso_createur_id TEXT',
   // 🎭 Rôles automatiques à l'arrivée (liste JSON d'identifiants de rôles)
   'autorole_role_ids TEXT',
@@ -827,6 +840,8 @@ const DEFAULT_CONFIG = {
   rp_jeu: 'roblox',
   bot_langue: 'fr',
   vocal_alerte_channel_id: null,
+  vocal_attente_channel_id: null,
+  vocal_assistance_ids: null,
   vocal_perso_createur_id: null,
   level_image_url: null,
   xp_text: 20,

@@ -39,6 +39,14 @@ module.exports = {
       console.warn(`⚠️ Balayage des salons perso non démarré : ${err.message}`);
     }
 
+    // 🎧 Les attentes vocales laissées ouvertes sont remises en face de la
+    // réalité : toujours dans le vocal d'attente → gardées, sinon clôturées.
+    try {
+      require('../utils/vocalAlerte').demarrer(client);
+    } catch (err) {
+      console.warn(`⚠️ Balayage des attentes vocales non démarré : ${err.message}`);
+    }
+
     // XP vocal : chaque minute, chaque membre connecté en vocal (non muet
     // serveur, hors salon AFK, hors bots) gagne l'XP vocal configuré.
     setInterval(() => {
