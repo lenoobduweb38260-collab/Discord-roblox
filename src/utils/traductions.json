@@ -572,6 +572,9 @@
   " nettoyé !": {
     "en": " cleared!"
   },
+  " non créé : ": {
+    "en": " not created: "
+  },
   " note(s) en attente publiée(s) dans **": {
     "en": " pending note(s) published in **"
   },
@@ -1673,6 +1676,9 @@
   "`) expulsé par <@": {
     "en": "`) kicked by <@"
   },
+  "`) n'y voit rien : concertez-vous librement, répondez-lui dans <#": {
+    "en": "`) cannot see it: talk freely, and answer them in <#"
+  },
   "`) supprimé": {
     "en": "`) deleted"
   },
@@ -2272,6 +2278,9 @@
   },
   "⚠️ Envoi interrompu après ": {
     "en": "⚠️ Sending stopped after "
+  },
+  "⚠️ Fil staff du ticket n°": {
+    "en": "⚠️ Staff thread for ticket #"
   },
   "⚠️ File d'attente vocale : ": {
     "en": "⚠️ Voice waiting queue: "
@@ -4733,6 +4742,9 @@
   "🔒 Ce ticket est fermé : inutile de relancer.": {
     "en": "🔒 This ticket is closed: no point nudging."
   },
+  "🔒 Fil réservé au **staff** pour le ticket n°**": {
+    "en": "🔒 Thread reserved for the **staff** for ticket #**"
+  },
   "🔒 Garder les entreprises ici": {
     "en": "🔒 Keep the companies here"
   },
@@ -4750,6 +4762,9 @@
   },
   "🔒 Réglage **verrouillé par l'administrateur du bot** — modifiable uniquement depuis le gestionnaire.": {
     "en": "🔒 Setting **locked by the bot administrator** — it can only be changed from the manager."
+  },
+  "🔒 staff-": {
+    "en": "🔒 staff-"
   },
   "🔒 Ticket fermé": {
     "en": "🔒 Ticket closed"
@@ -6214,6 +6229,9 @@
   },
   "discord.js a refusé de l'envoyer à la passerelle. C'est un défaut interne au bot : signalez-le à son créateur avec cette fiche.": {
     "en": "discord.js refused to send it to the gateway. That's an internal bot fault: report it to its creator with this report."
+  },
+  "Discussion staff du ticket n°": {
+    "en": "Staff discussion for ticket #"
   },
   "donnée à": {
     "en": "given to"

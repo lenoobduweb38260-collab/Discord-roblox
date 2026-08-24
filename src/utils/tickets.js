@@ -15,7 +15,7 @@ const {
 } = require('discord.js');
 const { db, getGuildConfig } = require('../database');
 const { COLORS, sendLog, logEmbed } = require('./embeds');
-const { GRADES, getGrade } = require('./permissions');
+const { GRADES, getGrade, staffRoleIds } = require('./permissions');
 const balises = require('./balises');
 const M = require('./miseEnPage');
 const { reglages } = require('./styleEmbeds');
@@ -394,7 +394,17 @@ async function provisionTicket(guild, type, owner) {
   const overwrites = [
     { id: guild.id, deny: [PermissionFlagsBits.ViewChannel] },
     { id: owner.id, allow: allowPerms },
-    { id: guild.client.user.id, allow: [...allowPerms, PermissionFlagsBits.ManageChannels] },
+    {
+      id: guild.client.user.id,
+      allow: [
+        ...allowPerms,
+        PermissionFlagsBits.ManageChannels,
+        // Le fil privé du staff : le créer, y écrire, y ajouter le staff.
+        PermissionFlagsBits.CreatePrivateThreads,
+        PermissionFlagsBits.SendMessagesInThreads,
+        PermissionFlagsBits.ManageThreads,
+      ],
+    },
   ];
   for (const roleId of roleIds) overwrites.push({ id: roleId, allow: allowPerms });
   if (cfg.staff_role_id && !roleIds.includes(String(cfg.staff_role_id))) {
@@ -444,7 +454,49 @@ async function provisionTicket(guild, type, owner) {
     embeds: [intro],
     components: [closeRow, ...(presetRow ? [presetRow] : []), staffRow],
   });
+  await creerFilStaff(guild, channel, { cfg, roleIds, num, owner }).catch((err) => {
+    console.warn(`⚠️ Fil staff du ticket n°${num} non créé : ${err.message}`);
+  });
   return { channel, num };
+}
+
+// 🔒 Le fil PRIVÉ du staff, accroché à chaque ticket.
+//
+// Un fil privé ne montre son contenu qu'aux membres qu'on y a AJOUTÉS :
+// l'auteur du ticket voit son salon, mais pas ce fil — le staff peut donc
+// se concerter à côté de la conversation, sans salon supplémentaire.
+//
+// L'ajout du staff est SILENCIEUX, membre par membre : mentionner les rôles
+// dans le fil les ajouterait d'un coup, mais re-sonnerait tout le monde —
+// et le ping du ticket vient déjà de partir dans le salon.
+async function creerFilStaff(guild, channel, { cfg, roleIds, num, owner }) {
+  const fil = await channel.threads.create({
+    name: `🔒 staff-${num}`.slice(0, 90),
+    type: ChannelType.PrivateThread,
+    invitable: false,
+    reason: `Discussion staff du ticket n°${num}`,
+  });
+  await fil.send({
+    content: `🔒 Fil réservé au **staff** pour le ticket n°**${num}**.\n`
+      + `➜ **${owner.username}** (\`${owner.id}\`) n'y voit rien : concertez-vous librement, répondez-lui dans <#${channel.id}>.`,
+  }).catch(() => null);
+
+  const cibles = new Set(roleIds.map(String));
+  if (cfg.staff_role_id) cibles.add(String(cfg.staff_role_id));
+  for (const id of staffRoleIds(cfg)) cibles.add(String(id));
+  if (!cibles.size) return fil;
+  // Le cache des membres peut être incomplet au réveil : on le remplit une
+  // fois — un ticket est un événement rare, le coût est acceptable.
+  const membres = await guild.members.fetch().catch(() => guild.members.cache);
+  let ajoutes = 0;
+  for (const membre of membres.values()) {
+    if (membre.user?.bot) continue;
+    if (![...cibles].some((id) => membre.roles.cache.has(id))) continue;
+    await fil.members.add(membre.id).catch(() => null);
+    ajoutes += 1;
+    if (ajoutes >= 100) break; // au-delà, le staff restant se joint via ManageThreads
+  }
+  return fil;
 }
 
 async function openTicket(interaction, typeId) {
@@ -1080,6 +1132,7 @@ module.exports = {
   insertType,
   deleteType,
   supportRoleIds,
+  creerFilStaff,
   insertPanel,
   lastPanel,
   updatePanelOptions,

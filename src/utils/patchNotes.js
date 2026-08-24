@@ -1399,6 +1399,20 @@ const RELEASES = [
     fix: [],
     retrait: [],
   },
+  {
+    id: 'fil-staff-tickets-2026-08bs',
+    title: 'Chaque ticket a son fil privé de concertation staff 🔒',
+    ajout: [
+      '🔒 **Un fil PRIVE est accroche a chaque nouveau ticket**, invisible pour son auteur : le staff s\'y concerte a cote de la conversation, sans salon supplementaire et sans risque de repondre au mauvais endroit',
+      '🤫 **Le staff y est ajoute en silence**, membre par membre (roles support du type de ticket + roles staff du serveur) : aucune mention, aucune sonnerie — le ping du ticket vient deja de partir dans le salon',
+      '📝 Le mot d\'ouverture du fil rappelle qui n\'y voit rien et ou repondre au membre',
+    ],
+    amelioration: [
+      '🎟️ Si le fil ne peut pas etre cree (permission manquante), le ticket s\'ouvre quand meme — le fil est un plus, jamais un prealable',
+    ],
+    fix: [],
+    retrait: [],
+  },
 ];
 
 // Construit l'embed d'une note à partir d'une entrée { title, ajout, fix,
