@@ -118,6 +118,8 @@ function fauxMembre(id, { bot = false, roles = [] } = {}) {
     const parti = await sendTranscript(interaction, ticket, 'S1');
     const d = envois[0]?.embeds?.[0]?.data?.description || '';
     V('le transcript part avec son fichier', parti === true && envois[0].files?.length === 1);
+    V('… sans sonner personne malgré les étiquettes',
+      Array.isArray(envois[0].allowedMentions?.parse) && envois[0].allowedMentions.parse.length === 0);
     V('… la carte nomme le SALON en clair (il sera supprimé)', /#ticket-0016-bay/.test(d), d.slice(0, 160));
     V('… dit qui a ouvert, nommé et identifié', /Ouvert par \*\*Bayouss\*\* \(<@U1> · `U1`\)/.test(d));
     V('… et qui a fermé', /Fermé par \*\*Staffeur\*\* \(<@S1> · `S1`\)/.test(d));

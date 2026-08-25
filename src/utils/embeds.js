@@ -175,14 +175,18 @@ async function sendLog(guild, embed, fichiers = null) {
     if (!cfg.log_channel_id) return;
     const channel = await guild.channels.fetch(cfg.log_channel_id).catch(() => null);
     if (!channel?.isTextBased()) return;
-    const corps = { embeds: [embed] };
+    // 🔕 Le journal ne sonne JAMAIS. Un embed n'a jamais notifié personne —
+    // mais converti en carte, son texte devient des composants où les
+    // mentions peuvent pinguer. Le réglage explicite ci-dessous vaut pour les
+    // deux familles : la conversion respecte des mentions déjà réglées.
+    const corps = { embeds: [embed], allowedMentions: { parse: [] } };
     if (Array.isArray(fichiers) && fichiers.length) corps.files = fichiers;
     await channel.send(corps).catch(async (err) => {
       // Un fichier refusé (trop lourd pour ce serveur, format bloqué) ne doit
       // pas emporter le journal : on renvoie le texte seul.
       if (!corps.files) throw err;
       console.warn(`⚠️ Journal : pièces jointes non renvoyées — ${err.message}`);
-      await channel.send({ embeds: [embed] }).catch(() => null);
+      await channel.send({ embeds: [embed], allowedMentions: { parse: [] } }).catch(() => null);
     });
   } catch {
     // le log ne doit jamais faire échouer la commande

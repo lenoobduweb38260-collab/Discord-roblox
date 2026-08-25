@@ -1455,6 +1455,16 @@ const RELEASES = [
     fix: [],
     retrait: [],
   },
+  {
+    id: 'logs-sans-ping-2026-08bw',
+    title: 'Le journal ne sonne plus jamais personne 🔕',
+    ajout: [],
+    amelioration: [],
+    fix: [
+      '🔕 **Les mentions des cartes de logs ne notifient plus.** Un embed n\'a jamais fait sonner personne — mais converti en carte, son texte devient des composants ou une mention pouvait pinguer. Le journal (et l\'archive des transcripts) coupe desormais TOUTES ses mentions explicitement : elles s\'affichent, en silence',
+    ],
+    retrait: [],
+  },
 ];
 
 // Construit l'embed d'une note à partir d'une entrée { title, ajout, fix,

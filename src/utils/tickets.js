@@ -696,7 +696,9 @@ async function sendTranscript(interaction, ticket, byId) {
       COLORS.WARNING
     );
 
-    const envoye = await target.send({ embeds: [entete], files: [file] }).then(() => true).catch(async (err) => {
+    // 🔕 L'archive ne sonne personne : les étiquettes de la carte s'affichent,
+    // sans notifier — même une fois convertie en carte.
+    const envoye = await target.send({ embeds: [entete], files: [file], allowedMentions: { parse: [] } }).then(() => true).catch(async (err) => {
       // ⚠️ Un fichier refusé ne doit pas emporter l'archive : c'est la
       // conversation entière qui disparaîtrait avec le salon, cinq secondes
       // plus tard. On renvoie donc le texte, tronqué s'il le faut, plutôt que
@@ -714,6 +716,7 @@ async function sendTranscript(interaction, ticket, byId) {
               COLORS.WARNING
             ),
           ],
+          allowedMentions: { parse: [] },
         })
         .then(() => true)
         .catch(() => false);

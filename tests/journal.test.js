@@ -122,6 +122,9 @@ const bits = (...noms) => ({ toArray: () => noms });
     );
     V('un salon renommé finit dans les logs', envois.length === 1
       && /ancien.*nouveau/.test(envois[0].embeds[0].data.description), JSON.stringify(envois[0] || {}).slice(0, 160));
+    V('… et le journal ne sonne JAMAIS : mentions explicitement coupées',
+      Array.isArray(envois[0].allowedMentions?.parse) && envois[0].allowedMentions.parse.length === 0,
+      JSON.stringify(envois[0].allowedMentions));
 
     await channelUpdate.execute(
       { guild, id: 'C1', name: 'pareil', permissionOverwrites: { cache: new Map() } },
