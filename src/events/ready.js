@@ -47,6 +47,14 @@ module.exports = {
       console.warn(`⚠️ Balayage des attentes vocales non démarré : ${err.message}`);
     }
 
+    // ⏰ Les rappels de bump se réarment — un rappel échu pendant le sommeil
+    // du bot part immédiatement.
+    try {
+      require('../utils/bumpReminder').demarrer(client);
+    } catch (err) {
+      console.warn(`⚠️ Rappels de bump non réarmés : ${err.message}`);
+    }
+
     // XP vocal : chaque minute, chaque membre connecté en vocal (non muet
     // serveur, hors salon AFK, hors bots) gagne l'XP vocal configuré.
     setInterval(() => {

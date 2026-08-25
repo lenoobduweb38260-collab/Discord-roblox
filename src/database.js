@@ -585,6 +585,9 @@ for (const column of [
   'vocal_alerte_channel_id TEXT',
   'vocal_attente_channel_id TEXT',
   'vocal_assistance_ids TEXT',
+  'bump_channel_id TEXT',               // rappel de bump : le salon du rappel
+  'bump_role_id TEXT',                  // rôle mentionné par le rappel (sonne)
+  'bump_dernier INTEGER',               // dernier bump DISBOARD vu (ms)
   'vocal_perso_createur_id TEXT',
   // 🎭 Rôles automatiques à l'arrivée (liste JSON d'identifiants de rôles)
   'autorole_role_ids TEXT',
@@ -850,6 +853,9 @@ const DEFAULT_CONFIG = {
   vocal_attente_channel_id: null,
   vocal_assistance_ids: null,
   vocal_perso_createur_id: null,
+  bump_channel_id: null,
+  bump_role_id: null,
+  bump_dernier: null,
   level_image_url: null,
   xp_text: 20,
   xp_voice: 20,

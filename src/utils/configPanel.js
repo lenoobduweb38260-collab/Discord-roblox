@@ -49,6 +49,7 @@ const CHANNEL_COLUMNS = {
   patch_channel_id: '📝 Salon des patch notes',
   captcha_channel_id: '🤖 Salon du captcha',
   ticket_transcript_channel_id: '📄 Salon des transcripts de tickets (défaut : logs)',
+  bump_channel_id: '⏰ Salon du rappel de bump (DISBOARD)',
 };
 
 // 🎧 Les réglages vocaux « à un seul salon » — l'assistance (une liste) et

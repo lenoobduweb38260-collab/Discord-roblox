@@ -9,7 +9,18 @@ const cooldowns = new Map();
 module.exports = {
   name: Events.MessageCreate,
   async execute(message) {
-    if (!message.inGuild() || message.author.bot) return;
+    if (!message.inGuild()) return;
+
+    // ⏰ Le rappel de bump écoute DISBOARD — qui EST un bot : sa réponse doit
+    // passer AVANT l'écarte-bots, sans quoi aucun bump ne serait jamais vu.
+    if (message.author.bot) {
+      try {
+        await require('../utils/bumpReminder').surveiller(message);
+      } catch (err) {
+        console.warn(`⚠️ Rappel de bump : ${err.message}`);
+      }
+      return;
+    }
 
     // Anti-scam : vérifie les images jointes contre les échantillons enregistrés.
     if (message.attachments.size) {

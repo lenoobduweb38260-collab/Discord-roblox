@@ -68,6 +68,9 @@
   "\n-# J'ai aussi changé la région du salon (": {
     "en": "\n-# I also changed the channel's region ("
   },
+  "\n-# Je reconnais la réponse « Bump effectué ! » de DISBOARD — rien d'autre à faire.": {
+    "en": "\n-# I recognize DISBOARD's \"Bump done!\" reply — nothing else to do."
+  },
   "\n-# Le panneau « Déclarer une absence » se publie avec `/absence panneau`.": {
     "en": "\n-# The \"Declare an absence\" panel is published with `/absence panneau`."
   },
@@ -134,8 +137,14 @@
   "\n➜ Déplacer une personne du vocal d'attente vers l'un d'eux clôturera son ticket.": {
     "en": "\n➜ Moving someone from the waiting voice channel into one of them will close their ticket."
   },
+  "\n➜ Dernier bump vu <t:": {
+    "en": "\n➜ Last bump seen <t:"
+  },
   "\n➜ Donnez-moi **Voir le salon** et **Envoyer des messages**, puis relancez.": {
     "en": "\n➜ Give me **View Channel** and **Send Messages**, then run it again."
+  },
+  "\n➜ En attente du prochain `/bump` réussi de DISBOARD.": {
+    "en": "\n➜ Waiting for the next successful DISBOARD `/bump`."
   },
   "\n➜ Les annonces partiront dans : ": {
     "en": "\n➜ Announcements will go to: "
@@ -283,6 +292,9 @@
   },
   " · ajouté par <@": {
     "en": " · added by <@"
+  },
+  " · rôle sonné : <@&": {
+    "en": " · role rung: <@&"
   },
   " · vu dans le salon=": {
     "en": " · seen in channel="
@@ -992,6 +1004,9 @@
   "[Propriétaire du bot] Éteint complètement le bot, depuis n'importe quel serveur": {
     "en": "[Bot owner] Shuts the bot down completely, from any server"
   },
+  "[Staff] Activer le rappel : choisir le salon (et le rôle à sonner)": {
+    "en": "[Staff] Enable the reminder: pick the channel (and the role to ring)"
+  },
   "[Staff] Ajouter d'un coup tous les salons textuels d'une catégorie": {
     "en": "[Staff] Add every text channel of a category at once"
   },
@@ -1031,6 +1046,9 @@
   "[Staff] Couper la file d'attente vocale": {
     "en": "[Staff] Turn off the voice waiting queue"
   },
+  "[Staff] Couper le rappel de bump": {
+    "en": "[Staff] Turn off the bump reminder"
+  },
   "[Staff] Couper les alertes de connexion vocale": {
     "en": "[Staff] Turn off the voice connection alerts"
   },
@@ -1052,6 +1070,9 @@
   "[Staff] Délivrer un permis (numéro généré, 12 points, daté du jour)": {
     "en": "[Staff] Issue a licence (number generated, 12 points, dated today)"
   },
+  "[Staff] Être prévenu quand le serveur peut être bump sur DISBOARD": {
+    "en": "[Staff] Get notified when the server can be bumped on DISBOARD"
+  },
   "[Staff] Expulser un membre du serveur": {
     "en": "[Staff] Kick a member from the server"
   },
@@ -1072,6 +1093,9 @@
   },
   "[Staff] Modifier une entreprise": {
     "en": "[Staff] Edit a company"
+  },
+  "[Staff] Où en est le rappel de bump ?": {
+    "en": "[Staff] Where does the bump reminder stand?"
   },
   "[Staff] Panneau central de configuration : rôles, salons, XP, whitelist métiers": {
     "en": "[Staff] Central configuration panel: roles, channels, XP, job whitelist"
@@ -1874,6 +1898,9 @@
   "> démute par <@": {
     "en": "> unmuted by <@"
   },
+  "> deux heures plus tard": {
+    "en": "> two hours later"
+  },
   "> doit d'abord avoir une **carte d'identité** (`/carte creer`).": {
     "en": "> needs an **ID card** first (`/carte creer`)."
   },
@@ -2071,6 +2098,18 @@
   },
   "⌛ Ce combat n'est plus actif. Relance `/sao boss`.": {
     "en": "⌛ This fight is no longer active. Run `/sao boss` again."
+  },
+  "⏰ C'est l'heure du bump !": {
+    "en": "⏰ It's bump time!"
+  },
+  "⏰ Rappel de bump **actif** — salon : <#": {
+    "en": "⏰ Bump reminder **active** — channel: <#"
+  },
+  "⏰ Rappel de bump **activé** : après chaque `/bump` réussi de DISBOARD, je préviens dans <#": {
+    "en": "⏰ Bump reminder **enabled**: after each successful DISBOARD `/bump`, I post in <#"
+  },
+  "⏰ Salon du rappel de bump (DISBOARD)": {
+    "en": "⏰ Bump reminder channel (DISBOARD)"
   },
   "⏱️ Temps de service — 🏢 ": {
     "en": "⏱️ Duty time — 🏢 "
@@ -2371,6 +2410,12 @@
   },
   "⚠️ Purge des tickets vocaux : ": {
     "en": "⚠️ Voice ticket purge: "
+  },
+  "⚠️ Rappel de bump : ": {
+    "en": "⚠️ Bump reminder: "
+  },
+  "⚠️ Rappels de bump non réarmés : ": {
+    "en": "⚠️ Bump reminders not re-armed: "
   },
   "⚠️ Récupération du message de preuve impossible : ": {
     "en": "⚠️ Could not fetch the evidence message: "
@@ -4826,6 +4871,9 @@
   "🔕 File d'attente vocale **coupée**.": {
     "en": "🔕 Voice waiting queue **turned off**."
   },
+  "🔕 Rappel de bump **coupé**.": {
+    "en": "🔕 Bump reminder **turned off**."
+  },
   "🔗 **Liée** à la communauté `": {
     "en": "🔗 **Linked** to community `"
   },
@@ -6551,6 +6599,9 @@
   "ℹ️ La liste était déjà vide.": {
     "en": "ℹ️ The list was already empty."
   },
+  "ℹ️ Le rappel de bump est **coupé**. Activez-le avec `/rappel-bump activer`.": {
+    "en": "ℹ️ The bump reminder is **off**. Enable it with `/rappel-bump activer`."
+  },
   "ℹ️ Les jeux de commandes par serveur se synchronisent automatiquement au démarrage du bot.": {
     "en": "ℹ️ The per-server command sets sync automatically when the bot starts."
   },
@@ -6853,6 +6904,9 @@
   },
   "Les commandes du salon": {
     "en": "The channel's controls"
+  },
+  "Les deux heures de DISBOARD sont passées : le serveur peut de nouveau être mis en avant.\n➜ Tapez `/bump` pour le faire remonter.": {
+    "en": "DISBOARD's two hours have passed: the server can be promoted again.\n➜ Type `/bump` to push it back up."
   },
   "Les membres connectés": {
     "en": "Members who are online"
@@ -7757,6 +7811,9 @@
   "Rôle invalide.": {
     "en": "Invalid role."
   },
+  "Rôle mentionné par le rappel (il sonnera)": {
+    "en": "Role mentioned by the reminder (it will ring)"
+  },
   "Rôle métier": {
     "en": "Job role"
   },
@@ -7831,6 +7888,9 @@
   },
   "Salon personnel vidé (rattrapage)": {
     "en": "Personal channel emptied (catch-up)"
+  },
+  "Salon texte où poster le rappel": {
+    "en": "Text channel where the reminder is posted"
   },
   "Salon texte où poster les alertes": {
     "en": "Text channel where alerts are posted"

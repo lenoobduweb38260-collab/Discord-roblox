@@ -1441,6 +1441,20 @@ const RELEASES = [
     fix: [],
     retrait: [],
   },
+  {
+    id: 'rappel-bump-2026-08bv',
+    title: 'Le rappel de bump : DISBOARD surveillé, fenêtre jamais ratée ⏰',
+    ajout: [
+      '⏰ **`/rappel-bump activer`** : le bot surveille les reponses de DISBOARD — a chaque `/bump` REUSSI, il note l\'heure et previent DEUX HEURES plus tard dans le salon choisi : « C\'est l\'heure du bump ! »',
+      '🔔 **Un role a sonner, au choix** : mentionne dans le message du rappel (pas dans la carte), donc il notifie vraiment ceux qui bumpent',
+      '🛠️ `/rappel-bump etat` dit ou on en est (dernier bump vu, prochain rappel), `/rappel-bump desactiver` coupe tout — et le salon se regle aussi depuis `/config` → 📢 Salons',
+    ],
+    amelioration: [
+      '🔄 Les rappels survivent aux redemarrages : l\'heure du dernier bump vit en base, le demarrage rearme chaque rappel — un rappel echu pendant le sommeil du bot part immediatement, et jamais deux fois',
+    ],
+    fix: [],
+    retrait: [],
+  },
 ];
 
 // Construit l'embed d'une note à partir d'une entrée { title, ajout, fix,
