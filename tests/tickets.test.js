@@ -17,7 +17,7 @@ Module.prototype.require = function (n) {
 
 const { ChannelType } = require(path.join(AIDES, 'stub-discord.js'));
 const { setGuildConfig } = require('../src/database');
-const { creerFilStaff, editerMessagePanneau, sendTranscript } = require('../src/utils/tickets');
+const { creerFilStaff, editerMessagePanneau, sendTranscript, resetPanelMenu, insertPanel } = require('../src/utils/tickets');
 const C = require('../src/utils/cartes');
 
 let ok = 0, ko = 0;
@@ -134,6 +134,29 @@ function fauxMembre(id, { bot = false, roles = [] } = {}) {
     V('… à l\'INTÉRIEUR du conteneur', converti.components.some((c) => c.type === C.T.CONTENEUR
       && (c.components || []).some((x) => x.type === C.T.FICHIER)));
     V('… et sans fichier, rien ne change', !JSON.stringify(C.convertirCorps({ content: '', embeds: [{ title: 'A' }] }, {})).includes('"type":13'));
+  }
+
+  console.log('\n4 bis) Le menu du panneau se décoche — même sur un panneau en carte');
+  {
+    const guild = { id: 'G1', name: 'Labo', iconURL: () => null };
+    const client = { user: { username: 'Bot' } };
+    insertPanel.run('G1', 'CPAN', 'MPAN1', JSON.stringify({ titre: 'Support', description: 'Choisissez votre motif.' }));
+
+    // Le panneau est une CARTE : l'ancien reset (embeds) était refusé par
+    // Discord, l'échec avalé, et le menu restait coché pour toujours.
+    const carte = {
+      id: 'MPAN1', flags: C.DRAPEAU_V2, components: [],
+      edits: [], async edit(m) { this.edits.push(m); return this; },
+    };
+    await resetPanelMenu({ guildId: 'G1', guild, client, message: carte });
+    V('le panneau-carte est réédité — le menu se décoche', carte.edits.length === 1
+      && Array.isArray(carte.edits[0].components) && carte.edits[0].components.length > 0);
+    V('… en composants, sans embeds', carte.edits[0].embeds === undefined, JSON.stringify(carte.edits[0] || {}).slice(0, 120));
+
+    // Un panneau inconnu en base : on renvoie ses composants tels quels.
+    const libre = { id: 'MPAN2', flags: 0, components: [{ toJSON: () => ({ type: 1, components: [] }) }], edits: [], async edit(m) { this.edits.push(m); return this; } };
+    await resetPanelMenu({ guildId: 'G1', guild, client, message: libre });
+    V('un panneau hors base se réaffiche tel quel', libre.edits.length === 1 && libre.edits[0].components.length === 1);
   }
 
   console.log('\n5) Le panneau publié s\'épingle, et la notification système s\'efface');

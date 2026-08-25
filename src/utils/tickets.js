@@ -821,7 +821,11 @@ async function resetPanelMenu(interaction) {
   try {
     const panel = getPanelByMessage.get(interaction.guildId, msg.id);
     if (panel) {
-      await msg.edit(buildPanelPayload(interaction.guildId, safeJson(panel.options)));
+      // ⚠️ Par editerMessagePanneau, jamais msg.edit(payload) directement :
+      // sur un panneau publié en CARTE, rééditer avec des embeds est refusé
+      // par Discord — l'échec était avalé ici, et le menu restait coché pour
+      // toujours : impossible de re-choisir la même raison au ticket suivant.
+      await editerMessagePanneau(interaction.guild, interaction.client, msg, buildPanelPayload(interaction.guildId, safeJson(panel.options)));
     } else {
       await msg.edit({ components: msg.components.map((c) => (c.toJSON ? c.toJSON() : c)) });
     }
@@ -1182,6 +1186,7 @@ module.exports = {
   creerFilStaff,
   editerMessagePanneau,
   sendTranscript,
+  resetPanelMenu,
   insertPanel,
   lastPanel,
   updatePanelOptions,

@@ -1465,6 +1465,16 @@ const RELEASES = [
     ],
     retrait: [],
   },
+  {
+    id: 'menu-panneau-decoche-2026-08bx',
+    title: 'Re-choisir la même raison de ticket fonctionne à nouveau 🎫',
+    ajout: [],
+    amelioration: [],
+    fix: [
+      '🎫 **Le menu du panneau de tickets se decoche apres chaque ouverture.** Discord garde l\'option cochee, et re-choisir la MEME entree ne declenche alors plus rien : impossible de rouvrir un ticket avec la meme raison. La reinitialisation echouait en silence sur les panneaux publies en carte (reedition avec embeds, refusee) — elle passe desormais par le meme moteur que l\'envoi',
+    ],
+    retrait: [],
+  },
 ];
 
 // Construit l'embed d'une note à partir d'une entrée { title, ajout, fix,
