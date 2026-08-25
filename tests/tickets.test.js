@@ -16,8 +16,8 @@ Module.prototype.require = function (n) {
 };
 
 const { ChannelType } = require(path.join(AIDES, 'stub-discord.js'));
-const { setGuildConfig } = require('../src/database');
-const { creerFilStaff, editerMessagePanneau, sendTranscript, resetPanelMenu, insertPanel } = require('../src/utils/tickets');
+const { db, setGuildConfig } = require('../src/database');
+const { creerFilStaff, editerMessagePanneau, sendTranscript, resetPanelMenu, insertPanel, insertType, prendreEnCharge, rangeesTicket } = require('../src/utils/tickets');
 const C = require('../src/utils/cartes');
 
 let ok = 0, ko = 0;
@@ -180,6 +180,54 @@ function fauxMembre(id, { bot = false, roles = [] } = {}) {
       channel: { messages: { fetch: async () => { throw new Error('ne doit pas être appelé'); } } },
     };
     V('sans « Gérer les messages », on renonce sans casser', (await epinglerProprement(refuse)) === false);
+  }
+
+  console.log('\n6) Le bouton 🙋 « Prendre en charge » sur la carte du ticket');
+  {
+    const typeId = insertType.run('G1', 'Support', null, null, null, null, JSON.stringify(['RSUP'])).lastInsertRowid;
+    const ticketId = db.prepare(
+      "INSERT INTO tickets (guild_id, type_id, channel_id, user_id, status, opened_at) VALUES ('G1', ?, 'CT1', 'U1', 'ouvert', ?)"
+    ).run(typeId, new Date().toISOString()).lastInsertRowid;
+    const enBase = () => db.prepare('SELECT * FROM tickets WHERE id = ?').get(ticketId);
+
+    V('la carte d\'un ticket neuf porte le bouton de prise en charge',
+      JSON.stringify(rangeesTicket('G1', ticketId)).includes('tktclaim') && JSON.stringify(rangeesTicket('G1', ticketId)).includes('Prendre en charge'));
+
+    const membre = (id, { roles = [], staff = false } = {}) => ({
+      id, user: { id }, displayName: id,
+      roles: { cache: new Map(roles.map((r) => [r, {}])) },
+      permissions: { has: () => staff },
+      guild: { id: 'G1' },
+    });
+    const clic = (m) => ({
+      guildId: 'G1', customId: `tktclaim:${ticketId}`,
+      user: { id: m.id }, member: m,
+      message: { flags: 0, edits: [] },
+      reponses: [], suites: [], replied: false, deferred: false,
+      async reply(x) { this.reponses.push(x); this.replied = true; return {}; },
+      async followUp(x) { this.suites.push(x); return {}; },
+      async update(x) { this.message.edits.push(x); this.replied = true; return {}; },
+      async deferUpdate() { this.deferred = true; return {}; },
+    });
+
+    const quidam = clic(membre('U9'));
+    await prendreEnCharge(quidam, ticketId);
+    V('un membre ordinaire est refusé', /⛔/.test(quidam.reponses[0]?.content) && !enBase().claimed_by, quidam.reponses[0]?.content);
+
+    const s1 = clic(membre('S1', { roles: ['RSUP'] }));
+    await prendreEnCharge(s1, ticketId);
+    V('le rôle support prend en charge — c\'est en base', enBase().claimed_by === 'S1' && Boolean(enBase().claimed_at));
+    V('… le bouton change de tête', /Pris en charge — reprendre/.test(JSON.stringify(s1.message.edits[0] || {})));
+    V('… et l\'annonce part dans le salon', /Ticket pris en charge/.test(JSON.stringify(s1.suites[0] || {})));
+
+    const encore = clic(membre('S1', { roles: ['RSUP'] }));
+    await prendreEnCharge(encore, ticketId);
+    V('re-cliquer soi-même informe sans écraser', /déjà pris/.test(encore.suites[0]?.content), encore.suites[0]?.content);
+
+    const s2 = clic(membre('S2', { staff: true }));
+    await prendreEnCharge(s2, ticketId);
+    V('un autre staff peut REPRENDRE le ticket', enBase().claimed_by === 'S2');
+    V('… et la reprise nomme l\'ancien assigné', /Auparavant assigné à <@S1>/.test(JSON.stringify(s2.suites[0] || {})), JSON.stringify(s2.suites[0] || {}).slice(0, 200));
   }
 
   fs.rmSync(RACINE, { recursive: true, force: true });

@@ -1475,6 +1475,19 @@ const RELEASES = [
     ],
     retrait: [],
   },
+  {
+    id: 'bouton-claim-tickets-2026-08by',
+    title: 'Le bouton « Prendre en charge » sur chaque ticket 🙋',
+    ajout: [
+      '🙋 **Un bouton « Prendre en charge » sur la carte de chaque ticket** : un clic (staff ou role support du type) et le ticket est assigne — la base le note, la carte change de tete, et l\'annonce « X s\'occupe desormais de ce ticket » part dans le salon',
+      '🔄 **Le bouton reste cliquable apres le claim** (« Pris en charge — reprendre ») : un autre membre du staff peut reprendre le ticket, la reprise nomme l\'ancien assigne',
+    ],
+    amelioration: [
+      '🧭 Bouton et menu staff (« Ticket pris en charge » / « Ticket libere ») partagent desormais LE MEME chemin : quel que soit le geste, la carte se met a jour et les menus se decochent',
+    ],
+    fix: [],
+    retrait: [],
+  },
 ];
 
 // Construit l'embed d'une note à partir d'une entrée { title, ajout, fix,

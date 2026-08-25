@@ -447,21 +447,10 @@ async function provisionTicket(guild, type, owner) {
     )
     .setTimestamp();
   const ticketId = result.lastInsertRowid;
-  const closeRow = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId(`tktclose:${ticketId}`).setLabel('Fermer le ticket').setEmoji('🔒').setStyle(ButtonStyle.Danger),
-    // 🔔 Relance : repingue l'auteur du ticket quand il ne répond plus.
-    new ButtonBuilder().setCustomId(`tktrevive:${ticketId}`).setLabel('Relancer').setEmoji('🔔').setStyle(ButtonStyle.Secondary)
-  );
-  // 📋 Réponses types écrites par le staff (/preset), s'il y en a.
-  const presetRow = require('./ticketPresets').menuPresets(guild.id, ticketId);
-  // 🛠️ Actions réservées au staff du serveur. Le menu est visible de tous —
-  // Discord ne sait pas masquer un composant par rôle — mais chaque action
-  // vérifie les droits avant d'agir.
-  const staffRow = menuActionsStaff(ticketId);
   await channel.send({
     content: `<@${owner.id}>${roleMentions ? ` ${roleMentions}` : ''}`,
     embeds: [intro],
-    components: [closeRow, ...(presetRow ? [presetRow] : []), staffRow],
+    components: rangeesTicket(guild.id, ticketId),
   });
   await creerFilStaff(guild, channel, { cfg, roleIds, num, owner }).catch((err) => {
     console.warn(`⚠️ Fil staff du ticket n°${num} non créé : ${err.message}`);
@@ -924,6 +913,60 @@ function menuActionsStaff(ticketId) {
   );
 }
 
+// Les rangées de la carte d'un ticket : fermer / relancer (repingue l'auteur
+// quand il ne répond plus) / 🙋 prendre en charge, puis les réponses types
+// (/preset) s'il y en a, et le menu staff — visible de tous, Discord ne sait
+// pas masquer un composant par rôle, mais chaque action vérifie les droits.
+// `claim` change la tête du bouton de prise en charge ; il reste cliquable :
+// un autre membre du staff peut reprendre le ticket.
+function rangeesTicket(guildId, ticketId, claim = false) {
+  const boutons = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId(`tktclose:${ticketId}`).setLabel('Fermer le ticket').setEmoji('🔒').setStyle(ButtonStyle.Danger),
+    new ButtonBuilder().setCustomId(`tktrevive:${ticketId}`).setLabel('Relancer').setEmoji('🔔').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId(`tktclaim:${ticketId}`)
+      .setLabel(claim ? 'Pris en charge — reprendre' : 'Prendre en charge')
+      .setEmoji('🙋')
+      .setStyle(claim ? ButtonStyle.Secondary : ButtonStyle.Success)
+  );
+  const presets = require('./ticketPresets').menuPresets(guildId, ticketId);
+  return [boutons, ...(presets ? [presets] : []), menuActionsStaff(ticketId)];
+}
+
+// 🙋 La prise en charge — par le BOUTON de la carte ou le menu staff. Le
+// même geste : la base est mise à jour, la carte change de tête (bouton
+// « Pris en charge », menus remis à zéro), et l'annonce part dans le salon.
+async function prendreEnCharge(interaction, ticketId) {
+  const ticket = getTicketById.get(ticketId, interaction.guildId);
+  if (!ticket) {
+    return interaction.reply({ content: '❌ Ticket introuvable (déjà supprimé ?).', flags: MessageFlags.Ephemeral });
+  }
+  const type = ticket.type_id ? getType.get(ticket.type_id, interaction.guildId) : null;
+  if (!canManageTicket(interaction.member, type)) {
+    if (interaction.isStringSelectMenu?.()) await resetStaffMenu(interaction).catch(() => null);
+    return refuser(interaction);
+  }
+  const moi = interaction.user;
+  if (ticket.claimed_by === moi.id) {
+    await mettreAJour(interaction, { components: rangeesTicket(interaction.guildId, ticket.id, true) });
+    return suivre(interaction, { content: 'ℹ️ Vous avez déjà pris ce ticket en charge.', flags: MessageFlags.Ephemeral });
+  }
+  claimTicket.run(moi.id, new Date().toISOString(), ticket.id);
+  await mettreAJour(interaction, { components: rangeesTicket(interaction.guildId, ticket.id, true) });
+  return suivre(interaction, {
+    embeds: [
+      new EmbedBuilder()
+        .setColor(COLORS.SUCCESS)
+        .setTitle('🚀 Ticket pris en charge')
+        .setDescription(
+          M.description([
+            `<@${moi.id}> s'occupe désormais de ce ticket.`,
+            ticket.claimed_by ? M.bloc('Reprise', [`Auparavant assigné à <@${ticket.claimed_by}>`], { prefixe: '🔄', compte: null }) : null,
+          ].filter(Boolean))
+        ),
+    ],
+  });
+}
+
 // Refus poli et éphémère : le menu est visible de tous, l'action ne l'est pas.
 async function refuser(interaction) {
   return interaction.reply({
@@ -947,28 +990,8 @@ async function handleStaffMenu(interaction, ticketId) {
   const choix = interaction.values[0];
   const moi = interaction.user;
 
-  if (choix === 'prendre') {
-    if (ticket.claimed_by === moi.id) {
-      await resetStaffMenu(interaction);
-      return suivre(interaction, { content: 'ℹ️ Vous avez déjà pris ce ticket en charge.', flags: MessageFlags.Ephemeral });
-    }
-    claimTicket.run(moi.id, new Date().toISOString(), ticket.id);
-    await resetStaffMenu(interaction);
-    await suivre(interaction, {
-      embeds: [
-        new EmbedBuilder()
-          .setColor(COLORS.SUCCESS)
-          .setTitle('🚀 Ticket pris en charge')
-          .setDescription(
-            M.description([
-              `<@${moi.id}> s'occupe désormais de ce ticket.`,
-              ticket.claimed_by ? M.bloc('Reprise', [`Auparavant assigné à <@${ticket.claimed_by}>`], { prefixe: '🔄', compte: null }) : null,
-            ].filter(Boolean))
-          ),
-      ],
-    });
-    return;
-  }
+  // Même chemin que le bouton 🙋 de la carte : base, carte et annonce.
+  if (choix === 'prendre') return prendreEnCharge(interaction, ticket.id);
 
   if (choix === 'liberer') {
     if (!ticket.claimed_by) {
@@ -976,7 +999,8 @@ async function handleStaffMenu(interaction, ticketId) {
       return suivre(interaction, { content: 'ℹ️ Ce ticket n\'est pris en charge par personne.', flags: MessageFlags.Ephemeral });
     }
     claimTicket.run(null, null, ticket.id);
-    await resetStaffMenu(interaction);
+    // Le bouton 🙋 redevient « Prendre en charge », et les menus se décochent.
+    await mettreAJour(interaction, { components: rangeesTicket(interaction.guildId, ticket.id, false) });
     await suivre(interaction, {
       embeds: [
         new EmbedBuilder()
@@ -1168,6 +1192,7 @@ async function handleTicketButton(interaction) {
     if (prefix === 'tktclose') return await closeTicket(interaction, id);
     if (prefix === 'tktdel') return await deleteTicket(interaction, id);
     if (prefix === 'tktrevive') return await reviveTicket(interaction, id);
+    if (prefix === 'tktclaim') return await prendreEnCharge(interaction, id);
   } catch (err) {
     console.error('Erreur ticket :', err);
     // Interaction morte (réponse trop tardive ou en double) : inutile — et
@@ -1187,6 +1212,8 @@ module.exports = {
   editerMessagePanneau,
   sendTranscript,
   resetPanelMenu,
+  prendreEnCharge,
+  rangeesTicket,
   insertPanel,
   lastPanel,
   updatePanelOptions,
