@@ -1198,7 +1198,12 @@ async function handleTicketButton(interaction) {
     // Interaction morte (réponse trop tardive ou en double) : inutile — et
     // impossible — de répondre à nouveau, on évite juste une 2ᵉ erreur bruyante.
     if (err?.code === 10062 || err?.code === 40060) return;
-    await suivre(interaction, { content: '❌ Une erreur est survenue sur ce ticket.', flags: MessageFlags.Ephemeral });
+    // La cause en petit : « une erreur est survenue » tout court ne dit ni ce
+    // qui s'est passé ni quoi rapporter au staff du bot.
+    await suivre(interaction, {
+      content: `❌ Une erreur est survenue sur ce ticket.\n-# ${String(err?.message || err).slice(0, 180)}`,
+      flags: MessageFlags.Ephemeral,
+    });
   }
 }
 

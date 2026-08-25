@@ -3473,6 +3473,9 @@
   "❌ Une erreur est survenue sur ce ticket.": {
     "en": "❌ Something went wrong with this ticket."
   },
+  "❌ Une erreur est survenue sur ce ticket.\n-# ": {
+    "en": "❌ Something went wrong on this ticket.\n-# "
+  },
   "❌ Une erreur est survenue sur le panneau.": {
     "en": "❌ Something went wrong with the panel."
   },

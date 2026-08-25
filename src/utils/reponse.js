@@ -256,13 +256,32 @@ async function reafficher(interaction) {
   const corps = estCarte(message)
     ? { components: composants, flags: C.DRAPEAU_V2 }
     : { components: composants };
-  return interaction.update(corps).catch(() => interaction.deferUpdate().catch(() => null));
+  // Même garde que mettreAJour : update() peut lever au lieu de rejeter.
+  try {
+    return await interaction.update(corps);
+  } catch {
+    return interaction.deferUpdate().catch(() => null);
+  }
+}
+
+// ⚠️ `interaction.update()` peut LEVER de façon synchrone (validation
+// discord.js du payload) au lieu de renvoyer une promesse rejetée. Un
+// `.catch()` chaîné ne voit jamais cette levée-là : elle sortait de
+// mettreAJour et emportait l'action entière. D'où ce garde, qui traite les
+// deux formes d'échec pareil.
+async function tenterUpdate(interaction, corps) {
+  try {
+    await interaction.update(corps);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 async function mettreAJour(interaction, payload) {
   const message = interaction.message;
   if (!estCarte(message)) {
-    const fait = await interaction.update(payload).then(() => true).catch(() => false);
+    const fait = await tenterUpdate(interaction, payload);
     return fait ? null : accuserQuandMeme(interaction);
   }
 
@@ -272,17 +291,13 @@ async function mettreAJour(interaction, payload) {
     // la carte en place et on retire seulement les boutons.
     const restants = (message.components || []).map(enJSON).filter((c) => c.type !== RANGEE);
     if (restants.length) {
-      const fait = await interaction.update({ components: restants, flags: C.DRAPEAU_V2 })
-        .then(() => true).catch(() => false);
+      const fait = await tenterUpdate(interaction, { components: restants, flags: C.DRAPEAU_V2 });
       if (fait) return null;
     }
     return accuserQuandMeme(interaction);
   }
 
-  const ok = await interaction
-    .update({ components: composants, flags: C.DRAPEAU_V2 })
-    .then(() => true)
-    .catch(() => false);
+  const ok = await tenterUpdate(interaction, { components: composants, flags: C.DRAPEAU_V2 });
   if (ok) return null;
 
   // Repli : si la mise à jour est refusée, on accuse au moins réception —

@@ -1488,6 +1488,18 @@ const RELEASES = [
     fix: [],
     retrait: [],
   },
+  {
+    id: 'update-blinde-erreurs-parlantes-2026-08bz',
+    title: 'Les mises à jour de cartes encaissent tout, et les erreurs disent leur cause 🛡️',
+    ajout: [],
+    amelioration: [
+      '🗣️ **« Une erreur est survenue sur ce ticket » dit desormais LA CAUSE**, en petit sous le message : de quoi comprendre — ou rapporter — au lieu de deviner',
+    ],
+    fix: [
+      '🛡️ **Une mise a jour de carte qui echoue n\'emporte plus l\'action.** discord.js peut LEVER pendant la validation au lieu de rejeter proprement : cet echec-la passait entre les mailles et cassait le geste entier (bouton de prise en charge compris). Toutes les mises a jour l\'encaissent desormais, et accusent reception quoi qu\'il arrive',
+    ],
+    retrait: [],
+  },
 ];
 
 // Construit l'embed d'une note à partir d'une entrée { title, ajout, fix,

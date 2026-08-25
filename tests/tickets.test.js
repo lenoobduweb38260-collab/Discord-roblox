@@ -230,6 +230,31 @@ function fauxMembre(id, { bot = false, roles = [] } = {}) {
     V('… et la reprise nomme l\'ancien assigné', /Auparavant assigné à <@S1>/.test(JSON.stringify(s2.suites[0] || {})), JSON.stringify(s2.suites[0] || {}).slice(0, 200));
   }
 
+  console.log('\n7) Un update() qui LÈVE (validation discord.js) ne casse plus l\'action');
+  {
+    const { mettreAJour, reafficher } = require('../src/utils/reponse');
+
+    const faits = { defers: 0 };
+    const casse = (flags) => ({
+      message: { flags, components: [] },
+      replied: false, deferred: false,
+      update() { throw new Error('validation synchrone'); },
+      async deferUpdate() { faits.defers += 1; this.deferred = true; return {}; },
+    });
+
+    let survit = true;
+    try { await mettreAJour(casse(0), { content: 'x' }); } catch { survit = false; }
+    V('mettreAJour survit à un update qui lève (message classique)', survit && faits.defers === 1);
+
+    survit = true;
+    try { await mettreAJour(casse(C.DRAPEAU_V2), { components: [{ type: 1, components: [] }] }); } catch { survit = false; }
+    V('… et sur une carte aussi', survit && faits.defers === 2);
+
+    survit = true;
+    try { await reafficher(casse(0)); } catch { survit = false; }
+    V('reafficher survit pareil', survit && faits.defers === 3);
+  }
+
   fs.rmSync(RACINE, { recursive: true, force: true });
   console.log(`\n${ko === 0 ? '✅' : '❌'} ${ok} réussis, ${ko} échoués`);
   process.exit(ko === 0 ? 0 : 1);

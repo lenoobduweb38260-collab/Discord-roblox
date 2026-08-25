@@ -3168,7 +3168,9 @@ Check that the bot has **Manage Channels**.";"";"";""
 ";"";"";""
 "utils.tickets.156";"utils/tickets.js";"1156";"";"➕ Membre(s) ajouté(s)";"➕ Member(s) added";"";"";""
 "utils.tickets.157";"utils/tickets.js";"1156";"";"➖ Membre(s) retiré(s)";"➖ Member(s) removed";"";"";""
-"utils.tickets.158";"utils/tickets.js";"1201";"";"❌ Une erreur est survenue sur ce ticket.";"❌ Something went wrong with this ticket.";"";"";""
+"utils.tickets.158";"utils/tickets.js";"1204";"";"❌ Une erreur est survenue sur ce ticket.
+-# ";"❌ Something went wrong on this ticket.
+-# ";"";"";""
 "utils.updateAnnounce.001";"utils/updateAnnounce.js";"56";"";"Salon des annonces de mise à jour du bot (créé automatiquement, visible du staff uniquement)";"Channel for the bot's update announcements (created automatically, staff-only)";"";"";""
 "utils.updateAnnounce.002";"utils/updateAnnounce.js";"61";"";"⚠️ Création de #shadow-logs impossible sur ";"⚠️ Could not create #shadow-logs on ";"";"";""
 "utils.updateAnnounce.003";"utils/updateAnnounce.js";"79";"";"⚠️ Annonce de mise à jour impossible sur ";"⚠️ Could not announce the update on ";"";"";""
