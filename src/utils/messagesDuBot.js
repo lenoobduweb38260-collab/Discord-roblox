@@ -27,12 +27,16 @@ const messageCompose = db.prepare('SELECT * FROM composed_messages WHERE channel
 
 // Le journal d'audit agrège les suppressions de messages : on cherche donc une
 // entrée récente visant le même salon, plutôt qu'un identifiant de message
-// (que Discord n'y met pas).
-async function quiAEfface(guild, channelId) {
+// (que Discord n'y met pas). Avec `auteurId`, l'entrée doit en plus viser le
+// même auteur — sans quoi une purge voisine ferait accuser le mauvais membre
+// du staff. ⚠️ Discord n'audite QUE les suppressions faites par un TIERS :
+// pas d'entrée = l'auteur a effacé son propre message.
+async function quiAEfface(guild, channelId, auteurId = null) {
   try {
     const logs = await guild.fetchAuditLogs({ type: AuditLogEvent.MessageDelete, limit: 6 });
     const recent = [...logs.entries.values()].find((e) => {
       if (String(e.extra?.channel?.id || e.extra?.channelId || '') !== String(channelId)) return false;
+      if (auteurId && String(e.target?.id || e.targetId || '') !== String(auteurId)) return false;
       // Une entrée d'audit vieille de plus d'une minute parle d'autre chose.
       return Date.now() - e.createdTimestamp < 60000;
     });

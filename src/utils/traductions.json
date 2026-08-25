@@ -1604,6 +1604,9 @@
   "*Rien d'autre en attente.*": {
     "en": "*Nothing else queued.*"
   },
+  "*Son auteur — Discord n'audite que les suppressions faites par un tiers*": {
+    "en": "*Its author — Discord only audits deletions made by someone else*"
+  },
   "*types à définir*": {
     "en": "*types to be set*"
   },
@@ -7999,6 +8002,9 @@
   },
   "supprimé": {
     "en": "deleted"
+  },
+  "Supprimé par": {
+    "en": "Deleted by"
   },
   "Supprimer définitivement": {
     "en": "Delete permanently"

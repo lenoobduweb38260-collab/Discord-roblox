@@ -74,6 +74,13 @@ module.exports = {
       ? M.borner(message.content, 1000)
       : '*Contenu indisponible (message non mis en cache)*';
 
+    // 🧹 QUI a effacé ? Le journal d'audit met une seconde à s'écrire — et il
+    // ne note que les suppressions faites par un TIERS : pas d'entrée, c'est
+    // que l'auteur a effacé son propre message. On vise l'entrée du même
+    // salon ET du même auteur, pour ne jamais accuser le mauvais modérateur.
+    await new Promise((r) => setTimeout(r, 1200));
+    const effaceur = await quiAEfface(message.guild, message.channelId, message.author?.id || null);
+
     // Le contenu est un CHAMP : avec « >>> » dans la description, la ligne
     // des pièces jointes se retrouvait aspirée dans la citation.
     const champs = [{ name: '📄 Contenu', value: M.borner(contenu, M.MAX_CHAMP), inline: false }];
@@ -83,6 +90,11 @@ module.exports = {
       '🗑️ Message supprimé',
       M.description([
         M.bloc('Auteur', [auteur], { prefixe: '👤', compte: null }),
+        M.bloc('Supprimé par', [
+          effaceur
+            ? etiquetteMembre(effaceur)
+            : '*Son auteur — Discord n\'audite que les suppressions faites par un tiers*',
+        ], { prefixe: '🧹', compte: null }),
         M.bloc('Salon', [`<#${message.channelId}>`], { prefixe: '📍', compte: null }),
       ]),
       COLORS.DANGER,

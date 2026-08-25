@@ -170,6 +170,32 @@ const bits = (...noms) => ({ toArray: () => noms });
     V('avec juste un ID', J.mentionAvecId('U4') === '<@U4> (`U4`)');
   }
 
+  console.log('\n4 ter) Qui a effacé — le journal d\'audit, sans accuser le mauvais');
+  {
+    const { quiAEfface } = require('../src/utils/messagesDuBot');
+    const entree = (extra = {}) => ({
+      executor: { id: 'MOD', tag: 'mod#0' },
+      target: { id: 'U1' },
+      extra: { channel: { id: 'C1' } },
+      createdTimestamp: Date.now(),
+      ...extra,
+    });
+    const guildAvec = (...entrees) => ({
+      fetchAuditLogs: async () => ({ entries: new Map(entrees.map((e, i) => [i, e])) }),
+    });
+
+    V('le modérateur qui a effacé est trouvé (salon + auteur)',
+      (await quiAEfface(guildAvec(entree()), 'C1', 'U1'))?.id === 'MOD');
+    V('une entrée visant un AUTRE auteur ne fait accuser personne',
+      (await quiAEfface(guildAvec(entree({ target: { id: 'U2' } })), 'C1', 'U1')) === null);
+    V('un autre salon non plus',
+      (await quiAEfface(guildAvec(entree({ extra: { channel: { id: 'AILLEURS' } } })), 'C1', 'U1')) === null);
+    V('une entrée trop vieille parle d\'autre chose',
+      (await quiAEfface(guildAvec(entree({ createdTimestamp: Date.now() - 120000 })), 'C1', 'U1')) === null);
+    V('sans accès au journal d\'audit, on renonce sans casser',
+      (await quiAEfface({ fetchAuditLogs: async () => { throw new Error('Missing Permissions'); } }, 'C1', 'U1')) === null);
+  }
+
   console.log('\n5) Les états vocaux fins : micro, caméra, stream — même salon');
   {
     const envois = [];

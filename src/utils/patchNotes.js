@@ -1510,6 +1510,17 @@ const RELEASES = [
     ],
     retrait: [],
   },
+  {
+    id: 'log-suppression-effaceur-2026-08cb',
+    title: 'Le log d\'un message supprimé dit QUI a effacé 🧹',
+    ajout: [
+      '🧹 **« Supprimé par » sur chaque log de suppression** : le moderateur qui a efface est nomme et identifie via le journal d\'audit — l\'entree doit viser le MEME salon ET le MEME auteur, pour ne jamais accuser le mauvais',
+      '👤 Pas d\'entree d\'audit ? C\'est que **l\'auteur a efface son propre message** — Discord n\'audite que les suppressions faites par un tiers, et le log le dit tel quel',
+    ],
+    amelioration: [],
+    fix: [],
+    retrait: [],
+  },
 ];
 
 // Construit l'embed d'une note à partir d'une entrée { title, ajout, fix,
