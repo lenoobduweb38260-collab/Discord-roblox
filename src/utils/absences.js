@@ -115,8 +115,12 @@ const rangeePanneau = () => new ActionRowBuilder().addComponents(
 
 // Publie le panneau. Les salons donnés s'AJOUTENT à la liste — republier
 // le panneau ne détruit pas une liste de trente salons montée à la main.
+// 📌 Le panneau est épinglé (et la notification système effacée) : il est
+// fait pour être retrouvé — sans « Gérer les messages », il reste simplement
+// non épinglé.
 async function publierPanneau(salonPanneau, salonsAnnonce) {
   const envoi = await salonPanneau.send({ embeds: [cartePanneau()], components: [rangeePanneau()] });
+  await require('./embeds').epinglerProprement(envoi);
   ajouterSalons(salonPanneau.guildId || salonPanneau.guild?.id, (salonsAnnonce || []).map((s2) => s2.id));
   return envoi;
 }

@@ -1428,6 +1428,19 @@ const RELEASES = [
     ],
     retrait: [],
   },
+  {
+    id: 'panneaux-epingles-2026-08bu',
+    title: 'Les panneaux s\'épinglent tout seuls 📌',
+    ajout: [
+      '📌 **Un panneau publie est epingle automatiquement** — tickets (publication ET republication) comme absences : un panneau est fait pour etre retrouve, meme apres des semaines de messages',
+      '🧹 **La notification systeme « X a epingle un message » est effacee dans la foulee** : elle n\'apprend rien et passerait pour du bruit laisse par le bot sous son propre panneau',
+    ],
+    amelioration: [
+      '🔑 Sans la permission « Gerer les messages », le panneau part quand meme, simplement non epingle — et la reponse de `/ticket panneau` le dit, avec la permission a donner',
+    ],
+    fix: [],
+    retrait: [],
+  },
 ];
 
 // Construit l'embed d'une note à partir d'une entrée { title, ajout, fix,

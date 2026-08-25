@@ -100,6 +100,7 @@ module.exports = {
   ButtonStyle: { Primary: 1, Secondary: 2, Success: 3, Danger: 4, Link: 5 },
   TextInputStyle: { Short: 1, Paragraph: 2 },
   ChannelType: { GuildText: 0, GuildVoice: 2, GuildCategory: 4, GuildAnnouncement: 5, PublicThread: 11, PrivateThread: 12 },
+  MessageType: { Default: 0, ChannelPinnedMessage: 6 },
   MessageFlags: { Ephemeral: 64 },
   PermissionFlagsBits: {
     ManageChannels: 1n << 4n, Stream: 1n << 9n, ViewChannel: 1n << 10n,

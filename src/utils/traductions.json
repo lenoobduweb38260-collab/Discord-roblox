@@ -41,6 +41,9 @@
   "\n-# 🏷️ En début de ligne : ": {
     "en": "\n-# 🏷️ At the start of a line: "
   },
+  "\n-# 📌 Épinglage impossible : donnez-moi **Gérer les messages** dans ce salon, puis republiez.": {
+    "en": "\n-# 📌 Pinning failed: give me **Manage Messages** in this channel, then republish."
+  },
   "\n-# 25 par passage — relancez la commande pour continuer.": {
     "en": "\n-# 25 per pass — run the command again to keep going."
   },
@@ -490,6 +493,9 @@
   },
   " est passé de <#": {
     "en": " moved from <#"
+  },
+  " et **épinglé** 📌": {
+    "en": " and **pinned** 📌"
   },
   " et de **tous les serveurs du bot**": {
     "en": " and from **every server the bot is on**"

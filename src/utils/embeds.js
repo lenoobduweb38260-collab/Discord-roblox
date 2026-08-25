@@ -189,6 +189,27 @@ async function sendLog(guild, embed, fichiers = null) {
   }
 }
 
+// 📌 Épingle un message, puis efface la notification système « X a épinglé
+// un message » que Discord poste dans le salon : elle n'apprend rien, et sous
+// un panneau elle passerait pour du bruit laissé par le bot.
+// Renvoie true si l'épinglage a réussi — il exige « Gérer les messages ».
+async function epinglerProprement(message) {
+  try {
+    await message.pin();
+  } catch {
+    return false;
+  }
+  try {
+    const { MessageType } = require('discord.js');
+    const recents = await message.channel.messages.fetch({ limit: 5 });
+    const notif = [...recents.values()].find(
+      (m) => m.system && Number(m.type) === Number(MessageType?.ChannelPinnedMessage ?? 6)
+    );
+    if (notif) await notif.delete().catch(() => null);
+  } catch {}
+  return true;
+}
+
 function logEmbed(title, description, color = COLORS.INFO, fields = null) {
   const embed = new EmbedBuilder()
     .setColor(color)
@@ -212,4 +233,5 @@ module.exports = {
   buildEnterpriseEmbed,
   sendLog,
   logEmbed,
+  epinglerProprement,
 };

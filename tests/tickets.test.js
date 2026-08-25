@@ -134,6 +134,29 @@ function fauxMembre(id, { bot = false, roles = [] } = {}) {
     V('… et sans fichier, rien ne change', !JSON.stringify(C.convertirCorps({ content: '', embeds: [{ title: 'A' }] }, {})).includes('"type":13'));
   }
 
+  console.log('\n5) Le panneau publié s\'épingle, et la notification système s\'efface');
+  {
+    const { epinglerProprement } = require('../src/utils/embeds');
+
+    const faits = { epingle: false, effaces: [] };
+    const notif = { system: true, type: 6, async delete() { faits.effaces.push('notif'); return this; } };
+    const autre = { system: false, type: 0, async delete() { faits.effaces.push('autre'); return this; } };
+    const message = {
+      async pin() { faits.epingle = true; return this; },
+      channel: { messages: { fetch: async () => new Map([['N1', notif], ['M1', autre]]) } },
+    };
+    const okEpingle = await epinglerProprement(message);
+    V('le message est épinglé', okEpingle === true && faits.epingle === true);
+    V('… la notification système « a épinglé » est effacée', faits.effaces.includes('notif'));
+    V('… et RIEN d\'autre', !faits.effaces.includes('autre'), faits.effaces.join(','));
+
+    const refuse = {
+      async pin() { throw new Error('Missing Permissions'); },
+      channel: { messages: { fetch: async () => { throw new Error('ne doit pas être appelé'); } } },
+    };
+    V('sans « Gérer les messages », on renonce sans casser', (await epinglerProprement(refuse)) === false);
+  }
+
   fs.rmSync(RACINE, { recursive: true, force: true });
   console.log(`\n${ko === 0 ? '✅' : '❌'} ${ok} réussis, ${ko} échoués`);
   process.exit(ko === 0 ? 0 : 1);

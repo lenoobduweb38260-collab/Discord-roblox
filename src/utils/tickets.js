@@ -14,7 +14,7 @@ const {
   UserSelectMenuBuilder,
 } = require('discord.js');
 const { db, getGuildConfig } = require('../database');
-const { COLORS, sendLog, logEmbed } = require('./embeds');
+const { COLORS, sendLog, logEmbed, epinglerProprement } = require('./embeds');
 const { GRADES, getGrade, staffRoleIds } = require('./permissions');
 const balises = require('./balises');
 const M = require('./miseEnPage');
@@ -309,7 +309,14 @@ async function finishPanel(interaction) {
       });
     }
     insertPanel.run(interaction.guildId, channel.id, message.id, JSON.stringify(merged));
-    await interaction.reply({ content: `✅ Panneau publié dans ${channel}. Modifiez-le avec \`/ticket panneau-modifier\`.`, flags: MessageFlags.Ephemeral });
+    // 📌 Le panneau est fait pour être retrouvé : on l'épingle, et la
+    // notification système « a épinglé un message » est effacée dans la foulée.
+    const epingle = await epinglerProprement(message);
+    await interaction.reply({
+      content: `✅ Panneau publié dans ${channel}${epingle ? ' et **épinglé** 📌' : ''}. Modifiez-le avec \`/ticket panneau-modifier\`.`
+        + (epingle ? '' : '\n-# 📌 Épinglage impossible : donnez-moi **Gérer les messages** dans ce salon, puis republiez.'),
+      flags: MessageFlags.Ephemeral,
+    });
     await sendLog(interaction.guild, logEmbed('🎫 Panneau publié', `Panneau publié dans <#${channel.id}> par <@${interaction.user.id}>.`, COLORS.INFO));
     return;
   }
@@ -336,6 +343,8 @@ async function finishPanel(interaction) {
     if (neuf) {
       await message.delete().catch(() => null);
       updatePanelMessage.run(channel.id, neuf.id, panel.id);
+      // Le nouveau message reprend la place de l'ancien, épingle comprise.
+      await epinglerProprement(neuf);
       republie = true;
     }
   }
