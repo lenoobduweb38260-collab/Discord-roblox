@@ -968,8 +968,12 @@ async function prendreEnCharge(interaction, ticketId) {
 }
 
 // Refus poli et éphémère : le menu est visible de tous, l'action ne l'est pas.
+// ⚠️ Par `suivre`, jamais `reply` directement : quand le menu vient d'être
+// remis à zéro (resetStaffMenu), l'interaction est DÉJÀ consommée — un
+// `reply` lèverait « InteractionAlreadyReplied », et le membre recevait
+// l'erreur générique au lieu du refus qui lui explique pourquoi.
 async function refuser(interaction) {
-  return interaction.reply({
+  return suivre(interaction, {
     content: '⛔ Ces actions sont réservées au **staff du serveur** et aux rôles support de ce type de ticket.',
     flags: MessageFlags.Ephemeral,
   });

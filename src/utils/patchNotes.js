@@ -1500,6 +1500,16 @@ const RELEASES = [
     ],
     retrait: [],
   },
+  {
+    id: 'refus-staff-fiable-2026-08ca',
+    title: 'Un membre sur les actions staff reçoit le refus, pas une erreur ⛔',
+    ajout: [],
+    amelioration: [],
+    fix: [
+      '⛔ **Un membre qui touche au menu « Actions staff » ou au bouton de prise en charge recoit bien « reserve au staff »** — plus jamais « une erreur est survenue ». Le refus partait en `reply` alors que la remise a zero du menu venait de consommer l\'interaction : Discord levait « InteractionAlreadyReplied », et le membre recevait l\'erreur generique. Le refus regarde desormais l\'etat REEL de l\'interaction avant de choisir sa porte',
+    ],
+    retrait: [],
+  },
 ];
 
 // Construit l'embed d'une note à partir d'une entrée { title, ajout, fix,

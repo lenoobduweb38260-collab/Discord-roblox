@@ -230,6 +230,46 @@ function fauxMembre(id, { bot = false, roles = [] } = {}) {
     V('… et la reprise nomme l\'ancien assigné', /Auparavant assigné à <@S1>/.test(JSON.stringify(s2.suites[0] || {})), JSON.stringify(s2.suites[0] || {}).slice(0, 200));
   }
 
+  console.log('\n6 bis) Un MEMBRE sur le menu « Actions staff » reçoit le refus, pas une erreur');
+  {
+    const { handleTicketButton } = require('../src/utils/tickets');
+    const typeId = insertType.run('G1', 'Aide', null, null, null, null, JSON.stringify(['RSUP'])).lastInsertRowid;
+    const tid = db.prepare(
+      "INSERT INTO tickets (guild_id, type_id, channel_id, user_id, status, opened_at) VALUES ('G1', ?, 'CT9', 'U1', 'ouvert', ?)"
+    ).run(typeId, new Date().toISOString()).lastInsertRowid;
+
+    const interaction = {
+      guildId: 'G1', customId: `tktstaff:${tid}`, values: ['prendre'],
+      user: { id: 'U9' },
+      member: { id: 'U9', user: { id: 'U9' }, roles: { cache: new Map() }, permissions: { has: () => false }, guild: { id: 'G1' } },
+      guild: { id: 'G1', name: 'Labo', iconURL: () => null },
+      client: { user: { username: 'Bot' } },
+      // Le message porte le menu : le remettre à zéro CONSOMME l'interaction.
+      message: { flags: 0, components: [{ toJSON: () => ({ type: 1, components: [] }) }] },
+      reponses: [], suites: [],
+      replied: false, deferred: false,
+      isButton: () => false,
+      isStringSelectMenu: () => true,
+      isUserSelectMenu: () => false,
+      isModalSubmit: () => false,
+      async reply(m) {
+        if (this.replied || this.deferred) throw new Error('InteractionAlreadyReplied');
+        this.reponses.push(m); this.replied = true; return {};
+      },
+      async followUp(m) { this.suites.push(m); return {}; },
+      async update(m) {
+        if (this.replied || this.deferred) throw new Error('InteractionAlreadyReplied');
+        this.replied = true; return {};
+      },
+      async deferUpdate() { this.deferred = true; return {}; },
+    };
+    await handleTicketButton(interaction);
+    const tout = JSON.stringify([interaction.reponses, interaction.suites]);
+    V('le membre reçoit le ⛔ « réservé au staff »', /réservées au \*\*staff du serveur\*\*/.test(tout), tout.slice(0, 160));
+    V('… et jamais l\'erreur générique', !/Une erreur est survenue/.test(tout));
+    V('… le ticket n\'est pas pris en charge', !db.prepare('SELECT claimed_by FROM tickets WHERE id = ?').get(tid).claimed_by);
+  }
+
   console.log('\n7) Un update() qui LÈVE (validation discord.js) ne casse plus l\'action');
   {
     const { mettreAJour, reafficher } = require('../src/utils/reponse');
