@@ -181,16 +181,16 @@ function preparerCartes(client, options) {
   const cible = estInteraction ? body.data : body;
 
   // 📎 Fichiers joints : une carte ne peut porter QUE des fichiers qu'un de
-  // ses composants désigne (`attachment://nom`). Un fichier libre — le
-  // transcript d'un ticket, par exemple — fait refuser TOUT le message par
-  // Discord avec un 400.
-  //
-  // Le repli rejouait bien la requête, mais deux envois pour chaque message à
-  // pièce jointe, et trois refus suffisent à couper les cartes partout. On
-  // renonce donc AVANT d'essayer : une image citée par l'embed reste
-  // convertie, un fichier libre garde l'ancien style.
-  if (!tousLesFichiersSontCites(options, cible)) return null;
-  const converti = convertirCorps(cible, { bordure: r.bordure, titre: r.titre, serveur: guild?.name || null });
+  // ses composants désigne (`attachment://nom`). Une image citée par l'embed
+  // survit telle quelle à la conversion ; un fichier LIBRE — le transcript
+  // d'un ticket, par exemple — reçoit son composant « fichier » dans la
+  // carte. Seul un fichier sans nom (impossible à désigner) fait renoncer :
+  // l'envoyer en carte serait refusé par Discord avec un 400.
+  const libres = fichiersLibres(options, cible);
+  if (libres === null) return null;
+  const converti = convertirCorps(cible, {
+    bordure: r.bordure, titre: r.titre, serveur: guild?.name || null, fichiers: libres,
+  });
   if (!converti) return null;
 
   const origine = JSON.parse(JSON.stringify(body));
@@ -199,12 +199,13 @@ function preparerCartes(client, options) {
   return origine;
 }
 
-// Chaque fichier joint est-il désigné par l'embed ? `setImage` et
-// `setThumbnail` acceptent `attachment://nom` : ces fichiers-là survivent à la
-// conversion, puisque la carte les cite à son tour. Les autres non.
-function tousLesFichiersSontCites(options, cible) {
+// Les fichiers joints que l'embed ne désigne pas (`setImage`/`setThumbnail`
+// acceptent `attachment://nom` — ces fichiers-là sont déjà cités par la carte).
+// Renvoie leurs noms, à afficher en composants « fichier » — ou null si l'un
+// d'eux n'a pas de nom : impossible à désigner, la conversion doit renoncer.
+function fichiersLibres(options, cible) {
   const fichiers = Array.isArray(options?.files) ? options.files : [];
-  if (!fichiers.length) return true;
+  if (!fichiers.length) return [];
   const cites = new Set();
   for (const e of cible.embeds || []) {
     for (const url of [e?.image?.url, e?.thumbnail?.url]) {
@@ -212,7 +213,13 @@ function tousLesFichiersSontCites(options, cible) {
       if (m) cites.add(m[1]);
     }
   }
-  return fichiers.every((f) => cites.has(String(f?.name || '')));
+  const libres = [];
+  for (const f of fichiers) {
+    const nom = String(f?.name || '');
+    if (!nom) return null;
+    if (!cites.has(nom)) libres.push(nom);
+  }
+  return libres;
 }
 
 // Un refus dû aux cartes se voit à un code 400 : la requête n'est pas partie,
@@ -273,5 +280,5 @@ function installer(client) {
 module.exports = {
   installer, appliquer, styliserUn, reglages, versEntier, guildeDe, listesDEmbeds, noterInteraction,
   couleurNeutre, COULEURS_NEUTRES, DEFAUT_ACCENT, FILET, filetDe, FILET_DEFAUT,
-  preparerCartes, routeDEnvoi, refusDeCartes, etatCartes, DRAPEAU_V2, tousLesFichiersSontCites, traduire,
+  preparerCartes, routeDEnvoi, refusDeCartes, etatCartes, DRAPEAU_V2, fichiersLibres, traduire,
 };

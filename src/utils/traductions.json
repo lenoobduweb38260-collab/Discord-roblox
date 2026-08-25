@@ -1301,6 +1301,9 @@
   "** introuvable. Choisissez un type existant.": {
     "en": "** not found. Pick a type that exists."
   },
+  "** message(s) conservé(s) — le transcript complet est joint à cette carte": {
+    "en": "** message(s) kept — the full transcript is attached to this card"
+  },
   "** message(s) gardaient leur barre colorée au dernier passage": {
     "en": "** message(s) still had their coloured bar on the last run"
   },
@@ -1459,6 +1462,9 @@
   },
   "**… l'étage ": {
     "en": "**… floor "
+  },
+  "**) fermé par <@": {
+    "en": "**) closed by <@"
   },
   "**/message · 🎙️ **": {
     "en": "**/message · 🎙️ **"
@@ -6398,6 +6404,9 @@
   "ferme et assertif": {
     "en": "firm and assertive"
   },
+  "Fermé par ": {
+    "en": "Closed by "
+  },
   "Fermé par <@": {
     "en": "Closed by <@"
   },
@@ -6745,6 +6754,9 @@
   },
   "Le Chevalier Impur": {
     "en": "The Irrational Cube"
+  },
+  "le contenu ne tient pas dans une carte — raccourcissez le panneau": {
+    "en": "the content does not fit in a card — shorten the panel"
   },
   "Le corps de l'annonce — « && » trace une barre, « &> » une entrée, « \\n » un saut de ligne": {
     "en": "The body of the announcement — “&&” draws a rule, “&>” an entry, “\\n” a line break"

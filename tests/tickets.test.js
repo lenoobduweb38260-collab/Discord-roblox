@@ -16,7 +16,9 @@ Module.prototype.require = function (n) {
 };
 
 const { ChannelType } = require(path.join(AIDES, 'stub-discord.js'));
-const { creerFilStaff } = require('../src/utils/tickets');
+const { setGuildConfig } = require('../src/database');
+const { creerFilStaff, editerMessagePanneau, sendTranscript } = require('../src/utils/tickets');
+const C = require('../src/utils/cartes');
 
 let ok = 0, ko = 0;
 const V = (t, c, d = '') => { if (c) { ok++; console.log('  ✅ ' + t); } else { ko++; console.log('  ❌ ' + t + (d ? ' — ' + d : '')); } };
@@ -71,6 +73,65 @@ function fauxMembre(id, { bot = false, roles = [] } = {}) {
       roleIds: [], num: '0001', owner: { id: 'U1', username: 'Seul' },
     });
     V('le fil est rendu, prêt pour ManageThreads', rendu === fil && fil.envois.length === 1);
+  }
+
+  console.log('\n3) Modifier un panneau publié en CARTE ne casse plus');
+  {
+    const guild = { id: 'G1', name: 'Labo', iconURL: () => null };
+    const client = { user: { username: 'Bot' } };
+    const payload = { embeds: [{ title: 'Panneau', description: 'Choisissez une raison.' }], components: [] };
+
+    // Un panneau à l'ancienne (embed) : la modification passe telle quelle.
+    const ancien = { flags: 0, edits: [], async edit(m) { this.edits.push(m); return this; } };
+    await editerMessagePanneau(guild, client, ancien, payload);
+    V('un panneau-embed se réédite avec ses embeds', Boolean(ancien.edits[0].embeds));
+
+    // Un panneau en carte : SURTOUT pas d'embeds — des composants reconstruits.
+    const carte = { flags: C.DRAPEAU_V2, edits: [], async edit(m) { this.edits.push(m); return this; } };
+    await editerMessagePanneau(guild, client, carte, payload);
+    V('un panneau-carte se réédite en composants', Array.isArray(carte.edits[0].components) && carte.edits[0].components.length > 0,
+      JSON.stringify(carte.edits[0] || {}).slice(0, 120));
+    V('… sans le champ embeds refusé par Discord', carte.edits[0].embeds === undefined);
+  }
+
+  console.log('\n4) Le transcript : une carte qui dit tout, fichier compris');
+  {
+    setGuildConfig('G1', 'ticket_transcript_channel_id', 'ARCH');
+    const envois = [];
+    const archive = { isTextBased: () => true, async send(m) { envois.push(m); return {}; } };
+    const proprio = { id: 'U1', displayName: 'Bayouss', user: { username: 'bay' } };
+    const guild = {
+      id: 'G1',
+      channels: { fetch: async (id) => (String(id) === 'ARCH' ? archive : null) },
+      members: { fetch: async (id) => (String(id) === 'U1' ? proprio : null) },
+    };
+    const messages = new Map([
+      ['M1', { createdTimestamp: 1000, author: { tag: 'bay#0' }, content: 'bonjour' }],
+      ['M2', { createdTimestamp: 2000, author: { tag: 'staff#0' }, content: 'on regarde' }],
+    ]);
+    const interaction = {
+      guild, guildId: 'G1',
+      user: { id: 'S1', username: 'Staffeur' },
+      channel: { name: 'ticket-0016-bay', messages: { fetch: async () => messages } },
+    };
+    const ticket = { id: 17, type_id: null, user_id: 'U1', created_at: '2026-08-24T15:00:00Z' };
+    const parti = await sendTranscript(interaction, ticket, 'S1');
+    const d = envois[0]?.embeds?.[0]?.data?.description || '';
+    V('le transcript part avec son fichier', parti === true && envois[0].files?.length === 1);
+    V('… la carte nomme le SALON en clair (il sera supprimé)', /#ticket-0016-bay/.test(d), d.slice(0, 160));
+    V('… dit qui a ouvert, nommé et identifié', /Ouvert par \*\*Bayouss\*\* \(<@U1> · `U1`\)/.test(d));
+    V('… et qui a fermé', /Fermé par \*\*Staffeur\*\* \(<@S1> · `S1`\)/.test(d));
+    V('… avec le compte de messages', /\*\*2\*\* message\(s\)/.test(d), d);
+
+    // Le moteur : un fichier libre devient un composant « fichier » DANS la carte.
+    const corps = { content: '', embeds: [{ title: 'Archive', description: 'x' }] };
+    const converti = C.convertirCorps(corps, { fichiers: ['transcript-ticket-17.txt'] });
+    const plat = JSON.stringify(converti);
+    V('le moteur pose le composant fichier', converti && plat.includes('"type":13')
+      && plat.includes('attachment://transcript-ticket-17.txt'), plat.slice(0, 200));
+    V('… à l\'INTÉRIEUR du conteneur', converti.components.some((c) => c.type === C.T.CONTENEUR
+      && (c.components || []).some((x) => x.type === C.T.FICHIER)));
+    V('… et sans fichier, rien ne change', !JSON.stringify(C.convertirCorps({ content: '', embeds: [{ title: 'A' }] }, {})).includes('"type":13'));
   }
 
   fs.rmSync(RACINE, { recursive: true, force: true });

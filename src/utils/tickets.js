@@ -341,7 +341,7 @@ async function finishPanel(interaction) {
   }
   if (!republie) {
     try {
-      await message.edit(payload);
+      await editerMessagePanneau(interaction.guild, interaction.client, message, payload);
     } catch (err) {
       return interaction.reply({ content: `❌ Modification impossible : ${err.message}`, flags: MessageFlags.Ephemeral });
     }
@@ -538,9 +538,11 @@ async function openTicket(interaction, typeId) {
     );
   }
   await interaction.editReply(`✅ Votre ticket est ouvert : ${res.channel}`);
+  // Le nom du salon en clair : une fois le ticket fermé et le salon supprimé,
+  // la mention <#id> de ce log afficherait « #inconnu » pour toujours.
   await sendLog(
     interaction.guild,
-    logEmbed('🎫 Ticket ouvert', `Ticket **${type.label}** n°${res.num} ouvert par <@${interaction.user.id}> → <#${res.channel.id}>`, COLORS.INFO)
+    logEmbed('🎫 Ticket ouvert', `Ticket **${type.label}** n°${res.num} ouvert par <@${interaction.user.id}> → <#${res.channel.id}> (**#${res.channel.name}**)`, COLORS.INFO)
   );
 }
 
@@ -616,6 +618,21 @@ async function addMemberToTicket(interaction, targetUser) {
   );
 }
 
+// Réédite le message d'un panneau, quelle que soit sa famille de composants.
+// Un panneau publié en CARTE n'a ni `content` ni `embeds` : le rééditer avec
+// `embeds` est refusé par Discord (« MESSAGE_CANNOT_USE_LEGACY_FIELDS_WITH_
+// COMPONENTS_V2 »). On reconstruit donc le contenu en composants — même
+// moteur que l'envoi, même rendu.
+async function editerMessagePanneau(guild, client, message, payload) {
+  const { enComposants, estCarte } = require('./reponse');
+  if (!estCarte(message)) return message.edit(payload);
+  const composants = enComposants(guild, client, payload);
+  if (!composants || !composants.length) {
+    throw new Error('le contenu ne tient pas dans une carte — raccourcissez le panneau');
+  }
+  return message.edit({ components: composants });
+}
+
 // Salon de destination du transcript : salon dédié configuré, sinon — par
 // défaut — le salon de logs de sécurité.
 async function transcriptChannelOf(guild) {
@@ -646,9 +663,27 @@ async function sendTranscript(interaction, ticket, byId) {
     const file = new AttachmentBuilder(Buffer.from(texte, 'utf8'), {
       name: `transcript-ticket-${ticket.id}.txt`,
     });
+    // 🪪 Le salon du ticket est SUPPRIMÉ cinq secondes plus tard : une mention
+    // <#id> afficherait « #inconnu » pour toujours. On écrit donc son NOM, et
+    // chaque personne est nommée en clair avec son ID, comme partout ailleurs.
+    const J = require('./journal');
+    const proprio = await interaction.guild.members.fetch(ticket.user_id).catch(() => null);
+    const fermeur = String(byId) === String(interaction.user?.id)
+      ? interaction.user
+      : await interaction.guild.members.fetch(byId).catch(() => null);
+    const ouverture = Date.parse(ticket.created_at || '') || null;
     const entete = logEmbed(
       '🎫 Ticket fermé & archivé',
-      `Ticket ${type ? `**${type.label}** ` : ''}de <@${ticket.user_id}>, fermé par <@${byId}> — transcript ci-joint.`,
+      M.description([
+        M.bloc('Le ticket', [
+          `${type?.emoji ? `${type.emoji} ` : ''}**${type?.label || 'Ticket'}** — salon **#${interaction.channel?.name || '?'}**`,
+          `Ouvert par ${proprio ? J.etiquetteMembre(proprio) : J.mentionAvecId(ticket.user_id)}${ouverture ? ` <t:${Math.floor(ouverture / 1000)}:f>` : ''}`,
+          `Fermé par ${fermeur ? J.etiquetteMembre(fermeur) : J.mentionAvecId(byId)}`,
+        ], { prefixe: '🎫', compte: null }),
+        M.bloc('L\'archive', [
+          `**${lines.length}** message(s) conservé(s) — le transcript complet est joint à cette carte`,
+        ], { prefixe: '🗂️', compte: null }),
+      ]),
       COLORS.WARNING
     );
 
@@ -740,7 +775,7 @@ async function closeTicket(interaction, ticketId) {
   );
   await sendLog(
     interaction.guild,
-    logEmbed('🎫 Ticket fermé', `Ticket ${ticket ? `n°${ticket.id} ` : ''}(<#${interaction.channelId}>) fermé par <@${interaction.user.id}>.`, COLORS.WARNING)
+    logEmbed('🎫 Ticket fermé', `Ticket ${ticket ? `n°${ticket.id} ` : ''}(**#${channel?.name || '?'}**) fermé par <@${interaction.user.id}>.`, COLORS.WARNING)
   );
   setTimeout(() => {
     channel.delete('Ticket fermé — suppression automatique').catch(() => null);
@@ -1133,6 +1168,8 @@ module.exports = {
   deleteType,
   supportRoleIds,
   creerFilStaff,
+  editerMessagePanneau,
+  sendTranscript,
   insertPanel,
   lastPanel,
   updatePanelOptions,

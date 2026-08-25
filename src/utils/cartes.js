@@ -33,6 +33,7 @@ const T = {
   TEXTE: 10,
   VIGNETTE: 11,
   GALERIE: 12,
+  FICHIER: 13,
   SEPARATEUR: 14,
   CONTENEUR: 17,
 };
@@ -269,15 +270,24 @@ function convertirCorps(corps, options = {}) {
   // ⚠️ Un conteneur n'accepte que 10 composants directs. Au-delà, ou s'il n'y
   // a pas de carte du tout, on garde les rangées à l'extérieur : mieux vaut
   // un bouton détaché qu'un message refusé.
+  //
+  // 📎 Les pièces jointes LIBRES (non citées par un embed) ont leur composant
+  // dédié en V2 : un bloc « fichier » qui les affiche dans la carte. C'est ce
+  // qui permet au transcript d'un ticket d'arriver en carte, fichier compris,
+  // au lieu de retomber dans l'ancien style.
+  const pieces = (Array.isArray(options.fichiers) ? options.fichiers : [])
+    .filter((nom) => nom)
+    .map((nom) => ({ type: T.FICHIER, file: { url: `attachment://${nom}` } }));
   const existants = Array.isArray(corps.components) ? corps.components : [];
+  const ajouts = [...pieces, ...existants];
   const derniere = cartes[cartes.length - 1];
   const tous = [];
-  if (derniere?.type === T.CONTENEUR && existants.length
-      && derniere.components.length + existants.length <= MAX_DANS_CONTENEUR) {
-    derniere.components.push(...existants);
+  if (derniere?.type === T.CONTENEUR && ajouts.length
+      && derniere.components.length + ajouts.length <= MAX_DANS_CONTENEUR) {
+    derniere.components.push(...ajouts);
     tous.push(...cartes);
   } else {
-    tous.push(...cartes, ...existants);
+    tous.push(...cartes, ...ajouts);
   }
 
   if (compter(tous) > MAX_COMPOSANTS) return null;

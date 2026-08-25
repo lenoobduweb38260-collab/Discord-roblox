@@ -1413,6 +1413,21 @@ const RELEASES = [
     fix: [],
     retrait: [],
   },
+  {
+    id: 'panneau-v2-transcript-carte-2026-08bt',
+    title: 'Le panneau se modifie a nouveau, et le transcript devient une vraie carte 📄',
+    ajout: [
+      '📎 **Le moteur de cartes sait desormais afficher les pieces jointes** : un fichier libre (le transcript d\'un ticket, par exemple) recoit son bloc « fichier » DANS la carte — ces messages restaient jusqu\'ici dans l\'ancien style, barre coloree comprise',
+      '📄 **La carte du transcript est refaite** : le ticket et son type, le SALON nomme en clair (sa mention afficherait « #inconnu » une fois le salon supprime), qui a ouvert et qui a ferme — nommes et identifies —, la date d\'ouverture et le nombre de messages conserves',
+    ],
+    amelioration: [
+      '🪪 Les logs « Ticket ouvert » et « Ticket ferme » ecrivent aussi le nom du salon en clair, pour rester lisibles apres sa suppression',
+    ],
+    fix: [
+      '🎫 **Modifier un panneau de tickets publie en carte ne renvoie plus « Invalid Form Body / MESSAGE_CANNOT_USE_LEGACY_FIELDS_WITH_COMPONENTS_V2 »** : une carte n\'a pas d\'embeds, la modification reconstruit desormais son contenu en composants — meme moteur que l\'envoi, meme rendu',
+    ],
+    retrait: [],
+  },
 ];
 
 // Construit l'embed d'une note à partir d'une entrée { title, ajout, fix,
