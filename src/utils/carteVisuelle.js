@@ -246,12 +246,24 @@ async function fabriquer(plan, options = {}) {
       }
     }
 
+    let textesTraces = 0;
     for (const texte of plan.textes) {
       const clair = texte.ton === 'bandeau';
       const font = await police(Jimp, texte.taille, clair);
       if (!font) continue;
       const x = texte.alignerDroite ? texte.x - Jimp.measureText(font, texte.texte) : texte.x;
       image.print(font, x, texte.y, texte.texte);
+      textesTraces += 1;
+    }
+
+    // Aucune police n'a pu se charger (fichiers de police absents de
+    // l'hébergement ou de l'exécutable) ? L'image serait un cadre MUET :
+    // fond, bandeau et photo, mais pas un mot — ni nom, ni titre. Mieux vaut
+    // renoncer ici : la commande retombe alors sur l'embed classique, qui
+    // porte toutes les informations.
+    if (plan.textes.length && !textesTraces) {
+      console.warn('⚠️ Document RP : polices introuvables — retour à l\'embed classique.');
+      return null;
     }
 
     return await image.getBufferAsync(Jimp.MIME_PNG);

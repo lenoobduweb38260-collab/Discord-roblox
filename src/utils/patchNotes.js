@@ -1548,6 +1548,22 @@ const RELEASES = [
     ],
     retrait: [],
   },
+  {
+    id: 'assurances-cartes-donnees-2026-08ce',
+    title: 'Assurances paginees, cartes lisibles, donnees RP protegees 🛡️',
+    ajout: [
+      '📄 **`/assurance liste` est paginee** : fini la coupe muette a 25 contrats — des pages entieres avec fleches ◀️ ▶️, comme les panneaux Blacklist/Whitelist RP',
+      '🚪 **Les assures partis du serveur sont marques** dans la liste, pour reperer d\'un coup d\'oeil qui a quitte',
+      '🏠 **`/entreprise rapatrier`** (admin) ramene une entreprise restee dans la reserve partagee — avec ses contrats — sur le serveur ou travaillent ses patrons : c\'est la que sont passees les entreprises « disparues »',
+    ],
+    fix: [
+      '🪪 **Plus de carte d\'identite muette** : quand les polices d\'ecriture manquent sur l\'hebergement, le bot renonce a l\'image (photo seule, aucun texte) et repond avec l\'embed complet',
+      '🛡️ **`/assurance` regarde la meme reserve que `/entreprise`** : un serveur non relie voyait ses assureurs dans une commande et pas dans l\'autre',
+      '🗃️ **Une migration ne supprime plus jamais** : les fiches en doublon (cartes, permis, entreprises) sont mises de cote dans la base au lieu d\'etre effacees — c\'etait la cause des « pertes de donnees »',
+    ],
+    amelioration: [],
+    retrait: [],
+  },
 ];
 
 // Construit l'embed d'une note à partir d'une entrée { title, ajout, fix,

@@ -286,6 +286,13 @@
     "pl": "\n⚠️ Rola <@&",
     "ru": "\n⚠️ Роль <@&"
   },
+  "\n✅ valide · ❌ expirée · 🔴🚨 recherché · 🔴🅿️ fourrière · 🚪 a quitté le serveur — détail : /assurance voir <n°>": {
+    "en": "\n✅ valid · ❌ expired · 🔴🚨 wanted · 🔴🅿️ impounded · 🚪 left the server — detail: /assurance voir <n°>",
+    "de": "\n✅ gültig · ❌ abgelaufen · 🔴🚨 gesucht · 🔴🅿️ beschlagnahmt · 🚪 hat den Server verlassen — Detail: /assurance voir <n°>",
+    "es": "\n✅ válida · ❌ expirada · 🔴🚨 buscado · 🔴🅿️ depósito · 🚪 ha salido del servidor — detalle: /assurance voir <n°>",
+    "pl": "\n✅ ważna · ❌ wygasła · 🔴🚨 poszukiwany · 🔴🅿️ na parkingu policyjnym · 🚪 opuścił serwer — szczegóły: /assurance voir <n°>",
+    "ru": "\n✅ действительна · ❌ истекла · 🔴🚨 в розыске · 🔴🅿️ на штрафстоянке · 🚪 покинул сервер — детали: /assurance voir <n°>"
+  },
   "\n❌ **Permis invalidé** (plus aucun point).": {
     "en": "\n❌ **Licence invalidated** (no points left).",
     "de": "\n❌ **Führerschein ungültig** (keine Punkte mehr).",
@@ -1198,6 +1205,13 @@
     "pl": " sprawdzonych",
     "ru": " проверено"
   },
+  " fiche(s) en doublon mise(s) de côté dans rp_migration_archive — rien n'est supprimé.": {
+    "en": " duplicate record(s) set aside in rp_migration_archive — nothing is deleted.",
+    "de": " doppelte Akte(n) in rp_migration_archive beiseitegelegt — nichts wird gelöscht.",
+    "es": " ficha(s) duplicadas apartadas en rp_migration_archive — nada se borra.",
+    "pl": " zduplikowanych kart odłożono do rp_migration_archive — nic nie jest usuwane.",
+    "ru": " дублирующихся записей отложено в rp_migration_archive — ничего не удаляется."
+  },
   " installée — le bot redémarre dans une nouvelle fenêtre…": {
     "en": " installed — the bot is restarting in a new window…",
     "de": " installiert — der Bot startet in einem neuen Fenster neu…",
@@ -1894,6 +1908,13 @@
     "pl": "-# Powiązanie czyni firmy RP wspólnym dobrem serwerów tej samej społeczności. ",
     "ru": "-# Привязка делает RP-компании общим достоянием серверов одного сообщества. "
   },
+  "-# Relier le serveur à sa communauté (`/config` → 🎭 Module RP → 🏢 Entreprises) la repartagerait avec les autres serveurs.": {
+    "en": "-# Linking the server to its community (`/config` → 🎭 Module RP → 🏢 Entreprises) would share it again with the other servers.",
+    "de": "-# Den Server mit seiner Community zu verknüpfen (`/config` → 🎭 Module RP → 🏢 Entreprises) würde es wieder mit den anderen Servern teilen.",
+    "es": "-# Vincular el servidor a su comunidad (`/config` → 🎭 Module RP → 🏢 Entreprises) volvería a compartirla con los demás servidores.",
+    "pl": "-# Powiązanie serwera z jego społecznością (`/config` → 🎭 Module RP → 🏢 Entreprises) znów udostępniłoby ją innym serwerom.",
+    "ru": "-# Привязка сервера к его сообществу (`/config` → 🎭 Module RP → 🏢 Entreprises) снова разделит её с другими серверами."
+  },
   "-# Rien n'est partagé tant qu'il n'a pas validé.": {
     "en": "-# Nothing is shared until they confirm.",
     "de": "-# Nichts wird geteilt, solange er nicht bestätigt hat.",
@@ -2145,6 +2166,13 @@
     "es": "[Admin] Definir el canal donde el bot publica las colaboraciones",
     "pl": "[Admin] Ustaw kanał, na którym bot publikuje partnerstwa",
     "ru": "[Admin] Задать канал, где бот публикует партнёрства"
+  },
+  "[Admin] Ramener ici une entreprise restée dans la réserve partagée": {
+    "en": "[Admin] Bring back here a company left in the shared pool",
+    "de": "[Admin] Ein in der geteilten Reserve verbliebenes Unternehmen hierher zurückholen",
+    "es": "[Admin] Traer aquí una empresa que quedó en la reserva compartida",
+    "pl": "[Admin] Sprowadź tu firmę pozostałą we wspólnej puli",
+    "ru": "[Admin] Вернуть сюда компанию, оставшуюся в общем фонде"
   },
   "[Admin] Redémarre le bot pour charger la dernière mise à jour publiée": {
     "en": "[Admin] Restarts the bot to load the latest published update",
@@ -2966,6 +2994,13 @@
     "pl": "** utworzona. Pojawi się na liście **nowych** ticketów; dla już otwartych użyj `/preset menu`.",
     "ru": "** создан. Появится в списке **новых** тикетов; для уже открытых используйте `/preset menu`."
   },
+  "** dans la réserve partagée.": {
+    "en": "** in the shared pool.",
+    "de": "** in der geteilten Reserve.",
+    "es": "** en la reserva compartida.",
+    "pl": "** we wspólnej puli.",
+    "ru": "** в общем фонде."
+  },
   "** dans le staff du bot.\n": {
     "en": "** on the bot staff.\n",
     "de": "** im Bot-Staff.\n",
@@ -3056,6 +3091,13 @@
     "es": "** examinado(s)",
     "pl": "** sprawdzonych",
     "ru": "** проверено"
+  },
+  "** existe déjà sur ce serveur : renommez ou supprimez l'une des deux d'abord.": {
+    "en": "** already exists on this server: rename or delete one of the two first.",
+    "de": "** existiert bereits auf diesem Server: Benennen Sie zuerst eines der beiden um oder löschen Sie es.",
+    "es": "** ya existe en este servidor: renombra o suprime una de las dos primero.",
+    "pl": "** już istnieje na tym serwerze: najpierw zmień nazwę lub usuń jedną z nich.",
+    "ru": "** уже существует на этом сервере: сначала переименуйте или удалите одну из двух."
   },
   "** existe déjà.": {
     "en": "** already exists.",
@@ -3154,6 +3196,13 @@
     "es": "** no tiene la casilla **Seguro ",
     "pl": "** nie ma zaznaczonej opcji **Ubezpieczenie ",
     "ru": "** не имеет отмеченной страховки **"
+  },
+  "** n'est membre de ce serveur : rapatriement refusé.": {
+    "en": "** is a member of this server: repatriation refused.",
+    "de": "** ist Mitglied dieses Servers: Zurückholen abgelehnt.",
+    "es": "** es miembro de este servidor: repatriación rechazada.",
+    "pl": "** nie jest członkiem tego serwera: sprowadzenie odrzucone.",
+    "ru": "** не является участником этого сервера: возврат отклонён."
   },
   "** n'est pas activé sur ce serveur. Un staff peut l'activer via `/config` → 🎭 Modules.": {
     "en": "** module is not switched on for this server. A staff member can switch it on with `/config` → 🎭 Modules.",
@@ -3259,6 +3308,20 @@
     "es": "** ahora ofrece seguros. Selecciona el/los tipo(s):",
     "pl": "** oferuje teraz ubezpieczenia. Wybierz rodzaj(e):",
     "ru": "** теперь предлагает страховки. Выберите вид(ы):"
+  },
+  "** ramenée de la réserve partagée par <@": {
+    "en": "** brought back from the shared pool by <@",
+    "de": "** aus der geteilten Reserve zurückgeholt von <@",
+    "es": "** traída de la reserva compartida por <@",
+    "pl": "** sprowadzona ze wspólnej puli przez <@",
+    "ru": "** возвращена из общего фонда <@"
+  },
+  "** rapatriée sur ce serveur, avec **": {
+    "en": "** brought back to this server, with **",
+    "de": "** auf diesen Server zurückgeholt, mit **",
+    "es": "** repatriada a este servidor, con **",
+    "pl": "** sprowadzona na ten serwer, wraz z **",
+    "ru": "** возвращена на этот сервер, вместе с **"
   },
   "** recréé(s) en carte": {
     "en": "** recreated as cards",
@@ -5813,6 +5876,13 @@
     "pl": "⚫ Obecnie offline — ogłoszenie wyjdzie przy następnym live.",
     "ru": "⚫ Сейчас офлайн — анонс выйдет при следующем стриме."
   },
+  "⛔ Aucun patron ni employé de **": {
+    "en": "⛔ No boss or employee of **",
+    "de": "⛔ Kein Chef und kein Angestellter von **",
+    "es": "⛔ Ningún jefe ni empleado de **",
+    "pl": "⛔ Żaden szef ani pracownik **",
+    "ru": "⛔ Ни один руководитель или сотрудник **"
+  },
   "⛔ Ce bouton ne fonctionne que sur un serveur, pas en message privé.": {
     "en": "⛔ This button only works on a server, not in direct messages.",
     "de": "⛔ Dieser Button funktioniert nur auf einem Server, nicht in einer Privatnachricht.",
@@ -6025,6 +6095,13 @@
     "es": "⛔ Seguridad: los **antecedentes** están reservados a los **roles de policía** (configúralos en `/config` → 👮 Roles).",
     "pl": "⛔ Bezpieczeństwo: **kartoteka karna** jest zarezerwowana dla **ról policji** (ustaw w `/config` → 👮 Role).",
     "ru": "⛔ Безопасность: **судимости** доступны только **ролям полиции** (настраивается в `/config` → 👮 Роли)."
+  },
+  "⛔ Sécurité : le rapatriement est réservé à l'**administration**.": {
+    "en": "⛔ Security: repatriation is reserved for the **administration**.",
+    "de": "⛔ Sicherheit: Das Zurückholen ist der **Administration** vorbehalten.",
+    "es": "⛔ Seguridad: la repatriación está reservada a la **administración**.",
+    "pl": "⛔ Bezpieczeństwo: sprowadzanie jest zarezerwowane dla **administracji**.",
+    "ru": "⛔ Безопасность: возврат доступен только **администрации**."
   },
   "⛔ Sécurité : réservé à la **police** ou au **staff**.": {
     "en": "⛔ Security: **police** or **staff** only.",
@@ -6907,6 +6984,13 @@
     "es": "❌ Ningún dato de nivel por ahora.",
     "pl": "❌ Na razie brak danych o poziomach.",
     "ru": "❌ Данных об уровнях пока нет."
+  },
+  "❌ Aucune entreprise **": {
+    "en": "❌ No company **",
+    "de": "❌ Kein Unternehmen **",
+    "es": "❌ Ninguna empresa **",
+    "pl": "❌ Brak firmy **",
+    "ru": "❌ Нет компании **"
   },
   "❌ Aucune entreprise sur ce serveur.": {
     "en": "❌ No company on this server.",
@@ -8009,6 +8093,13 @@
     "es": "❌ Una duración de cero no dice nada: deja el campo **vacío** para una ausencia sin fecha de fin.",
     "pl": "❌ Zerowy czas trwania nic nie mówi: zostaw pole **puste** dla nieobecności bez daty końca.",
     "ru": "❌ Нулевая длительность ничего не говорит: оставьте поле **пустым** для отсутствия без даты окончания."
+  },
+  "❌ Une entreprise **": {
+    "en": "❌ A company **",
+    "de": "❌ Ein Unternehmen **",
+    "es": "❌ Una empresa **",
+    "pl": "❌ Firma **",
+    "ru": "❌ Компания **"
   },
   "❌ Une entreprise nommée **": {
     "en": "❌ A company named **",
@@ -9709,6 +9800,13 @@
     "es": "🏢 Empresa modificada",
     "pl": "🏢 Firma zmieniona",
     "ru": "🏢 Компания изменена"
+  },
+  "🏢 Entreprise rapatriée": {
+    "en": "🏢 Company brought back",
+    "de": "🏢 Unternehmen zurückgeholt",
+    "es": "🏢 Empresa repatriada",
+    "pl": "🏢 Firma sprowadzona",
+    "ru": "🏢 Компания возвращена"
   },
   "🏢 Entreprise supprimée": {
     "en": "🏢 Company deleted",
@@ -14769,6 +14867,13 @@
     "pl": "Firma do edycji",
     "ru": "Компания для изменения"
   },
+  "Entreprise à rapatrier": {
+    "en": "Company to bring back",
+    "de": "Zurückzuholendes Unternehmen",
+    "es": "Empresa que repatriar",
+    "pl": "Firma do sprowadzenia",
+    "ru": "Компания для возврата"
+  },
   "Entreprise à supprimer": {
     "en": "Company to delete",
     "de": "Zu löschendes Unternehmen",
@@ -15237,6 +15342,13 @@
     "es": "ℹ️ Este mensaje ya tiene el estilo actual.\n-# Conserva su barra de color porque un embed ya enviado no puede volverse tarjeta: usa **mode: Recréer**.",
     "pl": "ℹ️ Ta wiadomość ma już aktualny styl.\n-# Zachowuje kolorowy pasek, bo wysłany embed nie może stać się kartą: użyj **mode: Recréer**.",
     "ru": "ℹ️ Это сообщение уже в текущем стиле.\n-# Оно сохраняет цветную полосу — отправленный эмбед не может стать карточкой: используйте **mode: Recréer**."
+  },
+  "ℹ️ Ce serveur est **relié à sa communauté** : il voit déjà la réserve partagée, il n'y a rien à rapatrier.": {
+    "en": "ℹ️ This server is **linked to its community**: it already sees the shared pool, there is nothing to bring back.",
+    "de": "ℹ️ Dieser Server ist **mit seiner Community verknüpft**: Er sieht die geteilte Reserve bereits, es gibt nichts zurückzuholen.",
+    "es": "ℹ️ Este servidor está **vinculado a su comunidad**: ya ve la reserva compartida, no hay nada que repatriar.",
+    "pl": "ℹ️ Ten serwer jest **powiązany ze swoją społecznością**: już widzi wspólną pulę, nie ma czego sprowadzać.",
+    "ru": "ℹ️ Этот сервер **привязан к своему сообществу**: он уже видит общий фонд, возвращать нечего."
   },
   "ℹ️ Ce ticket d'attente est déjà terminé.": {
     "en": "ℹ️ This waiting ticket is already closed.",

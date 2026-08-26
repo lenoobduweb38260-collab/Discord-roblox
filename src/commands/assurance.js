@@ -1,7 +1,15 @@
-const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
-const { db, RP_SCOPE } = require('../database');
+const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } = require('discord.js');
+const { db } = require('../database');
 const { COLORS, sendLog, logEmbed, frDateTime, applyMedia } = require('../utils/embeds');
 const { GRADES, getGrade, isPolice } = require('../utils/permissions');
+const { porteeEntreprises } = require('../utils/communaute');
+const M = require('../utils/miseEnPage');
+
+// 🔑 Même portée que /entreprise — et surtout pas la portée globale en dur.
+// Les deux commandes regardaient deux réserves différentes : /entreprise
+// voyait les entreprises du serveur, /assurance celles de la réserve partagée.
+// Un serveur non relié « perdait » donc ses assureurs sans rien comprendre.
+const PORTEE = (interaction) => porteeEntreprises(interaction.guildId);
 
 const getByName = db.prepare('SELECT * FROM enterprises WHERE guild_id = ? AND name = ?');
 const getEntById = db.prepare('SELECT * FROM enterprises WHERE id = ?');
@@ -143,6 +151,98 @@ function listLine(v) {
   );
 }
 
+// ----- 📄 Liste paginée -----
+// Au-delà d'une trentaine de contrats, l'ancienne liste coupait à 25 sans le
+// dire : les suivants étaient invisibles. Ici on découpe par ENTRÉES ENTIÈRES
+// — jamais au milieu d'une ligne — avec des flèches comme les panneaux RP.
+const PAR_PAGE = 20;
+const BUDGET_LISTE = 3800; // marge sous la limite Discord de 4096 caractères
+
+// Rendu d'une page de la liste. `mode` : 'e' (contrats d'une entreprise,
+// ref = son id) ou 'c' (contrats d'un client, ref = son id Discord).
+async function renduListe(guild, mode, ref, page) {
+  const portee = porteeEntreprises(guild.id);
+  let contracts;
+  let title;
+  if (mode === 'e') {
+    const ent = getEntById.get(Number(ref));
+    // L'entreprise doit appartenir à la portée du serveur : un bouton copié
+    // d'un autre serveur ne doit pas ouvrir la réserve d'autrui.
+    if (!ent || String(ent.guild_id) !== String(portee)) {
+      return { erreur: '❌ Entreprise introuvable.' };
+    }
+    contracts = contractsByEnterprise.all(ent.id);
+    title = `🛡️ Contrats d'assurance chez ${ent.name}`;
+  } else {
+    contracts = contractsByOwner.all(portee, String(ref));
+    const u = await guild.client.users.fetch(String(ref)).catch(() => null);
+    title = `🛡️ Contrats d'assurance de ${u?.username || ref}`;
+  }
+  if (!contracts.length) return { erreur: '📋 Aucun contrat d\'assurance trouvé.' };
+
+  // Pages par entrées entières, bornées en nombre ET en caractères.
+  const pages = [];
+  let courante = [];
+  let taille = 0;
+  for (const v of contracts) {
+    const cout = listLine(v).length + 8; // + saut de ligne et marqueur éventuel
+    if (courante.length >= PAR_PAGE || (courante.length && taille + cout > BUDGET_LISTE)) {
+      pages.push(courante);
+      courante = [];
+      taille = 0;
+    }
+    courante.push(v);
+    taille += cout;
+  }
+  if (courante.length) pages.push(courante);
+  const total = pages.length;
+  const num = Math.min(Math.max(0, Number(page) || 0), total - 1);
+  const visibles = pages[num];
+
+  // 🚪 Qui a quitté le serveur ? On ne récupère QUE les assurés de la page —
+  // pas tout le serveur — et un échec de l'appel laisse simplement la liste
+  // sans marqueur plutôt que de la faire échouer.
+  const ids = [...new Set(visibles.map((v) => String(v.owner_id)))];
+  let presents = null;
+  if (guild.members?.fetch) {
+    presents = await guild.members.fetch({ user: ids }).catch(() => null);
+  }
+  const parti = (v) => presents && !presents.has(String(v.owner_id));
+
+  const lignes = visibles.map((v) => `${listLine(v)}${parti(v) ? ' 🚪' : ''}`);
+  const embed = new EmbedBuilder()
+    .setColor(COLORS.INFO)
+    .setTitle(title)
+    .setDescription(lignes.join('\n'))
+    .setFooter({
+      text:
+        M.piedDePage({ total: contracts.length, motTotal: 'contrat', page: num + 1, pages: total, heure: false }) +
+        '\n✅ valide · ❌ expirée · 🔴🚨 recherché · 🔴🅿️ fourrière · 🚪 a quitté le serveur — détail : /assurance voir <n°>',
+    });
+
+  const components = [];
+  if (total > 1) {
+    const q = String(ref).slice(0, 40);
+    components.push(
+      new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setCustomId(`asspage:${mode}:${q}:${num - 1}`)
+          .setLabel('Page précédente')
+          .setEmoji('◀️')
+          .setStyle(ButtonStyle.Secondary)
+          .setDisabled(num <= 0),
+        new ButtonBuilder()
+          .setCustomId(`asspage:${mode}:${q}:${num + 1}`)
+          .setLabel('Page suivante')
+          .setEmoji('▶️')
+          .setStyle(ButtonStyle.Secondary)
+          .setDisabled(num >= total - 1)
+      )
+    );
+  }
+  return { embed, components };
+}
+
 // Options communes à tous les types (l'entreprise assureuse + le client).
 function baseOptions(sub) {
   return sub
@@ -240,7 +340,7 @@ module.exports = {
 
   async autocomplete(interaction) {
     const focused = interaction.options.getFocused();
-    const rows = searchInsurerNames.all(RP_SCOPE, `%${focused}%`);
+    const rows = searchInsurerNames.all(PORTEE(interaction), `%${focused}%`);
     await interaction.respond(rows.map((r) => ({ name: r.name, value: r.name })));
   },
 
@@ -253,7 +353,7 @@ module.exports = {
     if (interaction.options.getSubcommandGroup(false) === 'assigner') {
       const t = CONTRACT_TYPES[sub];
       const nom = interaction.options.getString('entreprise').trim();
-      const ent = getByName.get(RP_SCOPE, nom);
+      const ent = getByName.get(PORTEE(interaction), nom);
       if (!ent) {
         return interaction.reply({ content: `❌ Entreprise **${nom}** introuvable.`, flags: MessageFlags.Ephemeral });
       }
@@ -309,10 +409,10 @@ module.exports = {
       }
 
       const result = insertContract.run(
-        RP_SCOPE, ent.id, client.id, subject, plaque, couleur, mediaUrl, validFrom, until.toISOString(),
+        PORTEE(interaction), ent.id, client.id, subject, plaque, couleur, mediaUrl, validFrom, until.toISOString(),
         t.label, building, unite, cible, interaction.user.id, new Date().toISOString()
       );
-      const v = getContract.get(result.lastInsertRowid, RP_SCOPE);
+      const v = getContract.get(result.lastInsertRowid, PORTEE(interaction));
       const { embed, extra } = contractEmbed(v, ent.name);
       await interaction.reply({ content: extra || undefined, embeds: [embed] });
       await sendLog(
@@ -332,7 +432,7 @@ module.exports = {
         return interaction.reply({ content: '⛔ Sécurité : réservé à la **police** ou au **staff**.', flags: MessageFlags.Ephemeral });
       }
       const numero = interaction.options.getInteger('numero');
-      const v = getContract.get(numero, RP_SCOPE);
+      const v = getContract.get(numero, PORTEE(interaction));
       if (!v) return interaction.reply({ content: `❌ Contrat n°${numero} introuvable.`, flags: MessageFlags.Ephemeral });
       if (!isVehicle(v)) {
         return interaction.reply({ content: `❌ Le contrat n°${numero} n'est pas un contrat **véhicule** (statut police sans objet).`, flags: MessageFlags.Ephemeral });
@@ -345,7 +445,7 @@ module.exports = {
       const wanted = recherche ? (recherche === 'oui' ? 1 : 0) : v.wanted;
       const impounded = fourriere ? (fourriere === 'oui' ? 1 : 0) : v.impounded;
       setStatus.run(wanted, impounded, numero);
-      const updated = getContract.get(numero, RP_SCOPE);
+      const updated = getContract.get(numero, PORTEE(interaction));
       const ent = getEntById.get(updated.enterprise_id);
       const { embed, extra } = contractEmbed(updated, ent?.name);
       await interaction.reply({ content: extra || undefined, embeds: [embed] });
@@ -362,7 +462,7 @@ module.exports = {
 
     if (sub === 'voir') {
       const numero = interaction.options.getInteger('numero');
-      const v = getContract.get(numero, RP_SCOPE);
+      const v = getContract.get(numero, PORTEE(interaction));
       if (!v) return interaction.reply({ content: `❌ Contrat n°${numero} introuvable.`, flags: MessageFlags.Ephemeral });
       const ent = getEntById.get(v.enterprise_id);
       const { embed, extra } = contractEmbed(v, ent?.name);
@@ -371,7 +471,7 @@ module.exports = {
 
     if (sub === 'retirer') {
       const numero = interaction.options.getInteger('numero');
-      const contract = getContract.get(numero, RP_SCOPE);
+      const contract = getContract.get(numero, PORTEE(interaction));
       if (!contract) {
         return interaction.reply({ content: `❌ Contrat n°${numero} introuvable.`, flags: MessageFlags.Ephemeral });
       }
@@ -398,33 +498,45 @@ module.exports = {
     if (sub === 'liste') {
       const nom = interaction.options.getString('entreprise');
       const client = interaction.options.getUser('client');
-      let contracts;
-      let title;
+      let mode;
+      let ref;
       if (nom) {
-        const ent = getByName.get(RP_SCOPE, nom.trim());
+        const ent = getByName.get(PORTEE(interaction), nom.trim());
         if (!ent) {
           return interaction.reply({ content: `❌ Entreprise **${nom}** introuvable.`, flags: MessageFlags.Ephemeral });
         }
-        contracts = contractsByEnterprise.all(ent.id);
-        title = `🛡️ Contrats d'assurance chez ${ent.name}`;
+        mode = 'e';
+        ref = ent.id;
       } else if (client) {
-        contracts = contractsByOwner.all(RP_SCOPE, client.id);
-        title = `🛡️ Contrats d'assurance de ${client.username}`;
+        mode = 'c';
+        ref = client.id;
       } else {
         return interaction.reply({
           content: '❌ Indiquez une `entreprise` ou un `client` pour filtrer la liste.',
           flags: MessageFlags.Ephemeral,
         });
       }
-      if (!contracts.length) {
-        return interaction.reply({ content: '📋 Aucun contrat d\'assurance trouvé.', flags: MessageFlags.Ephemeral });
-      }
-      const embed = new EmbedBuilder()
-        .setColor(COLORS.INFO)
-        .setTitle(title)
-        .setDescription(contracts.slice(0, 25).map(listLine).join('\n'))
-        .setFooter({ text: '✅ valide · ❌ expirée · 🔴🚨 recherché · 🔴🅿️ fourrière — détail : /assurance voir <n°>' });
-      return interaction.reply({ embeds: [embed] });
+      const rendu = await renduListe(interaction.guild, mode, ref, 0);
+      if (rendu.erreur) return interaction.reply({ content: rendu.erreur, flags: MessageFlags.Ephemeral });
+      return interaction.reply({ embeds: [rendu.embed], components: rendu.components });
     }
   },
+
+  // Boutons ◀️ ▶️ de la liste : le filtre (entreprise ou client) voyage dans
+  // l'identifiant du bouton, la page est recalculée à chaque clic — la liste
+  // affichée est donc toujours l'état réel de la base, pas une photo.
+  async handleListButton(interaction) {
+    const [, mode, ref, page] = interaction.customId.split(':');
+    const rendu = await renduListe(interaction.guild, mode, ref, Number(page) || 0);
+    if (rendu.erreur) {
+      const { suivre } = require('../utils/reponse');
+      return suivre(interaction, { content: rendu.erreur, flags: MessageFlags.Ephemeral });
+    }
+    const { mettreAJour } = require('../utils/reponse');
+    return mettreAJour(interaction, { embeds: [rendu.embed], components: rendu.components });
+  },
+
+  // Exposé pour les tests : la pagination et le marqueur 🚪 se vérifient sans
+  // passer par une interaction complète.
+  renduListe,
 };

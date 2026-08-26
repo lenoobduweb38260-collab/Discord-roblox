@@ -6,7 +6,7 @@ const {
   MessageFlags,
 } = require('discord.js');
 const { db, RP_SCOPE } = require('../database');
-const { porteeEntreprises } = require('../utils/communaute');
+const { porteeEntreprises, estLie } = require('../utils/communaute');
 
 // 🔑 Où vivent les entreprises de CE serveur.
 //
@@ -30,6 +30,8 @@ const searchNames = db.prepare(
   'SELECT name FROM enterprises WHERE guild_id = ? AND name LIKE ? ORDER BY name LIMIT 25'
 );
 const deleteEnterprise = db.prepare('DELETE FROM enterprises WHERE id = ?');
+const adopterEntreprise = db.prepare('UPDATE enterprises SET guild_id = ? WHERE id = ?');
+const adopterContrats = db.prepare('UPDATE insured_vehicles SET guild_id = ? WHERE enterprise_id = ?');
 
 const getHeads = db.prepare('SELECT user_id FROM enterprise_heads WHERE enterprise_id = ?');
 const addHead = db.prepare('INSERT OR IGNORE INTO enterprise_heads (enterprise_id, user_id) VALUES (?, ?)');
@@ -181,10 +183,29 @@ module.exports = {
         .setDescription('[Staff] Retirer un membre (patron + employé) de toutes les entreprises')
         .addUserOption((o) => o.setName('utilisateur').setDescription('Membre à retirer de toutes les entreprises').setRequired(true))
     )
-    .addSubcommand((sub) => sub.setName('liste').setDescription('Liste des entreprises du serveur')),
+    .addSubcommand((sub) => sub.setName('liste').setDescription('Liste des entreprises du serveur'))
+    .addSubcommand((sub) =>
+      sub
+        .setName('rapatrier')
+        .setDescription('[Admin] Ramener ici une entreprise restée dans la réserve partagée')
+        .addStringOption((o) =>
+          o.setName('nom').setDescription('Entreprise à rapatrier').setRequired(true).setAutocomplete(true)
+        )
+    ),
 
   async autocomplete(interaction) {
     const focused = interaction.options.getFocused();
+    // Pour « rapatrier », on cherche dans la réserve partagée — mais on ne
+    // montre QUE les entreprises dont un patron est membre de CE serveur :
+    // les sociétés des autres communautés ne doivent pas s'afficher ici.
+    if (interaction.options.getSubcommand(false) === 'rapatrier') {
+      const rows = searchNames.all(RP_SCOPE, `%${focused}%`);
+      const notres = rows.filter((r) => {
+        const ent = getByName.get(RP_SCOPE, r.name);
+        return ent && getHeads.all(ent.id).some((h) => interaction.guild.members.cache.has(h.user_id));
+      });
+      return interaction.respond(notres.slice(0, 25).map((r) => ({ name: r.name, value: r.name })));
+    }
     const rows = searchNames.all(PORTEE(interaction), `%${focused}%`);
     await interaction.respond(rows.map((r) => ({ name: r.name, value: r.name })));
   },
@@ -198,6 +219,68 @@ module.exports = {
         content: '⛔ Sécurité : cette sous-commande est réservée au **staff**.',
         flags: MessageFlags.Ephemeral,
       });
+    }
+
+    // 🏠 Rapatrier une entreprise restée dans la réserve partagée.
+    //
+    // La migration globale avait déplacé TOUTES les entreprises dans la
+    // réserve partagée ; quand la liaison par communauté est arrivée, un
+    // serveur non relié a cessé de les voir — elles semblaient perdues alors
+    // qu'elles sont toujours en base. Cette sous-commande les ramène chez
+    // elles, avec leurs contrats d'assurance.
+    if (sub === 'rapatrier') {
+      if (getGrade(interaction.member) < GRADES.ADMIN) {
+        return interaction.reply({
+          content: '⛔ Sécurité : le rapatriement est réservé à l\'**administration**.',
+          flags: MessageFlags.Ephemeral,
+        });
+      }
+      if (estLie(interaction.guildId)) {
+        return interaction.reply({
+          content: 'ℹ️ Ce serveur est **relié à sa communauté** : il voit déjà la réserve partagée, il n\'y a rien à rapatrier.',
+          flags: MessageFlags.Ephemeral,
+        });
+      }
+      const nom = interaction.options.getString('nom').trim();
+      const ent = getByName.get(RP_SCOPE, nom);
+      if (!ent) {
+        return interaction.reply({
+          content: `❌ Aucune entreprise **${nom}** dans la réserve partagée.`,
+          flags: MessageFlags.Ephemeral,
+        });
+      }
+      if (getByName.get(PORTEE(interaction), ent.name)) {
+        return interaction.reply({
+          content: `❌ Une entreprise **${ent.name}** existe déjà sur ce serveur : renommez ou supprimez l'une des deux d'abord.`,
+          flags: MessageFlags.Ephemeral,
+        });
+      }
+      // Preuve d'appartenance : un patron (ou à défaut un employé) de cette
+      // entreprise doit être membre de CE serveur — sans quoi n'importe quel
+      // serveur pourrait s'approprier les sociétés d'une autre communauté.
+      const proches = [...getHeads.all(ent.id).map((r) => r.user_id), ...getEmployees.all(ent.id).map((r) => r.user_id)];
+      let preuve = false;
+      if (proches.length) {
+        const membres = await interaction.guild.members.fetch({ user: proches.slice(0, 100) }).catch(() => null);
+        preuve = !!membres && membres.size > 0;
+      }
+      if (!preuve) {
+        return interaction.reply({
+          content: `⛔ Aucun patron ni employé de **${ent.name}** n'est membre de ce serveur : rapatriement refusé.`,
+          flags: MessageFlags.Ephemeral,
+        });
+      }
+      const contrats = adopterContrats.run(PORTEE(interaction), ent.id).changes;
+      adopterEntreprise.run(PORTEE(interaction), ent.id);
+      await interaction.reply({
+        content: `🏠 **${ent.name}** rapatriée sur ce serveur, avec **${contrats}** contrat(s) d'assurance.\n`
+          + '-# Relier le serveur à sa communauté (`/config` → 🎭 Module RP → 🏢 Entreprises) la repartagerait avec les autres serveurs.',
+      });
+      await sendLog(
+        interaction.guild,
+        logEmbed('🏢 Entreprise rapatriée', `**${ent.name}** ramenée de la réserve partagée par <@${interaction.user.id}> (${contrats} contrat(s) suivis).`, COLORS.SUCCESS)
+      );
+      return;
     }
 
     if (sub === 'retirer-membre') {

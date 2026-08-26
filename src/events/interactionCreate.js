@@ -224,6 +224,12 @@ module.exports = {
       return require('../utils/rpList').handleSearchInteraction(interaction);
     }
 
+    // ----- Pagination de la liste des assurances -----
+    if (interaction.isButton() && interaction.customId.startsWith('asspage:')) {
+      if (!interaction.inGuild()) return horsServeur(interaction);
+      return require('../commands/assurance').handleListButton(interaction);
+    }
+
     // ----- Captcha de vérification -----
     // Le bouton porte désormais l'identifiant de son destinataire
     // (« captcha:verify:123456 ») : on compare le préfixe, sans quoi les
