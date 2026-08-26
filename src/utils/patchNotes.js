@@ -1535,6 +1535,19 @@ const RELEASES = [
     fix: [],
     retrait: [],
   },
+  {
+    id: 'tickets-reserves-support-2026-08cd',
+    title: 'Les tickets ne s\'ouvrent qu\'aux roles support choisis 🎫🔒',
+    fix: [
+      '🎫 **Un type de ticket AVEC roles support leur est reserve** : le salon et le fil prive staff ne s\'ouvrent qu\'a ces roles — le rôle staff generaliste n\'est plus ajoute d\'office, comme demande quand seuls les responsables tickets sont qualifies',
+      '🛎️ **Sans role support configure**, tout le staff garde l\'acces (liste ET ancien champ unique) : un ticket sans repondant n\'existe pas',
+    ],
+    ajout: [],
+    amelioration: [
+      '⚙️ Le panneau `/config` → 🎫 Tickets explique la regle en une ligne, pour choisir en connaissance de cause',
+    ],
+    retrait: [],
+  },
 ];
 
 // Construit l'embed d'une note à partir d'une entrée { title, ajout, fix,

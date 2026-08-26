@@ -17,7 +17,7 @@ Module.prototype.require = function (n) {
 
 const { ChannelType } = require(path.join(AIDES, 'stub-discord.js'));
 const { db, setGuildConfig } = require('../src/database');
-const { creerFilStaff, editerMessagePanneau, sendTranscript, resetPanelMenu, insertPanel, insertType, prendreEnCharge, rangeesTicket } = require('../src/utils/tickets');
+const { creerFilStaff, editerMessagePanneau, sendTranscript, resetPanelMenu, insertPanel, insertType, prendreEnCharge, rangeesTicket, provisionTicket } = require('../src/utils/tickets');
 const C = require('../src/utils/cartes');
 
 let ok = 0, ko = 0;
@@ -58,9 +58,34 @@ function fauxMembre(id, { bot = false, roles = [] } = {}) {
     V('le mot d\'ouverture dit à qui il est réservé et qui n\'y voit rien',
       /staff/.test(fil.envois[0]?.content) && /Bayouss/.test(fil.envois[0]?.content) && /<#C1>/.test(fil.envois[0]?.content),
       fil.envois[0]?.content);
-    V('les rôles support ET staff sont ajoutés', fil.ajoutes.includes('S1') && fil.ajoutes.includes('S2'));
+    V('des rôles support définis : le fil leur est RÉSERVÉ', fil.ajoutes.includes('S1'));
+    V('… le staff généraliste n\'y est PAS ajouté d\'office', !fil.ajoutes.includes('S2'), fil.ajoutes.join(','));
     V('… sans les bots ni l\'auteur du ticket', !fil.ajoutes.includes('B1') && !fil.ajoutes.includes('U1'), fil.ajoutes.join(','));
     V('… et sans la moindre mention qui sonne', !/<@&/.test(fil.envois[0]?.content || ''));
+  }
+
+  console.log('\n1 bis) Sans rôle support, le fil retombe sur tout le staff');
+  {
+    const membres = new Map([
+      ['S1', fauxMembre('S1', { roles: ['SUPPORT'] })],
+      ['S2', fauxMembre('S2', { roles: ['STAFF'] })],
+      ['S3', fauxMembre('S3', { roles: ['VIEUX_STAFF'] })],
+    ]);
+    const guild = { id: 'G1', members: { fetch: async () => membres, cache: membres } };
+    const fil = {
+      envois: [], ajoutes: [],
+      async send(m) { this.envois.push(m); return {}; },
+      members: { add: async (id) => { fil.ajoutes.push(String(id)); return {}; } },
+    };
+    const salon = { id: 'C1', threads: { create: async () => fil } };
+    await creerFilStaff(guild, salon, {
+      cfg: { staff_role_id: 'VIEUX_STAFF', staff_role_ids: JSON.stringify(['STAFF']) },
+      roleIds: [],
+      num: '0043',
+      owner: { id: 'U1', username: 'Bayouss' },
+    });
+    V('tout le staff est ajouté (liste + ancien champ)', fil.ajoutes.includes('S2') && fil.ajoutes.includes('S3'), fil.ajoutes.join(','));
+    V('… mais pas les membres hors staff', !fil.ajoutes.includes('S1'), fil.ajoutes.join(','));
   }
 
   console.log('\n2) Sans rôle configuré, le fil existe quand même');
@@ -73,6 +98,49 @@ function fauxMembre(id, { bot = false, roles = [] } = {}) {
       roleIds: [], num: '0001', owner: { id: 'U1', username: 'Seul' },
     });
     V('le fil est rendu, prêt pour ManageThreads', rendu === fil && fil.envois.length === 1);
+  }
+
+  console.log('\n1 ter) Le SALON du ticket suit la même règle que le fil');
+  {
+    // Un faux serveur assez complet pour provisionTicket : création de salon
+    // capturée, fil et envois muets, membres vides pour le fil staff.
+    const fauxGuild = (id) => {
+      const g = {
+        id,
+        creations: [],
+        client: { user: { id: 'BOT' } },
+        members: { fetch: async () => new Map(), cache: new Map() },
+        channels: {
+          create: async (opts) => {
+            g.creations.push(opts);
+            return {
+              id: 'CT-' + g.creations.length,
+              send: async () => ({}),
+              threads: { create: async () => ({ send: async () => ({}), members: { add: async () => ({}) } }) },
+            };
+          },
+        },
+      };
+      return g;
+    };
+    const owner = { id: 'U9', username: 'Bayouss', tag: 'bayouss' };
+
+    // a) Type AVEC rôles support : le staff généraliste n'a pas d'overwrite.
+    setGuildConfig('GTK1', 'staff_role_id', 'STAFF');
+    const g1 = fauxGuild('GTK1');
+    await provisionTicket(g1, { id: 901, label: 'Plainte', emoji: null, category_id: null, support_role_ids: JSON.stringify(['RESP']) }, owner);
+    const ids1 = g1.creations[0].permissionOverwrites.map((o) => String(o.id));
+    V('les rôles support ont leur overwrite', ids1.includes('RESP'), ids1.join(','));
+    V('… le rôle staff n\'est PAS ajouté d\'office', !ids1.includes('STAFF'), ids1.join(','));
+    V('… l\'auteur et le bot gardent l\'accès', ids1.includes('U9') && ids1.includes('BOT'), ids1.join(','));
+
+    // b) Type SANS rôle support : repli sur tout le staff (liste + ancien champ).
+    setGuildConfig('GTK2', 'staff_role_id', 'VIEUX_STAFF');
+    setGuildConfig('GTK2', 'staff_role_ids', JSON.stringify(['STAFF']));
+    const g2 = fauxGuild('GTK2');
+    await provisionTicket(g2, { id: 902, label: 'Support', emoji: null, category_id: null, support_role_ids: null, support_role_id: null }, owner);
+    const ids2 = g2.creations[0].permissionOverwrites.map((o) => String(o.id));
+    V('sans rôle support, tout le staff a l\'accès', ids2.includes('STAFF') && ids2.includes('VIEUX_STAFF'), ids2.join(','));
   }
 
   console.log('\n3) Modifier un panneau publié en CARTE ne casse plus');

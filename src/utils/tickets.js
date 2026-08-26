@@ -416,8 +416,12 @@ async function provisionTicket(guild, type, owner) {
     },
   ];
   for (const roleId of roleIds) overwrites.push({ id: roleId, allow: allowPerms });
-  if (cfg.staff_role_id && !roleIds.includes(String(cfg.staff_role_id))) {
-    overwrites.push({ id: cfg.staff_role_id, allow: allowPerms });
+  // Des rôles support sont définis pour ce type ? Le ticket leur est RÉSERVÉ :
+  // le staff généraliste n'y est pas ajouté — c'est précisément pour trier qui
+  // est qualifié que les rôles support existent. Sans rôle support, tout le
+  // staff garde l'accès : sinon personne ne verrait le ticket.
+  if (!roleIds.length) {
+    for (const id of staffRoleIds(cfg)) overwrites.push({ id, allow: allowPerms });
   }
   const channel = await guild.channels.create({
     name: `ticket-${num}-${owner.username}`.slice(0, 90),
@@ -479,9 +483,9 @@ async function creerFilStaff(guild, channel, { cfg, roleIds, num, owner }) {
       + `➜ **${owner.username}** (\`${owner.id}\`) n'y voit rien : concertez-vous librement, répondez-lui dans <#${channel.id}>.`,
   }).catch(() => null);
 
-  const cibles = new Set(roleIds.map(String));
-  if (cfg.staff_role_id) cibles.add(String(cfg.staff_role_id));
-  for (const id of staffRoleIds(cfg)) cibles.add(String(id));
+  // Même règle que le salon : des rôles support définis, le fil est à eux
+  // seuls ; sans rôle support, tout le staff est ajouté.
+  const cibles = new Set((roleIds.length ? roleIds : staffRoleIds(cfg)).map(String));
   if (!cibles.size) return fil;
   // Le cache des membres peut être incomplet au réveil : on le remplit une
   // fois — un ticket est un événement rare, le coût est acceptable.
@@ -1217,6 +1221,7 @@ module.exports = {
   insertType,
   deleteType,
   supportRoleIds,
+  provisionTicket,
   creerFilStaff,
   editerMessagePanneau,
   sendTranscript,

@@ -415,6 +415,13 @@
     "pl": "\n🚓 **Policja** może przeglądać kartotekę (`/casierjudiciaire`) i odbierać punkty prawa jazdy.",
     "ru": "\n🚓 **Полиция** может просматривать судимости (`/casierjudiciaire`) и снимать баллы с прав."
   },
+  "\n🛎️ Un type **avec** rôles support leur est réservé : le staff généraliste ne voit pas ces tickets. Sans rôle support, tout le staff y accède.": {
+    "en": "\n🛎️ A type **with** support roles is reserved for them: general staff don't see those tickets. Without a support role, the whole staff has access.",
+    "de": "\n🛎️ Ein Typ **mit** Support-Rollen ist ihnen vorbehalten: Der allgemeine Staff sieht diese Tickets nicht. Ohne Support-Rolle hat der ganze Staff Zugriff.",
+    "es": "\n🛎️ Un tipo **con** roles de soporte queda reservado a ellos: el staff general no ve esos tickets. Sin rol de soporte, todo el staff tiene acceso.",
+    "pl": "\n🛎️ Typ **z** rolami wsparcia jest dla nich zarezerwowany: ogólny staff nie widzi tych zgłoszeń. Bez roli wsparcia dostęp ma cały staff.",
+    "ru": "\n🛎️ Тип **с** ролями поддержки зарезервирован за ними: обычный стафф не видит эти тикеты. Без роли поддержки доступ есть у всего стаффа."
+  },
   "\nAppuyez sur Entrée pour fermer cette fenêtre…": {
     "en": "\nPress Enter to close this window…",
     "de": "\nDrücken Sie die Eingabetaste, um dieses Fenster zu schließen…",

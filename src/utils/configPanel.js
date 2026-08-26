@@ -635,6 +635,7 @@ function ticketsView(guild, selectedId = null) {
     .setDescription(
       summary +
         '\n\n➕ Ajoutez un type, ou sélectionnez-en un pour définir son **rôle support** ou le **supprimer**.' +
+        '\n🛎️ Un type **avec** rôles support leur est réservé : le staff généraliste ne voit pas ces tickets. Sans rôle support, tout le staff y accède.' +
         '\n⚠️ Après un ajout ou une suppression, republiez le panneau : `/ticket panneau-modifier`.'
     );
   const components = [];
