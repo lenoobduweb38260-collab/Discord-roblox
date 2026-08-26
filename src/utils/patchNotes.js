@@ -1521,6 +1521,20 @@ const RELEASES = [
     fix: [],
     retrait: [],
   },
+  {
+    id: 'choix-langue-arrivee-2026-08cc',
+    title: 'Le bot parle 6 langues, et le demande en arrivant 🌍',
+    ajout: [
+      '🌍 **Carte de choix de langue a l\'arrivee** : quand le bot rejoint un serveur, il envoie une carte avec un menu — Français, English, Deutsch, Español, Polski, Русский — et repond ensuite dans la langue choisie',
+      '🇵🇱 **Le polonais rejoint le registre** des langues du bot, au meme rang que les cinq autres',
+      '📚 **Traduction integrale** : les 2819 textes du bot sont traduits dans CHAQUE langue — commandes, panneaux, tickets, logs, musique, erreurs, jusqu\'au moindre detail',
+    ],
+    amelioration: [
+      '🧪 Le test de couverture exige desormais 100 % de traduction pour TOUTES les langues, pas seulement l\'anglais : un texte oublie fait echouer la suite',
+    ],
+    fix: [],
+    retrait: [],
+  },
 ];
 
 // Construit l'embed d'une note à partir d'une entrée { title, ajout, fix,

@@ -144,6 +144,12 @@ module.exports = {
       return perso.handleBouton(interaction);
     }
 
+    // ----- Choix de langue (carte d'arrivée du bot) -----
+    if (interaction.isStringSelectMenu() && interaction.customId === 'langue:sel') {
+      if (!interaction.inGuild()) return horsServeur(interaction);
+      return require('../utils/choixLangue').handleMenu(interaction);
+    }
+
     // ----- File d'attente vocale : le bouton « Prendre en charge » -----
     if (interaction.isButton() && interaction.customId?.startsWith('va:')) {
       if (!interaction.inGuild()) return horsServeur(interaction);

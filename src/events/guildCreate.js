@@ -20,6 +20,13 @@ function channelSlug(name) {
 module.exports = {
   name: Events.GuildCreate,
   async execute(guild) {
+    // 🌍 D'abord la carte de choix de langue — chaque ligne parle SA langue,
+    // pour que l'administrateur comprenne quel que soit son français.
+    try {
+      await require('../utils/choixLangue').envoyer(guild);
+    } catch (err) {
+      console.warn(`⚠️ Carte de choix de langue non envoyée : ${err.message}`);
+    }
     try {
       const cfg = getGuildConfig(guild.id);
       if (cfg.log_channel_id && guild.channels.cache.get(cfg.log_channel_id)) return;

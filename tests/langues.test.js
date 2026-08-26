@@ -23,10 +23,10 @@ const extracteur = require('../scripts/extraire-textes');
 let ok = 0, ko = 0;
 const V = (t, c, d = '') => { if (c) { ok++; console.log('  ✅ ' + t); } else { ko++; console.log('  ❌ ' + t + (d ? ' — ' + d : '')); } };
 
-console.log('\n1) Les cinq langues demandées');
+console.log('\n1) Les six langues demandées');
 {
-  V('cinq langues', LG.CLES.length === 5, LG.CLES.join(', '));
-  for (const c of ['fr', 'en', 'de', 'ru', 'es']) V(`${c} présente`, LG.CLES.includes(c));
+  V('six langues', LG.CLES.length === 6, LG.CLES.join(', '));
+  for (const c of ['fr', 'en', 'de', 'ru', 'es', 'pl']) V(`${c} présente`, LG.CLES.includes(c));
   V('le français est la langue source', LG.DEFAUT === 'fr');
   V('chacune a un nom et un drapeau', LG.liste().every((l) => l.nom && l.drapeau));
 }
@@ -269,13 +269,17 @@ console.log('\n14) L\'IA répond dans la langue du serveur');
   for (const c of LG.CLES) V(`${c} a son nom en français`, Boolean(LG.LANGUES[c].nomFr), LG.LANGUES[c].nomFr);
 }
 
-console.log('\n15) Couverture : tout le bot est traduit en anglais');
+console.log('\n15) Couverture : tout le bot est traduit dans CHAQUE langue');
 {
   const catalogue = extracteur.relever().filter((e) => !e.risque);
   const table = TR.table();
-  const manquants = catalogue.filter((e) => !table[e.fr]?.en);
-  V(`aucun texte sans anglais (${catalogue.length} relevés)`, manquants.length === 0,
-    manquants.slice(0, 5).map((e) => `${e.fichier}: ${JSON.stringify(e.fr)}`).join(' | '));
+  // Le moindre petit détail, dans toutes les langues : une chaîne ajoutée
+  // sans ses six versions fait échouer la suite — c'est voulu.
+  for (const langue of LG.CLES.filter((c) => c !== 'fr')) {
+    const manquants = catalogue.filter((e) => !table[e.fr]?.[langue]);
+    V(`aucun texte sans ${LG.LANGUES[langue].nomFr} (${catalogue.length} relevés)`, manquants.length === 0,
+      `${manquants.length} manquant(s) — ` + manquants.slice(0, 3).map((e) => JSON.stringify(e.fr)).join(' | '));
+  }
 }
 
 fs.rmSync(RACINE, { recursive: true, force: true });
