@@ -2203,3 +2203,28 @@ button.server-card { font: inherit; color: inherit; text-align: left; cursor: po
 .select option { background: #16142a; color: var(--text); }
 .textarea { resize: vertical; min-height: 74px; }
 .chat-compose .textarea { min-height: 46px; }
+/* États actifs hérités des anciens noms de classes. */
+.nav-btn.active { background: var(--accent-soft); color: #fff; font-weight: 700; }
+.nav-btn.active::before { content: ""; position: absolute; left: -10px; top: 20%; bottom: 20%; width: 3px; border-radius: 3px; background: var(--grad); box-shadow: 0 0 12px var(--a2); }
+.ticket-card.active { border-color: var(--a2); background: var(--accent-soft); box-shadow: 0 0 18px rgba(var(--accent-rgb), .18); }
+.top-search { flex: 1; max-width: 380px; margin-left: auto; }
+.top-search .input { border-radius: 10px; }
+@media (max-width: 1020px) { .top-search { display: none; } .crumb { display: none; } }
+.server-inviter {
+  border-style: dashed; cursor: pointer;
+  display: grid; place-items: center; gap: 4px;
+  min-height: 150px; color: var(--muted); text-align: center;
+  font: 600 13px/1.4 var(--font-body); background: none;
+}
+.server-inviter:hover { border-color: var(--a2); color: var(--text); }
+.server-card .server-card-top > div { flex: 1; min-width: 0; }
+.proof-mini {
+  display: inline-grid; place-items: center;
+  width: 34px; height: 26px; border-radius: 6px;
+  background: var(--card-2); border: 1px solid var(--line); font-size: 13px;
+}
+tr.cliquable { cursor: pointer; }
+.modline { display: flex; gap: 6px; flex-wrap: wrap; }
+/* Les onglets du créateur ne se compressent jamais : ils passent à la ligne. */
+.subtabs { flex-wrap: wrap; row-gap: 6px; }
+.subtab { flex: 0 0 auto; }

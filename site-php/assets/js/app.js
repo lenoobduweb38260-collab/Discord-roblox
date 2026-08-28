@@ -37,7 +37,7 @@
     blacklistQuery: "",
     serverQuery: "",
     mobileOpen: false,
-    creatorTab: "page",
+    creatorTab: "accueil",
     blocks: null,        // blocs en cours d'édition dans le constructeur de page
     previewGrade: null,  // grade simulé (aperçu « qui voit quoi »)
     agentBots: null,     // bots vus chez l'agent (null = pas encore interrogé)
@@ -61,20 +61,16 @@
   };
 
   const icons = {
-    dashboard: "⌂",
-    servers: "⌘",
-    blacklist: "⊘",
-    tickets: "▣",
-    creator: "◇",
-    config: "⚙",
-    overview: "01",
-    rp: "02",
-    arrivals: "03",
-    roles: "04",
-    channels: "05",
-    levels: "06",
-    whitelist: "07",
-    ticketModule: "08",
+    dashboard: "📊",
+    servers: "🗂️",
+    server: "⚙️",
+    rp: "🎭",
+    embeds: "✉️",
+    blacklist: "🚫",
+    tickets: "🎫",
+    creator: "🛠️",
+    config: "🧱",
+    home: "🏠",
   };
 
   const modules = [
@@ -664,19 +660,60 @@
     return `<span>${esc(logo)}</span>`;
   }
 
+  // 🧭 Fil d'Ariane de la barre du haut : Groupe / Page — comme la maquette.
+  function filAriane() {
+    const srv = selectedServer();
+    const noms = {
+      dashboard: ["Pilotage", "Vue d'ensemble"],
+      servers: ["Pilotage", "Mes serveurs"],
+      server: ["Serveur", srv?.name || "Configuration"],
+      tickets: ["Modération", "Tickets"],
+      blacklist: ["Modération", "Blacklist & preuves"],
+      creator: ["Administration", "Espace créateur"],
+      "site-config": ["Administration", "Site builder"],
+    };
+    const [groupe, page] = noms[ui.route] || ["", ""];
+    return `<span class="crumb">${esc(groupe)} / <b>${esc(page)}</b></span>`;
+  }
+
   function renderShell() {
     const bot = activeBot();
+    const srv = selectedServer();
     const openTickets = (state.tickets || []).filter(t => t.status !== "fermé").length;
-    const badges = { blacklist: state.blacklist?.length || 0, tickets: openTickets };
-    // La navigation est composée dans le Site builder (ordre, libellés,
-    // visibilité) PUIS filtrée par le grade prévisualisé.
-    // En aperçu, le menu est filtré EXACTEMENT comme le verrait ce grade
-    // (la sortie de l'aperçu reste possible via le bandeau en haut).
-    const navItems = navConfig()
-      .filter(item => item.show !== false || (item.id === "site-config" && !ui.previewGrade))
-      .filter(item => !ui.previewGrade || gradeCan("page." + (item.id === "site-config" ? "creator" : item.id)))
-      // 🔒 Le menu ne propose que les pages réellement accessibles.
-      .filter(item => { const p = pagesAutorisees(); return !p || p.includes(item.id); });
+    const badges = { tickets: openTickets };
+    // Pages visibles : réglages du Site builder + grade prévisualisé + accès réels.
+    const visible = (id) => {
+      const item = navConfig().find(x => x.id === id);
+      if (item && item.show === false && !(id === "site-config" && !ui.previewGrade)) return false;
+      if (ui.previewGrade && !gradeCan("page." + (id === "site-config" ? "creator" : id))) return false;
+      const p = pagesAutorisees();
+      return !p || p.includes(id);
+    };
+    const libelle = (id, defaut) => navConfig().find(x => x.id === id)?.label || defaut;
+    // ⚙️ Le groupe « Serveur » ouvre directement un onglet précis de la
+    // configuration : Module RP et Messages & embeds sont des raccourcis.
+    const boutonServeur = (module, icone, texte) => `<button class="nav-btn ${ui.route === "server" && (module === "*" ? true : ui.module === module) ? "on" : ""}"
+      data-action="nav-serveur" data-module="${module === "*" ? "overview" : module}">
+      <span class="nav-icon">${icone}</span><span class="nav-text">${esc(texte)}</span></button>`;
+    const groupes = [
+      ["Pilotage", [
+        visible("dashboard") ? sidebarNavButton("dashboard", libelle("dashboard", "Vue d'ensemble"), icons.dashboard) : "",
+        visible("servers") ? sidebarNavButton("servers", libelle("servers", "Mes serveurs"), icons.servers) : "",
+      ]],
+      [srv ? `Serveur · ${srv.name}` : "Serveur", visible("servers") && srv ? [
+        boutonServeur("overview", icons.server, "Configuration"),
+        boutonServeur("rp", icons.rp, "Module RP"),
+        boutonServeur("messages", icons.embeds, "Messages & embeds"),
+      ] : []],
+      ["Modération", [
+        visible("tickets") ? sidebarNavButton("tickets", libelle("tickets", "Tickets"), icons.tickets, badges.tickets || "") : "",
+        visible("blacklist") ? sidebarNavButton("blacklist", libelle("blacklist", "Blacklist & preuves"), icons.blacklist) : "",
+      ]],
+      ["Administration", [
+        visible("creator") ? sidebarNavButton("creator", libelle("creator", "Espace créateur"), icons.creator) : "",
+        `<button class="nav-btn" data-action="go-home"><span class="nav-icon">${icons.home}</span><span class="nav-text">Retour au site</span></button>`,
+      ]],
+    ];
     app.innerHTML = `
       <div class="app-shell">
         <header class="topbar">
@@ -685,9 +722,14 @@
             <!-- Logo + nom : retour à la page d'accueil du site, SANS se déconnecter. -->
             <div class="brand-home" data-action="go-home" title="Retour à l'accueil du site">
               <div class="brand-mark">${brandMark()}</div>
-              <div><h1>${esc(siteConfig().siteName || "AINCRAD CONTROL PANEL")}</h1><p>${esc(siteConfig().subtitle || "Sword Art Online Discord Management")}</p></div>
+              <div><h1>${esc(siteConfig().siteName || "Dashboard")}</h1><p>${esc(siteConfig().subtitle || "Dashboard")}</p></div>
             </div>
           </div>
+          ${filAriane()}
+          <form class="top-search searchbar" data-form="recherche-globale">
+            <input class="input" name="q" placeholder="Rechercher…" autocomplete="off">
+          </form>
+          <span class="chip green"><i class="status-dot"></i> Synchronisé</span>
           <div class="top-actions">
             ${profileBlock()}
           </div>
@@ -700,22 +742,10 @@
 
         <aside class="sidebar ${ui.mobileOpen ? "open" : ""}">
           <div class="sidebar-scroll">
-            ${(() => {
-              // 🗂️ Le menu est regroupé comme la maquette : Pilotage,
-              // Modération, Administration — dans l'ordre du Site builder.
-              const groupes = [["Pilotage", ["dashboard", "servers", "server"]], ["Modération", ["tickets", "blacklist"]], ["Administration", ["creator", "site-config"]]];
-              const groupeDe = (id) => groupes.find(([, ids]) => ids.includes(id))?.[0] || "Menu";
-              const parGroupe = new Map();
-              navItems.forEach(item => {
-                const g = groupeDe(item.id);
-                if (!parGroupe.has(g)) parGroupe.set(g, []);
-                parGroupe.get(g).push(item);
-              });
-              return [...parGroupe.entries()].map(([titre, items]) => `
-                <nav class="nav-section"><div class="nav-label">${esc(titre)}</div>
-                  ${items.map(item => sidebarNavButton(item.id, item.label, icons[item.id === "site-config" ? "config" : item.id] || "◆", badges[item.id] || "")).join("")}
-                </nav>`).join("");
-            })()}
+            ${groupes.map(([titre, items]) => {
+              const corps = items.filter(Boolean).join("");
+              return corps ? `<nav class="nav-section"><div class="nav-label">${esc(titre)}</div>${corps}</nav>` : "";
+            }).join("")}
           </div>
           <div class="active-bot-card">
             <small>BOT ACTUEL</small>
@@ -958,12 +988,30 @@
   }
 
   function serverCard(server) {
-    return `<button class="server-card ${ui.selectedServerId === server.id ? "selected" : ""}${server.mien ? " mien" : ""}" data-action="open-server" data-server-id="${esc(server.id)}">
-      <span class="server-card-top">${serverIcon(server)}${server.mien ? `<span class="chip green" style="font-size:9.5px">VOUS Y ÊTES</span>` : ""}<i class="status-dot"></i></span>
-      <h4>${esc(server.name)}</h4><p>${esc(server.region)} · ${esc(server.role)}${server.verified ? " · Vérifié" : ""}</p>
-      <span class="server-meta"><span>${formatNumber(server.members)} membres</span><span>${formatNumber(server.online)} en ligne</span></span>
-      <span class="server-progress"><span style="width:${Math.max(5, Number(server.activity || 0))}%"></span></span>
-    </button>`;
+    // 🎭 Étiquettes des modules, lues dans les réglages connus du serveur ;
+    // sans information, le module est affiché actif (c'est le défaut du bot).
+    const reglages = serverSettings(server.id) || {};
+    const actif = (chemin, defaut = true) => {
+      const [a, b] = chemin.split(".");
+      const v = reglages?.[a]?.[b];
+      return v === undefined ? defaut : Boolean(Number(v) || v === true);
+    };
+    const etiquettes = [
+      actif("rp.enabled") ? `<span class="severity low">🎭 RP</span>` : `<span class="ticket-status">🎭 off</span>`,
+      actif("levels.enabled") ? `<span class="state resolu">📈 Niveaux</span>` : `<span class="ticket-status">📈 off</span>`,
+      actif("tickets.enabled") ? `<span class="state resolu">🎫 Tickets</span>` : `<span class="ticket-status">🎫 off</span>`,
+    ].join("");
+    return `<div class="server-card ${ui.selectedServerId === server.id ? "selected glow hud" : ""}${server.mien ? " mien" : ""}">
+      <span class="server-card-top">${serverIcon(server)}
+        <div><strong>${esc(server.name)}</strong>
+        <span class="server-meta">${formatNumber(server.members)} membres · ${formatNumber(server.online)} en ligne</span></div>
+        ${server.mien ? `<span class="chip green" style="font-size:9.5px">VOUS Y ÊTES</span>` : ""}<i class="status-dot"></i></span>
+      <div class="modline">${etiquettes}</div>
+      <div class="row" style="gap:8px;flex-wrap:nowrap">
+        ${button("⚙️ Configurer", "open-server", "primary small", `data-server-id="${esc(server.id)}" style="flex:1"`)}
+        ${button("📊 Stats", "open-server-stats", "small", `data-server-id="${esc(server.id)}"`)}
+      </div>
+    </div>`;
   }
 
 
@@ -1010,13 +1058,16 @@
            <span style="color:var(--muted);font-size:12px">Si vous venez d'inviter le bot, cliquez sur « 🔄 Synchroniser » : la liste se met à jour depuis l'agent.</span>
          </div>` : "";
     return `<div class="content-view">
-      ${pageHead("Gestion / Serveurs", `Serveurs de ${bot.name}`, "Ouvrez un serveur pour configurer ses modules et consulter ses statistiques.",
+      ${pageHead("Pilotage", "Mes serveurs", "Chaque serveur a sa configuration : cliquez sur « Configurer » pour ouvrir la sienne.",
         button("🔄 Synchroniser", "bots-sync-rapide", "ghost") + button("➕ Inviter le bot", "invite-bot", "primary pulse"))}
       ${infoMiens}
       <section class="panel"><div class="panel-inner">
         <div class="panel-head"><div><h3>Infrastructure Discord</h3><p>${servers.length} serveur(s) correspondent à la sélection actuelle.</p></div><div class="searchbar"><input class="input" id="server-search" value="${esc(ui.serverQuery)}" placeholder="Rechercher un serveur…"><button class="btn" data-action="server-search">Rechercher</button></div></div>
         ${bascule}
-        <div class="grid-3">${servers.map(serverCard).join("") || emptyBlock("Aucun résultat", "Essayez une autre recherche.")}</div>
+        <div class="grid-3">${servers.map(serverCard).join("") || emptyBlock("Aucun résultat", "Essayez une autre recherche.")}
+          <button class="server-card server-inviter" data-action="invite-bot">
+            <span style="font-size:22px">➕</span>Inviter le bot<br>sur un autre serveur</button>
+        </div>
       </div></section>
       ${sansBot.length ? `<section class="panel mt-16"><div class="panel-inner">
         <div class="panel-head"><div><h3>➕ Vos serveurs sans le bot</h3>
@@ -2275,31 +2326,37 @@
     if (estEquipeSite()) setTimeout(() => importerBlacklistDiscord(false), 60);
     const query = ui.blacklistQuery.trim().toLowerCase();
     const entries = (state.blacklist || []).filter(item => !query || `${item.username} ${item.discordId} ${item.reason} ${item.server}`.toLowerCase().includes(query));
+    // 🖼️ Vignettes de preuves comme la maquette : un clic sur la LIGNE ouvre
+    // la fiche complète, où tout se gère (preuves, réapplication, retrait).
+    const vignettes = (entry) => {
+      const n = (entry.proofs || []).length + (entry.preuveDiscord ? 1 : 0);
+      if (!n) return `<span class="field-note">Aucune preuve</span>`;
+      return (entry.proofs || []).slice(0, 3).map(f => `<span class="proof-mini">${/\.(png|jpe?g|gif|webp)$/i.test(f) ? "🖼️" : /\.pdf$/i.test(f) ? "📕" : "📄"}</span>`).join(" ")
+        + (entry.preuveDiscord ? ` <span class="proof-mini">💬</span>` : "")
+        + (n > 3 ? ` <span class="field-note">+${n - 3}</span>` : "");
+    };
     return `<div class="content-view">
-      ${pageHead("Staff bot / Sécurité", "Blacklist globale", "Les sanctions posées ici partent sur Discord, et celles prononcées sur Discord remontent ici.",
-        button("📥 Importer depuis Discord", "blacklist-import", "ghost") + button("Ajouter une entrée", "open-blacklist-modal", "danger"))}
+      ${pageHead("Modération", "Blacklist & preuves", "La blacklist mutualisée du bot : chaque entrée exige des preuves, et bannit à l'arrivée sur tous les serveurs.",
+        button("📥 Importer depuis Discord", "blacklist-import", "ghost small") + button("➕ Blacklister un ID", "open-blacklist-modal", "primary"))}
       <section class="panel"><div class="panel-inner">
-        <div class="panel-head"><div><h3>Base de sanctions</h3><p>${entries.length} résultat(s) sur ${state.blacklist?.length || 0} entrées.</p></div><div class="searchbar"><input class="input" id="blacklist-search" value="${esc(ui.blacklistQuery)}" placeholder="Nom, ID Discord, serveur ou motif…"><button class="btn" data-action="blacklist-search">Rechercher</button></div></div>
+        <div class="panel-head">
+          <div class="searchbar" style="flex:1;max-width:340px"><input class="input" id="blacklist-search" value="${esc(ui.blacklistQuery)}" placeholder="ID Discord, pseudo ou raison…"></div>
+          <span class="spacer" style="flex:1"></span>
+          <span class="chip">${state.blacklist?.length || 0} entrée(s) active(s)</span>
+        </div>
         <div id="bl-import-rapport"></div>
-        <div class="table-wrap"><table class="data-table"><thead><tr><th>Utilisateur</th><th>Motif</th><th>Sévérité</th><th>Origine</th><th>Preuves</th><th>Actions</th></tr></thead><tbody>
-        ${entries.map(entry => `<tr class="cliquable" data-action="open-sanction" data-id="${esc(entry.id)}" title="Ouvrir la fiche et voir toutes les preuves">
-          <td><strong>${esc(entry.username)}</strong><br><span>${esc(entry.discordId)}</span><br><span>${esc(entry.id)} · ${esc(entry.date)}</span></td>
-          <td>${esc(entry.reason)}${entry.leveeSurDiscord ? `<br><span class="field-note" style="color:var(--amber,#f3c86a)">⚠️ levée sur Discord</span>` : ""}</td>
-          <td><span class="severity ${esc(entry.severity)}">${esc(entry.severity)}</span></td>
-          <td>${entry.origine === "discord" ? "💬 Discord" : "🖥️ Panel"}<br><span>${esc(entry.server)} · par ${esc(entry.author)}</span></td>
-          <td><div class="proof-list">${
-            (entry.proofs?.length ? entry.proofs.map(proof => `<span class="proof-pill">${esc(proof)}</span>`).join("") : "")
-            + (entry.preuveDiscord ? `<span class="proof-pill" title="${esc(entry.preuveDiscord)}">💬 preuve Discord</span>` : "")
-            || `<span class="field-note">Aucune preuve</span>`}</div></td>
-          <td><div class="page-actions">${button("📂 Fiche", "open-sanction", "small", `data-id="${esc(entry.id)}"`)}${button("Preuve", "open-proof-modal", "small", `data-id="${esc(entry.id)}"`)}${button("Retirer", "delete-blacklist", "danger small", `data-id="${esc(entry.id)}"`)}</div></td>
-        </tr>`).join("") || `<tr><td colspan="6">${emptyBlock("Aucun résultat", "Aucune entrée ne correspond à cette recherche.")}</td></tr>`}
-        </tbody></table></div>
+        <div class="table-wrap"><table class="data-table">
+          <thead><tr><th>Utilisateur</th><th>Raison</th><th>Preuves</th><th>Par</th><th>Le</th><th></th></tr></thead>
+          <tbody>${entries.map(entry => `<tr class="cliquable" data-action="open-sanction" data-id="${esc(entry.id)}" title="Ouvrir la fiche : preuves, réapplication, détails">
+            <td><b>${esc(entry.username)}</b><br><span style="color:var(--muted-2);font-size:11.5px">🆔 <code>${esc(entry.discordId)}</code></span></td>
+            <td>${esc(entry.reason)}${entry.leveeSurDiscord ? `<br><span class="field-note" style="color:var(--gold)">⚠️ levée sur Discord</span>` : ""}</td>
+            <td>${vignettes(entry)}</td>
+            <td>${esc(entry.author || "—")}</td>
+            <td>${esc(entry.date || "—")}</td>
+            <td>${button("Lever", "delete-blacklist", "danger small", `data-id="${esc(entry.id)}"`)}</td>
+          </tr>`).join("") || `<tr><td colspan="6">${emptyBlock("Aucun résultat", "Aucune entrée ne correspond à cette recherche.")}</td></tr>`}</tbody>
+        </table></div>
       </div></section>
-      <div class="grid-3 mt-16">
-        <div class="stat-card"><span>Sanctions critiques</span><strong>${(state.blacklist || []).filter(x=>x.severity==="critique").length}</strong><em>surveillance renforcée</em></div>
-        <div class="stat-card"><span>Preuves enregistrées</span><strong>${(state.blacklist || []).reduce((s,x)=>s+(x.proofs?.length||0),0)}</strong><em>images, PDF et logs</em></div>
-        <div class="stat-card"><span>Serveurs concernés</span><strong>${new Set((state.blacklist || []).map(x=>x.server)).size}</strong><em>base mutualisée</em></div>
-      </div>
     </div>`;
   }
 
@@ -2664,9 +2721,10 @@
 
   // ── Espace créateur : bots + page + apparence + écosystème ──────────
   function creatorView() {
-    const valid = ["ecosystem", "page", "builder", "bots", "perms", "discord", "db", "maj"];
-    const tab = valid.includes(ui.creatorTab) ? ui.creatorTab : "page";
+    const valid = ["accueil", "ecosystem", "page", "builder", "bots", "perms", "discord", "db", "maj"];
+    const tab = valid.includes(ui.creatorTab) ? ui.creatorTab : "accueil";
     const tabs = [
+      ["accueil", "🛠️ Vue d'ensemble", "L'essentiel en un écran"],
       ["page", "🧱 Constructeur de page", "Blocs de la page d'accueil"],
       ["bots", "🤖 Mes bots", "Ajoutez autant de bots que voulu"],
       ["perms", "🔐 Fonctions & grades", "Qui voit quoi, avec aperçu"],
@@ -2677,6 +2735,7 @@
       ["ecosystem", "🌍 Écosystème", "Serveurs et indicateurs"],
     ];
     const heads = {
+      accueil: pageHead("Administration", "Espace créateur", "Connexion Discord, diagnostic, site builder et grades — le reste est dans les onglets."),
       page: pageHead("Créateur / Site builder", "Construisez votre page", "Ajoutez, réordonnez et modifiez les blocs de votre page d'accueil : bannière, cartes, chiffres, galerie, FAQ, annonces…"),
       bots: pageHead("Créateur / Bots", "Mes bots", "Déclarez ici tous vos bots — il n'y a aucune limite. Reliez-les à votre agent pour récupérer leurs vrais serveurs."),
       perms: pageHead("Créateur / Permissions", "Fonctions & grades", "Toutes les fonctions du bot et toutes les pages du site : choisissez qui y a accès, et prévisualisez le site avec les yeux d'un grade."),
@@ -2690,7 +2749,8 @@
       <button class="subtab ${tab === t[0] ? "active" : ""}" data-action="creator-tab" data-tab="${t[0]}">
         <strong>${t[1]}</strong><span>${t[2]}</span>
       </button>`).join("")}</div>`;
-    const body = tab === "builder" ? siteBuilderBody()
+    const body = tab === "accueil" ? creatorAccueilBody()
+      : tab === "builder" ? siteBuilderBody()
       : tab === "page" ? pageBuilderBody()
       : tab === "bots" ? botsBuilderBody()
       : tab === "perms" ? permissionsBody()
@@ -2699,6 +2759,73 @@
       : tab === "maj" ? majBody()
       : creatorEcosystem();
     return `<div class="content-view">${heads[tab]}${tabBar}${body}</div>`;
+  }
+
+
+  // 🛠️ L'écran d'accueil de l'Espace créateur, tel que la maquette :
+  // Connexion Discord + Diagnostic côte à côte, puis Site builder et Grades.
+  function creatorAccueilBody() {
+    const pret = DISCORD.pret;
+    setTimeout(() => chargerDiagnosticCreateur(), 40);
+    const d = ui.diagCreateur;
+    const ligne = (titre, note, ok) => `<div class="acc-row"><span>${titre}</span>
+      <div><b>${esc(note)}</b></div>
+      <span class="tag" style="margin-left:auto;color:${ok ? "var(--green)" : "var(--gold)"}">${ok ? "✓" : "…"}</span></div>`;
+    return `<div class="grid-2">
+      <section class="panel glow"><div class="panel-inner">
+        <div class="panel-head"><div><h3>🔑 Connexion Discord</h3><p>OAuth2 — vos membres se connectent avec leur compte</p></div>
+          <span class="spacer" style="flex:1"></span>${pret ? '<span class="state resolu">prête</span>' : '<span class="ticket-status en-attente">à configurer</span>'}</div>
+        <div class="field"><label>Adresse de retour à déclarer (OAuth2 → Redirects)</label>
+          <input class="input" readonly value="${esc(DISCORD.redirect || "")}" onclick="this.select()"></div>
+        <div class="form-actions">${button("Ouvrir la configuration complète", "creator-tab", "primary small", 'data-tab="discord"')}</div>
+      </div></section>
+      <section class="panel"><div class="panel-inner">
+        <div class="panel-head"><div><h3>🩺 Diagnostic</h3><p>Ce que le site vérifie tout seul</p></div></div>
+        ${d ? `
+          ${ligne("Agent de synchronisation", d.agent, d.agentOk)}
+          ${ligne("Écriture du dossier data/", d.data, d.dataOk)}
+          ${ligne("Connexion Discord", pret ? "configurée" : "non configurée", pret)}
+          ${ligne("Version du site", d.version, true)}
+        ` : `<div class="row">⏳ <span style="color:var(--muted)">Vérification en cours…</span></div>`}
+      </div></section>
+    </div>
+    <section class="panel mt-16"><div class="panel-inner">
+      <div class="panel-head"><div><h3>🧱 Site builder</h3><p>La page d'accueil publique reste modulable : blocs, apparence, fond, navigation</p></div>
+        <span class="spacer" style="flex:1"></span>
+        ${button("Blocs de la page", "creator-tab", "small", 'data-tab="page"')}
+        ${button("Apparence", "creator-tab", "small", 'data-tab="builder"')}</div>
+      <div class="modline" style="display:flex;gap:6px;flex-wrap:wrap">
+        <span class="severity low">Héro</span><span class="severity low">Stats</span><span class="severity low">Fonctionnalités</span>
+        <span class="severity low">Annonces</span><span class="severity low">FAQ</span><span class="severity low">Galerie</span>
+      </div>
+    </div></section>
+    <section class="panel mt-16"><div class="panel-inner">
+      <div class="panel-head"><div><h3>👥 Grades & permissions</h3><p>Qui voit quoi — avec l'aperçu par grade</p></div>
+        <span class="spacer" style="flex:1"></span>${button("👁 Aperçu par grade", "creator-tab", "small", 'data-tab="perms"')}</div>
+      <div class="modline" style="display:flex;gap:6px;flex-wrap:wrap">
+        <span class="ticket-status">Membre</span><span class="severity low">Police / Métier</span><span class="state resolu">Staff</span>
+        <span class="severity medium">Administration</span><span class="tag violet">Responsable du bot</span><span class="severity high">Créateur</span>
+      </div>
+    </div></section>`;
+  }
+
+  // 🩺 Petites vérifications de l'écran d'accueil créateur (selftest).
+  async function chargerDiagnosticCreateur() {
+    if (ui.diagCreateur !== undefined) return;
+    ui.diagCreateur = undefined;
+    try {
+      const r = await api("selftest");
+      ui.diagCreateur = {
+        agent: r.agent?.joignable ? `joignable · ${(r.agent.bots || []).length} bot(s)` : (r.agent?.probleme || "injoignable"),
+        agentOk: Boolean(r.agent?.joignable),
+        data: r.conseils?.some(c => /data\//.test(c)) ? "droits à corriger (chmod)" : "autorisée",
+        dataOk: !r.conseils?.some(c => /data\//.test(c)),
+        version: r.version || "installée",
+      };
+    } catch (e) {
+      ui.diagCreateur = { agent: e.message, agentOk: false, data: "inconnue", dataOk: false, version: "?" };
+    }
+    if (ui.route === "creator" && ui.creatorTab === "accueil") render();
   }
 
   // ══════════════════════════════════════════════════════════════════
@@ -3841,6 +3968,17 @@
         case "navigate":
           navigate(target.dataset.route || "dashboard");
           break;
+        case "open-server-stats":
+          ui.selectedServerId = target.dataset.serverId;
+          storage.setItem("aincrad.server", ui.selectedServerId);
+          ui.module = "overview";
+          navigate("server");
+          break;
+        case "nav-serveur":
+          if (!ui.selectedServerId) ui.selectedServerId = state.servers?.[0]?.id || null;
+          ui.module = target.dataset.module || "overview";
+          navigate("server");
+          break;
         case "toggle-sidebar":
           ui.mobileOpen = !ui.mobileOpen;
           document.querySelector(".sidebar")?.classList.toggle("open", ui.mobileOpen);
@@ -4750,6 +4888,14 @@
     const form = event.target.closest("form[data-form]");
     if (!form) return;
     event.preventDefault();
+    if (form.dataset.form === "recherche-globale") {
+      const q = String(new FormData(form).get("q") || "").trim();
+      if (ui.route === "blacklist") ui.blacklistQuery = q;
+      else if (ui.route === "tickets" && ui.ticketTab === "archives") ui.archiveQuery = q;
+      else { ui.serverQuery = q; ui.route = "servers"; }
+      render();
+      return;
+    }
     const submit = form.querySelector('[type="submit"]');
     const originalText = submit?.textContent;
     if (submit) { submit.disabled = true; submit.textContent = "TRAITEMENT…"; }
