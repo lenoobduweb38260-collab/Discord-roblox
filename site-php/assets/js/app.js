@@ -1244,31 +1244,6 @@
     return { ...(srvParams()?.config || {}), ...(ui.brouillonModule || {}) };
   }
 
-  function champSalon(cle, label, aide = "", multiple = false) {
-    const p = srvParams();
-    const choisis = choixCourants(cfgCourant()[cle], multiple);
-    const options = (p?.channels || []).map(c =>
-      `<option value="${esc(c.id)}"${choisis.includes(String(c.id)) ? " selected" : ""}># ${esc(c.name)}</option>`).join("");
-    return `<div class="field"><label>${label}</label>
-      <select class="select" data-cfg="${esc(cle)}"${multiple ? ' multiple size="6" data-multi="1"' : ""}>
-        ${multiple ? "" : '<option value="">— Aucun —</option>'}${options}
-      </select>
-      <span class="field-note">${multiple ? "Maintenez Ctrl (⌘ sur Mac) pour en choisir plusieurs. " : ""}${aide}</span></div>`;
-  }
-
-  // Liste déroulante de CATÉGORIES — simple, ou à choix multiple.
-  function champCategorie(cle, label, aide = "", multiple = false) {
-    const p = srvParams();
-    const choisis = choixCourants(cfgCourant()[cle], multiple);
-    const options = (p?.categories || []).map(c =>
-      `<option value="${esc(c.id)}"${choisis.includes(String(c.id)) ? " selected" : ""}>${esc(c.name)}</option>`).join("");
-    return `<div class="field"><label>${label}</label>
-      <select class="select" data-cfg="${esc(cle)}"${multiple ? ' multiple size="5" data-multi="1"' : ""}>
-        ${multiple ? "" : '<option value="">— Aucune —</option>'}${options}
-      </select>
-      <span class="field-note">${multiple ? "Maintenez Ctrl (⌘ sur Mac) pour en choisir plusieurs. " : ""}${aide}</span></div>`;
-  }
-
   // La couleur d'affichage d'un rôle : la sienne, sauf le #000000 de Discord
   // qui signifie « sans couleur ».
   function couleurRole(r) {
@@ -1276,43 +1251,53 @@
     return /^#[0-9a-f]{6}$/i.test(c) && c.toLowerCase() !== "#000000" ? c : "var(--muted)";
   }
 
-  // Liste déroulante de RÔLES — simple, ou à choix multiple.
-  // À choix multiple, c'est le sélecteur façon Discord : les rôles choisis
-  // sont des jetons retirables, la liste se cherche au clavier, et chaque
-  // rôle s'affiche dans SA couleur. Fini le Ctrl+clic.
-  function champRole(cle, label, aide = "", multiple = false) {
+  // ── 🎛️ Sélecteur façon Discord — rôles, salons et catégories ──────
+  // PARTOUT où un réglage choisit un rôle, un salon ou une catégorie, le
+  // même menu déroulant : recherche au clavier, rôles dans LEUR couleur,
+  // salons préfixés #. En choix multiple, les éléments choisis sont des
+  // jetons retirables et la liste reste ouverte pour enchaîner. En choix
+  // simple, cliquer un élément le sélectionne et referme la liste ; le ×
+  // du jeton remet « Aucun ».
+  function champPicker(genre, cle, label, aide, multiple) {
     const p = srvParams();
+    const habit = {
+      role: { liste: p?.roles || [], vide: "Aucun rôle sur ce serveur.", cherche: "🔎 Rechercher un rôle…",
+        montre: r => ({ couleur: couleurRole(r), texte: r.name || "—", puce: true }) },
+      salon: { liste: p?.channels || [], vide: "Aucun salon.", cherche: "🔎 Rechercher un salon…",
+        montre: c => ({ couleur: "var(--text)", texte: `# ${c.name}`, puce: false }) },
+      categorie: { liste: p?.categories || [], vide: "Aucune catégorie.", cherche: "🔎 Rechercher une catégorie…",
+        montre: c => ({ couleur: "var(--text)", texte: `🗂️ ${c.name}`, puce: false }) },
+    }[genre];
     const valeur = cfgCourant()[cle] ?? "";
-    if (!multiple) {
-      const options = (p?.roles || []).map(r =>
-        `<option value="${esc(r.id)}"${String(r.id) === String(valeur) ? " selected" : ""}>@ ${esc(r.name || "—")}</option>`).join("");
-      return `<div class="field"><label>${label}</label>
-        <select class="select" data-cfg="${esc(cle)}"><option value="">— Aucun —</option>${options}</select>
-        <span class="field-note">${aide}</span></div>`;
-    }
-    const choisis = choixCourants(valeur, true);
-    const roles = p?.roles || [];
-    const parId = new Map(roles.map(r => [String(r.id), r]));
+    const choisis = multiple ? choixCourants(valeur, true) : (valeur ? [String(valeur)] : []);
+    const parId = new Map(habit.liste.map(x => [String(x.id), x]));
+    const mode = multiple ? "multi" : "un";
     const jetons = choisis.map(id => {
-      const r = parId.get(String(id));
-      return `<span class="picker-chip" style="--rc:${couleurRole(r)}"><i></i>${esc(r?.name || id)}
-        <button type="button" data-action="picker-retirer" data-cle="${esc(cle)}" data-id="${esc(id)}" aria-label="Retirer">×</button></span>`;
+      const x = parId.get(String(id));
+      const m = x ? habit.montre(x) : { couleur: "var(--muted)", texte: id, puce: false };
+      return `<span class="picker-chip" style="--rc:${m.couleur}">${m.puce ? "<i></i>" : ""}${esc(m.texte)}
+        <button type="button" data-action="picker-retirer" data-cle="${esc(cle)}" data-id="${esc(id)}" data-mode="${mode}" aria-label="Retirer">×</button></span>`;
     }).join("");
-    const options = roles.map(r => {
-      const pris = choisis.includes(String(r.id));
-      return `<button type="button" class="picker-opt${pris ? " pris" : ""}" data-action="picker-choisir" data-cle="${esc(cle)}" data-id="${esc(r.id)}" style="--rc:${couleurRole(r)}">
-        <i></i><span>${esc(r.name || "—")}</span>${pris ? "<b>✓</b>" : ""}</button>`;
+    const options = habit.liste.map(x => {
+      const pris = choisis.includes(String(x.id));
+      const m = habit.montre(x);
+      return `<button type="button" class="picker-opt${pris ? " pris" : ""}" data-action="picker-choisir" data-cle="${esc(cle)}" data-id="${esc(x.id)}" data-mode="${mode}" style="--rc:${m.couleur}">
+        ${m.puce ? "<i></i>" : ""}<span>${esc(m.texte)}</span>${pris ? "<b>✓</b>" : ""}</button>`;
     }).join("");
     const ouvert = ui.pickerOuvert === cle;
     return `<div class="field"><label>${label}</label>
       <div class="picker${ouvert ? " ouvert" : ""}" data-picker="${esc(cle)}">
         <div class="picker-champ">${jetons}
           <input class="picker-input" data-picker-cherche="${esc(cle)}" autocomplete="off" spellcheck="false"
-            placeholder="${choisis.length ? "Ajouter…" : "🔎 Rechercher un rôle…"}"></div>
-        <div class="picker-liste"${ouvert ? "" : " hidden"}>${options || '<div class="picker-vide">Aucun rôle sur ce serveur.</div>'}</div>
+            placeholder="${choisis.length ? (multiple ? "Ajouter…" : "Changer…") : habit.cherche}"></div>
+        <div class="picker-liste"${ouvert ? "" : " hidden"}>${options || `<div class="picker-vide">${habit.vide}</div>`}</div>
       </div>
       <span class="field-note">${aide}</span></div>`;
   }
+
+  function champSalon(cle, label, aide = "", multiple = false) { return champPicker("salon", cle, label, aide, multiple); }
+  function champCategorie(cle, label, aide = "", multiple = false) { return champPicker("categorie", cle, label, aide, multiple); }
+  function champRole(cle, label, aide = "", multiple = false) { return champPicker("role", cle, label, aide, multiple); }
 
   // Interrupteur enregistré dans le bot.
   // `defaut` : valeur du bot quand le réglage n'a jamais été touché.
@@ -4124,24 +4109,32 @@
           ui.notesTout = true;
           remplirNotes();
           break;
-        // Sélecteur de rôles façon Discord : un clic sur un rôle l'ajoute ou
-        // le retire ; la liste reste ouverte pour enchaîner les choix.
+        // Sélecteur façon Discord (rôles, salons, catégories). En multiple :
+        // un clic ajoute ou retire, la liste reste ouverte pour enchaîner.
+        // En simple : le clic sélectionne et referme.
         case "picker-choisir": {
           const cle = target.dataset.cle, id = String(target.dataset.id);
-          const ids = choixCourants(cfgCourant()[cle], true);
-          const deja = ids.indexOf(id);
-          if (deja >= 0) ids.splice(deja, 1); else ids.push(id);
           ui.brouillonModule = ui.brouillonModule || {};
-          ui.brouillonModule[cle] = JSON.stringify(ids);
-          ui.pickerOuvert = cle;
+          if (target.dataset.mode === "multi") {
+            const ids = choixCourants(cfgCourant()[cle], true);
+            const deja = ids.indexOf(id);
+            if (deja >= 0) ids.splice(deja, 1); else ids.push(id);
+            ui.brouillonModule[cle] = JSON.stringify(ids);
+            ui.pickerOuvert = cle;
+          } else {
+            ui.brouillonModule[cle] = id;
+            ui.pickerOuvert = null;
+            ui.pickerRecherche = "";
+          }
           render();
           break;
         }
         case "picker-retirer": {
           const cle = target.dataset.cle, id = String(target.dataset.id);
-          const ids = choixCourants(cfgCourant()[cle], true).filter(x => x !== id);
           ui.brouillonModule = ui.brouillonModule || {};
-          ui.brouillonModule[cle] = JSON.stringify(ids);
+          ui.brouillonModule[cle] = target.dataset.mode === "multi"
+            ? JSON.stringify(choixCourants(cfgCourant()[cle], true).filter(x => x !== id))
+            : "";
           render();
           break;
         }
