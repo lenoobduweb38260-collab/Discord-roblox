@@ -2351,3 +2351,26 @@ tr.cliquable { cursor: pointer; }
 .picker-opt.pris { background: rgba(var(--accent-rgb), .10); }
 .picker-opt b { color: var(--green); }
 .picker-vide { padding: 12px; color: var(--muted); font-size: 12.5px; text-align: center; }
+/* ── ☑️ Cases à cocher lisibles ──────────────────────────────────────
+   Les interrupteurs étaient des rectangles muets : rien n'indiquait si le
+   réglage était activé. Partout où l'on coche, une vraie case : carré vide
+   = désactivé, carré accent avec ✓ = activé. */
+.toggle {
+  width: 22px; height: 22px; padding: 0;
+  border: 2px solid var(--line-strong); border-radius: 6px;
+  background: var(--card-2); cursor: pointer;
+  transition: border-color .15s, background .15s, box-shadow .15s;
+}
+.toggle::after {
+  content: "✓"; position: absolute; inset: 0;
+  display: grid; place-items: center;
+  font: 900 13px/1 var(--font-body); color: #fff;
+  opacity: 0; transform: scale(.4);
+  transition: opacity .15s, transform .15s;
+}
+.toggle:hover { border-color: var(--a2); }
+.toggle.on {
+  background: var(--grad); border-color: transparent;
+  box-shadow: 0 0 10px rgba(var(--accent-rgb), .45);
+}
+.toggle.on::after { opacity: 1; transform: scale(1); }
