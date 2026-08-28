@@ -19654,5 +19654,12 @@
     "es": "se registrarán allí. Puedes cambiarlo en cualquier momento con `/config` o el dashboard.",
     "pl": "będą tam zapisywane. Możesz to zmienić w każdej chwili przez `/config` lub panel.",
     "ru": "будут записываться туда. Вы можете изменить его в любой момент через `/config` или дашборд."
+  },
+  "Le bot n'est pas encore connecté à Discord : démarrage en cours, token refusé ou coupure réseau — ouvrez sa console chez l'hébergeur pour voir la raison exacte.": {
+    "en": "The bot is not connected to Discord yet: starting up, token rejected, or network outage — open its console at your host to see the exact reason.",
+    "de": "Der Bot ist noch nicht mit Discord verbunden: Er startet gerade, der Token wurde abgelehnt oder das Netzwerk ist unterbrochen — öffnen Sie seine Konsole beim Hoster, um den genauen Grund zu sehen.",
+    "es": "El bot aún no está conectado a Discord: está arrancando, el token fue rechazado o hay un corte de red — abre su consola en tu alojamiento para ver la razón exacta.",
+    "pl": "Bot nie jest jeszcze połączony z Discordem: trwa uruchamianie, token został odrzucony lub wystąpiła przerwa w sieci — otwórz jego konsolę u hostingodawcy, aby zobaczyć dokładny powód.",
+    "ru": "Бот ещё не подключён к Discord: идёт запуск, токен отклонён или пропала сеть — откройте его консоль у хостера, чтобы увидеть точную причину."
   }
 }

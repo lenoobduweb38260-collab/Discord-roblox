@@ -420,15 +420,31 @@ const server = http.createServer(async (req, res) => {
       } catch {}
       if (!port || !s.proc) return sendJson(res, 400, { error: 'Démarrez le bot pour accéder à cette fonction.' });
       const subPath = '/' + parts.slice(4).join('/') + (url.search || '');
-      try {
-        const upstream = await fetch(`http://127.0.0.1:${port}${subPath}`, {
+      const corps = ['POST', 'PUT'].includes(req.method) ? JSON.stringify(await jsonBody(req)) : undefined;
+      const appel = () =>
+        fetch(`http://127.0.0.1:${port}${subPath}`, {
           method: req.method,
           headers: { 'Content-Type': 'application/json' },
-          body: ['POST', 'PUT'].includes(req.method) ? JSON.stringify(await jsonBody(req)) : undefined,
+          body: corps,
         });
+      try {
+        let upstream;
+        try {
+          upstream = await appel();
+        } catch {
+          // Le bot vient peut-être juste de (re)démarrer : une seconde chance
+          // évite un faux « injoignable » pendant la fenêtre de démarrage.
+          await new Promise((r) => setTimeout(r, 1200));
+          upstream = await appel();
+        }
         return sendJson(res, upstream.status, await upstream.json().catch(() => ({})));
       } catch {
-        return sendJson(res, 502, { error: 'Bot injoignable — est-il bien démarré ?' });
+        return sendJson(res, 502, {
+          error:
+            "L'API interne du bot ne répond pas : son processus tourne mais il n'est pas opérationnel — " +
+            'il démarre encore, il plante en boucle, ou son code est trop ancien. ' +
+            'Ouvrez sa console (▶ dans le panel) pour voir la raison, puis redémarrez-le.',
+        });
       }
     }
     return sendJson(res, 404, { error: 'Route inconnue.' });

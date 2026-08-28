@@ -1202,9 +1202,12 @@ if ($action === 'serveur.parametres') {
     [, $bot] = exiger_serveur((string) $guildId);
     [$code, $data] = agent_get('/agent/bots/' . rawurlencode($bot) . '/proxy/parametres?guild=' . rawurlencode((string) $guildId), 15);
     if ($code !== 200) {
-        respond(['ok' => false, 'error' => $code === 0
+        // L'agent et le bot savent maintenant DIRE pourquoi (démarrage en
+        // cours, token refusé, plantage…) : leur message passe en priorité.
+        $detail = is_array($data) ? trim((string) ($data['error'] ?? '')) : '';
+        respond(['ok' => false, 'error' => $detail !== '' ? $detail : ($code === 0
             ? "Le bot ne répond pas — est-il démarré ? (agent injoignable ou API interne arrêtée)"
-            : "Le bot a répondu HTTP $code. S'il est ancien, mettez-le à jour (⚙️ Créateur → 🔄 Mises à jour)."], 502);
+            : "Le bot a répondu HTTP $code. S'il est ancien, mettez-le à jour (⚙️ Créateur → 🔄 Mises à jour).")], 502);
     }
     respond(['ok' => true] + $data);
 }

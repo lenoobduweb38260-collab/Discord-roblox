@@ -270,14 +270,20 @@ async function start() {
   }
 
   // API locale pour le Gestionnaire de bots (dashboard + créateur d'embed).
+  // Démarrée TOUT DE SUITE, pas à la connexion Discord : un bot qui n'arrive
+  // pas à se connecter (token refusé, réseau, démarrage long) doit pouvoir le
+  // DIRE au site. Avant, api.port gardait le port d'un ancien démarrage et
+  // l'agent répondait 502 « injoignable » sans explication, alors que tout
+  // semblait à jour. Tant que le bot n'est pas prêt, l'API répond 503 avec la
+  // cause.
   if (process.env.BOT_MANAGED === '1') {
-    client.once(Events.ClientReady, () => {
+    (() => {
       try {
         require('./managedApi').startManagedApi(client, baseDir);
       } catch (err) {
         console.warn(`⚠️ API locale non démarrée : ${err.message}`);
       }
-    });
+    })();
   }
 
   // Synchronisation des commandes au démarrage : globales (app utilisateur)

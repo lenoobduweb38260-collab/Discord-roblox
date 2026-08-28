@@ -162,6 +162,15 @@ function startManagedApi(client, baseDir) {
     try {
       const url = new URL(req.url, 'http://localhost');
 
+      // ⏳ L'API écoute AVANT la connexion à Discord. Tant que le bot n'est
+      // pas prêt, on répond 503 en expliquant — le site affiche la cause au
+      // lieu d'un « injoignable » mystère.
+      if (!client.isReady()) {
+        return send(503, {
+          error: "Le bot n'est pas encore connecté à Discord : démarrage en cours, token refusé ou coupure réseau — ouvrez sa console chez l'hébergeur pour voir la raison exacte.",
+        });
+      }
+
       // 📎 Archives des pièces jointes supprimées.
       // L'API n'écoute que sur 127.0.0.1 : c'est la frontière de sécurité,
       // l'agent de l'hébergeur est le seul à pouvoir l'appeler.
