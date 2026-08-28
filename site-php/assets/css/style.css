@@ -2237,3 +2237,14 @@ tr.cliquable { cursor: pointer; }
 /* Le mini-graphe reste un flex même dans une carte KPI (la règle générique
    « span en bloc » des stat-cards ne doit pas l'aplatir). */
 .stat-card span.spark { display: flex; }
+/* ── 🖥️ Pleine largeur ───────────────────────────────────────────────
+   La page publique héritait d'un « max-width: 1120px » qui enfermait tout
+   l'écran d'accueil (bandeau compris) dans une colonne centrée, avec de
+   grandes bandes noires de chaque côté sur un grand moniteur. Le bandeau,
+   le héro et le pied de page s'étirent désormais d'un bord à l'autre ;
+   seuls les blocs de LECTURE gardent une largeur confortable, plus ample. */
+.page-public { max-width: none; margin: 0; }
+.feat-wrap, .public-inner, .page-public .content { max-width: min(1500px, 100%); }
+@media (min-width: 900px) { .feat-wrap .feature-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+/* Le dashboard aussi : le contenu remplit l'écran au lieu de s'arrêter à 1280px. */
+.content { max-width: none; }
