@@ -2301,3 +2301,53 @@ tr.cliquable { cursor: pointer; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition: none !important; }
 }
+/* ── 🎭 Sélecteur de rôles façon Discord ─────────────────────────────
+   Jetons retirables + recherche + liste déroulante, chaque rôle dans SA
+   couleur (--rc). Remplace les <select multiple> à Ctrl+clic. */
+.picker { position: relative; }
+.picker-champ {
+  display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+  padding: 7px 10px; border-radius: 10px;
+  border: 1px solid var(--line); background: var(--card-2);
+  cursor: text; transition: border-color .15s, box-shadow .15s;
+}
+.picker.ouvert .picker-champ {
+  border-color: var(--a2);
+  box-shadow: 0 0 0 3px rgba(var(--accent-rgb), .18);
+  border-radius: 10px 10px 0 0;
+}
+.picker-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 3px 6px 3px 8px; border-radius: 7px;
+  background: rgba(255, 255, 255, .05); border: 1px solid var(--line);
+  color: var(--rc); font-size: 12.5px; font-weight: 600; line-height: 1.3;
+}
+.picker-chip i { width: 9px; height: 9px; border-radius: 50%; background: var(--rc); flex-shrink: 0; }
+.picker-chip button {
+  border: none; background: none; cursor: pointer;
+  color: var(--muted); font-size: 14px; line-height: 1; padding: 0 2px;
+}
+.picker-chip button:hover { color: var(--red); }
+.picker-input {
+  flex: 1; min-width: 120px; border: none; background: none; outline: none;
+  color: var(--text); font: inherit; font-size: 13px; padding: 3px 2px;
+}
+.picker-input::placeholder { color: var(--muted-2); }
+.picker-liste {
+  position: absolute; left: 0; right: 0; top: 100%; z-index: 30;
+  max-height: 250px; overflow-y: auto;
+  border: 1px solid var(--a2); border-top: none; border-radius: 0 0 10px 10px;
+  background: #14121f;
+  box-shadow: 0 14px 30px rgba(0, 0, 0, .5);
+}
+.picker-opt {
+  display: flex; align-items: center; gap: 9px; width: 100%;
+  padding: 8px 11px; border: none; background: none; cursor: pointer;
+  color: var(--rc); font-size: 13px; font-weight: 600; text-align: left;
+}
+.picker-opt:hover { background: rgba(255, 255, 255, .06); }
+.picker-opt i { width: 10px; height: 10px; border-radius: 50%; background: var(--rc); flex-shrink: 0; }
+.picker-opt span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.picker-opt.pris { background: rgba(var(--accent-rgb), .10); }
+.picker-opt b { color: var(--green); }
+.picker-vide { padding: 12px; color: var(--muted); font-size: 12.5px; text-align: center; }

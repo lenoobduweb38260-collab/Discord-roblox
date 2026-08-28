@@ -41,6 +41,8 @@
     activiteTout: false, // « Tout voir » du flux d'activité de la vue d'ensemble
     notesBot: null,      // journal des mises à jour (assets/notes-bot.json)
     notesTout: false,    // « Tout le journal » sur la page d'accueil
+    pickerOuvert: null,  // sélecteur de rôles dont la liste est dépliée
+    pickerRecherche: "", // texte tapé dans ce sélecteur
     blocks: null,        // blocs en cours d'édition dans le constructeur de page
     previewGrade: null,  // grade simulé (aperçu « qui voit quoi »)
     agentBots: null,     // bots vus chez l'agent (null = pas encore interrogé)
@@ -1267,23 +1269,49 @@
       <span class="field-note">${multiple ? "Maintenez Ctrl (⌘ sur Mac) pour en choisir plusieurs. " : ""}${aide}</span></div>`;
   }
 
+  // La couleur d'affichage d'un rôle : la sienne, sauf le #000000 de Discord
+  // qui signifie « sans couleur ».
+  function couleurRole(r) {
+    const c = String(r?.couleur || "");
+    return /^#[0-9a-f]{6}$/i.test(c) && c.toLowerCase() !== "#000000" ? c : "var(--muted)";
+  }
+
   // Liste déroulante de RÔLES — simple, ou à choix multiple.
+  // À choix multiple, c'est le sélecteur façon Discord : les rôles choisis
+  // sont des jetons retirables, la liste se cherche au clavier, et chaque
+  // rôle s'affiche dans SA couleur. Fini le Ctrl+clic.
   function champRole(cle, label, aide = "", multiple = false) {
     const p = srvParams();
-    let valeur = cfgCourant()[cle] ?? "";
-    let choisis = [];
-    if (multiple) {
-      try { choisis = JSON.parse(valeur || "[]").map(String); } catch { choisis = valeur ? [String(valeur)] : []; }
+    const valeur = cfgCourant()[cle] ?? "";
+    if (!multiple) {
+      const options = (p?.roles || []).map(r =>
+        `<option value="${esc(r.id)}"${String(r.id) === String(valeur) ? " selected" : ""}>@ ${esc(r.name || "—")}</option>`).join("");
+      return `<div class="field"><label>${label}</label>
+        <select class="select" data-cfg="${esc(cle)}"><option value="">— Aucun —</option>${options}</select>
+        <span class="field-note">${aide}</span></div>`;
     }
-    const options = (p?.roles || []).map(r => {
-      const pris = multiple ? choisis.includes(String(r.id)) : String(r.id) === String(valeur);
-      return `<option value="${esc(r.id)}"${pris ? " selected" : ""}>@ ${esc(r.name)}</option>`;
+    const choisis = choixCourants(valeur, true);
+    const roles = p?.roles || [];
+    const parId = new Map(roles.map(r => [String(r.id), r]));
+    const jetons = choisis.map(id => {
+      const r = parId.get(String(id));
+      return `<span class="picker-chip" style="--rc:${couleurRole(r)}"><i></i>${esc(r?.name || id)}
+        <button type="button" data-action="picker-retirer" data-cle="${esc(cle)}" data-id="${esc(id)}" aria-label="Retirer">×</button></span>`;
     }).join("");
+    const options = roles.map(r => {
+      const pris = choisis.includes(String(r.id));
+      return `<button type="button" class="picker-opt${pris ? " pris" : ""}" data-action="picker-choisir" data-cle="${esc(cle)}" data-id="${esc(r.id)}" style="--rc:${couleurRole(r)}">
+        <i></i><span>${esc(r.name || "—")}</span>${pris ? "<b>✓</b>" : ""}</button>`;
+    }).join("");
+    const ouvert = ui.pickerOuvert === cle;
     return `<div class="field"><label>${label}</label>
-      <select class="select" data-cfg="${esc(cle)}"${multiple ? ' multiple size="5" data-multi="1"' : ""}>
-        ${multiple ? "" : '<option value="">— Aucun —</option>'}${options}
-      </select>
-      <span class="field-note">${multiple ? "Maintenez Ctrl (⌘ sur Mac) pour en choisir plusieurs. " : ""}${aide}</span></div>`;
+      <div class="picker${ouvert ? " ouvert" : ""}" data-picker="${esc(cle)}">
+        <div class="picker-champ">${jetons}
+          <input class="picker-input" data-picker-cherche="${esc(cle)}" autocomplete="off" spellcheck="false"
+            placeholder="${choisis.length ? "Ajouter…" : "🔎 Rechercher un rôle…"}"></div>
+        <div class="picker-liste"${ouvert ? "" : " hidden"}>${options || '<div class="picker-vide">Aucun rôle sur ce serveur.</div>'}</div>
+      </div>
+      <span class="field-note">${aide}</span></div>`;
   }
 
   // Interrupteur enregistré dans le bot.
@@ -3738,6 +3766,12 @@
     document.body.classList.toggle("overlay-open", Boolean(ui.menuProfil) || modalRoot.innerHTML !== "");
     setTimeout(scrollChatToBottom, 0);
     animerCompteurs();
+    // Sélecteur de rôles resté ouvert : le redessin lui rend son focus, son
+    // texte tapé et son filtrage — pour enchaîner les choix sans re-cliquer.
+    if (ui.pickerOuvert) {
+      const champ = app.querySelector(`[data-picker-cherche="${ui.pickerOuvert}"]`);
+      if (champ) { champ.value = ui.pickerRecherche || ""; filtrerPicker(champ); champ.focus(); }
+    }
   }
 
   // 🔢 Les compteurs marqués data-compteur montent jusqu'à leur valeur à
@@ -3992,6 +4026,12 @@
   }
 
   document.addEventListener("click", async event => {
+    // Un clic hors du sélecteur de rôles déplié le referme (sans redessiner).
+    if (ui.pickerOuvert && !event.target.closest(".picker")) {
+      ui.pickerOuvert = null;
+      document.querySelectorAll(".picker-liste").forEach(l => { l.hidden = true; });
+      document.querySelectorAll(".picker.ouvert").forEach(p => p.classList.remove("ouvert"));
+    }
     // Interrupteurs des réglages du bot : bascule immédiate, enregistrée
     // seulement au clic sur « Enregistrer dans le bot ».
     const bascule = event.target.closest("[data-cfg-toggle]");
@@ -4084,6 +4124,27 @@
           ui.notesTout = true;
           remplirNotes();
           break;
+        // Sélecteur de rôles façon Discord : un clic sur un rôle l'ajoute ou
+        // le retire ; la liste reste ouverte pour enchaîner les choix.
+        case "picker-choisir": {
+          const cle = target.dataset.cle, id = String(target.dataset.id);
+          const ids = choixCourants(cfgCourant()[cle], true);
+          const deja = ids.indexOf(id);
+          if (deja >= 0) ids.splice(deja, 1); else ids.push(id);
+          ui.brouillonModule = ui.brouillonModule || {};
+          ui.brouillonModule[cle] = JSON.stringify(ids);
+          ui.pickerOuvert = cle;
+          render();
+          break;
+        }
+        case "picker-retirer": {
+          const cle = target.dataset.cle, id = String(target.dataset.id);
+          const ids = choixCourants(cfgCourant()[cle], true).filter(x => x !== id);
+          ui.brouillonModule = ui.brouillonModule || {};
+          ui.brouillonModule[cle] = JSON.stringify(ids);
+          render();
+          break;
+        }
         case "open-creator-maj":
           ui.creatorTab = "maj";
           navigate("creator");
@@ -4961,7 +5022,33 @@
   }
   document.addEventListener("input", event => {
     if (event.target.closest("#site-builder-form")) livePreview();
+    // Recherche dans le sélecteur de rôles : filtrage en place, sans
+    // redessiner (le champ garderait sinon difficilement le focus).
+    if (event.target.matches?.("[data-picker-cherche]")) {
+      ui.pickerRecherche = event.target.value;
+      filtrerPicker(event.target);
+    }
   });
+
+  // La liste du sélecteur de rôles s'ouvre dès que son champ prend le focus.
+  document.addEventListener("focusin", event => {
+    const champ = event.target.closest?.("[data-picker-cherche]");
+    if (champ && ui.pickerOuvert !== champ.dataset.pickerCherche) {
+      ui.pickerOuvert = champ.dataset.pickerCherche;
+      ui.pickerRecherche = "";
+      render();
+    }
+  });
+
+  // Ne montre que les rôles dont le nom contient ce qui est tapé.
+  function filtrerPicker(champ) {
+    const liste = champ.closest(".picker")?.querySelector(".picker-liste");
+    if (!liste) return;
+    const q = champ.value.trim().toLowerCase();
+    liste.querySelectorAll(".picker-opt").forEach(o => {
+      o.hidden = Boolean(q) && !o.textContent.toLowerCase().includes(q);
+    });
+  }
 
   document.addEventListener("change", async event => {
     const target = event.target;
