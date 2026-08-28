@@ -318,6 +318,29 @@
     return peutGerer() ? PAGES_GESTIONNAIRE : PAGES_PUBLIQUES;
   }
 
+  // 🔒 Le dashboard exige un compte Discord connecté — la connexion ne passe
+  // QUE par Discord. Deux portes assumées, et deux seulement :
+  //  • la session de secours (SITE_ADMIN_PASSWORD de config.php), si le
+  //    propriétaire en a volontairement configuré une : c'est son filet
+  //    anti-perte de compte, jamais proposé quand Discord fonctionne ;
+  //  • l'installation neuve où la connexion Discord n'est pas encore
+  //    configurée ET où rien ne verrouille le site : sans cette porte, il
+  //    serait impossible d'atteindre l'écran ⚙️ Créateur qui configure
+  //    Discord (le bandeau rouge rappelle alors de le faire).
+  function accesDashboard() {
+    if (MOI) return true;
+    if (AUTH.required && AUTH.ok) return true;
+    return !DISCORD.pret && !AUTH.required;
+  }
+
+  // Envoie vers la connexion Discord — ou explique pourquoi elle n'est pas
+  // prête, au lieu d'un bouton qui ne fait rien.
+  function versConnexion() {
+    if (DISCORD.pret) { window.location.href = "oauth.php?p=login"; return; }
+    if (AUTH.motDePasse) { openLoginModal(); return; }
+    toast("CONNEXION DISCORD", "Elle n'est pas encore configurée : le propriétaire doit déclarer l'application dans ⚙️ Créateur → 🔑 Connexion Discord.", "error");
+  }
+
   // Bloc profil du bandeau : le vrai compte Discord, la session par mot de
   // passe, ou une invitation à se connecter.
   function profileBlock() {
@@ -333,7 +356,7 @@
       }
       // Visiteur : le menu reste accessible (aperçu, notifications…), mais
       // c'est « Se connecter » qui saute aux yeux.
-      return `<button class="btn primary small" data-action="auth-open" title="Se connecter avec Discord">🎮 Se connecter</button>
+      return `<button class="btn primary small" data-action="se-connecter" title="Se connecter avec Discord">🎮 Se connecter</button>
         <button class="icon-btn${ouvert}" data-action="menu-profil" title="Menu" aria-haspopup="menu">⋯</button>`;
     }
     const g = MOI.grade ? gradeById(MOI.grade) : null;
@@ -378,7 +401,7 @@
       ? `${item("account-open", "👤", "Mon compte", MOI ? "identifiant, grade, serveurs" : "session en cours")}
          ${MOI ? item("account-switch", "🔁", "Changer de compte", "choisir un autre compte Discord") : ""}
          ${item("deconnexion", "⏻", "Se déconnecter", "", "danger")}`
-      : `${item("auth-open", "🎮", "Se connecter", "avec votre compte Discord")}`;
+      : `${item("se-connecter", "🎮", "Se connecter", "avec votre compte Discord")}`;
     return `
       <div class="pm-layer" data-action="menu-profil-fermer"></div>
       <div class="profile-menu" role="menu">
@@ -570,7 +593,7 @@
           <div class="top-actions">
             ${MOI ? profileBlock() : (DISCORD.pret
               ? `<a class="btn ghost" href="oauth.php?p=login" style="text-decoration:none">🎮 Se connecter</a>`
-              : `<button class="btn ghost" data-action="auth-open">🎮 Se connecter</button>`)}
+              : `<button class="btn ghost" data-action="se-connecter">🎮 Se connecter</button>`)}
             <button class="btn primary" data-action="pub-entrer">⚡ Ouvrir le dashboard</button>
           </div>
         </header>
@@ -909,7 +932,7 @@
         <div class="row" style="flex-direction:column;align-items:flex-start;gap:8px">
           <span style="color:var(--muted)">Si vous administrez un serveur Discord où ce bot est présent,
             la gestion de ce serveur s'ouvrira <b>automatiquement</b> après connexion.</span>
-          <div class="page-actions">${button("🎮 Se connecter avec Discord", "auth-open", "primary")}</div>
+          <div class="page-actions">${button("🎮 Se connecter avec Discord", "se-connecter", "primary")}</div>
         </div>
       </div></section>`;
     }
@@ -3706,7 +3729,8 @@
   }
 
   function render() {
-    if (!ui.activeBotId || ui.route === "gate") renderGate();
+    // 🔒 Sans compte Discord connecté, seule la page d'accueil publique existe.
+    if (!accesDashboard() || !ui.activeBotId || ui.route === "gate") renderGate();
     else renderShell();
     applySitePreferences();
     // Le menu du profil est un calque par-dessus la page, comme une pop-up :
@@ -3893,6 +3917,7 @@
   }
 
   function navigate(route) {
+    if (route !== "gate" && !accesDashboard()) { versConnexion(); return; }
     ui.route = route;
     ui.mobileOpen = false;
     render();
@@ -4026,6 +4051,8 @@
           break;
         }
         case "pub-entrer":
+          // 🔒 Pas de compte connecté = direction la connexion Discord.
+          if (!accesDashboard()) { versConnexion(); break; }
           // ⚡ Entrer dans le dashboard : on retient le premier bot si aucun
           // n'est encore choisi — plus d'écran intermédiaire de sélection.
           if (!ui.activeBotId) {
@@ -4148,6 +4175,10 @@
         case "auth-open":
           ui.menuProfil = false;
           openLoginModal();
+          break;
+        case "se-connecter":
+          ui.menuProfil = false;
+          versConnexion();
           break;
         case "banner-close":
           ui.bandeauVu = true;

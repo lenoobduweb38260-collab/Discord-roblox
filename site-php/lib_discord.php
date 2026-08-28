@@ -86,6 +86,14 @@ function discord_app(): array {
   return ['clientId' => $s['clientId'], 'clientSecret' => $s['clientSecret'], 'origine' => 'aucune'];
 }
 
+// La connexion Discord est-elle prête (Client ID + Secret déclarés) ?
+// Dès qu'elle l'est, elle devient LA porte du site : sans compte connecté,
+// on ne voit que la page d'accueil publique.
+function discord_configure(): bool {
+  $app = discord_app();
+  return $app['clientId'] !== '' && $app['clientSecret'] !== '';
+}
+
 // Lecture (par expression régulière, jamais d'exécution) du config.php du
 // dashboard voisin, pour réutiliser la même application Discord.
 function dashboard_discord(): array {

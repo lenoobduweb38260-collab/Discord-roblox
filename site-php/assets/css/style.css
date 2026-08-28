@@ -1239,11 +1239,12 @@ code {
     radial-gradient(38% 44% at 88% 92%, rgba(196, 76, 255, .22), transparent 70%),
     radial-gradient(24% 30% at 60% 42%, rgba(79, 217, 255, .10), transparent 70%),
     linear-gradient(180deg, var(--bg), var(--bg-2));
-  animation: souffle 18s ease-in-out infinite alternate;
+  /* ⚡ Plus d'animation ici : bouger les dégradés + hue-rotate repeignait
+     TOUT l'écran en continu — le pire poste de consommation du site. */
 }
 @keyframes souffle {
-  from { background-position: 0 0, 0 0, 0 0, 0 0; filter: hue-rotate(0deg); }
-  to   { background-position: 60px 40px, -50px -30px, 30px -40px, 0 0; filter: hue-rotate(-8deg); }
+  from { background-position: 0 0, 0 0, 0 0, 0 0; }
+  to   { background-position: 60px 40px, -50px -30px, 30px -40px, 0 0; }
 }
 .sky-layer::before {
   content: ""; position: absolute; inset: 0;
@@ -1302,15 +1303,20 @@ body[data-bg="video"] .sky-layer::after { display: none; }
   box-shadow: 0 4px 24px rgba(var(--accent-rgb), .45);
 }
 .btn.primary:hover { box-shadow: 0 8px 34px rgba(196, 76, 255, .5); }
-/* Reflet qui balaie les boutons pleins. */
+/* Reflet qui balaie les boutons pleins — au survol seulement : en continu,
+   il animait « left » (recalcul de mise en page à chaque image) sur CHAQUE
+   bouton de la page. */
 .btn.primary::after, .btn.success::after {
   content: ""; position: absolute; top: 0; left: -70%; width: 45%; height: 100%;
   background: linear-gradient(100deg, transparent, rgba(255, 255, 255, .5), transparent);
-  transform: skewX(-20deg);
-  animation: reflet 3.4s infinite;
+  transform: skewX(-20deg) translateX(0);
   pointer-events: none;
 }
-@keyframes reflet { 0% { left: -70%; } 55% { left: 135%; } 100% { left: 135%; } }
+.btn.primary:hover::after, .btn.success:hover::after,
+.btn.primary:focus-visible::after, .btn.success:focus-visible::after {
+  animation: reflet .8s ease .05s 1;
+}
+@keyframes reflet { to { transform: skewX(-20deg) translateX(480%); } }
 .btn.success { background: linear-gradient(120deg, #1fbf74, #2fe38b 60%, #37e6c8); box-shadow: 0 4px 22px rgba(47, 227, 139, .35); }
 .btn.ghost { background: transparent; }
 .btn.ghost:hover { background: rgba(255, 255, 255, .05); }
@@ -1933,7 +1939,9 @@ textarea.input, .field textarea { resize: vertical; min-height: 74px; }
 }
 .previewbar span { flex: 1; min-width: 0; }
 .previewbar.alerte { animation: alerteClignote 2.6s ease-in-out infinite; }
-@keyframes alerteClignote { 50% { box-shadow: 0 0 22px rgba(255, 92, 116, .3); } }
+/* ⚡ On pulse la bordure, pas une ombre : repeindre l'ombre d'un bandeau
+   pleine largeur à chaque image se voyait sur les machines modestes. */
+@keyframes alerteClignote { 50% { border-color: rgba(255, 92, 116, .85); } }
 .previewnote { font-size: 11.5px; color: var(--muted-2); }
 
 /* ── 🪪 Documents RP : aperçus façon carte plastifiée ────────────── */
@@ -1947,12 +1955,13 @@ textarea.input, .field textarea { resize: vertical; min-height: 74px; }
 }
 .doc-rp::after {
   content: ""; position: absolute; top: -60%; left: -80%; width: 55%; height: 220%;
-  transform: rotate(18deg);
+  transform: rotate(18deg) translateX(0);
   background: linear-gradient(100deg, transparent, rgba(255, 255, 255, .38), rgba(79, 217, 255, .16), transparent);
-  animation: holo 4.6s ease-in-out infinite;
   pointer-events: none;
 }
-@keyframes holo { 0%, 55% { left: -80%; } 85%, 100% { left: 150%; } }
+/* Le balayage holographique ne joue qu'au survol du document. */
+.doc-rp:hover::after { animation: holo 1.4s ease-in-out 1; }
+@keyframes holo { to { transform: rotate(18deg) translateX(430%); } }
 .doc-rp .doc-bandeau { background: #23233a; color: #fff; padding: 10px 14px; }
 .doc-rp .doc-srv { font-size: 9.5px; letter-spacing: .16em; text-transform: uppercase; opacity: .75; }
 .doc-rp .doc-titre { font-size: 15px; font-weight: 900; letter-spacing: .04em; }
@@ -2277,3 +2286,18 @@ tr.cliquable { cursor: pointer; }
   transition: color .15s, background .15s;
 }
 .foot-liens button:hover { color: var(--text); background: rgba(255, 255, 255, .05); }
+/* ── ⚡ Performance ──────────────────────────────────────────────────
+   Le flou d'arrière-plan (backdrop-filter) se recalcule à chaque image dès
+   que quelque chose bouge derrière — sur une page pleine de cartes, c'était
+   LA source de lag. On le réserve aux calques posés PAR-DESSUS une page
+   figée (modales, menu du profil, toasts) ; les cartes et le bandeau
+   deviennent quasi opaques : même rendu, zéro flou à recalculer. */
+.topbar { backdrop-filter: none; background: rgba(11, 9, 14, .96); }
+.sidebar { backdrop-filter: none; background: rgba(13, 11, 17, .97); }
+.pub-top { backdrop-filter: none; background: rgba(7, 6, 13, .96); }
+.panel, .stat-card, .server-card, .gate-metric, .chip { backdrop-filter: none; }
+/* ♿ + ⚡ « Réduire les animations » côté système = les mêmes coupes que le
+   réglage « Animations » du Site builder. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition: none !important; }
+}

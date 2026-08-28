@@ -17,9 +17,12 @@ require_once __DIR__ . '/lib_discord.php';
 if (session_status() !== PHP_SESSION_ACTIVE) session_start();
 
 $motDePasse = defined('SITE_ADMIN_PASSWORD') ? (string) SITE_ADMIN_PASSWORD : '';
+$app = discord_app();
+$discordPret = $app['clientId'] !== '' && $app['clientSecret'] !== '';
 // Le site est protégé dès qu'un propriétaire est épinglé, qu'un compte est
-// autorisé, ou qu'un mot de passe de secours existe.
-$authRequired = $motDePasse !== '' || owner_id() !== '' || discord_admins() !== [] || discord_staff() !== [];
+// autorisé, qu'un mot de passe de secours existe — ou dès que la connexion
+// Discord est configurée : elle devient alors la seule porte du site.
+$authRequired = $motDePasse !== '' || owner_id() !== '' || discord_admins() !== [] || discord_staff() !== [] || $discordPret;
 $authOk = !$authRequired || discord_est_admin() || !empty($_SESSION['site_admin']);
 
 // Profil Discord de la session (jamais de secret ici).
@@ -40,9 +43,6 @@ if (!empty($_SESSION['discord']['id'])) {
     ];
     unset($_SESSION['discord_premier']);
 }
-$app = discord_app();
-$discordPret = $app['clientId'] !== '' && $app['clientSecret'] !== '';
-
 // 🌐 Marque les serveurs où le membre connecté est réellement présent, dès
 // le premier affichage — sans quoi il faudrait attendre un appel à l'API.
 $bootState = marquer_mes_serveurs($bootState);

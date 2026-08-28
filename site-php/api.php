@@ -36,20 +36,23 @@ require_once __DIR__ . '/lib_db.php';
 
 // ----- 🔒 Protection de l'administration -----
 // Deux façons d'être administrateur :
-//   • connecté avec un COMPTE DISCORD autorisé (recommandé) ;
-//   • ou le mot de passe de secours de config.php.
-// Si ni compte autorisé ni mot de passe n'existe, le site reste ouvert
-// (pratique en local, signalé en rouge dans le diagnostic).
+//   • connecté avec un COMPTE DISCORD autorisé (la voie normale) ;
+//   • ou le mot de passe de secours de config.php (filet facultatif).
+// Le site ne reste ouvert que tant que RIEN n'est configuré — ni compte, ni
+// mot de passe, ni connexion Discord (pratique pour la toute première mise en
+// place, signalé en rouge). Dès que la connexion Discord est prête, elle
+// devient la seule porte : sans compte connecté, page d'accueil publique.
 session_start();
 function admin_password(): string {
   return defined('SITE_ADMIN_PASSWORD') ? (string) SITE_ADMIN_PASSWORD : '';
 }
-// Une protection est en place dès qu'il y a un mot de passe OU au moins un
-// compte Discord autorisé.
 // Une protection est en place dès qu'il y a un propriétaire épinglé, un
-// membre d'équipe déclaré, un compte administrateur, ou un mot de passe.
+// membre d'équipe déclaré, un compte administrateur, un mot de passe —
+// ou dès que la connexion Discord est configurée : à partir de là, elle
+// devient la SEULE porte du site (personne n'entre sans compte connecté).
 function admin_requis(): bool {
-  return admin_password() !== '' || owner_id() !== '' || discord_admins() !== [] || discord_staff() !== [];
+  return admin_password() !== '' || owner_id() !== '' || discord_admins() !== [] || discord_staff() !== []
+    || discord_configure();
 }
 function admin_connecte(): bool {
   if (!admin_requis()) return true;
@@ -61,7 +64,7 @@ function exiger_admin(): void {
   // Message adapté à la protection réellement en place.
   $message = !empty($_SESSION['discord']['id'])
     ? "Votre compte Discord n'est pas autorisé à modifier ce site. Demandez au propriétaire de vous ajouter (⚙️ Créateur → 🔑 Connexion Discord)."
-    : (discord_admins()
+    : (discord_admins() || discord_configure()
       ? "Connexion requise : identifiez-vous avec votre compte Discord."
       : "Connexion requise : entrez le mot de passe d'administration.");
   respond(['ok' => false, 'error' => $message, 'authRequired' => true], 401);

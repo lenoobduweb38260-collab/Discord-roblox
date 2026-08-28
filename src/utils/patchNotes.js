@@ -1584,6 +1584,7 @@ const RELEASES = [
     ajout: [
       '📝 **Les notes de mise a jour se lisent sur le site** : le menu « Mises a jour » de la page d\'accueil montre le journal du bot, version par version',
       '🎫 **Une section Support sur la page d\'accueil** : ou ouvrir un ticket, comment joindre le staff, et le serveur d\'entraide si le staff en a configure un',
+      '🔒 **Le dashboard exige un compte Discord connecte** : la page d\'accueil reste publique, tout le reste passe par « Se connecter avec Discord » — et par rien d\'autre',
     ],
     amelioration: [
       '🖥️ Le site occupe enfin tout l\'ecran : plus de bandes noires sur les grands moniteurs, du menu du haut au pied de page',
