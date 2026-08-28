@@ -1777,7 +1777,11 @@ textarea.input, .field textarea { resize: vertical; min-height: 74px; }
 .ticket-card.on { border-color: var(--a2); background: var(--accent-soft); box-shadow: 0 0 18px rgba(var(--accent-rgb), .18); }
 .ticket-card b { font-size: 13px; display: block; margin-bottom: 2px; }
 .ticket-card small { color: var(--muted-2); font-size: 11.5px; }
-.ticket-status { position: absolute; top: 11px; right: 11px; }
+.ticket-card .ticket-status { position: absolute; top: 11px; right: 11px; }
+.ticket-status { display: inline-block; border-radius: 7px; padding: 2px 9px; font-size: 11.5px; font-weight: 700; background: rgba(255,255,255,.07); color: var(--muted); white-space: nowrap; }
+.ticket-status.ouvert { background: rgba(79,217,255,.13); color: var(--cyan); }
+.ticket-status.en-attente, .ticket-status.attente { background: rgba(243,200,106,.13); color: var(--gold); }
+.ticket-status.ferme, .ticket-status.fermé { background: rgba(255,92,116,.13); color: var(--red); }
 .chat-panel { display: flex; flex-direction: column; min-height: 380px; max-height: 72vh; }
 .chat-head { display: flex; align-items: center; gap: 10px; padding-bottom: 11px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
 .chat-head b { font-size: 14px; }
@@ -2137,3 +2141,65 @@ button.server-card { font: inherit; color: inherit; text-align: left; cursor: po
   padding: 10px 13px; font-size: 12.5px; color: var(--muted);
   margin-bottom: 13px;
 }
+
+/* ── 🏠 Menu principal public (maquette) ────────────────────────── */
+.pub-top {
+  position: sticky; top: 0; z-index: 20;
+  display: flex; align-items: center; gap: 20px;
+  padding: 14px clamp(14px, 5vw, 48px);
+  background: rgba(7, 6, 13, .72);
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--line);
+}
+.pub-top .top-actions { margin-left: auto; }
+.logo-txt b { display: block; font-size: 15px; line-height: 1.1; }
+.logo-txt span { font-size: 10.5px; color: var(--muted-2); letter-spacing: .14em; text-transform: uppercase; }
+.pub-nav { display: flex; gap: 4px; margin-left: 8px; }
+.pub-nav button {
+  border: none; background: none; cursor: pointer;
+  padding: 8px 13px; border-radius: 9px;
+  color: var(--muted); font: 600 13.5px/1.2 var(--font-body);
+  transition: background .15s, color .15s;
+}
+.pub-nav button:hover, .pub-nav button.on { color: var(--text); background: rgba(255, 255, 255, .06); }
+@media (max-width: 860px) { .pub-nav { display: none; } }
+.page-public .hero-panel { border: none; background: none; }
+.feat-wrap { padding: 10px clamp(14px, 5vw, 48px) 54px; max-width: 1160px; margin-inline: auto; }
+.feat-wrap h2 { text-align: center; font: 800 26px/1.2 var(--font-display); margin: 0 0 6px; }
+.feat-wrap .lead { text-align: center; color: var(--muted); margin: 0 0 26px; font-size: 14px; }
+.pub-foot {
+  border-top: 1px solid var(--line);
+  padding: 24px clamp(14px, 5vw, 48px);
+  display: flex; gap: 14px; align-items: center; flex-wrap: wrap;
+  color: var(--muted-2); font-size: 12.5px;
+}
+.public-inner { max-width: 1160px; margin-inline: auto; padding: 0 clamp(14px, 5vw, 48px) 40px; display: flex; flex-direction: column; gap: 16px; }
+
+/* ── 🎫 Vue d'un ticket : colonne d'actions ─────────────────────── */
+.tk-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.tk-actions .btn { width: 100%; }
+@media (max-width: 520px) { .tk-actions { grid-template-columns: 1fr; } }
+/* Accessibilité : sans animations, l'écran de démarrage s'efface net. */
+@media (prefers-reduced-motion: reduce) {
+  .boot-screen { transition: none; }
+  .boot-screen.is-hidden { display: none; }
+}
+/* Alias des classes de champs employées par les vues. */
+.select, .textarea {
+  width: 100%;
+  background: var(--card-2);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 9px 12px;
+  color: var(--text);
+  font: 400 13px/1.4 var(--font-body);
+  transition: border-color .15s, box-shadow .15s;
+}
+.select:focus, .textarea:focus {
+  outline: none;
+  border-color: var(--a2);
+  box-shadow: 0 0 0 3px rgba(var(--accent-rgb), .18);
+}
+.select option { background: #16142a; color: var(--text); }
+.textarea { resize: vertical; min-height: 74px; }
+.chat-compose .textarea { min-height: 46px; }

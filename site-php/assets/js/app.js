@@ -32,7 +32,8 @@
     route: _lien.get("page") || (storage.getItem("aincrad.activeBot") || _lien.get("bot") ? "dashboard" : "gate"),
     selectedServerId: _lien.get("server") || storage.getItem("aincrad.server") || (state.servers?.[0]?.id ?? null),
     module: _lien.get("module") || "overview",
-    selectedTicketId: state.tickets?.find(t => t.status !== "fermé")?.id || state.tickets?.[0]?.id || null,
+    selectedTicketId: _lien.get("ticket") || state.tickets?.find(t => t.status !== "fermé")?.id || state.tickets?.[0]?.id || null,
+    ticketOuvert: Boolean(_lien.get("ticket")),
     blacklistQuery: "",
     serverQuery: "",
     mobileOpen: false,
@@ -531,15 +532,90 @@
       </div>`;
   }
 
-  // Page d'accueil publique : rendue depuis les BLOCS composés par le
-  // créateur dans « Constructeur de page ».
+  // 🏠 MENU PRINCIPAL PUBLIC — la maquette validée : barre de navigation,
+  // héro avec le bot qui flotte, appels à l'action, bande de statistiques,
+  // grille de fonctionnalités, puis les blocs personnalisés du Site builder.
   function renderGate() {
+    const cfg = siteConfig();
     const blocks = pageBlocks();
+    const hero = blocks.find(b => b.type === "hero")?.props || {};
+    const bots = state.bots || [];
+    const bot = bots[0] || {};
+    const servers = state.servers || [];
+    const membres = bots.reduce((s, b) => s + Number(b.users || 0), 0) || servers.reduce((s, x) => s + Number(x.members || 0), 0);
+    const enLigne = bots.some(b => /ligne|online|en service/i.test(String(b.status || "")));
+    const invite = bots.map(b => inviteUrl(b)).find(Boolean);
+    const custom = blocks.filter(b => !["hero", "stats", "bots"].includes(b.type));
+    const features = [
+      ["🪪", "Roleplay complet", "Cartes d'identité, permis à points, entreprises avec patrons & employés, assurances, casier, warns RP."],
+      ["🎫", "Tickets & support vocal", "Panneaux à raisons, claim, fil privé staff, transcripts — et file d'attente vocale automatique."],
+      ["🛡️", "Sécurité sérieuse", "Anti-spam, anti-nuke, captcha à l'arrivée, blacklist mutualisée avec preuves, ban global."],
+      ["📈", "Niveaux & récompenses", "XP écrit + vocal fusionnés en un seul niveau, rôles paliers, classements."],
+      ["🎵", "Musique & radios", "YouTube, SoundCloud, Spotify/Deezer (via YouTube) et radios françaises en direct."],
+      ["🌍", "6 langues", "Français, English, Deutsch, Español, Polski, Русский — jusqu'au moindre détail."],
+    ];
     app.innerHTML = `
       <div class="page-public">
-        ${blocks.map((block, index) => renderBlock(block, index)).join("")}
-      </div>
-      ${ui.activeBotId ? `<button class="btn primary gate-back" data-action="navigate" data-route="dashboard">← Retour à l'administration</button>` : ""}`;
+        <header class="pub-top">
+          <div class="brand-home" data-action="go-home">
+            <div class="brand-mark">${brandMark()}</div>
+            <div class="logo-txt"><b>${esc(cfg.siteName || "Dashboard du bot")}</b><span>${esc(cfg.subtitle || "Discord Management")}</span></div>
+          </div>
+          <nav class="pub-nav">
+            <button class="on" data-action="pub-ancre" data-cible="#haut">Accueil</button>
+            <button data-action="pub-ancre" data-cible="#fonctionnalites">Fonctionnalités</button>
+            ${custom.length ? `<button data-action="pub-ancre" data-cible="#extras">Communauté</button>` : ""}
+          </nav>
+          <div class="top-actions">
+            ${MOI ? profileBlock() : (DISCORD.pret
+              ? `<a class="btn ghost" href="oauth.php?p=login" style="text-decoration:none">🎮 Se connecter</a>`
+              : `<button class="btn ghost" data-action="auth-open">🎮 Se connecter</button>`)}
+            <button class="btn primary" data-action="pub-entrer">⚡ Ouvrir le dashboard</button>
+          </div>
+        </header>
+        ${profileMenu()}
+
+        <section class="hero-panel" id="haut">
+          <div class="hero-content">
+            <div class="bot-float">${brandMark()}</div>
+            <span class="hero-kicker"><i class="status-dot"${enLigne ? "" : ' style="background:var(--muted-2);box-shadow:none"'}></i>
+              ${enLigne ? "BOT EN LIGNE" : "BOT"}${bot.latency ? ` · PING ${esc(bot.latency)} MS` : ""}</span>
+            <h1>${hero.titre ? esc(hero.titre) : `Le bot <span class="gtxt">tout-en-un</span> de votre serveur Roleplay`}</h1>
+            <p class="accroche">${esc(hero.texte || "Cartes d'identité, permis, entreprises, assurances, tickets, niveaux, musique, sécurité — et ce dashboard pour tout piloter sans une seule commande.")}</p>
+            <div class="hero-cta">
+              ${invite ? `<a class="btn primary big pulse" href="${esc(invite)}" target="_blank" rel="noopener" style="text-decoration:none">➕ Inviter le bot</a>` : ""}
+              ${!MOI && DISCORD.pret ? `<a class="btn big" href="oauth.php?p=login" style="text-decoration:none">🎮 Se connecter avec Discord</a>` : ""}
+              <button class="btn big ghost" data-action="pub-ancre" data-cible="#fonctionnalites">📖 Découvrir ↓</button>
+            </div>
+            <div class="gate-metrics">
+              ${membres ? `<div class="gate-metric"><strong>${formatNumber(membres)}</strong><span>membres protégés</span></div>` : ""}
+              ${servers.length ? `<div class="gate-metric"><strong>${servers.length}</strong><span>serveur(s) équipé(s)</span></div>` : ""}
+              <div class="gate-metric"><strong>${bots.length || 1}</strong><span>bot(s) de la communauté</span></div>
+              <div class="gate-metric"><strong>6</strong><span>langues parlées</span></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="feat-wrap" id="fonctionnalites">
+          <h2>Tout ce qu'il sait <span class="gtxt">faire</span></h2>
+          <p class="lead">Chaque module s'active ou se coupe par serveur, depuis le dashboard ou <code>/config</code>.</p>
+          <div class="feature-grid">
+            ${features.map(([ic, titre, texte], i) => `<div class="feature-card${i === 0 ? " glow hud" : ""}">
+              <div class="feature-icon">${ic}</div><b>${esc(titre)}</b><span>${esc(texte)}</span></div>`).join("")}
+          </div>
+        </section>
+
+        ${custom.length ? `<section class="public-inner" id="extras">
+          ${custom.map((block, index) => renderBlock(block, index)).join("")}
+        </section>` : ""}
+
+        <footer class="pub-foot">
+          <div class="brand-mark" style="width:28px;height:28px;font-size:13px">${brandMark()}</div>
+          <span>${esc(cfg.siteName || "Dashboard du bot")}${cfg.footer ? ` — ${esc(cfg.footer)}` : ""}</span>
+          <span class="spacer" style="flex:1"></span>
+          ${ui.activeBotId ? `<button class="btn small" data-action="navigate" data-route="dashboard">← Retour à l'administration</button>` : ""}
+        </footer>
+      </div>`;
     startAnnouncements();
   }
 
@@ -808,10 +884,10 @@
       </div>
       <div class="stat-stack">
         ${gestion ? `
-        <div class="stat-card hud"><span class="quick-icon">🗂️</span><strong data-compteur>${servers.length}</strong><span>Serveurs connectés</span><em>configurables ici</em></div>
-        <div class="stat-card"><span class="quick-icon">👥</span><strong data-compteur>${formatNumber(totalMembers)}</strong><span>Membres cumulés</span><em>${formatNumber(totalOnline)} en ligne</em></div>
-        <div class="stat-card"><span class="quick-icon">🎫</span><strong data-compteur>${openTickets}</strong><span>Tickets actifs</span><em>support disponible</em></div>
-        <div class="stat-card"><span class="quick-icon">🚫</span><strong data-compteur>${state.blacklist?.length || 0}</strong><span>Entrées blacklist</span><em>base globale</em></div>`
+        <div class="stat-card hud"><span class="quick-icon">🗂️</span><strong data-compteur>${servers.length}</strong><span>Serveurs connectés</span><em>configurables ici</em>${spark("serveurs")}</div>
+        <div class="stat-card"><span class="quick-icon">👥</span><strong data-compteur>${formatNumber(totalMembers)}</strong><span>Membres cumulés</span><em>${formatNumber(totalOnline)} en ligne</em>${spark("membres")}</div>
+        <div class="stat-card"><span class="quick-icon">🎫</span><strong data-compteur>${openTickets}</strong><span>Tickets actifs</span><em>support disponible</em>${spark("tickets")}</div>
+        <div class="stat-card"><span class="quick-icon">🚫</span><strong data-compteur>${state.blacklist?.length || 0}</strong><span>Entrées blacklist</span><em>base globale</em>${spark("blacklist")}</div>`
         : `
         <div class="stat-card hud"><span class="quick-icon">🤖</span><strong data-compteur>${(state.bots || []).length}</strong><span>Bots de la communauté</span><em>en service</em></div>
         <div class="stat-card"><span class="quick-icon">📡</span><strong>En ligne</strong><span>État</span><em>tous les modules actifs</em></div>`}
@@ -838,9 +914,22 @@
         </div>
       </div></section>
 
-      <div class="grid-2 mt-16">
-        <section class="panel"><div class="panel-inner"><div class="panel-head"><div><h3>Activité récente</h3><p>Flux des actions importantes du bot.</p></div></div><div class="activity-list">${activityRows()}</div></div></section>
-        <section class="panel"><div class="panel-inner"><div class="panel-head"><div><h3>Signal Cardinal</h3><p>État global des connexions Discord.</p></div><span class="chip green">STABLE</span></div><div class="radar"><div class="radar-grid"><i class="radar-dot" style="left:30%;top:42%"></i><i class="radar-dot" style="left:63%;top:25%"></i><i class="radar-dot" style="left:72%;top:68%"></i><i class="radar-dot" style="left:44%;top:73%"></i></div></div></div></section>
+      <div class="grid-2 mt-16" style="grid-template-columns:1.4fr 1fr">
+        <section class="panel"><div class="panel-inner"><div class="panel-head"><div><h3>🕒 Dernière activité</h3><p>Flux des actions importantes du bot.</p></div></div><div class="activity-list">${activityRows()}</div></div></section>
+        <div style="display:flex;flex-direction:column;gap:14px">
+          <section class="panel"><div class="panel-inner">
+            <div class="panel-head"><div><h3>🤖 Mes bots</h3><p>Reliés au site — cliquez pour basculer.</p></div></div>
+            ${(state.bots || []).map(b => `<button class="toggle-row" data-action="pick-bot" data-bot-id="${esc(b.id)}" style="width:100%;background:none;border:none;border-bottom:1px solid var(--line)">
+              ${botAvatar(b)}
+              <span class="toggle-copy" style="text-align:left"><b>${esc(b.name)}</b><span>${esc(b.tag || b.status || "")}${b.servers ? ` · ${esc(b.servers)} serveur(s)` : ""}</span></span>
+              ${b.id === ui.activeBotId ? '<span class="chip green">● actuel</span>' : '<span class="chip">basculer</span>'}
+            </button>`).join("") || emptyBlock("Aucun bot", "Reliez un bot dans ⚙️ Créateur → 🤖 Mes bots.")}
+          </div></section>
+          <section class="panel glow"><div class="panel-inner">
+            <div class="panel-head"><div><h3>📡 Signal du bot</h3><p>État des connexions Discord.</p></div><span class="chip green">STABLE</span></div>
+            <div class="radar"><div class="radar-grid"><i class="radar-dot" style="left:30%;top:42%"></i><i class="radar-dot" style="left:63%;top:25%"></i><i class="radar-dot" style="left:72%;top:68%"></i><i class="radar-dot" style="left:44%;top:73%"></i></div></div>
+          </div></section>
+        </div>
       </div>` : `
       ${panneauAccesRefuse()}` }
     </div>`;
@@ -875,6 +964,16 @@
       <span class="server-meta"><span>${formatNumber(server.members)} membres</span><span>${formatNumber(server.online)} en ligne</span></span>
       <span class="server-progress"><span style="width:${Math.max(5, Number(server.activity || 0))}%"></span></span>
     </button>`;
+  }
+
+
+  // Mini-graphe décoratif des cartes KPI : un motif stable dérivé du libellé
+  // (pas une série de données — Discord ne fournit pas d'historique ici).
+  function spark(graine) {
+    let h = 0;
+    for (const c of String(graine)) h = (h * 31 + c.charCodeAt(0)) % 997;
+    const barres = Array.from({ length: 7 }, (_, i) => 30 + ((h * (i + 3)) % 63));
+    return `<span class="spark">${barres.map(v => `<i style="height:${v}%"></i>`).join("")}</span>`;
   }
 
   function quickAction(icon, title, subtitle, route) {
@@ -945,19 +1044,15 @@
     // 🎭 On demande au bot le grade réel du membre sur CE serveur.
     if (MOI && server?.id) chargerMonGrade(server.id);
     return `<div class="content-view">
-      ${pageHead("Serveurs / Configuration", server.name, `Module actif : ${current.label}. Les modifications sont enregistrées dans le fichier JSON du projet.`, button("Retour aux serveurs", "navigate", "ghost", 'data-route="servers"'))}
+      ${pageHead("Serveur / Configuration", server.name,
+        "Tout ce que le bot fait sur ce serveur se règle ici — la même base que /config sur Discord.",
+        `<span class="chip">${formatNumber(server.members)} membres</span><span class="chip green"><i class="status-dot"></i> CONNECTÉ</span>`
+        + button("← Mes serveurs", "navigate", "ghost", 'data-route="servers"'))}
       ${monGradeBandeau(server)}
-      <div class="server-layout">
-        <aside class="server-sidebar">
-          <section class="panel"><div class="server-id-card">
-            ${serverIcon(server)}<h3>${esc(server.name)}</h3><p>${formatNumber(server.members)} membres · ${formatNumber(server.online)} en ligne</p>
-            <div class="hero-status" style="justify-content:center"><span class="chip green">CONNECTÉ</span><span class="chip">${esc(server.region)}</span></div>
-          </div></section>
-          <nav class="module-nav">${modules.filter(m => gradeCan("mod." + m.id)).map((module, index) => `
-            <button class="module-btn ${ui.module === module.id ? "active" : ""}" data-action="select-module" data-module="${module.id}"><span class="index">${String(index+1).padStart(2,"0")}</span><span class="label">${esc(module.label)}</span><i class="state"></i></button>`).join("")}</nav>
-        </aside>
-        <section>${moduleView(ui.module, server)}</section>
+      <div class="subtabs">${modules.filter(m => gradeCan("mod." + m.id)).map(module => `
+        <button class="subtab ${ui.module === module.id ? "on" : ""}" data-action="select-module" data-module="${module.id}">${esc(module.label)}</button>`).join("")}
       </div>
+      <section>${moduleView(ui.module, server)}</section>
     </div>`;
   }
 
@@ -2269,22 +2364,82 @@
   }
 
   function ticketsView() {
-    // 🗄️ Deux vues : les tickets EN COURS et les ARCHIVES (tickets fermés).
+    // 🗄️ Trois vues : la LISTE, le DÉTAIL d'un ticket, et les ARCHIVES.
     if (ui.ticketTab === "archives") return archivesView();
-    const ticket = (state.tickets || []).find(item => item.id === ui.selectedTicketId) || state.tickets?.[0];
+    const tickets = state.tickets || [];
     const nbArchives = (state.archives || []).length;
+    const ticket = ui.ticketOuvert ? tickets.find(item => item.id === ui.selectedTicketId) : null;
+    if (ticket) return ticketDetailView(ticket, nbArchives);
+    const compte = (etat) => tickets.filter(t => t.status === etat).length;
     return `<div class="content-view">
-      ${pageHead("Staff bot / Support", "Gestion des tickets", "Ouvrez une conversation, répondez depuis le site et modifiez son statut. Un ticket fermé part automatiquement dans les archives.",
-        button(`🗄️ Archives (${nbArchives})`, "ticket-tab", "ghost", 'data-tab="archives"') + button("Actualiser", "pulse-system", "primary"))}
-      <div class="ticket-layout">
-        <section class="panel"><div class="panel-head" style="padding:17px;margin:0"><div><h3>Tickets en cours</h3><p>${state.tickets?.length || 0} ticket(s) ouvert(s).</p></div></div><div class="ticket-list">
-          ${(state.tickets || []).map(item => `<button class="ticket-card ${ticket?.id === item.id ? "active" : ""}" data-action="select-ticket" data-ticket-id="${esc(item.id)}"><span><strong>${esc(item.id)} · ${esc(item.user)}</strong><p>${esc(item.subject)}</p><small>${esc(item.server)} · ${esc(item.date)}</small></span><span class="ticket-status ${slug(item.status)}">${esc(item.status)}</span></button>`).join("")
-            || emptyBlock("Aucun ticket en cours", "Les tickets fermés sont dans les archives.")}
+      ${pageHead("Modération / Support", "Tickets", "Cliquez sur un ticket pour l'ouvrir : conversation, actions et détails. Un ticket fermé part automatiquement dans les archives.",
+        button(`🗄️ Archives (${nbArchives})`, "ticket-tab", "ghost", 'data-tab="archives"') + button("🔄 Actualiser", "pulse-system", "primary"))}
+      <div class="stat-stack" style="margin-bottom:14px">
+        <div class="stat-card"><strong data-compteur>${compte("en attente")}</strong><span>🟡 En attente</span></div>
+        <div class="stat-card"><strong data-compteur>${compte("ouvert")}</strong><span>🔓 Ouverts</span></div>
+        <div class="stat-card"><strong data-compteur>${tickets.length}</strong><span>🎫 En cours au total</span></div>
+        <div class="stat-card"><strong data-compteur>${nbArchives}</strong><span>🔒 Archivés</span></div>
+      </div>
+      <section class="panel"><div class="panel-inner">
+        <div class="table-wrap"><table class="data-table">
+          <thead><tr><th>N°</th><th>Sujet</th><th>Membre</th><th>Serveur</th><th>État</th><th>Ouvert</th><th></th></tr></thead>
+          <tbody>${tickets.map(item => `<tr>
+            <td><b>${esc(item.id)}</b></td>
+            <td>${esc(item.subject)}</td>
+            <td>${esc(item.user)}</td>
+            <td>${esc(item.server)}</td>
+            <td><span class="ticket-status ${slug(item.status)}">${esc(item.status)}</span></td>
+            <td>${esc(item.date)}</td>
+            <td>${button("Ouvrir", "open-ticket", "small", `data-ticket-id="${esc(item.id)}"`)}</td>
+          </tr>`).join("") || `<tr><td colspan="7">${emptyBlock("Aucun ticket en cours", "Les tickets fermés sont dans les archives.")}</td></tr>`}</tbody>
+        </table></div>
+      </div></section>
+    </div>`;
+  }
+
+  // 🎫 Vue d'UN ticket — la maquette : conversation à gauche, colonne
+  // Actions + Détails à droite.
+  function ticketDetailView(ticket, nbArchives) {
+    const etatTag = `<span class="ticket-status ${slug(ticket.status)}" style="font-size:13px;padding:5px 12px">${esc(ticket.status)}</span>`;
+    const boutonEtat = (valeur, libelle) => ticket.status === valeur
+      ? `<button class="btn small primary" disabled>${libelle}</button>`
+      : `<button class="btn small" data-action="ticket-status-btn" data-ticket-id="${esc(ticket.id)}" data-statut="${esc(valeur)}">${libelle}</button>`;
+    return `<div class="content-view">
+      ${pageHead("Modération / Tickets", `🎫 Ticket ${ticket.id} — ${ticket.subject}`,
+        `Ouvert par ${ticket.user} · ${ticket.server} · ${ticket.date}`,
+        button("← Retour à la liste", "ticket-retour", "ghost small") + etatTag)}
+      <div class="ticket-layout" style="grid-template-columns:minmax(0,1.55fr) minmax(0,1fr)">
+        <section class="panel chat-panel"><div class="panel-inner" style="display:flex;flex-direction:column;min-height:420px">
+          <header class="chat-head"><div><h3>💬 Conversation</h3><p>${(ticket.messages || []).length} message(s) — vos réponses partent signées du staff.</p></div></header>
+          <div class="chat-messages" id="chat-messages">${(ticket.messages || []).map(message => `
+            <article class="message ${message.staff ? "staff" : ""}">
+              <div class="message-head"><strong>${esc(message.author)}</strong><time>${esc(message.time)}</time></div>
+              <p>${esc(message.content)}</p></article>`).join("") || emptyBlock("Pas encore de message", "Écrivez le premier message ci-dessous.")}</div>
+          <form class="chat-compose" data-form="ticket-message" data-ticket-id="${esc(ticket.id)}">
+            <textarea class="textarea" name="content" placeholder="✏️ Répondre au membre…"></textarea>
+            <button class="btn success" type="submit">Envoyer</button>
+          </form>
         </div></section>
-        ${ticket ? `<section class="panel chat-panel"><header class="chat-head"><div><h3>${esc(ticket.id)} · ${esc(ticket.subject)}</h3><p>${esc(ticket.user)} — ${esc(ticket.server)} — priorité ${esc(ticket.priority)}</p></div><select class="select" style="width:auto;min-width:135px" data-action="ticket-status" data-ticket-id="${esc(ticket.id)}"><option value="ouvert" ${ticket.status==="ouvert"?"selected":""}>Ouvert</option><option value="en attente" ${ticket.status==="en attente"?"selected":""}>En attente</option><option value="fermé" ${ticket.status==="fermé"?"selected":""}>Fermé</option></select></header>
-          <div class="chat-messages" id="chat-messages">${(ticket.messages || []).map(message => `<article class="message ${message.staff ? "staff" : ""}"><div class="message-head"><strong>${esc(message.author)}</strong><time>${esc(message.time)}</time></div><p>${esc(message.content)}</p></article>`).join("")}</div>
-          <form class="chat-compose" data-form="ticket-message" data-ticket-id="${esc(ticket.id)}"><textarea class="textarea" name="content" placeholder="Écrire une réponse au membre…" ${ticket.status === "fermé" ? "" : ""}></textarea><button class="btn success" type="submit">Envoyer la réponse</button></form>
-        </section>` : `<section class="panel">${emptyBlock("Aucun ticket", "Aucune conversation n'est disponible.")}</section>`}
+        <div style="display:flex;flex-direction:column;gap:14px">
+          <section class="panel glow hud"><div class="panel-inner">
+            <div class="panel-head"><div><h3>⚡ Actions</h3></div></div>
+            <div class="tk-actions">
+              ${boutonEtat("ouvert", "🔓 Ouvrir")}
+              ${boutonEtat("en attente", "🟡 En attente")}
+              ${boutonEtat("fermé", "🔒 Fermer + archiver")}
+              ${button("🗄️ Voir les archives", "ticket-tab", "small", 'data-tab="archives"')}
+            </div>
+          </div></section>
+          <section class="panel"><div class="panel-inner">
+            <div class="panel-head"><div><h3>📇 Détails</h3></div></div>
+            <div class="acc-row"><span>Membre</span><div><b>${esc(ticket.user)}</b></div></div>
+            <div class="acc-row"><span>Serveur</span><div><b>${esc(ticket.server)}</b></div></div>
+            <div class="acc-row"><span>Priorité</span><div><b>${esc(ticket.priority || "normale")}</b></div></div>
+            <div class="acc-row"><span>Ouvert</span><div><b>${esc(ticket.date)}</b></div></div>
+            <div class="acc-row"><span>Messages</span><div><b>${(ticket.messages || []).length}</b></div></div>
+            <div class="acc-row"><span>Archivés</span><div><b>${nbArchives} ticket(s) au total</b></div></div>
+          </div></section>
+        </div>
       </div>
     </div>`;
   }
@@ -3368,6 +3523,8 @@
   // chaque affichage — un chiffre déjà en mouvement n'est pas repris.
   function animerCompteurs() {
     if (document.body.dataset.anim === "off") return;
+    // ♿ Animations réduites : la valeur finale est déjà dans le HTML.
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     app.querySelectorAll("[data-compteur]").forEach(el => {
       const brut = el.textContent.trim();
       const cible = parseInt(brut.replace(/[^0-9]/g, ""), 10);
@@ -3647,11 +3804,39 @@
           render();
           toast("LINK START", `Interface ${activeBot().name} chargée.`);
           break;
-        case "switch-bot":
-          ui.activeBotId = null;
-          storage.removeItem("aincrad.activeBot");
-          ui.route = "gate";
-          render();
+        case "switch-bot": {
+          // 🤖 Changer de bot sans quitter le dashboard : une petite modale.
+          const bots = state.bots || [];
+          if (bots.length <= 1) { toast("🤖 Bot", "Un seul bot est relié au site."); break; }
+          openModal("🤖 Changer de bot", `<div class="module-nav">${bots.map(b => `
+            <button class="module-btn${b.id === ui.activeBotId ? " on" : ""}" data-action="pick-bot" data-bot-id="${esc(b.id)}">
+              ${botAvatar(b)}<span class="label" style="flex:1;text-align:left"><b>${esc(b.name)}</b><br>
+              <small style="color:var(--muted)">${esc(b.tag || b.status || "")}</small></span>
+              ${b.id === ui.activeBotId ? '<span class="chip green">actuel</span>' : ""}
+            </button>`).join("")}</div>`);
+          break;
+        }
+        case "pick-bot":
+          ui.activeBotId = target.dataset.botId;
+          storage.setItem("aincrad.activeBot", ui.activeBotId);
+          closeModal();
+          navigate("dashboard");
+          break;
+        case "pub-ancre": {
+          const cible = document.querySelector(target.dataset.cible || "#haut");
+          if (cible) cible.scrollIntoView({ behavior: "smooth", block: "start" });
+          document.querySelectorAll(".pub-nav button").forEach(b => b.classList.toggle("on", b === target));
+          break;
+        }
+        case "pub-entrer":
+          // ⚡ Entrer dans le dashboard : on retient le premier bot si aucun
+          // n'est encore choisi — plus d'écran intermédiaire de sélection.
+          if (!ui.activeBotId) {
+            ui.activeBotId = state.bots?.[0]?.id || null;
+            if (ui.activeBotId) storage.setItem("aincrad.activeBot", ui.activeBotId);
+          }
+          if (!ui.activeBotId) { toast("⚡ Dashboard", "Aucun bot n'est encore relié au site.", "error"); break; }
+          navigate("dashboard");
           break;
         case "navigate":
           navigate(target.dataset.route || "dashboard");
@@ -4406,6 +4591,26 @@
         case "select-ticket":
           ui.selectedTicketId = target.dataset.ticketId;
           render();
+          break;
+        case "open-ticket":
+          ui.selectedTicketId = target.dataset.ticketId;
+          ui.ticketOuvert = true;
+          render();
+          break;
+        case "ticket-retour":
+          ui.ticketOuvert = false;
+          render();
+          break;
+        case "ticket-status-btn":
+          try {
+            await api("ticket.status", { ticketId: target.dataset.ticketId, status: target.dataset.statut });
+            // Fermé = parti aux archives : la vue détail n'a plus rien à montrer.
+            if (target.dataset.statut === "fermé") ui.ticketOuvert = false;
+            render();
+            toast("TICKET", "Le statut a été mis à jour.");
+          } catch (error) {
+            toast("ERREUR", error.message, "error");
+          }
           break;
         // ── 🗄️ Archives de tickets ──────────────────────────────────
         case "ticket-tab":
