@@ -38,6 +38,7 @@
     serverQuery: "",
     mobileOpen: false,
     creatorTab: "accueil",
+    activiteTout: false, // « Tout voir » du flux d'activité de la vue d'ensemble
     blocks: null,        // blocs en cours d'édition dans le constructeur de page
     previewGrade: null,  // grade simulé (aperçu « qui voit quoi »)
     agentBots: null,     // bots vus chez l'agent (null = pas encore interrogé)
@@ -901,23 +902,22 @@
     // Il gère ses serveurs sans être de l'équipe du site : on le lui dit,
     // sinon l'absence de blacklist et d'espace créateur paraît anormale.
     const proprio = gestion && !estEquipeSite();
+    const enAttente = (state.tickets || []).filter(t => t.status === "en attente").length;
+    const blRecentes = (state.blacklist || []).filter(b => {
+      const d = new Date(b.date); return !isNaN(d) && Date.now() - d.getTime() < 30 * 864e5;
+    }).length;
     return `<div class="content-view">
-      ${pageHead("Cardinal / Centre de contrôle", `Bienvenue dans l'interface ${bot.name}`,
+      ${pageHead("Pilotage", "Vue d'ensemble",
         gestion
-          ? "Surveillez vos serveurs Discord et accédez rapidement aux systèmes de gestion."
+          ? "L'état de vos bots et serveurs, en un coup d'œil."
           : "Voici le bot de la communauté. Identifiez-vous avec Discord pour accéder à la gestion.",
-        gestion ? button("Synchroniser", "pulse-system", "primary") : "")}
-      <div class="row" style="margin-bottom:14px">
-        <span class="chip green"><i class="status-dot"></i> BOT EN LIGNE</span>
-        <span class="chip">PING ${esc(bot.latency)} MS</span>
-        ${bot.description ? `<span class="sous-titre">${esc(bot.description)}</span>` : ""}
-      </div>
+        gestion ? button("🔄 Synchroniser", "bots-sync-rapide", "ghost") + button("➕ Inviter le bot", "invite-bot", "primary pulse") : "")}
       <div class="stat-stack">
         ${gestion ? `
-        <div class="stat-card hud"><span class="quick-icon">🗂️</span><strong data-compteur>${servers.length}</strong><span>Serveurs connectés</span><em>configurables ici</em>${spark("serveurs")}</div>
-        <div class="stat-card"><span class="quick-icon">👥</span><strong data-compteur>${formatNumber(totalMembers)}</strong><span>Membres cumulés</span><em>${formatNumber(totalOnline)} en ligne</em>${spark("membres")}</div>
-        <div class="stat-card"><span class="quick-icon">🎫</span><strong data-compteur>${openTickets}</strong><span>Tickets actifs</span><em>support disponible</em>${spark("tickets")}</div>
-        <div class="stat-card"><span class="quick-icon">🚫</span><strong data-compteur>${state.blacklist?.length || 0}</strong><span>Entrées blacklist</span><em>base globale</em>${spark("blacklist")}</div>`
+        <div class="stat-card hud glow"><div class="kpi-head"><span class="quick-icon">👥</span><span class="chip green">${formatNumber(totalOnline)} en ligne</span></div><strong data-compteur>${formatNumber(totalMembers)}</strong><span>Membres · ${servers.length} serveur(s)</span>${spark("membres")}</div>
+        <div class="stat-card"><div class="kpi-head"><span class="quick-icon">🎫</span><span class="chip gold">${enAttente} en attente</span></div><strong data-compteur>${openTickets}</strong><span>Tickets actifs</span>${spark("tickets")}</div>
+        <div class="stat-card"><div class="kpi-head"><span class="quick-icon">🗂️</span><span class="chip violet">RP</span></div><strong data-compteur>${servers.length}</strong><span>Serveurs connectés</span>${spark("serveurs")}</div>
+        <div class="stat-card"><div class="kpi-head"><span class="quick-icon">🚫</span><span class="chip red">${blRecentes} récente(s)</span></div><strong data-compteur>${state.blacklist?.length || 0}</strong><span>Entrées blacklist</span>${spark("blacklist")}</div>`
         : `
         <div class="stat-card hud"><span class="quick-icon">🤖</span><strong data-compteur>${(state.bots || []).length}</strong><span>Bots de la communauté</span><em>en service</em></div>
         <div class="stat-card"><span class="quick-icon">📡</span><strong>En ligne</strong><span>État</span><em>tous les modules actifs</em></div>`}
@@ -929,23 +929,11 @@
         La blacklist et l'espace créateur, eux, sont mutualisés entre tous les serveurs et restent réservés à l'équipe du site.</span>
       </div>` : ""}
       ${gestion ? `
-      <section class="panel mt-16"><div class="panel-inner">
-        <div class="panel-head"><div><h3>Mes serveurs</h3><p>Sélectionnez un serveur pour ouvrir ses huit modules.</p></div>${button("Voir tous", "navigate", "ghost", 'data-route="servers"')}</div>
-        <div class="server-strip">${servers.map(serverCard).join("") || emptyBlock("Aucun serveur", "Ce bot n'est lié à aucun serveur.")}</div>
-      </div></section>
-
-      <section class="panel mt-16"><div class="panel-inner">
-        <div class="panel-head"><div><h3>Accès rapides</h3><p>Les systèmes les plus utilisés par votre équipe.</p></div></div>
-        <div class="quick-grid">
-          ${quickAction("BL", "Blacklist", `${state.blacklist?.length || 0} utilisateurs enregistrés`, "blacklist")}
-          ${quickAction("TK", "Tickets", `${openTickets} conversations actives`, "tickets")}
-          ${quickAction("SV", "Serveurs", `${servers.length} configurations disponibles`, "servers")}
-          ${quickAction("CF", "Configuration", "Personnaliser le Cardinal System", "site-config")}
-        </div>
-      </div></section>
-
       <div class="grid-2 mt-16" style="grid-template-columns:1.4fr 1fr">
-        <section class="panel"><div class="panel-inner"><div class="panel-head"><div><h3>🕒 Dernière activité</h3><p>Flux des actions importantes du bot.</p></div></div><div class="activity-list">${activityRows()}</div></div></section>
+        <section class="panel"><div class="panel-inner">
+          <div class="panel-head"><div><h3>🕒 Dernière activité</h3><p>Tous serveurs</p></div>${button(ui.activiteTout ? "Réduire" : "Tout voir", "activite-tout", "ghost small")}</div>
+          <div class="activity-list">${activityRows() || emptyBlock("Aucune activité", "Le flux se remplit dès que le bot travaille.")}</div>
+        </div></section>
         <div style="display:flex;flex-direction:column;gap:14px">
           <section class="panel"><div class="panel-inner">
             <div class="panel-head"><div><h3>🤖 Mes bots</h3><p>Reliés au site — cliquez pour basculer.</p></div></div>
@@ -955,10 +943,17 @@
               ${b.id === ui.activeBotId ? '<span class="chip green">● actuel</span>' : '<span class="chip">basculer</span>'}
             </button>`).join("") || emptyBlock("Aucun bot", "Reliez un bot dans ⚙️ Créateur → 🤖 Mes bots.")}
           </div></section>
+          ${(pagesAutorisees() || ["creator"]).includes("creator") ? `
+          <section class="panel glow"><div class="panel-inner">
+            <div class="panel-head"><div><h3>📦 Mise à jour</h3></div></div>
+            <b style="font-size:13px">Le site et les bots se mettent à jour depuis l'espace créateur.</b>
+            <p style="font-size:12.5px;color:var(--muted);margin-top:4px">Vérification, journal des versions et lancement en un clic.</p>
+            <div class="page-actions" style="margin-top:12px">${button("📝 Ouvrir les mises à jour", "open-creator-maj", "ghost small")}</div>
+          </div></section>` : `
           <section class="panel glow"><div class="panel-inner">
             <div class="panel-head"><div><h3>📡 Signal du bot</h3><p>État des connexions Discord.</p></div><span class="chip green">STABLE</span></div>
             <div class="radar"><div class="radar-grid"><i class="radar-dot" style="left:30%;top:42%"></i><i class="radar-dot" style="left:63%;top:25%"></i><i class="radar-dot" style="left:72%;top:68%"></i><i class="radar-dot" style="left:44%;top:73%"></i></div></div>
-          </div></section>
+          </div></section>`}
         </div>
       </div>` : `
       ${panneauAccesRefuse()}` }
@@ -1029,8 +1024,10 @@
   }
 
   function activityRows() {
-    return (state.activity || []).slice(0, 7).map((item, index) => `
-      <div class="activity-row"><span class="activity-icon">${String(index + 1).padStart(2,"0")}</span><span><strong>${esc(item.label)}</strong><span> · ${esc(item.detail)}</span></span><time>${esc(item.time)}</time></div>`).join("");
+    const emojis = { ticket: "🎫", blacklist: "🚫", proof: "🖼️", server: "🗂️", carte: "🪪", niveau: "📈" };
+    const items = state.activity || [];
+    return (ui.activiteTout ? items : items.slice(0, 7)).map(item => `
+      <div class="activity-row"><span class="activity-icon">${emojis[item.type] || "🛰️"}</span><span><strong>${esc(item.label)}</strong><span> · ${esc(item.detail)}</span></span><time>${esc(item.time)}</time></div>`).join("");
   }
 
   function serversView() {
@@ -3978,6 +3975,14 @@
           if (!ui.selectedServerId) ui.selectedServerId = state.servers?.[0]?.id || null;
           ui.module = target.dataset.module || "overview";
           navigate("server");
+          break;
+        case "activite-tout":
+          ui.activiteTout = !ui.activiteTout;
+          render();
+          break;
+        case "open-creator-maj":
+          ui.creatorTab = "maj";
+          navigate("creator");
           break;
         case "toggle-sidebar":
           ui.mobileOpen = !ui.mobileOpen;

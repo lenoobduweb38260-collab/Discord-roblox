@@ -2228,3 +2228,12 @@ tr.cliquable { cursor: pointer; }
 /* Les onglets du créateur ne se compressent jamais : ils passent à la ligne. */
 .subtabs { flex-wrap: wrap; row-gap: 6px; }
 .subtab { flex: 0 0 auto; }
+/* Tête de carte KPI (croquis) : icône à gauche, pastille colorée à droite. */
+.kpi-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.kpi-head .quick-icon { margin-bottom: 0; }
+.kpi-head .chip { font-size: 11px; }
+.chip.violet { color: var(--a2); border-color: rgba(196, 76, 255, .4); }
+.chip.red { color: var(--red); border-color: rgba(255, 92, 116, .4); }
+/* Le mini-graphe reste un flex même dans une carte KPI (la règle générique
+   « span en bloc » des stat-cards ne doit pas l'aplatir). */
+.stat-card span.spark { display: flex; }
