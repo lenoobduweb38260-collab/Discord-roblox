@@ -1578,6 +1578,19 @@ const RELEASES = [
     fix: [],
     retrait: [],
   },
+  {
+    id: 'site-notes-support-2026-08cg',
+    title: 'Le site s\'etoffe : plein ecran, notes de mise a jour et support',
+    ajout: [
+      '📝 **Les notes de mise a jour se lisent sur le site** : le menu « Mises a jour » de la page d\'accueil montre le journal du bot, version par version',
+      '🎫 **Une section Support sur la page d\'accueil** : ou ouvrir un ticket, comment joindre le staff, et le serveur d\'entraide si le staff en a configure un',
+    ],
+    amelioration: [
+      '🖥️ Le site occupe enfin tout l\'ecran : plus de bandes noires sur les grands moniteurs, du menu du haut au pied de page',
+    ],
+    fix: [],
+    retrait: [],
+  },
 ];
 
 // Construit l'embed d'une note à partir d'une entrée { title, ajout, fix,

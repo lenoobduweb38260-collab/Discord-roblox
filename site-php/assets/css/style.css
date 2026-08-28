@@ -2248,3 +2248,32 @@ tr.cliquable { cursor: pointer; }
 @media (min-width: 900px) { .feat-wrap .feature-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 /* Le dashboard aussi : le contenu remplit l'écran au lieu de s'arrêter à 1280px. */
 .content { max-width: none; }
+/* ── 📝 Journal des mises à jour sur la page d'accueil ─────────────── */
+.notes-wrap .lead { margin-bottom: 22px; }
+.notes-liste { display: flex; flex-direction: column; gap: 14px; max-width: 900px; margin-inline: auto; }
+.note-version {
+  text-align: left;
+  background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 18px 20px;
+  animation: cardIn .45s ease both;
+}
+.note-version header { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
+.note-version header b { font-size: 15px; }
+.note-rub { margin-top: 10px; }
+.note-rub-titre {
+  display: block; margin-bottom: 4px;
+  font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase;
+  background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.note-rub p { margin: 3px 0; color: var(--muted); font-size: 13px; line-height: 1.6; }
+.note-rub p b { color: var(--text); }
+.note-attente { color: var(--muted); text-align: center; padding: 22px; }
+.notes-wrap .blk-btns { margin-top: 16px; }
+/* Liens du pied de page public (📝 Mises à jour · 🎫 Support · 🔒 Espace staff) */
+.foot-liens { display: flex; gap: 4px; flex-wrap: wrap; }
+.foot-liens button {
+  border: none; background: none; cursor: pointer;
+  color: var(--muted-2); font-size: 12.5px; padding: 4px 8px; border-radius: 8px;
+  transition: color .15s, background .15s;
+}
+.foot-liens button:hover { color: var(--text); background: rgba(255, 255, 255, .05); }

@@ -39,6 +39,8 @@
     mobileOpen: false,
     creatorTab: "accueil",
     activiteTout: false, // « Tout voir » du flux d'activité de la vue d'ensemble
+    notesBot: null,      // journal des mises à jour (assets/notes-bot.json)
+    notesTout: false,    // « Tout le journal » sur la page d'accueil
     blocks: null,        // blocs en cours d'édition dans le constructeur de page
     previewGrade: null,  // grade simulé (aperçu « qui voit quoi »)
     agentBots: null,     // bots vus chez l'agent (null = pas encore interrogé)
@@ -561,6 +563,8 @@
           <nav class="pub-nav">
             <button class="on" data-action="pub-ancre" data-cible="#haut">Accueil</button>
             <button data-action="pub-ancre" data-cible="#fonctionnalites">Fonctionnalités</button>
+            <button data-action="pub-ancre" data-cible="#mises-a-jour">📝 Mises à jour</button>
+            <button data-action="pub-ancre" data-cible="#support">Support</button>
             ${custom.length ? `<button data-action="pub-ancre" data-cible="#extras">Communauté</button>` : ""}
           </nav>
           <div class="top-actions">
@@ -602,6 +606,27 @@
           </div>
         </section>
 
+        <section class="feat-wrap notes-wrap" id="mises-a-jour">
+          <h2>📝 Mises à <span class="gtxt">jour</span></h2>
+          <p class="lead">Le journal du bot — les mêmes notes que celles publiées sur Discord.</p>
+          <div class="notes-liste" id="notes-liste"><div class="note-attente">⏳ Chargement du journal…</div></div>
+          <div class="blk-btns" id="notes-plus" hidden><button class="btn ghost" data-action="notes-tout">📜 Tout le journal</button></div>
+        </section>
+
+        <section class="feat-wrap" id="support">
+          <h2>🎫 Besoin d'un <span class="gtxt">coup de main</span> ?</h2>
+          <p class="lead">Le support passe par Discord — voici où frapper.</p>
+          <div class="feature-grid">
+            <div class="feature-card glow hud"><div class="feature-icon">🎫</div><b>Ouvrir un ticket</b>
+              <span>Sur le serveur Discord, le panneau support crée un salon privé entre vous et le staff : choisissez la raison, expliquez, le bon rôle est prévenu aussitôt.</span></div>
+            <div class="feature-card"><div class="feature-icon">💬</div><b>Serveur d'entraide</b>
+              <span>${cfg.supportUrl ? "La communauté et le staff répondent en direct." : "Demandez le lien d'invitation au staff de votre serveur."}</span>
+              ${cfg.supportUrl ? `<div style="margin-top:12px"><a class="btn small primary" style="text-decoration:none" href="${esc(cfg.supportUrl)}" target="_blank" rel="noopener">🎮 Rejoindre le serveur</a></div>` : ""}</div>
+            <div class="feature-card"><div class="feature-icon">🩺</div><b>Un module se comporte mal ?</b>
+              <span>Regardez d'abord les mises à jour ci-dessus — ce qui vient de changer y est toujours listé — puis signalez le souci en ticket.</span></div>
+          </div>
+        </section>
+
         ${custom.length ? `<section class="public-inner" id="extras">
           ${custom.map((block, index) => renderBlock(block, index)).join("")}
         </section>` : ""}
@@ -610,10 +635,56 @@
           <div class="brand-mark" style="width:28px;height:28px;font-size:13px">${brandMark()}</div>
           <span>${esc(cfg.siteName || "Dashboard du bot")}${cfg.footer ? ` — ${esc(cfg.footer)}` : ""}</span>
           <span class="spacer" style="flex:1"></span>
+          <nav class="foot-liens">
+            <button data-action="pub-ancre" data-cible="#mises-a-jour">📝 Mises à jour</button>
+            <button data-action="pub-ancre" data-cible="#support">🎫 Support</button>
+            <button data-action="pub-entrer">🔒 Espace staff</button>
+          </nav>
           ${ui.activeBotId ? `<button class="btn small" data-action="navigate" data-route="dashboard">← Retour à l'administration</button>` : ""}
         </footer>
       </div>`;
     startAnnouncements();
+    chargerNotesPublic();
+  }
+
+  // 📝 Le journal du bot sur la page d'accueil. Le JSON est EXTRAIT de
+  // src/utils/patchNotes.js par ./scripts-publier-moteur.sh : ce sont les
+  // mêmes notes que celles publiées sur Discord, à l'octet près.
+  function chargerNotesPublic() {
+    if (ui.notesBot) { remplirNotes(); return; }
+    fetch("assets/notes-bot.json").then(r => r.ok ? r.json() : Promise.reject(r.status))
+      .then(notes => { ui.notesBot = notes; remplirNotes(); })
+      .catch(() => {
+        const zone = document.getElementById("notes-liste");
+        if (zone) zone.innerHTML = `<div class="note-attente">Le journal n'est pas disponible — le fichier
+          <code>assets/notes-bot.json</code> manque sur l'hébergeur.</div>`;
+      });
+  }
+
+  // Gras et code inline des notes, sans laisser passer de HTML.
+  function mdNote(texte) {
+    return esc(String(texte))
+      .replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>")
+      .replace(/`([^`]+)`/g, "<code>$1</code>");
+  }
+
+  function remplirNotes() {
+    const zone = document.getElementById("notes-liste");
+    if (!zone || !Array.isArray(ui.notesBot)) return;
+    const RUBRIQUES = [["ajout", "🆕 Ajout"], ["fix", "🔧 Correction"], ["amelioration", "✨ Amélioration"], ["retrait", "➖ Retrait"]];
+    const lignes = v => (Array.isArray(v) ? v : String(v || "").split("\n")).map(l => String(l).trim()).filter(Boolean);
+    const recentes = ui.notesBot.slice().reverse();
+    const visibles = ui.notesTout ? recentes : recentes.slice(0, 4);
+    zone.innerHTML = visibles.map((n, i) => `<article class="note-version${i === 0 ? " glow" : ""}">
+      <header><b>${mdNote(n.title)}</b>${i === 0 ? `<span class="chip green">dernière version</span>` : ""}${n.id === "initial" ? `<span class="chip">récapitulatif</span>` : ""}</header>
+      ${RUBRIQUES.map(([cle, titre]) => {
+        const items = lignes(n[cle]);
+        return items.length ? `<div class="note-rub"><span class="note-rub-titre">${titre}</span>
+          ${items.map(l => `<p>➜ ${mdNote(l)}</p>`).join("")}</div>` : "";
+      }).join("")}
+    </article>`).join("");
+    const plus = document.getElementById("notes-plus");
+    if (plus) plus.hidden = ui.notesTout || recentes.length <= 4;
   }
 
   // Fait défiler les blocs « Annonces » présents sur la page.
@@ -3499,6 +3570,8 @@
       ${inputField("subtitle", "Sous-titre / accroche", s.subtitle || "Sword Art Online Discord Management")}
       ${inputField("logo", "Logo (emoji ou URL d'image)", s.logo || "⚔️", "text", "Un emoji (⚔️, 🐉…) ou l'URL d'une image carrée.")}
       ${inputField("footer", "Pied de page", s.footer || "© 2026 Aincrad Corporation")}
+      ${inputField("supportUrl", "Serveur d'entraide (invitation Discord)", s.supportUrl || "", "text",
+        "Affiché sur la page d'accueil, section Support. Vide = le bouton « Rejoindre » n'apparaît pas.")}
     </div></div></section>`;
     const theme = `<section class="panel"><div class="panel-inner"><div class="panel-head"><div><h3>🎨 Thème</h3><p>Couleur, police, forme des boutons et arrondi des cartes — appliqués en direct.</p></div></div>
       <div class="form-grid">
@@ -3979,6 +4052,10 @@
         case "activite-tout":
           ui.activiteTout = !ui.activiteTout;
           render();
+          break;
+        case "notes-tout":
+          ui.notesTout = true;
+          remplirNotes();
           break;
         case "open-creator-maj":
           ui.creatorTab = "maj";

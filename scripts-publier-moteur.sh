@@ -8,3 +8,5 @@ for m in identite cartes balises; do
   cp "src/utils/$m.js" "site-php/assets/js/moteur-$m.js"
 done
 echo "✅ moteur de rendu publié : identite, cartes, balises"
+# Les notes de mise à jour suivent la même règle : extraites, jamais réécrites.
+node scripts/publier-notes.js
