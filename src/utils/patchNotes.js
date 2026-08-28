@@ -1564,6 +1564,20 @@ const RELEASES = [
     amelioration: [],
     retrait: [],
   },
+  {
+    id: 'dashboard-neon-2026-08cf',
+    title: 'Le dashboard fait peau neuve : neon, halos et documents RP ✨',
+    ajout: [
+      '🎨 **Nouveau design integral du site** : halos animes, cartes en verre depoli, boutons biseautes a reflet, compteurs qui montent, menu regroupe (Pilotage / Moderation / Administration)',
+      '🪪 **Aperçus des documents RP dans le dashboard** : la carte d\'identite et le permis s\'affichent en direct au theme du serveur (Roblox, GTA, DarkRP, Red Dead, Militaire) depuis Serveur → Module RP',
+      '🔗 **Liens profonds** : `?page=…&server=…&module=…` ouvrent directement un ecran precis du dashboard, pratique a partager entre staff',
+    ],
+    amelioration: [
+      '⚙️ Le Site builder garde la main sur tout : accent, police, style de bouton, fond image/video — le nouveau design les respecte',
+    ],
+    fix: [],
+    retrait: [],
+  },
 ];
 
 // Construit l'embed d'une note à partir d'une entrée { title, ajout, fix,

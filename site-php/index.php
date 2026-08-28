@@ -158,8 +158,8 @@ function taille_envoi_lisible(): string
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="theme-color" content="#03121f">
-    <meta name="description" content="Interface PHP de gestion de bots Discord inspirée d’Aincrad.">
+    <meta name="theme-color" content="#07060d">
+    <meta name="description" content="Dashboard du bot Discord : configuration, tickets, blacklist et aperçus en direct.">
     <title><?= $siteName ?></title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

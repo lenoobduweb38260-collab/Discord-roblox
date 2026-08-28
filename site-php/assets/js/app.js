@@ -24,11 +24,14 @@
       };
     }
   })();
+  // 🔗 Liens profonds : ?bot=…&page=… ouvrent directement une page du
+  // dashboard (pratique pour partager un écran précis à un collègue).
+  const _lien = new URLSearchParams(window.location.search);
   const ui = {
-    activeBotId: storage.getItem("aincrad.activeBot") || null,
-    route: storage.getItem("aincrad.activeBot") ? "dashboard" : "gate",
-    selectedServerId: storage.getItem("aincrad.server") || (state.servers?.[0]?.id ?? null),
-    module: "overview",
+    activeBotId: _lien.get("bot") || storage.getItem("aincrad.activeBot") || null,
+    route: _lien.get("page") || (storage.getItem("aincrad.activeBot") || _lien.get("bot") ? "dashboard" : "gate"),
+    selectedServerId: _lien.get("server") || storage.getItem("aincrad.server") || (state.servers?.[0]?.id ?? null),
+    module: _lien.get("module") || "overview",
     selectedTicketId: state.tickets?.find(t => t.status !== "fermé")?.id || state.tickets?.[0]?.id || null,
     blacklistQuery: "",
     serverQuery: "",
@@ -621,9 +624,22 @@
 
         <aside class="sidebar ${ui.mobileOpen ? "open" : ""}">
           <div class="sidebar-scroll">
-            <nav class="nav-section"><div class="nav-label">Menu</div>
-              ${navItems.map(item => sidebarNavButton(item.id, item.label, icons[item.id === "site-config" ? "config" : item.id] || "◆", badges[item.id] || "")).join("")}
-            </nav>
+            ${(() => {
+              // 🗂️ Le menu est regroupé comme la maquette : Pilotage,
+              // Modération, Administration — dans l'ordre du Site builder.
+              const groupes = [["Pilotage", ["dashboard", "servers", "server"]], ["Modération", ["tickets", "blacklist"]], ["Administration", ["creator", "site-config"]]];
+              const groupeDe = (id) => groupes.find(([, ids]) => ids.includes(id))?.[0] || "Menu";
+              const parGroupe = new Map();
+              navItems.forEach(item => {
+                const g = groupeDe(item.id);
+                if (!parGroupe.has(g)) parGroupe.set(g, []);
+                parGroupe.get(g).push(item);
+              });
+              return [...parGroupe.entries()].map(([titre, items]) => `
+                <nav class="nav-section"><div class="nav-label">${esc(titre)}</div>
+                  ${items.map(item => sidebarNavButton(item.id, item.label, icons[item.id === "site-config" ? "config" : item.id] || "◆", badges[item.id] || "")).join("")}
+                </nav>`).join("");
+            })()}
           </div>
           <div class="active-bot-card">
             <small>BOT ACTUEL</small>
@@ -785,23 +801,20 @@
           ? "Surveillez vos serveurs Discord et accédez rapidement aux systèmes de gestion."
           : "Voici le bot de la communauté. Identifiez-vous avec Discord pour accéder à la gestion.",
         gestion ? button("Synchroniser", "pulse-system", "primary") : "")}
-      <div class="hero-grid">
-        <article class="panel hero-panel"><div class="hero-content">
-          <span class="hero-kicker">A I N C R A D · FLOOR 75</span>
-          <h3>Cardinal System opérationnel</h3>
-          <p>${esc(bot.description)} Tous les modules sont synchronisés avec l'infrastructure Discord.</p>
-          <div class="hero-status"><span class="chip green"><i class="status-dot"></i> BOT EN LIGNE</span><span class="chip">PING ${esc(bot.latency)} MS</span><span class="chip gold">VERSION 2.0.0</span></div>
-        </div></article>
-        <div class="stat-stack">
-          ${gestion ? `
-          <div class="stat-card"><span>Serveurs connectés</span><strong>${servers.length}</strong><em>+1 ce mois</em></div>
-          <div class="stat-card"><span>Membres cumulés</span><strong>${formatNumber(totalMembers)}</strong><em>${formatNumber(totalOnline)} en ligne</em></div>
-          <div class="stat-card"><span>Tickets actifs</span><strong>${openTickets}</strong><em>support disponible</em></div>
-          <div class="stat-card"><span>Entrées blacklist</span><strong>${state.blacklist?.length || 0}</strong><em>base globale</em></div>`
-          : `
-          <div class="stat-card"><span>Bots de la communauté</span><strong>${(state.bots || []).length}</strong><em>en service</em></div>
-          <div class="stat-card"><span>État</span><strong>En ligne</strong><em>tous les modules actifs</em></div>`}
-        </div>
+      <div class="row" style="margin-bottom:14px">
+        <span class="chip green"><i class="status-dot"></i> BOT EN LIGNE</span>
+        <span class="chip">PING ${esc(bot.latency)} MS</span>
+        ${bot.description ? `<span class="sous-titre">${esc(bot.description)}</span>` : ""}
+      </div>
+      <div class="stat-stack">
+        ${gestion ? `
+        <div class="stat-card hud"><span class="quick-icon">🗂️</span><strong data-compteur>${servers.length}</strong><span>Serveurs connectés</span><em>configurables ici</em></div>
+        <div class="stat-card"><span class="quick-icon">👥</span><strong data-compteur>${formatNumber(totalMembers)}</strong><span>Membres cumulés</span><em>${formatNumber(totalOnline)} en ligne</em></div>
+        <div class="stat-card"><span class="quick-icon">🎫</span><strong data-compteur>${openTickets}</strong><span>Tickets actifs</span><em>support disponible</em></div>
+        <div class="stat-card"><span class="quick-icon">🚫</span><strong data-compteur>${state.blacklist?.length || 0}</strong><span>Entrées blacklist</span><em>base globale</em></div>`
+        : `
+        <div class="stat-card hud"><span class="quick-icon">🤖</span><strong data-compteur>${(state.bots || []).length}</strong><span>Bots de la communauté</span><em>en service</em></div>
+        <div class="stat-card"><span class="quick-icon">📡</span><strong>En ligne</strong><span>État</span><em>tous les modules actifs</em></div>`}
       </div>
 
       ${proprio ? `<div class="row mt-16" style="border-color:rgba(47,227,139,.45);flex-direction:column;align-items:flex-start;gap:6px">
@@ -899,7 +912,7 @@
          </div>` : "";
     return `<div class="content-view">
       ${pageHead("Gestion / Serveurs", `Serveurs de ${bot.name}`, "Ouvrez un serveur pour configurer ses modules et consulter ses statistiques.",
-        button("🔄 Synchroniser", "bots-sync-rapide", "ghost") + button("Ajouter un serveur", "invite-bot", "primary"))}
+        button("🔄 Synchroniser", "bots-sync-rapide", "ghost") + button("➕ Inviter le bot", "invite-bot", "primary pulse"))}
       ${infoMiens}
       <section class="panel"><div class="panel-inner">
         <div class="panel-head"><div><h3>Infrastructure Discord</h3><p>${servers.length} serveur(s) correspondent à la sélection actuelle.</p></div><div class="searchbar"><input class="input" id="server-search" value="${esc(ui.serverQuery)}" placeholder="Rechercher un serveur…"><button class="btn" data-action="server-search">Rechercher</button></div></div>
@@ -1187,16 +1200,55 @@
     return modulePanel("Vue d'ensemble", "Activez ou coupez les grands modules du bot sur ce serveur.", body, "overview");
   }
 
+  // 🎮 Les jeux du Module RP : mêmes clés que le bot (rp_jeu). Le titre des
+  // documents change avec le thème — c'est ce que montre l'aperçu.
+  const RP_JEUX = [
+    ["roblox", "🎮 Roblox RP", "CARTE D'IDENTITÉ", "PERMIS DE CONDUIRE", "Délivrée par les services de l'État RP"],
+    ["fivem", "🌴 GTA · Los Santos", "CARTE DE RÉSIDENT", "PERMIS DE CONDUIRE", "Délivrée par la Mairie de Los Santos"],
+    ["gmod", "🔧 Garry's Mod (DarkRP)", "CARTE D'IDENTITÉ", "LICENCE DE PORT D'ARME", "Délivrée par le Maire — révocable"],
+    ["rdr2", "🤠 Red Dead RP", "REGISTRE DE CITOYEN", "AUTORISATION DE PORT D'ARME", "Bureau du shérif — valable dans le comté"],
+    ["arma", "🎖️ Militaire", "ÉTATS DE SERVICE", "HABILITATION OPÉRATIONNELLE", "État-major — révocable par le commandement"],
+  ];
+
+  // 🪪 Aperçu « carte plastifiée » d'un document RP, au thème du serveur.
+  function apercuDocumentRP(type) {
+    const server = selectedServer();
+    const jeu = String(cfgCourant().rp_jeu || "roblox").toLowerCase();
+    const t = RP_JEUX.find(j => j[0] === jeu) || RP_JEUX[0];
+    const permis = type === "permis";
+    const champs = permis
+      ? [["Titulaire", "John DOE"], ["Statut", "✅ VALIDE"], ["Points", "12 / 12"], ["Délivré le", new Date().toLocaleDateString("fr-FR")]]
+      : [["Nom", "DOE"], ["Prénom", "John"], ["Sexe", "M"], ["Né(e) le", "12/04/2001"], ["Pseudo en jeu", "JohnD"], ["Nationalité", "Française"]];
+    return `<div class="doc-rp${permis ? " permis" : ""}">
+      <div class="doc-bandeau"><div class="doc-srv">${esc(server?.name || "Votre serveur")}</div><div class="doc-titre">${esc(permis ? t[3] : t[2])}</div></div>
+      <div class="doc-corps">
+        <div class="doc-photo">🧑</div>
+        <div class="doc-champs">${champs.map(([l, v]) => `<div><label>${esc(l)}</label><b>${esc(v)}</b></div>`).join("")}</div>
+      </div>
+      <div class="doc-pied"><span class="doc-num">${permis ? "N° 4821 5560 9917" : "CNI-8F2K1D"}</span><span class="doc-mention">${esc(t[4])}</span></div>
+    </div>`;
+  }
+
   function rpModule() {
     const body = `<div class="builder-hint">🎭 Le module RP apporte les cartes d'identité, permis, entreprises et assurances. Les rôles ci-dessous décident qui peut quoi.</div>
     <div class="form-grid">
       ${champRole("police_role_ids", "Rôles Police", "Peuvent retirer des points de permis et tenir le casier judiciaire.", true)}
       ${champRole("wlrp_role_id", "Rôle donné par la Whitelist RP", "Attribué automatiquement quand vous whitelistez quelqu'un.")}
+      ${champChoix("rp_jeu", "🎮 Jeu du serveur", RP_JEUX.map(([v, l]) => [v, l]),
+        "Change les mots et l'habillage des documents RP. Aucune fiche n'est perdue : on peut revenir en arrière.", "roblox")}
     </div>
     <div class="mt-16">
       ${champBascule("rp_enabled", "Activer le module RP", "Synchronise les commandes RP sur ce serveur.")}
       ${champBascule("rp_locked", "Verrouiller les modifications RP", "Empêche les changements de cartes et de permis.")}
-    </div>`;
+    </div>
+    <div class="panel-line"></div>
+    <div class="panel-head"><div><h3>🪪 Aperçu des documents</h3>
+      <p>Le rendu suit le jeu choisi ci-dessus — enregistrez pour l'appliquer au bot.</p></div></div>
+    <div class="grid-2">
+      <div>${apercuDocumentRP("carte")}</div>
+      <div>${apercuDocumentRP("permis")}</div>
+    </div>
+    <p class="previewnote mt-16">Aperçu indicatif : le document réel est dessiné par le bot, avec la photo et les vraies informations de chaque membre.</p>`;
     return modulePanel("Module RP", "Personnages, permis, entreprises et rôles métier.", body, "rp");
   }
 
@@ -3309,6 +3361,29 @@
     // il profite du même gel du décor animé (voir .overlay-open dans le CSS).
     document.body.classList.toggle("overlay-open", Boolean(ui.menuProfil) || modalRoot.innerHTML !== "");
     setTimeout(scrollChatToBottom, 0);
+    animerCompteurs();
+  }
+
+  // 🔢 Les compteurs marqués data-compteur montent jusqu'à leur valeur à
+  // chaque affichage — un chiffre déjà en mouvement n'est pas repris.
+  function animerCompteurs() {
+    if (document.body.dataset.anim === "off") return;
+    app.querySelectorAll("[data-compteur]").forEach(el => {
+      const brut = el.textContent.trim();
+      const cible = parseInt(brut.replace(/[^0-9]/g, ""), 10);
+      if (!Number.isFinite(cible) || cible <= 0 || cible > 999999 || el.dataset.compteurFait) return;
+      el.dataset.compteurFait = "1";
+      const groupes = /[  .,]/.test(brut);
+      let t0 = null;
+      const pas = (ts) => {
+        if (!t0) t0 = ts;
+        const p = Math.min((ts - t0) / 620, 1);
+        const v = Math.round(cible * (1 - Math.pow(1 - p, 3)));
+        el.textContent = groupes ? formatNumber(v) : String(v);
+        if (p < 1) requestAnimationFrame(pas);
+      };
+      requestAnimationFrame(pas);
+    });
   }
 
   // Applique TOUTE la configuration du builder (accent, police, boutons,
