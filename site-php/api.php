@@ -42,7 +42,7 @@ require_once __DIR__ . '/lib_db.php';
 // mot de passe, ni connexion Discord (pratique pour la toute première mise en
 // place, signalé en rouge). Dès que la connexion Discord est prête, elle
 // devient la seule porte : sans compte connecté, page d'accueil publique.
-session_start();
+demarrer_session();
 function admin_password(): string {
   return defined('SITE_ADMIN_PASSWORD') ? (string) SITE_ADMIN_PASSWORD : '';
 }

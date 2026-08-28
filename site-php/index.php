@@ -14,7 +14,7 @@ $siteName = htmlspecialchars((string) ($bootState['siteConfig']['siteName'] ?? '
 // 🔒 Qui est connecté, et le site est-il protégé ?
 if (is_file(__DIR__ . '/config.php')) require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/lib_discord.php';
-if (session_status() !== PHP_SESSION_ACTIVE) session_start();
+demarrer_session();
 
 $motDePasse = defined('SITE_ADMIN_PASSWORD') ? (string) SITE_ADMIN_PASSWORD : '';
 $app = discord_app();
@@ -103,7 +103,7 @@ if (!$estStaffSite) {
 // Message d'erreur éventuel du retour OAuth2, traduit en clair.
 $oauthErreurs = [
     'discord_non_configure' => "La connexion Discord n'est pas encore configurée sur ce site (⚙️ Créateur → 🔑 Connexion Discord).",
-    'oauth_etat' => "Connexion interrompue (jeton de sécurité expiré). Réessayez.",
+    'oauth_etat' => "Connexion interrompue : le navigateur est revenu de Discord sans le jeton de sécurité. Réessayez — le détail ci-dessous dit quoi vérifier si ça se reproduit.",
     'oauth_echange' => "Discord a refusé la connexion. Vérifiez la clé secrète, et que l'adresse de retour est bien déclarée dans OAuth2 → Redirects.",
     'discord_profil' => "Discord n'a pas renvoyé votre profil. Réessayez dans un instant.",
 ];

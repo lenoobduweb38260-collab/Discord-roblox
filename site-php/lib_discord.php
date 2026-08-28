@@ -36,6 +36,25 @@ function oauth_redirect_uri(): string {
   return site_url() . '/oauth.php?p=callback';
 }
 
+// ----- 🍪 Session du site, avec des réglages de cookie EXPLICITES -----
+// Le retour de Discord est une navigation venue d'un autre site : un cookie
+// de session en SameSite=Strict (défaut de certains hébergeurs) n'est alors
+// PAS renvoyé — la session paraît vide et la connexion échoue sur « jeton de
+// sécurité expiré ». On impose donc Lax (le cookie suit les navigations de
+// premier plan), path=/ (index, api et oauth partagent la même session) et
+// Secure en HTTPS.
+function demarrer_session(): void {
+  if (session_status() === PHP_SESSION_ACTIVE) return;
+  session_set_cookie_params([
+    'lifetime' => 0,
+    'path' => '/',
+    'secure' => req_scheme() === 'https',
+    'httponly' => true,
+    'samesite' => 'Lax',
+  ]);
+  session_start();
+}
+
 // ----- 💾 Identifiants de l'application Discord, saisis dans le site -----
 // Le cache passe par une variable globale (et non un « static ») pour qu'une
 // écriture le rafraîchisse immédiatement dans la même requête.

@@ -12,7 +12,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/lib_discord.php';
 
-session_start();
+demarrer_session();
 
 $p = $_GET['p'] ?? '';
 $retour = site_url() . '/index.php';
@@ -26,6 +26,13 @@ if ($p === 'login') {
   }
   $etat = bin2hex(random_bytes(16));
   $_SESSION['oauth_state'] = $etat;
+  // Ceinture ET bretelles : le jeton part AUSSI dans un cookie dédié posé en
+  // SameSite=Lax. Si la session ne survit pas à l'aller-retour chez Discord
+  // (hébergeur qui impose Strict, session recyclée…), le cookie, lui, revient.
+  setcookie('oauth_state_c', $etat, [
+    'expires' => time() + 600, 'path' => '/',
+    'secure' => req_scheme() === 'https', 'httponly' => true, 'samesite' => 'Lax',
+  ]);
   // On mémorise l'adresse de retour EXACTE : Discord exige qu'elle soit
   // identique entre l'autorisation et l'échange du code.
   $redirect = oauth_redirect_uri();
@@ -46,11 +53,24 @@ if ($p === 'login') {
 if ($p === 'callback') {
   $code = (string) ($_GET['code'] ?? '');
   $etat = (string) ($_GET['state'] ?? '');
-  if ($code === '' || $etat === '' || !hash_equals((string) ($_SESSION['oauth_state'] ?? ''), $etat)) {
+  // Le jeton renvoyé par Discord doit correspondre à celui posé au départ —
+  // en session, OU dans le cookie de dépannage si la session s'est perdue.
+  $attenduSession = (string) ($_SESSION['oauth_state'] ?? '');
+  $attenduCookie = (string) ($_COOKIE['oauth_state_c'] ?? '');
+  $valide = $etat !== '' && (
+    ($attenduSession !== '' && hash_equals($attenduSession, $etat))
+    || ($attenduCookie !== '' && hash_equals($attenduCookie, $etat))
+  );
+  if ($code === '' || !$valide) {
+    // On note POURQUOI, pour l'afficher sous le bandeau d'erreur.
+    $_SESSION['oauth_detail'] = ($attenduSession === '' && $attenduCookie === '')
+      ? "Le navigateur est revenu de Discord sans aucun cookie du site : ouvrez le site par la même adresse que celle déclarée dans OAuth2 → Redirects (avec ou sans www, en https), et vérifiez que les cookies ne sont pas bloqués."
+      : "Le jeton renvoyé ne correspond pas à celui attendu — souvent deux onglets de connexion ouverts en même temps. Réessayez depuis un seul onglet.";
     header('Location: ' . $retour . '?erreur=oauth_etat');
     exit;
   }
   unset($_SESSION['oauth_state']);
+  setcookie('oauth_state_c', '', ['expires' => time() - 3600, 'path' => '/']);
   $redirect = (string) ($_SESSION['oauth_redirect'] ?? oauth_redirect_uri());
   unset($_SESSION['oauth_redirect']);
 
