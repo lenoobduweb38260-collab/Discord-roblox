@@ -1567,5 +1567,15 @@
    "🖥️ Le site occupe enfin tout l'ecran : plus de bandes noires sur les grands moniteurs, du menu du haut au pied de page"
   ],
   "retrait": []
+ },
+ {
+  "id": "absences-auteur-2026-08ch",
+  "title": "Une absence n'appartient qu'a son auteur",
+  "ajout": [],
+  "fix": [
+   "⛔ Plus personne d'autre que l'auteur d'une absence ne peut la modifier ni cliquer « ✅ Je suis de retour » a sa place — le staff non plus. Avant, n'importe qui du staff pouvait clore ou reecrire l'absence de quelqu'un d'autre"
+  ],
+  "amelioration": [],
+  "retrait": []
  }
 ]

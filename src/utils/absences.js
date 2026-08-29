@@ -220,11 +220,11 @@ async function handleBouton(interaction) {
     if (!absence) {
       return interaction.reply({ content: '📅 Cette absence était déjà terminée.', flags: MessageFlags.Ephemeral }).catch(() => null);
     }
-    const estConcerne = String(interaction.user.id) === absence.user_id;
-    const estStaff = getGrade(interaction.member) >= GRADES.STAFF;
-    if (!estConcerne && !estStaff) {
+    // Une absence appartient à qui l'a déclarée : personne d'autre — pas
+    // même le staff — ne la modifie ou ne la clôt à sa place.
+    if (String(interaction.user.id) !== absence.user_id) {
       return interaction.reply({
-        content: `⛔ Seul <@${absence.user_id}> — ou le staff — peut modifier cette absence.`,
+        content: `⛔ Cette absence appartient à <@${absence.user_id}> : il n'y a que cette personne qui puisse la modifier.`,
         flags: MessageFlags.Ephemeral,
       });
     }
@@ -305,10 +305,9 @@ async function modifierAbsence(interaction) {
   if (!absence) {
     return interaction.reply({ content: '📅 Cette absence était déjà terminée.', flags: MessageFlags.Ephemeral }).catch(() => null);
   }
-  const estConcerne = String(interaction.user.id) === absence.user_id;
-  if (!estConcerne && getGrade(interaction.member) < GRADES.STAFF) {
+  if (String(interaction.user.id) !== absence.user_id) {
     return interaction.reply({
-      content: `⛔ Seul <@${absence.user_id}> — ou le staff — peut modifier cette absence.`,
+      content: `⛔ Cette absence appartient à <@${absence.user_id}> : il n'y a que cette personne qui puisse la modifier.`,
       flags: MessageFlags.Ephemeral,
     });
   }
@@ -361,7 +360,8 @@ async function editerCopies(client, absence) {
   }
 }
 
-// « Je suis de retour » — la personne concernée, ou le staff.
+// « Je suis de retour » — UNIQUEMENT la personne concernée : une absence
+// appartient à qui l'a déclarée, personne ne la clôt à sa place.
 async function terminer(interaction) {
   const ligne = parMessage.get(String(interaction.message?.id));
   const absence = ligne ? parId.get(ligne.absence_id) : null;
@@ -370,17 +370,15 @@ async function terminer(interaction) {
     await interaction.message?.delete?.().catch(() => null);
     return interaction.reply({ content: '📅 Cette absence était déjà terminée.', flags: MessageFlags.Ephemeral }).catch(() => null);
   }
-  const estConcerne = String(interaction.user.id) === absence.user_id;
-  const estStaff = getGrade(interaction.member) >= GRADES.STAFF;
-  if (!estConcerne && !estStaff) {
+  if (String(interaction.user.id) !== absence.user_id) {
     return interaction.reply({
-      content: `⛔ Seul <@${absence.user_id}> — ou le staff — peut clore cette absence.`,
+      content: `⛔ Cette absence appartient à <@${absence.user_id}> : il n'y a que cette personne qui puisse dire qu'elle est de retour.`,
       flags: MessageFlags.Ephemeral,
     });
   }
   await supprimerCopies(interaction.client, absence);
   return interaction.reply({
-    content: estConcerne ? '👋 Bon retour ! Votre annonce d\'absence est supprimée partout.' : '✅ Absence close : ses annonces sont supprimées.',
+    content: '👋 Bon retour ! Votre annonce d\'absence est supprimée partout.',
     flags: MessageFlags.Ephemeral,
   }).catch(() => null);
 }

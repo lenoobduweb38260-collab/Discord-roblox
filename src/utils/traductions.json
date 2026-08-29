@@ -19661,5 +19661,26 @@
     "es": "El bot aún no está conectado a Discord: está arrancando, el token fue rechazado o hay un corte de red — abre su consola en tu alojamiento para ver la razón exacta.",
     "pl": "Bot nie jest jeszcze połączony z Discordem: trwa uruchamianie, token został odrzucony lub wystąpiła przerwa w sieci — otwórz jego konsolę u hostingodawcy, aby zobaczyć dokładny powód.",
     "ru": "Бот ещё не подключён к Discord: идёт запуск, токен отклонён или пропала сеть — откройте его консоль у хостера, чтобы увидеть точную причину."
+  },
+  "⛔ Cette absence appartient à <@": {
+    "en": "⛔ This absence belongs to <@",
+    "de": "⛔ Diese Abwesenheit gehört <@",
+    "es": "⛔ Esta ausencia pertenece a <@",
+    "pl": "⛔ Ta nieobecność należy do <@",
+    "ru": "⛔ Это отсутствие принадлежит <@"
+  },
+  "> : il n'y a que cette personne qui puisse la modifier.": {
+    "en": ">: only that person can edit it.",
+    "de": ">: Nur diese Person kann sie bearbeiten.",
+    "es": ">: solo esa persona puede modificarla.",
+    "pl": ">: tylko ta osoba może ją edytować.",
+    "ru": ">: изменить его может только этот человек."
+  },
+  "> : il n'y a que cette personne qui puisse dire qu'elle est de retour.": {
+    "en": ">: only that person can say they are back.",
+    "de": ">: Nur diese Person kann sagen, dass sie zurück ist.",
+    "es": ">: solo esa persona puede decir que ha vuelto.",
+    "pl": ">: tylko ta osoba może powiedzieć, że wróciła.",
+    "ru": ">: сказать, что он вернулся, может только этот человек."
   }
 }

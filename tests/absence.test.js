@@ -149,10 +149,17 @@ function fausseInteraction(monde, { user = 'U1', salon = 'C1', membreStaff = fal
     V('un tiers ne peut pas clore l\'absence d\'un autre', /⛔/.test(intrus.reponses[0]?.content), intrus.reponses[0]?.content);
     V('… rien n\'est supprimé', a1.supprimes.length === 0 && a2.supprimes.length === 0);
 
+    // Une absence n'appartient qu'à son auteur : même le staff est refusé.
     const staff = fausseInteraction(monde, { user: 'U3', membreStaff: true, messageId: idMessage });
     staff.customId = 'abs:fin';
     await absences.handleBouton(staff);
-    V('le staff, lui, peut', /supprimées/.test(staff.reponses[0]?.content), staff.reponses[0]?.content);
+    V('le staff non plus ne peut pas la clore', /⛔/.test(staff.reponses[0]?.content), staff.reponses[0]?.content);
+    V('… et rien n\'est supprimé', a1.supprimes.length === 0 && a2.supprimes.length === 0);
+
+    const auteur = fausseInteraction(monde, { user: 'U2', messageId: idMessage });
+    auteur.customId = 'abs:fin';
+    await absences.handleBouton(auteur);
+    V('l\'auteur, lui, peut', /supprimée partout/.test(auteur.reponses[0]?.content), auteur.reponses[0]?.content);
     V('TOUTES les copies sont supprimées', a1.supprimes.length === 1 && a2.supprimes.length === 1);
     V('et l\'absence quitte la base', absences.enCours('G1').filter((a) => a.user_id === 'U2').length === 0);
   }

@@ -1592,6 +1592,16 @@ const RELEASES = [
     fix: [],
     retrait: [],
   },
+  {
+    id: 'absences-auteur-2026-08ch',
+    title: 'Une absence n\'appartient qu\'a son auteur',
+    fix: [
+      '⛔ Plus personne d\'autre que l\'auteur d\'une absence ne peut la modifier ni cliquer « ✅ Je suis de retour » a sa place — le staff non plus. Avant, n\'importe qui du staff pouvait clore ou reecrire l\'absence de quelqu\'un d\'autre',
+    ],
+    ajout: [],
+    amelioration: [],
+    retrait: [],
+  },
 ];
 
 // Construit l'embed d'une note à partir d'une entrée { title, ajout, fix,
