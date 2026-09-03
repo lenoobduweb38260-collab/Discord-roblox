@@ -1614,6 +1614,19 @@ const RELEASES = [
     fix: [],
     retrait: [],
   },
+  {
+    id: 'arrivees-invites-2026-09cj',
+    title: 'Arrivees & departs : roles automatiques, traqueur d\'invitations',
+    ajout: [
+      '👋 **Nouvelle categorie « Arrivees & departs » dans /config** : salon des arrivees, salon des departs (separe), roles automatiques — tout au meme endroit',
+      '🎭 **Roles automatiques des membres** reglables dans /config (ils existaient deja cote site) — donnes a l\'arrivee, ou apres le captcha s\'il est actif',
+      '🤖 **Roles automatiques des BOTS** : leur propre liste, donnee des leur arrivee — un rôle « Bots » range a part, jamais les roles des joueurs',
+      '📨 **Traqueur d\'invitations** : le bot note qui a invite chaque nouveau membre. `/invites voir` (ses invitations, et par qui il est arrive), `/invites classement` (les meilleurs inviteurs), et l\'embed d\'arrivee affiche « Invite par »',
+    ],
+    fix: [],
+    amelioration: [],
+    retrait: [],
+  },
 ];
 
 // Construit l'embed d'une note à partir d'une entrée { title, ajout, fix,

@@ -295,6 +295,14 @@ async function start() {
       .catch((err) => console.warn(`⚠️ Synchronisation des commandes : ${err.message}`));
   });
 
+  // 📨 Traqueur d'invitations : photo de départ des compteurs de chaque
+  // serveur — sans elle, impossible de dire quelle invitation a servi.
+  client.once(Events.ClientReady, () => {
+    require('./utils/invitations')
+      .primerTout(client)
+      .catch((err) => console.warn(`⚠️ Traqueur d'invitations : ${err.message}`));
+  });
+
   // Annonces de mise à jour au staff : « installée » après une mise à jour,
   // « prête » quand une nouvelle release est publiée (vérification périodique).
   client.once(Events.ClientReady, () => {

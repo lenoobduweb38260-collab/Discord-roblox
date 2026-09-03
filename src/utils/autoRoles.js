@@ -9,13 +9,23 @@ const { getGuildConfig } = require('../database');
 //     contourner la vérification, mais ne jamais les donner laisserait le
 //     membre bloqué : c'était le défaut de la première version).
 
-function rolesConfigures(cfg) {
+function listeJson(valeur) {
   try {
-    const liste = JSON.parse(cfg.autorole_role_ids || '[]');
+    const liste = JSON.parse(valeur || '[]');
     return Array.isArray(liste) ? liste.map(String).filter(Boolean) : [];
   } catch {
     return [];
   }
+}
+
+function rolesConfigures(cfg) {
+  return listeJson(cfg.autorole_role_ids);
+}
+
+// 🤖 Les BOTS ont leur propre liste : un rôle « Bots » rangé à part, jamais
+// les rôles des membres (un bot n'a rien à faire avec un rôle de joueur).
+function rolesBotConfigures(cfg) {
+  return listeJson(cfg.autorole_bot_role_ids);
 }
 
 // Ne garde que les rôles que le bot peut RÉELLEMENT donner, et explique
@@ -39,11 +49,22 @@ function trier(member, ids) {
   return { donnables, refuses };
 }
 
-// Applique les rôles automatiques. Renvoie ce qui a été fait, pour les logs.
+// Applique les rôles automatiques des MEMBRES. Renvoie ce qui a été fait.
 async function appliquer(member, raison = 'Rôle automatique') {
   if (!member?.guild || member.user?.bot) return { donnes: [], refuses: [] };
   const cfg = getGuildConfig(member.guild.id);
-  const ids = rolesConfigures(cfg);
+  return appliquerIds(member, rolesConfigures(cfg), raison);
+}
+
+// Applique les rôles automatiques des BOTS — tout de suite à leur arrivée :
+// un bot ne passe pas le captcha.
+async function appliquerBot(member, raison = 'Rôle automatique des bots') {
+  if (!member?.guild || !member.user?.bot) return { donnes: [], refuses: [] };
+  const cfg = getGuildConfig(member.guild.id);
+  return appliquerIds(member, rolesBotConfigures(cfg), raison);
+}
+
+async function appliquerIds(member, ids, raison) {
   if (!ids.length) return { donnes: [], refuses: [] };
 
   const moi = member.guild.members.me;
@@ -72,4 +93,4 @@ function captchaActif(guildId) {
   return Boolean(cfg.captcha_enabled && cfg.verified_role_id);
 }
 
-module.exports = { appliquer, rolesConfigures, captchaActif };
+module.exports = { appliquer, appliquerBot, rolesConfigures, rolesBotConfigures, captchaActif };

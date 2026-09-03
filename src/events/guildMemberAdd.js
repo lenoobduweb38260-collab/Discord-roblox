@@ -63,9 +63,21 @@ module.exports = {
     // Avec un captcha actif, on ne donne RIEN ici : c'est sa validation qui
     // les attribuera (voir utils/captcha.js). Sans captcha, tout de suite —
     // pour que le membre ne reste pas « Visiteur » sans pouvoir agir.
+    // Les BOTS ont leur propre liste et ne passent pas le captcha.
     const autoRoles = require('../utils/autoRoles');
-    if (!autoRoles.captchaActif(member.guild.id)) {
+    if (member.user.bot) {
+      await autoRoles.appliquerBot(member);
+    } else if (!autoRoles.captchaActif(member.guild.id)) {
       await autoRoles.appliquer(member, 'Rôle automatique à l\'arrivée');
+    }
+
+    // 2 ter) 📨 Traqueur d'invitations : quelle invitation a servi ?
+    // Silencieux en cas d'échec — le reste de l'arrivée n'en dépend pas.
+    let invitation = null;
+    try {
+      invitation = await require('../utils/invitations').detecter(member);
+    } catch {
+      invitation = null;
     }
 
     // 3) Embed d'arrivée dans le salon membres configuré.
@@ -153,6 +165,15 @@ module.exports = {
     if (detaille) {
       embed.setAuthor({ name: `Bienvenue sur ${member.guild.name} !`, iconURL: member.guild.iconURL({ size: 128 }) || undefined });
       embed.setFooter({ text: `${member.client.user.username} • ${member.guild.name}` });
+    }
+    // 📨 Qui l'a invité — une information réelle, quel que soit le style.
+    if (invitation?.inviterId) {
+      const total = require('../utils/invitations').totalDe(member.guild.id, invitation.inviterId);
+      embed.addFields({
+        name: '📨 Invité par',
+        value: `<@${invitation.inviterId}> — **${total}** invitation(s) · code \`${invitation.code}\``,
+        inline: false,
+      });
     }
 
     // 🖼️ Bannière fabriquée par le bot (image, seul moyen d'avoir une vraie

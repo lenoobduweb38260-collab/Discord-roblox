@@ -6,6 +6,9 @@ module.exports = {
   name: Events.InviteCreate,
   async execute(invite) {
     if (!invite.guild) return;
+    // 📨 Le traqueur d'invitations suit chaque création, pour que la
+    // détection « qui a invité qui » reste juste.
+    require('../utils/invitations').invitationCreee(invite);
     const details = [
       `➜ Code : \`${invite.code}\``,
       `➜ Salon : <#${invite.channelId}>`,

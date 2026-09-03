@@ -19745,5 +19745,243 @@
     "es": "** reescrita tal como se muestra en el editor (un campo vaciado queda vacío).",
     "pl": "** zapisana dokładnie tak, jak w edytorze (opróżnione pole zostaje wyczyszczone).",
     "ru": "** переписан ровно так, как в редакторе (очищенное поле очищается)."
+  },
+  "Arrivées & départs": {
+    "en": "Arrivals & departures",
+    "de": "Ankünfte & Abgänge",
+    "es": "Llegadas y salidas",
+    "pl": "Przybycia i odejścia",
+    "ru": "Приходы и уходы"
+  },
+  "Salon d'arrivée, salon de départ, rôles automatiques": {
+    "en": "Arrival channel, departure channel, automatic roles",
+    "de": "Ankunftskanal, Abgangskanal, automatische Rollen",
+    "es": "Canal de llegada, canal de salida, roles automáticos",
+    "pl": "Kanał powitań, kanał pożegnań, role automatyczne",
+    "ru": "Канал приходов, канал уходов, автоматические роли"
+  },
+  "👋 Configuration — Arrivées & départs": {
+    "en": "👋 Configuration — Arrivals & departures",
+    "de": "👋 Konfiguration — Ankünfte & Abgänge",
+    "es": "👋 Configuración — Llegadas y salidas",
+    "pl": "👋 Konfiguracja — Przybycia i odejścia",
+    "ru": "👋 Настройка — Приходы и уходы"
+  },
+  "👋 Salon des arrivées : ": {
+    "en": "👋 Arrivals channel: ",
+    "de": "👋 Ankunftskanal: ",
+    "es": "👋 Canal de llegadas: ",
+    "pl": "👋 Kanał powitań: ",
+    "ru": "👋 Канал приходов: "
+  },
+  "📤 Salon des départs : ": {
+    "en": "📤 Departures channel: ",
+    "de": "📤 Abgangskanal: ",
+    "es": "📤 Canal de salidas: ",
+    "pl": "📤 Kanał pożegnań: ",
+    "ru": "📤 Канал уходов: "
+  },
+  "*même salon que les arrivées*": {
+    "en": "*same channel as arrivals*",
+    "de": "*derselbe Kanal wie Ankünfte*",
+    "es": "*el mismo canal que las llegadas*",
+    "pl": "*ten sam kanał co powitania*",
+    "ru": "*тот же канал, что и приходы*"
+  },
+  "🎭 Rôles automatiques des membres : ": {
+    "en": "🎭 Automatic member roles: ",
+    "de": "🎭 Automatische Mitgliederrollen: ",
+    "es": "🎭 Roles automáticos de miembros: ",
+    "pl": "🎭 Automatyczne role członków: ",
+    "ru": "🎭 Автоматические роли участников: "
+  },
+  "🤖 Rôles automatiques des bots : ": {
+    "en": "🤖 Automatic bot roles: ",
+    "de": "🤖 Automatische Bot-Rollen: ",
+    "es": "🤖 Roles automáticos de bots: ",
+    "pl": "🤖 Automatyczne role botów: ",
+    "ru": "🤖 Автоматические роли ботов: "
+  },
+  "➕ Sélectionner un rôle dans un menu **l'ajoute** à la liste. 🧹 **Vider** pour repartir de zéro.": {
+    "en": "➕ Picking a role in a menu **adds** it to the list. 🧹 **Clear** to start over.",
+    "de": "➕ Eine Rolle im Menü auszuwählen **fügt** sie der Liste hinzu. 🧹 **Leeren**, um neu zu beginnen.",
+    "es": "➕ Seleccionar un rol en un menú **lo añade** a la lista. 🧹 **Vaciar** para empezar de cero.",
+    "pl": "➕ Wybranie roli w menu **dodaje** ją do listy. 🧹 **Wyczyść**, aby zacząć od nowa.",
+    "ru": "➕ Выбор роли в меню **добавляет** её в список. 🧹 **Очистить** — начать заново."
+  },
+  "🤖 Avec un captcha actif, les rôles des membres sont donnés **après** sa validation ; ceux des bots tout de suite.": {
+    "en": "🤖 With an active captcha, member roles are given **after** it is passed; bot roles right away.",
+    "de": "🤖 Bei aktivem Captcha werden Mitgliederrollen **nach** dessen Bestehen vergeben; Bot-Rollen sofort.",
+    "es": "🤖 Con un captcha activo, los roles de miembros se dan **después** de validarlo; los de bots, de inmediato.",
+    "pl": "🤖 Przy aktywnej captchy role członków są nadawane **po** jej zaliczeniu; role botów od razu.",
+    "ru": "🤖 При активной капче роли участников выдаются **после** её прохождения; роли ботов — сразу."
+  },
+  "📨 Chaque arrivée note aussi **qui a invité** le membre — voir `/invites`.": {
+    "en": "📨 Each arrival also records **who invited** the member — see `/invites`.",
+    "de": "📨 Jede Ankunft hält auch fest, **wer** das Mitglied **eingeladen** hat — siehe `/invites`.",
+    "es": "📨 Cada llegada registra también **quién invitó** al miembro — ver `/invites`.",
+    "pl": "📨 Każde przybycie zapisuje też, **kto zaprosił** członka — zobacz `/invites`.",
+    "ru": "📨 Каждый приход также фиксирует, **кто пригласил** участника — см. `/invites`."
+  },
+  "👋 Salon des arrivées": {
+    "en": "👋 Arrivals channel",
+    "de": "👋 Ankunftskanal",
+    "es": "👋 Canal de llegadas",
+    "pl": "👋 Kanał powitań",
+    "ru": "👋 Канал приходов"
+  },
+  "📤 Salon des départs (vide = même salon que les arrivées)": {
+    "en": "📤 Departures channel (empty = same as arrivals)",
+    "de": "📤 Abgangskanal (leer = wie Ankünfte)",
+    "es": "📤 Canal de salidas (vacío = el mismo que llegadas)",
+    "pl": "📤 Kanał pożegnań (pusty = ten sam co powitania)",
+    "ru": "📤 Канал уходов (пусто = тот же, что приходы)"
+  },
+  "🎭 Rôles automatiques des membres (s'ajoutent)": {
+    "en": "🎭 Automatic member roles (they add up)",
+    "de": "🎭 Automatische Mitgliederrollen (kumulativ)",
+    "es": "🎭 Roles automáticos de miembros (se acumulan)",
+    "pl": "🎭 Automatyczne role członków (sumują się)",
+    "ru": "🎭 Автоматические роли участников (накапливаются)"
+  },
+  "🤖 Rôles automatiques des bots (s'ajoutent)": {
+    "en": "🤖 Automatic bot roles (they add up)",
+    "de": "🤖 Automatische Bot-Rollen (kumulativ)",
+    "es": "🤖 Roles automáticos de bots (se acumulan)",
+    "pl": "🤖 Automatyczne role botów (sumują się)",
+    "ru": "🤖 Автоматические роли ботов (накапливаются)"
+  },
+  "Vider rôles membres": {
+    "en": "Clear member roles",
+    "de": "Mitgliederrollen leeren",
+    "es": "Vaciar roles de miembros",
+    "pl": "Wyczyść role członków",
+    "ru": "Очистить роли участников"
+  },
+  "Vider rôles bots": {
+    "en": "Clear bot roles",
+    "de": "Bot-Rollen leeren",
+    "es": "Vaciar roles de bots",
+    "pl": "Wyczyść role botów",
+    "ru": "Очистить роли ботов"
+  },
+  "automatiques des membres": {
+    "en": "automatic member roles",
+    "de": "automatische Mitgliederrollen",
+    "es": "automáticos de miembros",
+    "pl": "automatyczne członków",
+    "ru": "автоматические роли участников"
+  },
+  "automatiques des bots": {
+    "en": "automatic bot roles",
+    "de": "automatische Bot-Rollen",
+    "es": "automáticos de bots",
+    "pl": "automatyczne botów",
+    "ru": "автоматические роли ботов"
+  },
+  "Le traqueur d'invitations : qui a fait venir qui": {
+    "en": "The invite tracker: who brought in whom",
+    "de": "Der Einladungs-Tracker: wer wen hergebracht hat",
+    "es": "El rastreador de invitaciones: quién trajo a quién",
+    "pl": "Śledzenie zaproszeń: kto kogo sprowadził",
+    "ru": "Трекер приглашений: кто кого привёл"
+  },
+  "Les invitations d'un membre — et qui l'a invité": {
+    "en": "A member's invites — and who invited them",
+    "de": "Die Einladungen eines Mitglieds — und wer es eingeladen hat",
+    "es": "Las invitaciones de un miembro — y quién lo invitó",
+    "pl": "Zaproszenia członka — i kto go zaprosił",
+    "ru": "Приглашения участника — и кто его пригласил"
+  },
+  "Sans réponse : vous-même": {
+    "en": "Left empty: yourself",
+    "de": "Ohne Angabe: Sie selbst",
+    "es": "Sin respuesta: tú mismo",
+    "pl": "Bez odpowiedzi: ty sam",
+    "ru": "Без ответа: вы сами"
+  },
+  "Les meilleurs inviteurs du serveur": {
+    "en": "The server's top inviters",
+    "de": "Die besten Einlader des Servers",
+    "es": "Los mejores invitadores del servidor",
+    "pl": "Najlepsi zapraszający na serwerze",
+    "ru": "Лучшие приглашающие сервера"
+  },
+  "membre(s) amené(s) sur ce serveur": {
+    "en": "member(s) brought to this server",
+    "de": "Mitglied(er) auf diesen Server gebracht",
+    "es": "miembro(s) traído(s) a este servidor",
+    "pl": "członków sprowadzonych na ten serwer",
+    "ru": "участник(ов) приведено на этот сервер"
+  },
+  "Arrivé(e) grâce à <@": {
+    "en": "Arrived thanks to <@",
+    "de": "Gekommen dank <@",
+    "es": "Llegó gracias a <@",
+    "pl": "Przybył(a) dzięki <@",
+    "ru": "Пришёл благодаря <@"
+  },
+  "Arrivée enregistrée, mais l'invitation utilisée n'a pas pu être identifiée (lien de vanité, ou permission « Gérer le serveur » manquante à ce moment-là).": {
+    "en": "Arrival recorded, but the invite used could not be identified (vanity link, or the “Manage Server” permission was missing at the time).",
+    "de": "Ankunft erfasst, aber die verwendete Einladung konnte nicht ermittelt werden (Vanity-Link, oder die Berechtigung „Server verwalten“ fehlte zu dem Zeitpunkt).",
+    "es": "Llegada registrada, pero no se pudo identificar la invitación usada (enlace personalizado, o faltaba el permiso « Gestionar servidor » en ese momento).",
+    "pl": "Przybycie zapisane, ale nie udało się ustalić użytego zaproszenia (link vanity lub brak uprawnienia „Zarządzaj serwerem” w tamtej chwili).",
+    "ru": "Приход записан, но использованное приглашение определить не удалось (vanity-ссылка, или в тот момент не было права «Управлять сервером»)."
+  },
+  "Aucune arrivée enregistrée : le bot n'était pas encore là (ou pas équipé du traqueur) quand ce membre a rejoint.": {
+    "en": "No arrival recorded: the bot was not there yet (or not equipped with the tracker) when this member joined.",
+    "de": "Keine Ankunft erfasst: Der Bot war noch nicht da (oder hatte den Tracker noch nicht), als dieses Mitglied beitrat.",
+    "es": "Ninguna llegada registrada: el bot aún no estaba (o no tenía el rastreador) cuando este miembro se unió.",
+    "pl": "Brak zapisanego przybycia: bota jeszcze nie było (lub nie miał trackera), gdy ten członek dołączył.",
+    "ru": "Приход не записан: бота ещё не было (или трекер не работал), когда этот участник присоединился."
+  },
+  "📨 Invitations — ": {
+    "en": "📨 Invites — ",
+    "de": "📨 Einladungen — ",
+    "es": "📨 Invitaciones — ",
+    "pl": "📨 Zaproszenia — ",
+    "ru": "📨 Приглашения — "
+  },
+  "📨 Aucune invitation enregistrée pour l'instant : le traqueur compte les arrivées à partir de maintenant.": {
+    "en": "📨 No invites recorded yet: the tracker counts arrivals from now on.",
+    "de": "📨 Noch keine Einladungen erfasst: Der Tracker zählt Ankünfte ab jetzt.",
+    "es": "📨 Ninguna invitación registrada por ahora: el rastreador cuenta las llegadas a partir de ahora.",
+    "pl": "📨 Nie zapisano jeszcze żadnych zaproszeń: tracker liczy przybycia od teraz.",
+    "ru": "📨 Приглашений пока не записано: трекер считает приходы с этого момента."
+  },
+  "🏆 Meilleurs inviteurs": {
+    "en": "🏆 Top inviters",
+    "de": "🏆 Beste Einlader",
+    "es": "🏆 Mejores invitadores",
+    "pl": "🏆 Najlepsi zapraszający",
+    "ru": "🏆 Лучшие приглашающие"
+  },
+  "Classement du serveur": {
+    "en": "Server leaderboard",
+    "de": "Server-Rangliste",
+    "es": "Clasificación del servidor",
+    "pl": "Ranking serwera",
+    "ru": "Рейтинг сервера"
+  },
+  "📨 Invité par": {
+    "en": "📨 Invited by",
+    "de": "📨 Eingeladen von",
+    "es": "📨 Invitado por",
+    "pl": "📨 Zaproszony przez",
+    "ru": "📨 Приглашён"
+  },
+  "Rôle automatique des bots": {
+    "en": "Automatic bot role",
+    "de": "Automatische Bot-Rolle",
+    "es": "Rol automático de bots",
+    "pl": "Automatyczna rola botów",
+    "ru": "Автоматическая роль ботов"
+  },
+  "⚠️ Traqueur d'invitations : ": {
+    "en": "⚠️ Invite tracker: ",
+    "de": "⚠️ Einladungs-Tracker: ",
+    "es": "⚠️ Rastreador de invitaciones: ",
+    "pl": "⚠️ Tracker zaproszeń: ",
+    "ru": "⚠️ Трекер приглашений: "
   }
 }

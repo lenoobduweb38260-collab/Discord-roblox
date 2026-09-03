@@ -196,6 +196,7 @@ function mainView(guild) {
       .addOptions(
         { label: 'Modules (RP, Interactions, SAO)', value: 'rp', emoji: '🎭', description: 'Activer/désactiver RP, Interactions et Aventure SAO' },
         { label: 'Rôles', value: 'roles', emoji: '👮', description: 'Staff, administration, en service' },
+        { label: 'Arrivées & départs', value: 'arrivees', emoji: '👋', description: 'Salon d\'arrivée, salon de départ, rôles automatiques' },
         { label: 'Salons', value: 'salons', emoji: '📢', description: 'Logs, niveaux, service, staff' },
         { label: 'XP & niveaux', value: 'xp', emoji: '📈', description: 'XP texte, XP vocal, cooldown' },
         { label: 'Sécurité', value: 'securite', emoji: '🛡️', description: 'Anti-spam, anti-nuke, captcha' },
@@ -265,6 +266,78 @@ function rolesView(guild) {
       new ActionRowBuilder().addComponents(adminMenu),
       new ActionRowBuilder().addComponents(policeMenu),
       new ActionRowBuilder().addComponents(serviceMenu),
+      bottom,
+    ],
+  };
+}
+
+// ----- Catégorie : arrivées & départs — salons dédiés + rôles automatiques -----
+function idsJson(valeur) {
+  try {
+    const liste = JSON.parse(valeur || '[]');
+    return Array.isArray(liste) ? liste.map(String).filter(Boolean) : [];
+  } catch {
+    return [];
+  }
+}
+
+function arriveesView(guild) {
+  const cfg = getGuildConfig(guild.id);
+  const membres = idsJson(cfg.autorole_role_ids);
+  const bots = idsJson(cfg.autorole_bot_role_ids);
+  const embed = new EmbedBuilder()
+    .setColor(COLORS.INFO)
+    .setTitle('👋 Configuration — Arrivées & départs')
+    .setDescription(
+      [
+        `👋 Salon des arrivées : ${show(cfg.member_channel_id, 'channel')}`,
+        `📤 Salon des départs : ${cfg.goodbye_channel_id ? show(cfg.goodbye_channel_id, 'channel') : '*même salon que les arrivées*'}`,
+        `🎭 Rôles automatiques des membres : ${membres.map((id) => `<@&${id}>`).join(' ') || '*Aucun*'}`,
+        `🤖 Rôles automatiques des bots : ${bots.map((id) => `<@&${id}>`).join(' ') || '*Aucun*'}`,
+        '',
+        '➕ Sélectionner un rôle dans un menu **l\'ajoute** à la liste. 🧹 **Vider** pour repartir de zéro.',
+        '🤖 Avec un captcha actif, les rôles des membres sont donnés **après** sa validation ; ceux des bots tout de suite.',
+        '📨 Chaque arrivée note aussi **qui a invité** le membre — voir `/invites`.',
+      ].join('\n')
+    );
+  const salonArrivee = new ChannelSelectMenuBuilder()
+    .setCustomId('cfgchana:member_channel_id')
+    .setPlaceholder('👋 Salon des arrivées')
+    .setChannelTypes(ChannelType.GuildText)
+    .setMinValues(0)
+    .setMaxValues(1);
+  if (cfg.member_channel_id) salonArrivee.setDefaultChannels(cfg.member_channel_id);
+  const salonDepart = new ChannelSelectMenuBuilder()
+    .setCustomId('cfgchana:goodbye_channel_id')
+    .setPlaceholder('📤 Salon des départs (vide = même salon que les arrivées)')
+    .setChannelTypes(ChannelType.GuildText)
+    .setMinValues(0)
+    .setMaxValues(1);
+  if (cfg.goodbye_channel_id) salonDepart.setDefaultChannels(cfg.goodbye_channel_id);
+  const rolesMembres = new RoleSelectMenuBuilder()
+    .setCustomId('cfgmrole:autorole')
+    .setPlaceholder('🎭 Rôles automatiques des membres (s\'ajoutent)')
+    .setMinValues(1)
+    .setMaxValues(10);
+  if (membres.length) rolesMembres.setDefaultRoles(membres.slice(0, 10));
+  const rolesBots = new RoleSelectMenuBuilder()
+    .setCustomId('cfgmrole:autorolebot')
+    .setPlaceholder('🤖 Rôles automatiques des bots (s\'ajoutent)')
+    .setMinValues(1)
+    .setMaxValues(10);
+  if (bots.length) rolesBots.setDefaultRoles(bots.slice(0, 10));
+  const bottom = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('cfgback').setLabel('⬅ Retour').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('cfgrolereset:autorole').setLabel('Vider rôles membres').setEmoji('🧹').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('cfgrolereset:autorolebot').setLabel('Vider rôles bots').setEmoji('🧹').setStyle(ButtonStyle.Secondary)
+  );
+  return {
+    embeds: [embed],
+    components: [
+      new ActionRowBuilder().addComponents(salonArrivee),
+      new ActionRowBuilder().addComponents(salonDepart),
+      new ActionRowBuilder().addComponents(rolesMembres),
+      new ActionRowBuilder().addComponents(rolesBots),
       bottom,
     ],
   };
@@ -883,7 +956,7 @@ function absencesView(guild) {
   };
 }
 
-const CATEGORY_VIEWS = { rp: rpView, roles: rolesView, salons: salonsView, xp: xpView, securite: securiteView, whitelist: whitelistView, tickets: ticketsView, vocal: vocalView, absences: absencesView, reseaux: reseauxView };
+const CATEGORY_VIEWS = { rp: rpView, roles: rolesView, arrivees: arriveesView, salons: salonsView, xp: xpView, securite: securiteView, whitelist: whitelistView, tickets: ticketsView, vocal: vocalView, absences: absencesView, reseaux: reseauxView };
 const SECURITY_TOGGLES = new Set(['antispam_enabled', 'antinuke_enabled', 'captcha_enabled']);
 
 function xpModal(cfg) {
@@ -995,15 +1068,16 @@ async function handleConfigInteraction(interaction) {
       return;
     }
 
-    // Rôles staff / administration / police MULTIPLES.
+    // Rôles staff / administration / police / automatiques MULTIPLES.
     if (id.startsWith('cfgmrole:')) {
-      const kind = id.split(':')[1]; // 'staff' | 'admin' | 'police'
-      if (!['staff', 'admin', 'police'].includes(kind)) return;
-      // Sécurité grade élevé : les rôles Administration ET Police (pouvoirs
-      // élevés : casier judiciaire, retrait de points) sont réservés aux admins.
-      if ((kind === 'admin' || kind === 'police') && grade < GRADES.ADMIN) {
+      const kind = id.split(':')[1]; // 'staff' | 'admin' | 'police' | 'autorole' | 'autorolebot'
+      if (!['staff', 'admin', 'police', 'autorole', 'autorolebot'].includes(kind)) return;
+      // Sécurité grade élevé : les rôles Administration, Police et
+      // AUTOMATIQUES (distribués à tout arrivant !) sont réservés aux admins.
+      if (kind !== 'staff' && grade < GRADES.ADMIN) {
         return await interaction.reply({
-          content: `⛔ Sécurité : seul un membre de l\'**administration** peut changer les rôles ${kind === 'admin' ? 'Administration' : 'Police'}.`,
+          content: `⛔ Sécurité : seul un membre de l\'**administration** peut changer les rôles ${
+            { admin: 'Administration', police: 'Police', autorole: 'automatiques des membres', autorolebot: 'automatiques des bots' }[kind]}.`,
           flags: MessageFlags.Ephemeral,
         });
       }
@@ -1011,16 +1085,26 @@ async function handleConfigInteraction(interaction) {
       // « remplacent » la sélection, donc sans fusion un 2e ajout écraserait
       // le 1er et un seul rôle resterait). Le retrait passe par « Vider ».
       const cfg = getGuildConfig(interaction.guildId);
-      const existing = kind === 'staff' ? staffRoleIds(cfg) : kind === 'admin' ? adminRoleIds(cfg) : policeRoleIds(cfg);
+      const autoRoles = require('./autoRoles');
+      const existing = kind === 'staff' ? staffRoleIds(cfg)
+        : kind === 'admin' ? adminRoleIds(cfg)
+        : kind === 'police' ? policeRoleIds(cfg)
+        : kind === 'autorole' ? autoRoles.rolesConfigures(cfg)
+        : autoRoles.rolesBotConfigures(cfg);
       const ids = [...new Set([...existing, ...interaction.values])].slice(0, 10);
       if (kind === 'police') {
         setGuildConfig(interaction.guildId, 'police_role_ids', JSON.stringify(ids));
+      } else if (kind === 'autorole') {
+        setGuildConfig(interaction.guildId, 'autorole_role_ids', JSON.stringify(ids));
+      } else if (kind === 'autorolebot') {
+        setGuildConfig(interaction.guildId, 'autorole_bot_role_ids', JSON.stringify(ids));
       } else {
         setGuildConfig(interaction.guildId, `${kind}_role_ids`, JSON.stringify(ids));
         setGuildConfig(interaction.guildId, `${kind}_role_id`, ids[0] || null); // compatibilité colonne historique
       }
-      await mettreAJour(interaction, rolesView(interaction.guild));
-      const label = { staff: 'Staff', admin: 'Administration', police: 'Police' }[kind];
+      const vueApres = kind === 'autorole' || kind === 'autorolebot' ? arriveesView : rolesView;
+      await mettreAJour(interaction, vueApres(interaction.guild));
+      const label = { staff: 'Staff', admin: 'Administration', police: 'Police', autorole: 'automatiques (membres)', autorolebot: 'automatiques (bots)' }[kind];
       await sendLog(
         interaction.guild,
         logEmbed(
@@ -1035,21 +1119,27 @@ async function handleConfigInteraction(interaction) {
     // Bouton « Vider » : réinitialise une liste de rôles (staff/admin/police).
     if (id.startsWith('cfgrolereset:')) {
       const kind = id.split(':')[1];
-      if (!['staff', 'admin', 'police'].includes(kind)) return;
-      if ((kind === 'admin' || kind === 'police') && grade < GRADES.ADMIN) {
+      if (!['staff', 'admin', 'police', 'autorole', 'autorolebot'].includes(kind)) return;
+      if (kind !== 'staff' && grade < GRADES.ADMIN) {
         return await interaction.reply({
-          content: `⛔ Sécurité : seul un membre de l\'**administration** peut vider les rôles ${kind === 'admin' ? 'Administration' : 'Police'}.`,
+          content: `⛔ Sécurité : seul un membre de l\'**administration** peut vider les rôles ${
+            { admin: 'Administration', police: 'Police', autorole: 'automatiques des membres', autorolebot: 'automatiques des bots' }[kind]}.`,
           flags: MessageFlags.Ephemeral,
         });
       }
       if (kind === 'police') {
         setGuildConfig(interaction.guildId, 'police_role_ids', '[]');
+      } else if (kind === 'autorole') {
+        setGuildConfig(interaction.guildId, 'autorole_role_ids', '[]');
+      } else if (kind === 'autorolebot') {
+        setGuildConfig(interaction.guildId, 'autorole_bot_role_ids', '[]');
       } else {
         setGuildConfig(interaction.guildId, `${kind}_role_ids`, '[]');
         setGuildConfig(interaction.guildId, `${kind}_role_id`, null);
       }
-      await mettreAJour(interaction, rolesView(interaction.guild));
-      const label = { staff: 'Staff', admin: 'Administration', police: 'Police' }[kind];
+      const vueApres = kind === 'autorole' || kind === 'autorolebot' ? arriveesView : rolesView;
+      await mettreAJour(interaction, vueApres(interaction.guild));
+      const label = { staff: 'Staff', admin: 'Administration', police: 'Police', autorole: 'automatiques (membres)', autorolebot: 'automatiques (bots)' }[kind];
       await sendLog(
         interaction.guild,
         logEmbed('⚙️ Configuration modifiée', `Rôles ${label} **vidés** par <@${interaction.user.id}>.`, COLORS.WARNING)
@@ -1397,6 +1487,21 @@ async function handleConfigInteraction(interaction) {
       await sendLog(
         interaction.guild,
         logEmbed('⚙️ Configuration modifiée', `${CHANNEL_COLUMNS[col]} → <#${channelId}>\nPar <@${interaction.user.id}>`, COLORS.INFO)
+      );
+      return;
+    }
+
+    // Salons de la catégorie « Arrivées & départs » — mêmes colonnes que la
+    // catégorie Salons, mais on revient sur SA vue (désélectionner = retirer).
+    if (id.startsWith('cfgchana:')) {
+      const col = id.split(':')[1];
+      if (!['member_channel_id', 'goodbye_channel_id'].includes(col)) return;
+      const channelId = interaction.values[0] || null;
+      setGuildConfig(interaction.guildId, col, channelId);
+      await mettreAJour(interaction, arriveesView(interaction.guild));
+      await sendLog(
+        interaction.guild,
+        logEmbed('⚙️ Configuration modifiée', `${CHANNEL_COLUMNS[col]} → ${channelId ? `<#${channelId}>` : '*retiré*'}\nPar <@${interaction.user.id}>`, COLORS.INFO)
       );
       return;
     }

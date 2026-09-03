@@ -591,6 +591,8 @@ for (const column of [
   'vocal_perso_createur_id TEXT',
   // 🎭 Rôles automatiques à l'arrivée (liste JSON d'identifiants de rôles)
   'autorole_role_ids TEXT',
+  // 🤖 Rôles automatiques des BOTS à leur arrivée (liste JSON)
+  'autorole_bot_role_ids TEXT',
   // 👋 Apparence des messages d'arrivée / de départ, réglée depuis le site
   'welcome_color TEXT',        // couleur de la barre de l'embed (#RRGGBB)
   'welcome_image TEXT',        // grande image de fond de l'embed
@@ -773,6 +775,19 @@ db.exec(`CREATE TABLE IF NOT EXISTS rp_migration_archive (
   archived_at TEXT NOT NULL
 )`);
 
+// 📨 Traqueur d'invitations : qui a fait venir chaque membre.
+// Une ligne par arrivée détectée — l'inviteur peut être NULL (lien de vanité,
+// permission « Gérer le serveur » manquante, ou détection impossible).
+db.exec(`CREATE TABLE IF NOT EXISTS invitations (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  guild_id   TEXT NOT NULL,
+  member_id  TEXT NOT NULL,
+  inviter_id TEXT,
+  code       TEXT,
+  at         INTEGER NOT NULL
+)`);
+db.exec('CREATE INDEX IF NOT EXISTS idx_invitations_guild ON invitations (guild_id, inviter_id)');
+
 try {
   const done = db.prepare("SELECT value FROM app_state WHERE key = 'rp_global_migrated'").get();
   if (!done) {
@@ -837,6 +852,7 @@ const DEFAULT_CONFIG = {
   goodbye_channel_id: null,
   welcome_mention: 0,
   autorole_role_ids: null,
+  autorole_bot_role_ids: null,
   welcome_color: null,
   embed_style: 1,
   embed_accent: null,

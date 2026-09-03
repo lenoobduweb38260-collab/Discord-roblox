@@ -20,6 +20,9 @@ function channelSlug(name) {
 module.exports = {
   name: Events.GuildCreate,
   async execute(guild) {
+    // 📨 Photo de départ des invitations de ce nouveau serveur, pour que le
+    // traqueur sache dire « qui a invité qui » dès la première arrivée.
+    require('../utils/invitations').primer(guild).catch(() => null);
     // 🌍 D'abord la carte de choix de langue — chaque ligne parle SA langue,
     // pour que l'administrateur comprenne quel que soit son français.
     try {
