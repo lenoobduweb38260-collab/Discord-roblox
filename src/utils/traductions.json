@@ -20151,5 +20151,131 @@
     "es": "módulo cargado pero falta la API getInfo",
     "pl": "moduł załadowany, ale brak API getInfo",
     "ru": "модуль загружен, но API getInfo отсутствует"
+  },
+  " Lecteur YouTube (yt-dlp)": {
+    "en": " YouTube player (yt-dlp)",
+    "de": " YouTube-Player (yt-dlp)",
+    "es": " Reproductor de YouTube (yt-dlp)",
+    "pl": " Odtwarzacz YouTube (yt-dlp)",
+    "ru": " Проигрыватель YouTube (yt-dlp)"
+  },
+  " — sera téléchargé à la première lecture": {
+    "en": " — will be downloaded on first playback",
+    "de": " — wird bei der ersten Wiedergabe heruntergeladen",
+    "es": " — se descargará en la primera reproducción",
+    "pl": " — zostanie pobrany przy pierwszym odtworzeniu",
+    "ru": " — будет загружен при первом воспроизведении"
+  },
+  "⚠️ Recherche YouTube (play-dl) : ": {
+    "en": "⚠️ YouTube search (play-dl): ",
+    "de": "⚠️ YouTube-Suche (play-dl): ",
+    "es": "⚠️ Búsqueda de YouTube (play-dl): ",
+    "pl": "⚠️ Wyszukiwanie YouTube (play-dl): ",
+    "ru": "⚠️ Поиск YouTube (play-dl): "
+  },
+  " — essai avec yt-dlp.": {
+    "en": " — trying yt-dlp.",
+    "de": " — Versuch mit yt-dlp.",
+    "es": " — probando con yt-dlp.",
+    "pl": " — próba z yt-dlp.",
+    "ru": " — пробую yt-dlp."
+  },
+  "⬇️ Première lecture YouTube : téléchargement de yt-dlp (le lecteur maintenu)…": {
+    "en": "⬇️ First YouTube playback: downloading yt-dlp (the maintained player)…",
+    "de": "⬇️ Erste YouTube-Wiedergabe: yt-dlp wird heruntergeladen (der gepflegte Player)…",
+    "es": "⬇️ Primera reproducción de YouTube: descargando yt-dlp (el reproductor mantenido)…",
+    "pl": "⬇️ Pierwsze odtwarzanie YouTube: pobieranie yt-dlp (utrzymywanego odtwarzacza)…",
+    "ru": "⬇️ Первое воспроизведение YouTube: загрузка yt-dlp (поддерживаемого проигрывателя)…"
+  },
+  "téléchargement de yt-dlp impossible (HTTP ": {
+    "en": "yt-dlp download failed (HTTP ",
+    "de": "yt-dlp-Download nicht möglich (HTTP ",
+    "es": "descarga de yt-dlp imposible (HTTP ",
+    "pl": "pobranie yt-dlp niemożliwe (HTTP ",
+    "ru": "не удалось загрузить yt-dlp (HTTP "
+  },
+  "✅ yt-dlp installé à côté du bot.": {
+    "en": "✅ yt-dlp installed next to the bot.",
+    "de": "✅ yt-dlp neben dem Bot installiert.",
+    "es": "✅ yt-dlp instalado junto al bot.",
+    "pl": "✅ yt-dlp zainstalowany obok bota.",
+    "ru": "✅ yt-dlp установлен рядом с ботом."
+  },
+  "🔄 yt-dlp a plus de sept jours : mise à jour…": {
+    "en": "🔄 yt-dlp is more than seven days old: updating…",
+    "de": "🔄 yt-dlp ist älter als sieben Tage: Aktualisierung…",
+    "es": "🔄 yt-dlp tiene más de siete días: actualizando…",
+    "pl": "🔄 yt-dlp ma ponad siedem dni: aktualizacja…",
+    "ru": "🔄 yt-dlp старше семи дней: обновление…"
+  },
+  "YouTube bloque l'adresse IP de cet hébergement (contrôle anti-robot). ": {
+    "en": "YouTube is blocking this host's IP address (anti-bot check). ",
+    "de": "YouTube blockiert die IP-Adresse dieses Hosts (Anti-Bot-Prüfung). ",
+    "es": "YouTube bloquea la dirección IP de este alojamiento (control anti-robot). ",
+    "pl": "YouTube blokuje adres IP tego hostingu (kontrola antybotowa). ",
+    "ru": "YouTube блокирует IP-адрес этого хостинга (антибот-проверка). "
+  },
+  "Réessayez plus tard — si ça persiste, exportez les cookies YouTube d'un navigateur ": {
+    "en": "Try again later — if it persists, export YouTube cookies from a browser ",
+    "de": "Versuchen Sie es später erneut — wenn es anhält, exportieren Sie YouTube-Cookies aus einem Browser ",
+    "es": "Inténtalo más tarde — si persiste, exporta las cookies de YouTube desde un navegador ",
+    "pl": "Spróbuj później — jeśli problem nie ustąpi, wyeksportuj pliki cookie YouTube z przeglądarki ",
+    "ru": "Повторите попытку позже — если не поможет, экспортируйте cookie YouTube из браузера "
+  },
+  "et posez le chemin du fichier dans `YTDLP_COOKIES` (fichier .env du bot).": {
+    "en": "and set the file path in `YTDLP_COOKIES` (the bot's .env file).",
+    "de": "und tragen Sie den Dateipfad in `YTDLP_COOKIES` ein (.env-Datei des Bots).",
+    "es": "y pon la ruta del archivo en `YTDLP_COOKIES` (archivo .env del bot).",
+    "pl": "i wpisz ścieżkę pliku w `YTDLP_COOKIES` (plik .env bota).",
+    "ru": "и укажите путь к файлу в `YTDLP_COOKIES` (файл .env бота)."
+  },
+  "yt-dlp s'est arrêté (code ": {
+    "en": "yt-dlp stopped (code ",
+    "de": "yt-dlp hat sich beendet (Code ",
+    "es": "yt-dlp se detuvo (código ",
+    "pl": "yt-dlp zatrzymał się (kod ",
+    "ru": "yt-dlp завершился (код "
+  },
+  "aucun résultat": {
+    "en": "no result",
+    "de": "kein Ergebnis",
+    "es": "ningún resultado",
+    "pl": "brak wyników",
+    "ru": "нет результатов"
+  },
+  "yt-dlp n'a renvoyé aucun son en 30 secondes": {
+    "en": "yt-dlp returned no audio within 30 seconds",
+    "de": "yt-dlp hat innerhalb von 30 Sekunden keinen Ton geliefert",
+    "es": "yt-dlp no devolvió ningún sonido en 30 segundos",
+    "pl": "yt-dlp nie zwrócił żadnego dźwięku w ciągu 30 sekund",
+    "ru": "yt-dlp не вернул звук за 30 секунд"
+  },
+  "⚠️ Flux YouTube (yt-dlp) : ": {
+    "en": "⚠️ YouTube stream (yt-dlp): ",
+    "de": "⚠️ YouTube-Stream (yt-dlp): ",
+    "es": "⚠️ Flujo de YouTube (yt-dlp): ",
+    "pl": "⚠️ Strumień YouTube (yt-dlp): ",
+    "ru": "⚠️ Поток YouTube (yt-dlp): "
+  },
+  " — essai avec ytdl-core.": {
+    "en": " — trying ytdl-core.",
+    "de": " — Versuch mit ytdl-core.",
+    "es": " — probando con ytdl-core.",
+    "pl": " — próba z ytdl-core.",
+    "ru": " — пробую ytdl-core."
+  },
+  "⚠️ Flux YouTube (play-dl) : ": {
+    "en": "⚠️ YouTube stream (play-dl): ",
+    "de": "⚠️ YouTube-Stream (play-dl): ",
+    "es": "⚠️ Flujo de YouTube (play-dl): ",
+    "pl": "⚠️ Strumień YouTube (play-dl): ",
+    "ru": "⚠️ Поток YouTube (play-dl): "
+  },
+  " — plus aucun secours.": {
+    "en": " — no fallback left.",
+    "de": " — keine Rückfallebene mehr.",
+    "es": " — sin ningún recurso más.",
+    "pl": " — nie ma już żadnego zapasu.",
+    "ru": " — резервов больше нет."
   }
 }

@@ -16,6 +16,9 @@ process.env.DATA_FILE = path.join(RACINE, 'data.sqlite');
 // Un « FFmpeg » factice : la détection ne demande qu'un fichier existant,
 // et les radios du laboratoire ne lancent jamais le vrai binaire.
 process.env.FFMPEG_PATH = process.execPath;
+// Un « yt-dlp » factice, même recette : un binaire existant qui échoue vite.
+// Sans lui, le moteur TÉLÉCHARGERAIT le vrai yt-dlp — pas de réseau ici.
+process.env.YTDLP_PATH = process.execPath;
 
 const Module = require('module');
 const vrai = Module.prototype.require;

@@ -351,6 +351,7 @@ async function diagnostic(interaction) {
           `${oui(d.opus)} Encodeur Opus${d.opus ? ` — \`${d.opus}\`` : ''}`,
           `${oui(d.chiffrement)} Chiffrement de la voix${d.chiffrement ? ` — \`${d.chiffrement}\`` : ''}`,
           `${oui(d.dave)} Chiffrement de bout en bout (DAVE)${d.dave ? ` — \`${d.dave}\`` : ' — exigé par Discord depuis mars 2026'}`,
+          `${oui(d.ytdlp)} Lecteur YouTube (yt-dlp)${d.ytdlp ? ` — \`${d.ytdlp}\`` : ' — sera téléchargé à la première lecture'}`,
         ], { prefixe: '🔎', compte: null }),
       ].filter(Boolean)))
       .setFooter({ text: `État final : ${e.statutFinal}${e.erreur ? ` · ${e.erreur}` : ''}` });
@@ -404,6 +405,7 @@ function carteSources() {
         `${d.opus ? '✅' : '❌'} Encodeur Opus${d.opus ? ` — \`${d.opus}\`` : ' — **manquant**'}`,
         `${d.chiffrement ? '✅' : '❌'} Chiffrement de la voix${d.chiffrement ? ` — \`${d.chiffrement}\`` : ' — **manquant**'}`,
         `${d.ffmpeg ? '✅' : '❌'} FFmpeg (radios)${d.ffmpeg ? ` — \`${d.ffmpeg}\`` : ' — **manquant** : les radios ne peuvent pas jouer'}`,
+        `${d.ytdlp ? '✅' : '❌'} Lecteur YouTube (yt-dlp)${d.ytdlp ? ` — \`${d.ytdlp}\`` : ' — sera téléchargé à la première lecture'}`,
       ], { prefixe: '🔧', compte: null }),
       manque
         ? `⚠️ **Il manque ${manque.length === 1 ? 'une brique' : 'des briques'} :**\n${manque.map((m) => `➜ ${m}`).join('\n')}\n`

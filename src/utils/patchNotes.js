@@ -1650,6 +1650,18 @@ const RELEASES = [
     amelioration: [],
     retrait: [],
   },
+  {
+    id: 'musique-ytdlp-2026-09cm',
+    title: 'YouTube : lecture confiee a yt-dlp, le moteur qui tient',
+    fix: [
+      '📺 **Les liens YouTube ne jouaient toujours pas** : depuis 2026, YouTube exige des jetons d\'origine et bloque les adresses IP d\'hebergeurs — les bibliotheques Node (ytdl-core est archive, play-dl abandonne) ne suivent plus. Le bot s\'appuie desormais sur **yt-dlp**, l\'outil maintenu qu\'utilisent les bots qui marchent encore : un binaire pose a cote du bot, telecharge automatiquement a la premiere lecture, et remis a jour tout seul des qu\'il a plus de sept jours',
+    ],
+    amelioration: [
+      '🩺 En cas d\'echec, le message dit la vraie cause — par exemple le controle anti-robot de YouTube, avec la parade (`YTDLP_COOKIES` dans le .env) — au lieu d\'un « Invalid URL » muet. `/musique diagnostic` et `/musique sources` montrent l\'etat du lecteur yt-dlp',
+    ],
+    ajout: [],
+    retrait: [],
+  },
 ];
 
 // Construit l'embed d'une note à partir d'une entrée { title, ajout, fix,

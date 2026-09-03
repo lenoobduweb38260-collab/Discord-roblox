@@ -105,16 +105,23 @@ const etatSources = () => ({ ...etat, erreurs: [...etat.erreurs] });
 // « ce que Spotify/Deezer disent » et « ce qu'on peut réellement diffuser ».
 async function chercherSurYouTube(requete) {
   const p = play();
-  const trouves = await p.search(requete, { limit: 1, source: { youtube: 'video' } });
-  const v = trouves?.[0];
-  if (!v?.url) return null;
-  return {
-    titre: v.title,
-    url: v.url,
-    duree: v.durationInSec || 0,
-    auteur: v.channel?.name || null,
-    vignette: v.thumbnails?.[0]?.url || null,
-  };
+  try {
+    const trouves = await p.search(requete, { limit: 1, source: { youtube: 'video' } });
+    const v = trouves?.[0];
+    if (v?.url) {
+      return {
+        titre: v.title,
+        url: v.url,
+        duree: v.durationInSec || 0,
+        auteur: v.channel?.name || null,
+        vignette: v.thumbnails?.[0]?.url || null,
+      };
+    }
+  } catch (err) {
+    console.warn(`⚠️ Recherche YouTube (play-dl) : ${err.message} — essai avec yt-dlp.`);
+  }
+  // play-dl muet ou cassé : yt-dlp cherche à sa place.
+  return ficheYtDlp(`ytsearch1:${requete}`).catch(() => null);
 }
 
 // Résout une requête en une LISTE de pistes jouables (une, ou toute une liste).
@@ -154,18 +161,23 @@ async function resoudre(requete) {
         vignette: d.thumbnails?.[0]?.url, source: 'youtube', lienOrigine: url,
       })];
     } catch (err) {
-      // play-dl cassé sur ce lien : ytdl-core lit la fiche à sa place.
+      // play-dl cassé sur ce lien : ytdl-core puis yt-dlp lisent la fiche.
       const id = idYouTube(url);
       if (!id) throw err;
-      const info = await ytdl().getInfo(`https://www.youtube.com/watch?v=${id}`).catch(() => null);
+      const lien = `https://www.youtube.com/watch?v=${id}`;
+      const info = await ytdl().getInfo(lien).catch(() => null);
       const d = info?.videoDetails;
-      if (!d) throw err;
-      return [S.piste({
-        titre: d.title, url: d.video_url || `https://www.youtube.com/watch?v=${id}`,
-        duree: Number(d.lengthSeconds) || 0, auteur: d.author?.name || null,
-        vignette: d.thumbnails?.[d.thumbnails.length - 1]?.url || null,
-        source: 'youtube', lienOrigine: url,
-      })];
+      if (d) {
+        return [S.piste({
+          titre: d.title, url: d.video_url || lien,
+          duree: Number(d.lengthSeconds) || 0, auteur: d.author?.name || null,
+          vignette: d.thumbnails?.[d.thumbnails.length - 1]?.url || null,
+          source: 'youtube', lienOrigine: url,
+        })];
+      }
+      const fiche = await ficheYtDlp(lien).catch(() => null);
+      if (!fiche) throw err;
+      return [S.piste({ ...fiche, source: 'youtube', lienOrigine: url })];
     }
   }
 
@@ -312,6 +324,190 @@ async function fluxYouTubeYtdl(morceau) {
   }
 }
 
+// ══════════════════════════════════════════════════════════════════
+// 📥 YT-DLP — le moteur YouTube qui marche encore en 2026
+// ══════════════════════════════════════════════════════════════════
+//
+// Depuis 2025-2026, YouTube exige des jetons d'origine et bloque les adresses
+// IP d'hébergeurs (« Sign in to confirm you're not a bot »). Les bibliothèques
+// Node (ytdl-core est archivé, play-dl abandonné) ne suivent plus. Le seul
+// outil qui tient le rythme est yt-dlp : un binaire autonome, mis à jour en
+// continu par sa communauté.
+//
+// On applique la recette de FFmpeg : le binaire vit À CÔTÉ du bot. S'il n'y
+// est pas, on le télécharge depuis ses releases GitHub (même mécanique que la
+// mise à jour du bot lui-même) ; s'il a plus de sept jours, il se met à jour
+// tout seul (`yt-dlp -U`) — c'est cette fraîcheur qui fait que « les autres
+// bots marchent » : ils remettent leur extracteur à jour sans arrêt.
+//
+//  • YTDLP_PATH (.env) impose un binaire précis — jamais touché par nous ;
+//  • YTDLP_COOKIES (.env) pointe un fichier de cookies exporté d'un
+//    navigateur, la parade officielle au contrôle anti-robot.
+
+function dossierBot() {
+  const path = require('path');
+  if (process.env.BOT_DIR) return process.env.BOT_DIR;
+  return process.pkg ? path.dirname(process.execPath) : path.join(__dirname, '..', '..');
+}
+
+let _cheminYtDlp;
+function cheminYtDlp() {
+  if (_cheminYtDlp !== undefined) return _cheminYtDlp;
+  const fs = require('fs');
+  const path = require('path');
+  const { spawnSync } = require('child_process');
+  _cheminYtDlp = null;
+  const local = path.join(dossierBot(), process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp');
+  if (process.env.YTDLP_PATH && fs.existsSync(process.env.YTDLP_PATH)) {
+    _cheminYtDlp = process.env.YTDLP_PATH;
+  } else if (fs.existsSync(local)) {
+    _cheminYtDlp = local;
+  } else if (spawnSync('yt-dlp', ['--version'], { stdio: 'ignore', shell: false }).status === 0) {
+    _cheminYtDlp = 'yt-dlp';
+  }
+  return _cheminYtDlp;
+}
+
+// Télécharge le binaire AUTONOME (aucun Python à installer) à côté du bot.
+// Une seule descente à la fois : dix lectures simultanées ne doivent pas
+// écrire dix fois le même fichier.
+let _descenteYtDlp = null;
+function assurerYtDlp() {
+  const present = cheminYtDlp();
+  if (present) return Promise.resolve(present);
+  if (!_descenteYtDlp) {
+    _descenteYtDlp = (async () => {
+      const fs = require('fs');
+      const path = require('path');
+      const asset = process.platform === 'win32' ? 'yt-dlp.exe'
+        : process.platform === 'darwin' ? 'yt-dlp_macos' : 'yt-dlp_linux';
+      const cible = path.join(dossierBot(), process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp');
+      console.log('⬇️ Première lecture YouTube : téléchargement de yt-dlp (le lecteur maintenu)…');
+      const res = await fetch(`https://github.com/yt-dlp/yt-dlp/releases/latest/download/${asset}`, {
+        headers: { 'User-Agent': 'discord-roblox-rp-bot' },
+      });
+      if (!res.ok) throw new Error(`téléchargement de yt-dlp impossible (HTTP ${res.status})`);
+      const provisoire = `${cible}.download`;
+      fs.writeFileSync(provisoire, Buffer.from(await res.arrayBuffer()));
+      if (process.platform !== 'win32') fs.chmodSync(provisoire, 0o755);
+      fs.renameSync(provisoire, cible);
+      _cheminYtDlp = cible;
+      console.log('✅ yt-dlp installé à côté du bot.');
+      return cible;
+    })().catch((err) => {
+      _descenteYtDlp = null; // un échec réseau ne condamne pas les essais suivants
+      throw err;
+    });
+  }
+  return _descenteYtDlp;
+}
+
+// YouTube casse ses clients toutes les quelques semaines : un yt-dlp d'il y a
+// deux mois est un yt-dlp mort. Une fois par démarrage, s'il a plus de sept
+// jours, on le laisse se remettre à jour lui-même.
+let _fraicheurVerifiee = false;
+async function rafraichirYtDlp(bin) {
+  if (_fraicheurVerifiee) return;
+  _fraicheurVerifiee = true;
+  try {
+    if (bin === 'yt-dlp' || process.env.YTDLP_PATH) return; // pas le nôtre : on n'y touche pas
+    const fs = require('fs');
+    if (Date.now() - fs.statSync(bin).mtimeMs < 7 * 24 * 3600 * 1000) return;
+    console.log('🔄 yt-dlp a plus de sept jours : mise à jour…');
+    const { spawn } = require('child_process');
+    await new Promise((fini) => {
+      const p = spawn(bin, ['-U'], { stdio: 'ignore' });
+      const garde = setTimeout(() => { p.kill(); fini(); }, 30000);
+      p.on('close', () => { clearTimeout(garde); fini(); });
+      p.on('error', () => { clearTimeout(garde); fini(); });
+    });
+  } catch { /* au mieux : un échec ici ne doit rien empêcher */ }
+}
+
+// Transforme la sortie d'erreur brute de yt-dlp en phrase actionnable.
+function erreurYtDlp(brut, code) {
+  const texte = String(brut || '');
+  if (/sign in to confirm/i.test(texte)) {
+    return 'YouTube bloque l\'adresse IP de cet hébergement (contrôle anti-robot). '
+      + 'Réessayez plus tard — si ça persiste, exportez les cookies YouTube d\'un navigateur '
+      + 'et posez le chemin du fichier dans `YTDLP_COOKIES` (fichier .env du bot).';
+  }
+  const ligne = texte.split('\n').reverse().find((l) => l.trim().startsWith('ERROR:'));
+  if (ligne) return ligne.replace(/^\s*ERROR:\s*/, '').trim();
+  return `yt-dlp s'est arrêté (code ${code}) sans explication`;
+}
+
+// Lit la FICHE d'un lien (ou d'une recherche `ytsearch1:`) via `yt-dlp -J`.
+async function ficheYtDlp(cible) {
+  const bin = cheminYtDlp() || await assurerYtDlp();
+  const args = ['-J', '--no-warnings'];
+  if (!/^ytsearch/.test(cible)) args.push('--no-playlist');
+  if (process.env.YTDLP_COOKIES) args.push('--cookies', process.env.YTDLP_COOKIES);
+  args.push(cible);
+  const { execFile } = require('child_process');
+  const brut = await new Promise((livrer, rejeter) => {
+    execFile(bin, args, { maxBuffer: 16 * 1024 * 1024, timeout: 30000 }, (err, stdout, stderr) => {
+      if (err) rejeter(new Error(erreurYtDlp(stderr || err.message, err.code)));
+      else livrer(stdout);
+    });
+  });
+  let d = JSON.parse(brut);
+  if (Array.isArray(d.entries)) d = d.entries[0];
+  if (!d) throw new Error('aucun résultat');
+  return {
+    titre: d.title,
+    url: d.webpage_url || (d.id ? `https://www.youtube.com/watch?v=${d.id}` : cible),
+    duree: Math.round(d.duration || 0),
+    auteur: d.uploader || d.channel || null,
+    vignette: d.thumbnail || d.thumbnails?.[d.thumbnails.length - 1]?.url || null,
+  };
+}
+
+// Ouvre l'audio d'une vidéo via yt-dlp. Avec FFmpeg (déjà exigé par les
+// radios), n'importe quel format audio passe ; sans lui, on impose l'opus/webm
+// que le lecteur sait démuxer tout seul.
+async function fluxYouTubeYtDlp(morceau) {
+  const v = voice();
+  const bin = cheminYtDlp() || await assurerYtDlp();
+  await rafraichirYtDlp(bin);
+  const avecFfmpeg = !!cheminFfmpeg();
+  const args = [
+    '--no-playlist', '--no-warnings', '--quiet',
+    '-f', avecFfmpeg ? 'bestaudio/best' : 'bestaudio[acodec=opus]',
+    '-o', '-',
+  ];
+  if (process.env.YTDLP_COOKIES) args.push('--cookies', process.env.YTDLP_COOKIES);
+  args.push(morceau.url);
+  const { spawn } = require('child_process');
+  const enfant = spawn(bin, args, { stdio: ['ignore', 'pipe', 'pipe'] });
+  let sortieErreur = '';
+  enfant.stderr.on('data', (d) => { sortieErreur = (sortieErreur + d).slice(-4000); });
+  // On attend le PREMIER octet d'audio avant de rendre la main : c'est lui qui
+  // sépare « ça joue » d'un refus de YouTube — qu'on veut pouvoir raconter.
+  await new Promise((pret, rejeter) => {
+    let demarre = false;
+    const garde = setTimeout(() => {
+      if (!demarre) { enfant.kill(); rejeter(new Error('yt-dlp n\'a renvoyé aucun son en 30 secondes')); }
+    }, 30000);
+    enfant.stdout.once('data', (premier) => {
+      demarre = true;
+      clearTimeout(garde);
+      enfant.stdout.pause();
+      enfant.stdout.unshift(premier);
+      pret();
+    });
+    enfant.once('error', (err) => { clearTimeout(garde); rejeter(err); });
+    enfant.once('close', (code) => {
+      clearTimeout(garde);
+      if (!demarre) rejeter(new Error(erreurYtDlp(sortieErreur, code)));
+    });
+  });
+  return v.createAudioResource(enfant.stdout, {
+    inputType: avecFfmpeg ? v.StreamType.Arbitrary : v.StreamType.WebmOpus,
+    inlineVolume: true,
+  });
+}
+
 // Ouvre le flux audio d'une piste et l'emballe pour le lecteur.
 //
 // `inlineVolume` coûte un peu de calcul mais permet de régler le volume sans
@@ -328,12 +524,28 @@ async function ouvrirFlux(morceau) {
     if (souci) throw new Error(souci);
     return v.createAudioResource(morceau.url, { inputType: v.StreamType.Arbitrary, inlineVolume: true });
   }
-  // 📺 YouTube : ytdl-core d'abord, play-dl en secours.
+  // 📺 YouTube : yt-dlp d'abord (le seul qui tienne face aux protections de
+  // 2026), puis ytdl-core, puis play-dl. Si TOUT échoue, on raconte la
+  // première cause — c'est elle que l'utilisateur peut comprendre et agir.
   if (morceau.source === 'youtube') {
+    let cause = null;
+    try {
+      return await fluxYouTubeYtDlp(morceau);
+    } catch (err) {
+      cause = err.message;
+      console.warn(`⚠️ Flux YouTube (yt-dlp) : ${err.message} — essai avec ytdl-core.`);
+    }
     try {
       return await fluxYouTubeYtdl(morceau);
     } catch (err) {
       console.warn(`⚠️ Flux YouTube (ytdl-core) : ${err.message} — essai avec play-dl.`);
+    }
+    try {
+      const flux = await p.stream(morceau.url, { discordPlayerCompatibility: false, quality: 2 });
+      return v.createAudioResource(flux.stream, { inputType: flux.type, inlineVolume: true });
+    } catch (err) {
+      console.warn(`⚠️ Flux YouTube (play-dl) : ${err.message} — plus aucun secours.`);
+      throw new Error(cause || err.message);
     }
   }
   const flux = await p.stream(morceau.url, { discordPlayerCompatibility: false, quality: 2 });
@@ -435,6 +647,9 @@ function rapportDependances() {
   // raccroche pendant l'identification avec le code 4017.
   rapport.dave = trouver(['@snazzah/davey']);
   rapport.ffmpeg = cheminFfmpeg();
+  // 📥 Le lecteur YouTube. Absent n'est pas grave : il se télécharge tout
+  // seul à la première lecture — le diagnostic le dit.
+  rapport.ytdlp = cheminYtDlp();
   return rapport;
 }
 
@@ -451,5 +666,5 @@ function briquesManquantes() {
 module.exports = {
   preparer, etatSources, resoudre, chercherSurYouTube, ouvrirFlux, play, voice,
   rapportDependances, briquesManquantes, cheminFfmpeg, ffmpegManquant,
-  verifierClientYouTube,
+  verifierClientYouTube, cheminYtDlp, assurerYtDlp, ficheYtDlp,
 };
