@@ -1602,6 +1602,18 @@ const RELEASES = [
     amelioration: [],
     retrait: [],
   },
+  {
+    id: 'preset-editeur-2026-09ci',
+    title: 'Reponses types : un vrai editeur avec retours a la ligne',
+    ajout: [
+      '📝 **/preset ajouter** (sans texte) et **/preset modifier** (avec le seul numero) ouvrent un **editeur multiligne** : la touche Entree fait un vrai retour a la ligne, et l\'embed ressort exactement comme ecrit',
+    ],
+    amelioration: [
+      '✏️ A la modification, l\'editeur arrive prerempli avec les textes actuels — on corrige sur place au lieu de tout retaper. Les balises restent valables partout : && = barre, &> = liste, \\n = saut de ligne',
+    ],
+    fix: [],
+    retrait: [],
+  },
 ];
 
 // Construit l'embed d'une note à partir d'une entrée { title, ajout, fix,

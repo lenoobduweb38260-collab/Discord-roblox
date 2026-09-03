@@ -1,4 +1,7 @@
-const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
+const {
+  SlashCommandBuilder, EmbedBuilder, MessageFlags,
+  ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder,
+} = require('discord.js');
 const {
   listPresets,
   getPreset,
@@ -26,7 +29,7 @@ module.exports = {
     .addSubcommand((sub) =>
       sub
         .setName('ajouter')
-        .setDescription('Créer une réponse type')
+        .setDescription('Créer une réponse type — sans texte fourni, un éditeur multiligne s\'ouvre')
         .addStringOption((o) => o.setName('nom').setDescription('Nom affiché dans la liste déroulante').setRequired(true))
         .addStringOption((o) => o.setName('message').setDescription('Texte envoyé — && = barre, &> = liste, \\n = saut de ligne').setRequired(false))
         .addStringOption((o) => o.setName('titre').setDescription('Titre de l\'embed (facultatif)').setRequired(false))
@@ -38,7 +41,7 @@ module.exports = {
     .addSubcommand((sub) =>
       sub
         .setName('modifier')
-        .setDescription('Modifier une réponse type (les champs laissés vides ne changent pas)')
+        .setDescription('Modifier une réponse type — avec le seul numéro, un éditeur multiligne s\'ouvre')
         .addIntegerOption((o) => o.setName('numero').setDescription('Numéro de la réponse (voir /preset liste)').setRequired(true))
         .addStringOption((o) => o.setName('nom').setDescription('Nouveau nom').setRequired(false))
         .addStringOption((o) => o.setName('message').setDescription('Nouveau texte — && = barre, &> = liste (« - » pour vider)').setRequired(false))
@@ -89,12 +92,10 @@ module.exports = {
       const message = lignes(interaction.options.getString('message'));
       const titre = interaction.options.getString('titre');
       const description = lignes(interaction.options.getString('description'));
-      // Un preset vide n'enverrait rien : autant le refuser tout de suite.
+      // Aucun texte fourni : on ouvre l'ÉDITEUR MULTILIGNE — la seule façon,
+      // dans Discord, de taper de vrais retours à la ligne avec Entrée.
       if (!message?.trim() && !titre?.trim() && !description?.trim()) {
-        return interaction.reply({
-          content: '❌ Une réponse type doit contenir au moins un **message**, un **titre** ou une **description**.',
-          flags: MessageFlags.Ephemeral,
-        });
+        return interaction.showModal(modalePreset('preset:add', { label: nom }));
       }
       const r = insertPreset.run(
         interaction.guildId, nom,
@@ -114,6 +115,14 @@ module.exports = {
       const id = interaction.options.getInteger('numero');
       const p = getPreset.get(id, interaction.guildId);
       if (!p) return interaction.reply({ content: `❌ Aucune réponse type n°${id}.`, flags: MessageFlags.Ephemeral });
+      // Seul le numéro est donné : ÉDITEUR MULTILIGNE prérempli — les textes
+      // s'y corrigent avec de vrais retours à la ligne (Entrée), et l'embed
+      // ressort exactement comme écrit.
+      const rienFourni = ['nom', 'message', 'titre', 'description', 'couleur', 'emoji', 'aide']
+        .every((o) => interaction.options.getString(o) === null);
+      if (rienFourni) {
+        return interaction.showModal(modalePreset(`preset:modif:${id}`, p));
+      }
       // « - » vide un champ ; une option absente le laisse tel quel.
       const maj = (nom, actuel, transforme = (v) => v) => {
         const v = interaction.options.getString(nom);
@@ -198,4 +207,79 @@ module.exports = {
     });
     return interaction.reply({ content: '✅ Liste déroulante publiée.', flags: MessageFlags.Ephemeral });
   },
+
+  handleModal,
 };
+
+// 📝 L'éditeur multiligne d'une réponse type : la SEULE façon, dans Discord,
+// de taper de vrais retours à la ligne (Entrée) — les options de commande
+// sont monolignes. Prérempli à la modification ; à la validation, ce qui est
+// écrit remplace l'existant et un champ vidé est vidé.
+function modalePreset(customId, p = {}) {
+  const champ = (id, label, style, valeur, requis, max) => {
+    const entree = new TextInputBuilder()
+      .setCustomId(id).setLabel(label).setStyle(style)
+      .setRequired(requis).setMaxLength(max);
+    if (valeur) entree.setValue(String(valeur).slice(0, max));
+    return new ActionRowBuilder().addComponents(entree);
+  };
+  return new ModalBuilder()
+    .setCustomId(customId)
+    .setTitle(customId === 'preset:add' ? 'Nouvelle réponse type' : 'Modifier la réponse type')
+    .addComponents(
+      champ('preset:nom', 'Nom (dans la liste déroulante)', TextInputStyle.Short, p.label, true, 100),
+      champ('preset:titre', 'Titre de l\'embed (facultatif)', TextInputStyle.Short, p.embed_title, false, 256),
+      champ('preset:texte', 'Texte de l\'embed — Entrée = saut de ligne', TextInputStyle.Paragraph, p.embed_text, false, 4000),
+      champ('preset:message', 'Message hors embed (facultatif)', TextInputStyle.Paragraph, p.content, false, 2000),
+    );
+}
+
+async function handleModal(interaction) {
+  const cfg = getGuildConfig(interaction.guildId);
+  if (getGrade(interaction.member, cfg) < GRADES.STAFF) {
+    return interaction.reply({ content: '⛔ Réservé au staff.', flags: MessageFlags.Ephemeral });
+  }
+  const lire = (id) => String(interaction.fields.getTextInputValue(id) || '').trim();
+  const nom = lire('preset:nom').slice(0, 100);
+  const titre = lire('preset:titre').slice(0, 256) || null;
+  const texte = lire('preset:texte') || null;
+  const message = lire('preset:message') || null;
+  if (!message && !titre && !texte) {
+    return interaction.reply({
+      content: '❌ Une réponse type doit contenir au moins un **message**, un **titre** ou une **description**.',
+      flags: MessageFlags.Ephemeral,
+    });
+  }
+
+  if (interaction.customId === 'preset:add') {
+    if (getPresetByLabel.get(interaction.guildId, nom)) {
+      return interaction.reply({ content: `❌ Une réponse type s'appelle déjà « ${nom} ».`, flags: MessageFlags.Ephemeral });
+    }
+    if (listPresets.all(interaction.guildId).length >= MAX) {
+      return interaction.reply({
+        content: `❌ Maximum atteint (${MAX} réponses) : Discord n'accepte pas plus d'options dans une liste déroulante. Supprimez-en une d'abord.`,
+        flags: MessageFlags.Ephemeral,
+      });
+    }
+    const r = insertPreset.run(
+      interaction.guildId, nom, null, null, message, titre, texte, null,
+      interaction.user.id, new Date().toISOString()
+    );
+    return interaction.reply({
+      content: `✅ Réponse type **n°${r.lastInsertRowid} — ${nom}** créée, avec vos retours à la ligne tels quels. Emoji, aide et couleur s'ajoutent via \`/preset modifier\`.`,
+      flags: MessageFlags.Ephemeral,
+    });
+  }
+
+  const id = Number(interaction.customId.split(':')[2]);
+  const p = getPreset.get(id, interaction.guildId);
+  if (!p) return interaction.reply({ content: `❌ Aucune réponse type n°${id}.`, flags: MessageFlags.Ephemeral });
+  updatePreset.run(
+    nom || p.label, p.emoji, p.description, message, titre, texte, p.embed_color,
+    id, interaction.guildId
+  );
+  return interaction.reply({
+    content: `✏️ Réponse type **n°${id} — ${nom || p.label}** réécrite telle qu'affichée dans l'éditeur (un champ vidé est vidé).`,
+    flags: MessageFlags.Ephemeral,
+  });
+}

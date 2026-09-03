@@ -19682,5 +19682,68 @@
     "es": ">: solo esa persona puede decir que ha vuelto.",
     "pl": ">: tylko ta osoba może powiedzieć, że wróciła.",
     "ru": ">: сказать, что он вернулся, может только этот человек."
+  },
+  "Créer une réponse type — sans texte fourni, un éditeur multiligne s'ouvre": {
+    "en": "Create a canned reply — with no text given, a multiline editor opens",
+    "de": "Eine Standardantwort erstellen — ohne Text öffnet sich ein mehrzeiliger Editor",
+    "es": "Crear una respuesta predefinida — sin texto, se abre un editor multilínea",
+    "pl": "Utwórz gotową odpowiedź — bez tekstu otwiera się edytor wielowierszowy",
+    "ru": "Создать шаблонный ответ — без текста откроется многострочный редактор"
+  },
+  "Modifier une réponse type — avec le seul numéro, un éditeur multiligne s'ouvre": {
+    "en": "Edit a canned reply — with only the number, a multiline editor opens",
+    "de": "Eine Standardantwort bearbeiten — nur mit der Nummer öffnet sich ein mehrzeiliger Editor",
+    "es": "Editar una respuesta predefinida — solo con el número, se abre un editor multilínea",
+    "pl": "Edytuj gotową odpowiedź — z samym numerem otwiera się edytor wielowierszowy",
+    "ru": "Изменить шаблонный ответ — только с номером откроется многострочный редактор"
+  },
+  "Nouvelle réponse type": {
+    "en": "New canned reply",
+    "de": "Neue Standardantwort",
+    "es": "Nueva respuesta predefinida",
+    "pl": "Nowa gotowa odpowiedź",
+    "ru": "Новый шаблонный ответ"
+  },
+  "Modifier la réponse type": {
+    "en": "Edit the canned reply",
+    "de": "Standardantwort bearbeiten",
+    "es": "Editar la respuesta predefinida",
+    "pl": "Edytuj gotową odpowiedź",
+    "ru": "Изменить шаблонный ответ"
+  },
+  "Nom (dans la liste déroulante)": {
+    "en": "Name (in the dropdown list)",
+    "de": "Name (in der Auswahlliste)",
+    "es": "Nombre (en la lista desplegable)",
+    "pl": "Nazwa (na liście rozwijanej)",
+    "ru": "Название (в выпадающем списке)"
+  },
+  "Texte de l'embed — Entrée = saut de ligne": {
+    "en": "Embed text — Enter = line break",
+    "de": "Embed-Text — Enter = Zeilenumbruch",
+    "es": "Texto del embed — Enter = salto de línea",
+    "pl": "Tekst osadzenia — Enter = nowy wiersz",
+    "ru": "Текст эмбеда — Enter = перенос строки"
+  },
+  "Message hors embed (facultatif)": {
+    "en": "Message outside the embed (optional)",
+    "de": "Nachricht außerhalb des Embeds (optional)",
+    "es": "Mensaje fuera del embed (opcional)",
+    "pl": "Wiadomość poza osadzeniem (opcjonalnie)",
+    "ru": "Сообщение вне эмбеда (необязательно)"
+  },
+  "** créée, avec vos retours à la ligne tels quels. Emoji, aide et couleur s'ajoutent via `/preset modifier`.": {
+    "en": "** created, with your line breaks kept as typed. Emoji, help text and color can be added via `/preset modifier`.",
+    "de": "** erstellt, mit Ihren Zeilenumbrüchen wie getippt. Emoji, Hilfetext und Farbe lassen sich über `/preset modifier` ergänzen.",
+    "es": "** creada, con tus saltos de línea tal cual. El emoji, la ayuda y el color se añaden con `/preset modifier`.",
+    "pl": "** utworzona, z zachowaniem wpisanych nowych wierszy. Emoji, opis i kolor dodasz przez `/preset modifier`.",
+    "ru": "** создан, переносы строк сохранены как набраны. Эмодзи, подсказку и цвет можно добавить через `/preset modifier`."
+  },
+  "** réécrite telle qu'affichée dans l'éditeur (un champ vidé est vidé).": {
+    "en": "** rewritten exactly as shown in the editor (an emptied field is cleared).",
+    "de": "** neu geschrieben, genau wie im Editor angezeigt (ein geleertes Feld wird geleert).",
+    "es": "** reescrita tal como se muestra en el editor (un campo vaciado queda vacío).",
+    "pl": "** zapisana dokładnie tak, jak w edytorze (opróżnione pole zostaje wyczyszczone).",
+    "ru": "** переписан ровно так, как в редакторе (очищенное поле очищается)."
   }
 }

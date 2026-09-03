@@ -167,6 +167,12 @@ module.exports = {
       return absences.handleBouton(interaction);
     }
 
+    // ----- Réponses types : l'éditeur multiligne (création/modification) -----
+    if (interaction.isModalSubmit() && interaction.customId?.startsWith('preset:')) {
+      if (!interaction.inGuild()) return horsServeur(interaction);
+      return require('../commands/preset').handleModal(interaction);
+    }
+
     // ----- Menu déroulant de rôles (constructeur de messages du site) -----
     if (interaction.isStringSelectMenu() && interaction.customId?.startsWith('rrm')) {
       if (!interaction.inGuild()) return horsServeur(interaction);
