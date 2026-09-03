@@ -796,6 +796,41 @@ console.log('\n14) Branchements');
     labo.reinitialiser();
   }
 
+  console.log('\n17) Le morceau s\'affiche : statut du salon, statut du bot, qualité boostée');
+  {
+    labo.reinitialiser();
+    const S17 = require('../src/utils/musiqueSources');
+    const statuts = [];
+    const activites = [];
+    const salonVocal = { id: 'VOC1', bitrate: 256000, guild: { premiumTier: 2 }, isTextBased: () => false };
+    const salonTexte = {
+      id: 'TXT1', isTextBased: () => true, lastMessageId: null,
+      send: async () => ({ id: 'M1' }),
+      messages: { fetch: async () => null, delete: async () => {} },
+    };
+    const sc = scene();
+    sc.client = {
+      channels: { fetch: async (id) => (id === 'VOC1' ? salonVocal : salonTexte) },
+      rest: { put: async (route, corps) => { statuts.push([route, corps?.body?.status]); } },
+      user: { setActivity: (nom, opts) => activites.push([nom, opts?.type]) },
+    };
+    await musique.ajouterPiste(sc, S17.piste({ titre: 'Morceau affiché', url: 'uA', source: 'youtube' }));
+    await new Promise((r) => setTimeout(r, 40));
+    const s = musique.fileDe('G1');
+    V('le statut du salon vocal annonce le morceau',
+      statuts.some(([route, texte]) => route === '/channels/VOC1/voice-status' && texte === '🎵 Morceau affiché'),
+      JSON.stringify(statuts));
+    V('le statut du bot passe en « Écoute »',
+      activites.some(([nom, type]) => nom === 'Morceau affiché' && type === 2), JSON.stringify(activites));
+    V('le débit suit le salon (boost niveau 2 → 256 kb/s)',
+      s?.qualite?.debit === 256000 && s?.qualite?.niveau === 2, JSON.stringify(s?.qualite));
+    musique.quitter('G1', 'fin de test');
+    V('à l\'arrêt, le statut du salon est effacé',
+      statuts.some(([route, texte]) => route === '/channels/VOC1/voice-status' && texte === ''),
+      JSON.stringify(statuts));
+    labo.reinitialiser();
+  }
+
   global.fetch = vraiFetch;
   fs.rmSync(RACINE, { recursive: true, force: true });
   console.log(`\n${ko === 0 ? '✅' : '❌'} ${ok} réussis, ${ko} échoués`);

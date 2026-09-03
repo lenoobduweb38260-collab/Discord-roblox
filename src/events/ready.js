@@ -1,4 +1,4 @@
-const { Events, ActivityType } = require('discord.js');
+const { Events } = require('discord.js');
 const { getGuildConfig } = require('../database');
 const { addXp, announceLevelUp } = require('../utils/levels');
 
@@ -7,7 +7,8 @@ module.exports = {
   once: true,
   execute(client) {
     console.log(`✅ Connecté en tant que ${client.user.tag}`);
-    client.user.setActivity('le serveur RP 🎭', { type: ActivityType.Watching });
+    // Statut du bot : celui configuré par le créateur, sinon celui par défaut.
+    require('../utils/presence').appliquer(client);
 
     // 🎵 État des briques audio, DÈS le démarrage.
     //

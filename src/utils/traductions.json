@@ -20459,5 +20459,12 @@
     "es": "Esta selección de Spotify está vacía",
     "pl": "Ten wybór Spotify jest pusty",
     "ru": "Эта подборка Spotify пуста"
+  },
+  "⚠️ Statut du bot non appliqué : ": {
+    "en": "⚠️ Bot status not applied: ",
+    "de": "⚠️ Bot-Status nicht angewendet: ",
+    "es": "⚠️ Estado del bot no aplicado: ",
+    "pl": "⚠️ Status bota nie został zastosowany: ",
+    "ru": "⚠️ Статус бота не применён: "
   }
 }

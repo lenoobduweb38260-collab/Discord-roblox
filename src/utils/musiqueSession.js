@@ -69,6 +69,7 @@ class Session {
     this.pause = false;
     this.radioPassee = false; // un skip volontaire n'est pas une panne
     this.carteMessage = null; // LA carte « en cours » : { salonId, id }
+    this.qualite = null;      // { debit, niveau } — le débit d'encodage retenu
     this.brancher();
   }
 
@@ -146,6 +147,49 @@ class Session {
     if (envoye?.id) this.carteMessage = { salonId: salon.id, id: envoye.id };
   }
 
+  // 🎚️ La qualité audio suit le SALON : Discord borne le débit d'un vocal
+  // selon le niveau de boost du serveur (96 → 128 → 256 → 384 kb/s), et
+  // l'administrateur le règle dans les paramètres du salon. On encode donc
+  // au débit du salon — ni plus (Discord jetterait l'excédent), ni moins
+  // (un serveur boosté niveau 3 mérite ses 384 kb/s).
+  async reglerQualite(ressource) {
+    try {
+      const salon = await this.client?.channels?.fetch(this.salonVocalId).catch(() => null);
+      const debit = Math.min(Number(salon?.bitrate) || 0, 384000);
+      if (!debit) return;
+      ressource.encoder?.setBitrate?.(debit);
+      this.qualite = { debit, niveau: salon?.guild?.premiumTier ?? null };
+    } catch { /* la lecture prime sur la qualité */ }
+  }
+
+  // 🪧 Le statut du SALON VOCAL — la ligne sous son nom, visible sans
+  // l'ouvrir. C'est la vitrine de ce qui joue, propre à chaque serveur.
+  // Vide (''), il s'efface. Sans la permission « Définir le statut des
+  // salons vocaux », Discord refuse en silence — et la musique continue.
+  majStatutVocal(texte) {
+    const rest = this.client?.rest;
+    if (typeof rest?.put !== 'function') return;
+    rest.put(`/channels/${this.salonVocalId}/voice-status`, {
+      body: { status: String(texte || '').slice(0, 120) },
+    }).catch(() => null);
+  }
+
+  // 🎧 Le statut du BOT (« Écoute … ») est GLOBAL : il ne s'affiche que
+  // quand une seule lecture est en cours. Deux serveurs qui jouent des
+  // morceaux différents reprennent le statut configuré — mentir sur l'un
+  // des deux serait pire que ne rien dire.
+  majPresence() {
+    try {
+      const u = this.client?.user;
+      if (typeof u?.setActivity !== 'function') return;
+      if (sessions.size === 1 && this.encours) {
+        u.setActivity(String(this.encours.titre).slice(0, 100), { type: 2 }); // 2 = « Écoute »
+      } else if (sessions.size > 1) {
+        require('./presence').appliquer(this.client);
+      }
+    } catch { /* décoratif : jamais bloquant */ }
+  }
+
   // ── Le fil de la lecture ────────────────────────────────────────
   async jouerSuivante() {
     const suivante = this.pistes[0];
@@ -171,6 +215,7 @@ class Session {
       // sur un lecteur que plus rien n'écoute.
       if (pour(this.guildId) !== this) return null;
       ressource.volume?.setVolume(this.volume / 100);
+      await this.reglerQualite(ressource);
       this.ressource = ressource;
       this.debutLecture = Date.now();
       this.lecteur.play(ressource);
@@ -179,6 +224,8 @@ class Session {
       // direct PROUVÉ (15 s de lecture), dans finDePiste().
       if (suivante.source !== 'radio') this.echecs = 0;
       this.publierCarte().catch(() => null);
+      this.majStatutVocal(`🎵 ${suivante.titre}`);
+      this.majPresence();
       return suivante;
     } catch (err) {
       // La session a pu être arrêtée pendant l'ouverture : annoncer un échec
@@ -369,6 +416,12 @@ function quitter(guildId, raison = null) {
       .then((message) => (message ? editerCarte(message, { content: '⏹️ Lecture terminée.', embeds: [], components: [] }) : null))
       .catch(() => null);
   }
+  // 🪧 Le statut du salon vocal s'efface, et le statut configuré du bot
+  // reprend sa place dès qu'aucune lecture ne subsiste.
+  session.majStatutVocal('');
+  if (!sessions.size) {
+    try { require('./presence').appliquer(session.client); } catch { /* décoratif */ }
+  }
   if (raison) console.log(`🎵 Musique arrêtée sur ${guildId} : ${raison}.`);
   return true;
 }
@@ -470,6 +523,7 @@ const etat = (guildId) => {
     pause: session.pause,
     ecoule: session.ecoule(),
     salonVocalId: session.salonVocalId,
+    qualite: session.qualite,
   };
 };
 

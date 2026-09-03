@@ -64,6 +64,10 @@ function carteLecture(etat) {
       text: [
         `🔊 ${etat.volume} %`,
         etat.boucle !== 'aucune' ? `🔁 ${etat.boucle === 'piste' ? 'ce morceau' : 'la file'}` : null,
+        // 🎚️ Le débit suivi : celui du salon vocal, borné par le boost.
+        etat.qualite?.debit
+          ? `🎚️ ${Math.round(etat.qualite.debit / 1000)} kb/s${etat.qualite.niveau ? ` (Boost niv. ${etat.qualite.niveau})` : ''}`
+          : null,
       ].filter(Boolean).join(' • '),
     });
   if (p.vignette) embed.setThumbnail(p.vignette);

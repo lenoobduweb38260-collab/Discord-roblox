@@ -1677,6 +1677,19 @@ const RELEASES = [
     ],
     retrait: [],
   },
+  {
+    id: 'musique-affichage-2026-09co',
+    title: 'Le morceau s\'affiche partout, la qualite suit les boosts',
+    ajout: [
+      '🪧 **Le statut du salon vocal** affiche le morceau en cours (« 🎵 Titre ») juste sous le nom du salon, et s\'efface a l\'arret — donnez au bot la permission « Definir le statut des salons vocaux »',
+      '🎧 **Le statut du bot** passe en « Ecoute <titre> » pendant la lecture (quand un seul serveur joue) ; le statut configure reprend sa place des la fin',
+    ],
+    amelioration: [
+      '🎚️ **La qualite audio suit les boosts** : le bot encode au debit du salon vocal — 96, 128, 256 ou 384 kb/s selon le niveau de boost du serveur et le reglage du salon — et la carte de lecture affiche le debit retenu',
+    ],
+    fix: [],
+    retrait: [],
+  },
 ];
 
 // Construit l'embed d'une note à partir d'une entrée { title, ajout, fix,

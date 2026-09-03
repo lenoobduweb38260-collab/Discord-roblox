@@ -352,27 +352,9 @@ async function start() {
       .catch((err) => console.warn(`⚠️ Notes de mise à jour non publiées : ${err.message}`));
   });
 
-  // Statut personnalisé du bot (défini par le créateur), réappliqué au démarrage.
-  client.once(Events.ClientReady, () => {
-    try {
-      const { state } = require('./utils/botTeam');
-      const cfg = JSON.parse(state('bot_status') || 'null');
-      if (cfg?.text) {
-        const { ActivityType, PresenceUpdateStatus } = require('discord.js');
-        const typeMap = { playing: ActivityType.Playing, watching: ActivityType.Watching, listening: ActivityType.Listening, competing: ActivityType.Competing, custom: ActivityType.Custom };
-        const presenceMap = { online: PresenceUpdateStatus.Online, idle: PresenceUpdateStatus.Idle, dnd: PresenceUpdateStatus.DoNotDisturb, invisible: PresenceUpdateStatus.Invisible };
-        const activity = { name: String(cfg.text).slice(0, 128), type: typeMap[cfg.type] ?? ActivityType.Custom };
-        if (activity.type === ActivityType.Custom) activity.state = activity.name;
-        if (cfg.type === 'streaming' && /^https?:\/\/(www\.)?twitch\.tv\//i.test(cfg.url || '')) {
-          activity.type = ActivityType.Streaming;
-          activity.url = cfg.url;
-        }
-        client.user.setPresence({ activities: [activity], status: presenceMap[cfg.presence] || PresenceUpdateStatus.Online });
-      }
-    } catch (err) {
-      console.warn(`⚠️ Statut personnalisé non appliqué : ${err.message}`);
-    }
-  });
+  // Statut personnalisé du bot : appliqué par events/ready.js via
+  // utils/presence.js — une seule logique, aussi utilisée quand la musique
+  // rend le statut après un « Écoute … ».
   client.on(Events.GuildCreate, (guild) => {
     require('./commandSync').syncGuild(guild.id).catch(() => null);
   });
