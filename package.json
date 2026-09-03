@@ -19,7 +19,7 @@
       "node_modules/better-sqlite3/build/Release/*.node",
       "node_modules/@snazzah/**",
       "node_modules/opusscript/build/**",
-      "node_modules/youtubei.js/**",
+      "genere/**",
       "package.json"
     ]
   },

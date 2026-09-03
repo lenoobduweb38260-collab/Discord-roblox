@@ -38,6 +38,17 @@ jobs:
       - name: Installer les dépendances
         run: npm install
 
+      # youtubei.js est un paquet ESM avec « await » de haut niveau : pkg ne
+      # sait pas le charger depuis son instantané. On le fond en UN fichier
+      # ESM embarqué comme asset — le bot l'extrait à côté de lui au premier
+      # démarrage et l'importe normalement (voir musiqueMoteur.js).
+      - name: Empaqueter youtubei.js en un seul fichier
+        run: |
+          printf "export * from 'youtubei.js';\n" > youtubei-entree.mjs
+          npx --yes esbuild youtubei-entree.mjs --bundle --platform=node --target=node22 --format=esm --outfile=genere/youtubei.bundle.mjs
+          rm youtubei-entree.mjs
+        shell: bash
+
       - name: Versionner le build (v2.0.${{ github.run_number }})
         run: npm version --no-git-tag-version "1.0.${{ github.run_number }}"
 

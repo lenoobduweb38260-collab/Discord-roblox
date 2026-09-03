@@ -262,7 +262,27 @@ async function fichesSpotify(url) {
 let _innertube; // instance partagée : sa création interroge YouTube
 
 async function chargerYoutubei() {
-  // Le paquet peut être CJS ou ESM selon la version : on tente les deux.
+  // youtubei.js est un paquet ESM avec « await » de haut niveau : le
+  // chargeur ESM de Node ne lit PAS l'instantané pkg. La CI le fond donc en
+  // UN fichier (genere/youtubei.bundle.mjs), embarqué comme asset ; dans
+  // l'exécutable, on l'extrait à côté du bot avant de l'importer — un import
+  // depuis le vrai disque, que Node sait faire.
+  const fs = require('fs');
+  const path = require('path');
+  const { pathToFileURL } = require('url');
+  const bundle = path.join(__dirname, '..', '..', 'genere', 'youtubei.bundle.mjs');
+  if (fs.existsSync(bundle)) {
+    let cible = bundle;
+    if (process.pkg) {
+      const dossier = process.env.BOT_DIR || path.dirname(process.execPath);
+      cible = path.join(dossier, 'youtubei.bundle.mjs');
+      const attendu = fs.statSync(bundle).size;
+      const actuel = fs.existsSync(cible) ? fs.statSync(cible).size : -1;
+      if (actuel !== attendu) fs.writeFileSync(cible, fs.readFileSync(bundle));
+    }
+    return await import(pathToFileURL(cible).href);
+  }
+  // Mode Node classique : le paquet de node_modules, CJS ou ESM.
   try {
     return require('youtubei.js');
   } catch (err) {
