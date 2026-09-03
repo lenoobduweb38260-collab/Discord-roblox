@@ -1639,6 +1639,17 @@ const RELEASES = [
     ajout: [],
     retrait: [],
   },
+  {
+    id: 'musique-sources-2026-09cl',
+    title: 'Musique : YouTube lisible a nouveau, radios reparees',
+    fix: [
+      '📺 **« Invalid URL » a la lecture YouTube** : l\'ancien lecteur (play-dl, abandonne) ne suit plus les changements de YouTube. Le flux passe desormais par youtubei.js, le client maintenu — play-dl ne reste qu\'en secours. Les liens Spotify et Deezer, joues via YouTube, refonctionnent du meme coup',
+      '📻 **Les radios plantaient (« wasm not included »)** : le fichier WASM de l\'encodeur Opus manquait dans l\'executable. Il est embarque, et l\'auto-test de publication le charge desormais reellement — un build muet ne peut plus sortir',
+    ],
+    ajout: [],
+    amelioration: [],
+    retrait: [],
+  },
 ];
 
 // Construit l'embed d'une note à partir d'une entrée { title, ajout, fix,

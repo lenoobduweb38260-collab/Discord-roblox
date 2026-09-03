@@ -141,12 +141,25 @@ async function resoudre(requete) {
       }));
     }
     if (genre !== 'video') throw new Error('Ce lien YouTube n\'est ni une vidéo ni une playlist.');
-    const info = await p.video_basic_info(url);
-    const d = info.video_details;
-    return [S.piste({
-      titre: d.title, url: d.url, duree: d.durationInSec, auteur: d.channel?.name,
-      vignette: d.thumbnails?.[0]?.url, source: 'youtube', lienOrigine: url,
-    })];
+    try {
+      const info = await p.video_basic_info(url);
+      const d = info.video_details;
+      return [S.piste({
+        titre: d.title, url: d.url, duree: d.durationInSec, auteur: d.channel?.name,
+        vignette: d.thumbnails?.[0]?.url, source: 'youtube', lienOrigine: url,
+      })];
+    } catch (err) {
+      // play-dl cassé sur ce lien : youtubei.js lit la fiche à sa place.
+      const yt = await innertube();
+      const id = idYouTube(url);
+      if (!yt || !id) throw err;
+      const b = (await yt.getBasicInfo(id)).basic_info;
+      return [S.piste({
+        titre: b.title, url: `https://www.youtube.com/watch?v=${b.id || id}`,
+        duree: Number(b.duration) || 0, auteur: b.author || null,
+        vignette: b.thumbnail?.[0]?.url || null, source: 'youtube', lienOrigine: url,
+      })];
+    }
   }
 
   // ── SoundCloud (diffusé directement) ──
@@ -238,6 +251,71 @@ async function fichesSpotify(url) {
 // ══════════════════════════════════════════════════════════════════
 // 🎧 FLUX
 // ══════════════════════════════════════════════════════════════════
+// 📺 YOUTUBEI.JS — le client YouTube qui ouvre les flux
+// ══════════════════════════════════════════════════════════════════
+//
+// play-dl n'est plus maintenu et son flux YouTube meurt sur « Invalid URL »
+// (les changements de signature de YouTube le dépassent). youtubei.js, lui,
+// est le client InnerTube entretenu : c'est LUI qui ouvre l'audio, play-dl
+// ne reste que la roue de secours — et il garde la recherche et SoundCloud.
+
+let _innertube; // instance partagée : sa création interroge YouTube
+
+async function chargerYoutubei() {
+  // Le paquet peut être CJS ou ESM selon la version : on tente les deux.
+  try {
+    return require('youtubei.js');
+  } catch (err) {
+    if (err.code !== 'ERR_REQUIRE_ESM') throw err;
+    return await import('youtubei.js');
+  }
+}
+
+async function innertube() {
+  if (_innertube !== undefined) return _innertube;
+  try {
+    const mod = await chargerYoutubei();
+    const Innertube = mod.Innertube || mod.default?.Innertube;
+    _innertube = await Innertube.create();
+  } catch (err) {
+    console.warn(`⚠️ Client YouTube (youtubei.js) indisponible : ${err.message} — play-dl servira de secours.`);
+    _innertube = null;
+  }
+  return _innertube;
+}
+
+// L'auto-test de la CI s'en sert : un exécutable dont le client YouTube ne
+// charge pas ne doit pas être publié.
+async function verifierClientYouTube() {
+  const mod = await chargerYoutubei();
+  const Innertube = mod.Innertube || mod.default?.Innertube;
+  if (typeof Innertube?.create !== 'function') throw new Error('module chargé mais API Innertube absente');
+}
+
+// L'identifiant d'une vidéo, quel que soit l'habillage du lien.
+function idYouTube(url) {
+  const m = String(url || '').match(/(?:v=|youtu\.be\/|shorts\/|embed\/|live\/)([A-Za-z0-9_-]{11})/);
+  return m ? m[1] : null;
+}
+
+// Ouvre l'audio d'une vidéo via youtubei.js. webm/opus de préférence : la
+// démux WebmOpus du lecteur le lit sans FFmpeg ; sinon n'importe quel format
+// audio, décodé par FFmpeg s'il est là.
+async function fluxYouTubeInnertube(morceau) {
+  const v = voice();
+  const yt = await innertube();
+  if (!yt) throw new Error('youtubei.js absent');
+  const id = idYouTube(morceau.url);
+  if (!id) throw new Error('identifiant vidéo introuvable dans ce lien');
+  const { Readable } = require('stream');
+  try {
+    const flux = await yt.download(id, { type: 'audio', quality: 'best', format: 'webm' });
+    return v.createAudioResource(Readable.fromWeb(flux), { inputType: v.StreamType.WebmOpus, inlineVolume: true });
+  } catch {
+    const flux = await yt.download(id, { type: 'audio', quality: 'best', format: 'any' });
+    return v.createAudioResource(Readable.fromWeb(flux), { inputType: v.StreamType.Arbitrary, inlineVolume: true });
+  }
+}
 
 // Ouvre le flux audio d'une piste et l'emballe pour le lecteur.
 //
@@ -254,6 +332,16 @@ async function ouvrirFlux(morceau) {
     const souci = ffmpegManquant();
     if (souci) throw new Error(souci);
     return v.createAudioResource(morceau.url, { inputType: v.StreamType.Arbitrary, inlineVolume: true });
+  }
+  // 📺 YouTube : youtubei.js d'abord, play-dl en secours.
+  if (morceau.source === 'youtube') {
+    try {
+      return await fluxYouTubeInnertube(morceau);
+    } catch (err) {
+      if (err.message !== 'youtubei.js absent') {
+        console.warn(`⚠️ Flux YouTube (youtubei.js) : ${err.message} — essai avec play-dl.`);
+      }
+    }
   }
   const flux = await p.stream(morceau.url, { discordPlayerCompatibility: false, quality: 2 });
   const ressource = v.createAudioResource(flux.stream, { inputType: flux.type, inlineVolume: true });
@@ -370,4 +458,5 @@ function briquesManquantes() {
 module.exports = {
   preparer, etatSources, resoudre, chercherSurYouTube, ouvrirFlux, play, voice,
   rapportDependances, briquesManquantes, cheminFfmpeg, ffmpegManquant,
+  verifierClientYouTube,
 };

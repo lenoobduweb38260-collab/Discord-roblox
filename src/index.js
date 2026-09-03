@@ -114,8 +114,22 @@ if (mode === 'check') {
   // avec le code 4017 et le bot reste muet. On refuse de livrer ça.
   require('@snazzah/davey');
   console.log('✅ Brique DAVE (chiffrement de bout en bout de la voix) chargée.');
-  console.log(`✅ Auto-test OK : base de données initialisée, ${commands.length} commande(s) chargée(s).`);
-  process.exit(0);
+  // 🎚️ L'encodeur Opus est INSTANCIÉ, pas seulement résolu : son fichier
+  // WASM doit être dans l'exécutable, et seul un vrai chargement le prouve
+  // (on a déjà livré un build où il manquait — radios et volume muets).
+  const OpusScript = require('opusscript');
+  const opus = new OpusScript(48000, 2, OpusScript.Application.AUDIO);
+  if (typeof opus.delete === 'function') opus.delete();
+  console.log('✅ Encodeur Opus (WASM) chargé.');
+  // 📺 Le client YouTube qui ouvre les flux audio (play-dl ne sait plus).
+  require('./utils/musiqueMoteur').verifierClientYouTube()
+    .then(() => {
+      console.log('✅ Client YouTube (youtubei.js) chargé.');
+      console.log(`✅ Auto-test OK : base de données initialisée, ${commands.length} commande(s) chargée(s).`);
+      process.exit(0);
+    })
+    .catch((err) => fatal(`❌ Client YouTube (youtubei.js) : ${err.message}`));
+  return;
 } else if (mode === 'deploy') {
   require('./deploy-commands')
     .deployCommands()

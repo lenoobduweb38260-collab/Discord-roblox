@@ -18,6 +18,8 @@
     "assets": [
       "node_modules/better-sqlite3/build/Release/*.node",
       "node_modules/@snazzah/**",
+      "node_modules/opusscript/build/**",
+      "node_modules/youtubei.js/**",
       "package.json"
     ]
   },
@@ -31,6 +33,7 @@
     "jimp": "^0.22.12",
     "libsodium-wrappers": "^0.7.15",
     "opusscript": "^0.1.1",
-    "play-dl": "^1.9.7"
+    "play-dl": "^1.9.7",
+    "youtubei.js": "^18.0.0"
   }
 }

@@ -20060,5 +20060,68 @@
     "es": " — exigido por Discord desde marzo de 2026",
     "pl": " — wymagane przez Discorda od marca 2026",
     "ru": " — требуется Discord с марта 2026"
+  },
+  "✅ Encodeur Opus (WASM) chargé.": {
+    "en": "✅ Opus encoder (WASM) loaded.",
+    "de": "✅ Opus-Encoder (WASM) geladen.",
+    "es": "✅ Codificador Opus (WASM) cargado.",
+    "pl": "✅ Enkoder Opus (WASM) załadowany.",
+    "ru": "✅ Кодировщик Opus (WASM) загружен."
+  },
+  "✅ Client YouTube (youtubei.js) chargé.": {
+    "en": "✅ YouTube client (youtubei.js) loaded.",
+    "de": "✅ YouTube-Client (youtubei.js) geladen.",
+    "es": "✅ Cliente de YouTube (youtubei.js) cargado.",
+    "pl": "✅ Klient YouTube (youtubei.js) załadowany.",
+    "ru": "✅ Клиент YouTube (youtubei.js) загружен."
+  },
+  "❌ Client YouTube (youtubei.js) : ": {
+    "en": "❌ YouTube client (youtubei.js): ",
+    "de": "❌ YouTube-Client (youtubei.js): ",
+    "es": "❌ Cliente de YouTube (youtubei.js): ",
+    "pl": "❌ Klient YouTube (youtubei.js): ",
+    "ru": "❌ Клиент YouTube (youtubei.js): "
+  },
+  "⚠️ Client YouTube (youtubei.js) indisponible : ": {
+    "en": "⚠️ YouTube client (youtubei.js) unavailable: ",
+    "de": "⚠️ YouTube-Client (youtubei.js) nicht verfügbar: ",
+    "es": "⚠️ Cliente de YouTube (youtubei.js) no disponible: ",
+    "pl": "⚠️ Klient YouTube (youtubei.js) niedostępny: ",
+    "ru": "⚠️ Клиент YouTube (youtubei.js) недоступен: "
+  },
+  " — play-dl servira de secours.": {
+    "en": " — play-dl will serve as fallback.",
+    "de": " — play-dl dient als Ersatz.",
+    "es": " — play-dl servirá de respaldo.",
+    "pl": " — play-dl posłuży jako zapas.",
+    "ru": " — play-dl будет запасным вариантом."
+  },
+  "module chargé mais API Innertube absente": {
+    "en": "module loaded but Innertube API missing",
+    "de": "Modul geladen, aber Innertube-API fehlt",
+    "es": "módulo cargado pero falta la API Innertube",
+    "pl": "moduł załadowany, ale brak API Innertube",
+    "ru": "модуль загружен, но API Innertube отсутствует"
+  },
+  "identifiant vidéo introuvable dans ce lien": {
+    "en": "video id not found in this link",
+    "de": "Video-ID in diesem Link nicht gefunden",
+    "es": "no se encontró el id del vídeo en este enlace",
+    "pl": "nie znaleziono identyfikatora wideo w tym linku",
+    "ru": "идентификатор видео не найден в этой ссылке"
+  },
+  "⚠️ Flux YouTube (youtubei.js) : ": {
+    "en": "⚠️ YouTube stream (youtubei.js): ",
+    "de": "⚠️ YouTube-Stream (youtubei.js): ",
+    "es": "⚠️ Flujo de YouTube (youtubei.js): ",
+    "pl": "⚠️ Strumień YouTube (youtubei.js): ",
+    "ru": "⚠️ Поток YouTube (youtubei.js): "
+  },
+  " — essai avec play-dl.": {
+    "en": " — trying play-dl.",
+    "de": " — Versuch mit play-dl.",
+    "es": " — probando con play-dl.",
+    "pl": " — próba z play-dl.",
+    "ru": " — пробуем play-dl."
   }
 }
