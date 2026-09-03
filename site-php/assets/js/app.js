@@ -3044,6 +3044,7 @@
       <option value="">— Choisissez le bot —</option>
       ${dispo.map(b => `<option value="${esc(b.nom)}"${b.nom === bot.agentName ? " selected" : ""}>${b.demarre ? "🟢" : "⚪"} ${esc(b.nom)}</option>`).join("")}
       ${bot.agentName && !connu ? `<option value="${esc(bot.agentName)}" selected>⚠️ ${esc(bot.agentName)} (inconnu chez l'agent)</option>` : ""}
+      <option value="__nouveau__">➕ Créer un nouveau bot (taper son nom)…</option>
     </select>`;
   }
   // Lien d'invitation Discord d'un bot, construit depuis son Client ID.
@@ -3086,7 +3087,8 @@
           <div class="field"><label>Couleur</label><select class="select" data-f="accent">${ACCENTS.map(a => `<option value="${a.value}"${(bot.accent || "cyan") === a.value ? " selected" : ""}>${a.label}</option>`).join("")}</select></div>
           <div class="field full"><label>Description</label><input class="input" data-f="description" value="${esc(bot.description || "")}" placeholder="Ce que fait ce bot"></div>
           <div class="field"><label>1️⃣ Nom chez l'agent</label>${agentNameField(bot)}
-            <span class="field-note">Le nom EXACT du bot chez votre agent (dossier <code>bots/&lt;nom&gt;</code>). C'est ce qui relie le site au bot.</span></div>
+            <span class="field-note">Le nom EXACT du bot chez votre agent (dossier <code>bots/&lt;nom&gt;</code>). C'est ce qui relie le site au bot.
+              Choisissez-le dans la liste — ou <b>➕ Créer un nouveau bot</b> pour taper un nom libre : son dossier sera créé chez l'agent au premier démarrage.</span></div>
           <div class="field"><label>2️⃣ Client ID Discord <span style="color:var(--muted-2);font-weight:400">(facultatif)</span></label>
             <input class="input" data-f="clientId" value="${esc(bot.clientId || "")}" placeholder="1528910533183541308" inputmode="numeric">
             <span class="field-note">${clientIdNote(bot.clientId)}</span></div>
@@ -5045,6 +5047,21 @@
 
   document.addEventListener("change", async event => {
     const target = event.target;
+    // « ➕ Créer un nouveau bot » dans le nom chez l'agent : la liste devient
+    // un champ libre — le dossier bots/<nom> sera créé chez l'agent au
+    // premier démarrage. On remplace l'élément SUR PLACE (même data-f) pour
+    // que l'enregistrement lise la valeur tapée sans rien changer d'autre.
+    if (target.matches?.('select[data-f="agentName"]') && target.value === "__nouveau__") {
+      const champ = document.createElement("input");
+      champ.className = "input";
+      champ.dataset.f = "agentName";
+      champ.placeholder = "nom_du_nouveau_bot (lettres, chiffres, - et _)";
+      champ.autocomplete = "off";
+      champ.spellcheck = false;
+      target.replaceWith(champ);
+      champ.focus();
+      return;
+    }
     // 🗄️ Type de base : on montre le bon jeu de champs, sans reconstruire la
     // page (ce qui effacerait ce qui est déjà saisi).
     if (target.dataset && target.dataset.bascule === "db") {

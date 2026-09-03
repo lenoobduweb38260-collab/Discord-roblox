@@ -90,7 +90,11 @@ function botState(name) {
   }
   return bots.get(name);
 }
-const botDir = (name) => path.join(botsDir, name);
+// Le nom d'un bot devient un NOM DE DOSSIER : on ne garde que lettres,
+// chiffres, tiret, point et underscore — un nom mal formé (ou malveillant,
+// genre « ../../x ») ne peut donc jamais sortir de bots/.
+const nomSur = (name) => String(name || '').replace(/[^A-Za-z0-9_.-]/g, '').replace(/^\.+$/, '') || 'bot';
+const botDir = (name) => path.join(botsDir, nomSur(name));
 function ensureBot(name) {
   const dir = botDir(name);
   if (!fs.existsSync(dir)) {
