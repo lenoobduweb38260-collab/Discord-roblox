@@ -270,6 +270,11 @@ async function chargerYoutubei() {
   const fs = require('fs');
   const path = require('path');
   const { pathToFileURL } = require('url');
+  // ⚠️ Un « import( ) » écrit en clair serait compilé par pkg, qui ne lui
+  // fournit AUCUN rappel d'import dynamique (« A dynamic import callback was
+  // not specified »). Construit au runtime, il échappe au compilateur et
+  // c'est le vrai Node qui l'exécute.
+  const importer = new Function('cible', 'return import(cible);');
   const bundle = path.join(__dirname, '..', '..', 'genere', 'youtubei.bundle.mjs');
   if (fs.existsSync(bundle)) {
     let cible = bundle;
@@ -280,14 +285,14 @@ async function chargerYoutubei() {
       const actuel = fs.existsSync(cible) ? fs.statSync(cible).size : -1;
       if (actuel !== attendu) fs.writeFileSync(cible, fs.readFileSync(bundle));
     }
-    return await import(pathToFileURL(cible).href);
+    return await importer(pathToFileURL(cible).href);
   }
   // Mode Node classique : le paquet de node_modules, CJS ou ESM.
   try {
     return require('youtubei.js');
   } catch (err) {
     if (err.code !== 'ERR_REQUIRE_ESM') throw err;
-    return await import('youtubei.js');
+    return await importer('youtubei.js');
   }
 }
 
