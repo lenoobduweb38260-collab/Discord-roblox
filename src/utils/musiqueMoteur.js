@@ -8,6 +8,7 @@ const S = require('./musiqueSources');
 
 let _play = null;
 let _voice = null;
+let _ytdl = null;
 
 function play() {
   if (!_play) _play = require('play-dl');
@@ -16,6 +17,10 @@ function play() {
 function voice() {
   if (!_voice) _voice = require('@discordjs/voice');
   return _voice;
+}
+function ytdl() {
+  if (!_ytdl) _ytdl = require('@distube/ytdl-core');
+  return _ytdl;
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -149,15 +154,17 @@ async function resoudre(requete) {
         vignette: d.thumbnails?.[0]?.url, source: 'youtube', lienOrigine: url,
       })];
     } catch (err) {
-      // play-dl cassé sur ce lien : youtubei.js lit la fiche à sa place.
-      const yt = await innertube();
+      // play-dl cassé sur ce lien : ytdl-core lit la fiche à sa place.
       const id = idYouTube(url);
-      if (!yt || !id) throw err;
-      const b = (await yt.getBasicInfo(id)).basic_info;
+      if (!id) throw err;
+      const info = await ytdl().getInfo(`https://www.youtube.com/watch?v=${id}`).catch(() => null);
+      const d = info?.videoDetails;
+      if (!d) throw err;
       return [S.piste({
-        titre: b.title, url: `https://www.youtube.com/watch?v=${b.id || id}`,
-        duree: Number(b.duration) || 0, auteur: b.author || null,
-        vignette: b.thumbnail?.[0]?.url || null, source: 'youtube', lienOrigine: url,
+        titre: d.title, url: d.video_url || `https://www.youtube.com/watch?v=${id}`,
+        duree: Number(d.lengthSeconds) || 0, auteur: d.author?.name || null,
+        vignette: d.thumbnails?.[d.thumbnails.length - 1]?.url || null,
+        source: 'youtube', lienOrigine: url,
       })];
     }
   }
@@ -251,70 +258,27 @@ async function fichesSpotify(url) {
 // ══════════════════════════════════════════════════════════════════
 // 🎧 FLUX
 // ══════════════════════════════════════════════════════════════════
-// 📺 YOUTUBEI.JS — le client YouTube qui ouvre les flux
+// 📺 YTDL-CORE — le client YouTube qui ouvre les flux
 // ══════════════════════════════════════════════════════════════════
 //
 // play-dl n'est plus maintenu et son flux YouTube meurt sur « Invalid URL »
-// (les changements de signature de YouTube le dépassent). youtubei.js, lui,
-// est le client InnerTube entretenu : c'est LUI qui ouvre l'audio, play-dl
-// ne reste que la roue de secours — et il garde la recherche et SoundCloud.
-
-let _innertube; // instance partagée : sa création interroge YouTube
-
-async function chargerYoutubei() {
-  // youtubei.js est un paquet ESM avec « await » de haut niveau : le
-  // chargeur ESM de Node ne lit PAS l'instantané pkg. La CI le fond donc en
-  // UN fichier (genere/youtubei.bundle.mjs), embarqué comme asset ; dans
-  // l'exécutable, on l'extrait à côté du bot avant de l'importer — un import
-  // depuis le vrai disque, que Node sait faire.
-  const fs = require('fs');
-  const path = require('path');
-  const { pathToFileURL } = require('url');
-  // ⚠️ Un « import( ) » écrit en clair serait compilé par pkg, qui ne lui
-  // fournit AUCUN rappel d'import dynamique (« A dynamic import callback was
-  // not specified »). Construit au runtime, il échappe au compilateur et
-  // c'est le vrai Node qui l'exécute.
-  const importer = new Function('cible', 'return import(cible);');
-  const bundle = path.join(__dirname, '..', '..', 'genere', 'youtubei.bundle.mjs');
-  if (fs.existsSync(bundle)) {
-    let cible = bundle;
-    if (process.pkg) {
-      const dossier = process.env.BOT_DIR || path.dirname(process.execPath);
-      cible = path.join(dossier, 'youtubei.bundle.mjs');
-      const attendu = fs.statSync(bundle).size;
-      const actuel = fs.existsSync(cible) ? fs.statSync(cible).size : -1;
-      if (actuel !== attendu) fs.writeFileSync(cible, fs.readFileSync(bundle));
-    }
-    return await importer(pathToFileURL(cible).href);
-  }
-  // Mode Node classique : le paquet de node_modules, CJS ou ESM.
-  try {
-    return require('youtubei.js');
-  } catch (err) {
-    if (err.code !== 'ERR_REQUIRE_ESM') throw err;
-    return await importer('youtubei.js');
-  }
-}
-
-async function innertube() {
-  if (_innertube !== undefined) return _innertube;
-  try {
-    const mod = await chargerYoutubei();
-    const Innertube = mod.Innertube || mod.default?.Innertube;
-    _innertube = await Innertube.create();
-  } catch (err) {
-    console.warn(`⚠️ Client YouTube (youtubei.js) indisponible : ${err.message} — play-dl servira de secours.`);
-    _innertube = null;
-  }
-  return _innertube;
-}
+// (les changements de signature de YouTube le dépassent). @distube/ytdl-core,
+// lui, est entretenu : c'est LUI qui ouvre l'audio, play-dl ne reste que la
+// roue de secours — et il garde la recherche et SoundCloud.
+//
+// Pourquoi celui-là et pas youtubei.js ? youtubei.js est un paquet ESM avec
+// « await » de haut niveau, que l'exécutable pkg ne peut PAS charger : son
+// chargeur ESM ne lit pas l'instantané, et il ne fournit aucun rappel
+// d'import dynamique. Trois builds y sont morts. ytdl-core est du CommonJS
+// pur : il s'empaquette comme le reste du code.
 
 // L'auto-test de la CI s'en sert : un exécutable dont le client YouTube ne
 // charge pas ne doit pas être publié.
 async function verifierClientYouTube() {
-  const mod = await chargerYoutubei();
-  const Innertube = mod.Innertube || mod.default?.Innertube;
-  if (typeof Innertube?.create !== 'function') throw new Error('module chargé mais API Innertube absente');
+  const y = ytdl();
+  if (typeof y.getInfo !== 'function' || typeof y.chooseFormat !== 'function') {
+    throw new Error('module chargé mais API getInfo absente');
+  }
 }
 
 // L'identifiant d'une vidéo, quel que soit l'habillage du lien.
@@ -323,22 +287,28 @@ function idYouTube(url) {
   return m ? m[1] : null;
 }
 
-// Ouvre l'audio d'une vidéo via youtubei.js. webm/opus de préférence : la
+// Ouvre l'audio d'une vidéo via ytdl-core. webm/opus de préférence : la
 // démux WebmOpus du lecteur le lit sans FFmpeg ; sinon n'importe quel format
 // audio, décodé par FFmpeg s'il est là.
-async function fluxYouTubeInnertube(morceau) {
+async function fluxYouTubeYtdl(morceau) {
   const v = voice();
-  const yt = await innertube();
-  if (!yt) throw new Error('youtubei.js absent');
+  const y = ytdl();
   const id = idYouTube(morceau.url);
   if (!id) throw new Error('identifiant vidéo introuvable dans ce lien');
-  const { Readable } = require('stream');
+  const info = await y.getInfo(`https://www.youtube.com/watch?v=${id}`);
+  // Un gros tampon : le réseau peut hoqueter, pas la lecture.
+  const options = { highWaterMark: 1 << 25 };
   try {
-    const flux = await yt.download(id, { type: 'audio', quality: 'best', format: 'webm' });
-    return v.createAudioResource(Readable.fromWeb(flux), { inputType: v.StreamType.WebmOpus, inlineVolume: true });
+    const format = y.chooseFormat(info.formats, {
+      quality: 'highestaudio',
+      filter: (f) => f.hasAudio && !f.hasVideo && f.container === 'webm' && f.audioCodec === 'opus',
+    });
+    const flux = y.downloadFromInfo(info, { ...options, format });
+    return v.createAudioResource(flux, { inputType: v.StreamType.WebmOpus, inlineVolume: true });
   } catch {
-    const flux = await yt.download(id, { type: 'audio', quality: 'best', format: 'any' });
-    return v.createAudioResource(Readable.fromWeb(flux), { inputType: v.StreamType.Arbitrary, inlineVolume: true });
+    const format = y.chooseFormat(info.formats, { quality: 'highestaudio', filter: 'audioonly' });
+    const flux = y.downloadFromInfo(info, { ...options, format });
+    return v.createAudioResource(flux, { inputType: v.StreamType.Arbitrary, inlineVolume: true });
   }
 }
 
@@ -358,14 +328,12 @@ async function ouvrirFlux(morceau) {
     if (souci) throw new Error(souci);
     return v.createAudioResource(morceau.url, { inputType: v.StreamType.Arbitrary, inlineVolume: true });
   }
-  // 📺 YouTube : youtubei.js d'abord, play-dl en secours.
+  // 📺 YouTube : ytdl-core d'abord, play-dl en secours.
   if (morceau.source === 'youtube') {
     try {
-      return await fluxYouTubeInnertube(morceau);
+      return await fluxYouTubeYtdl(morceau);
     } catch (err) {
-      if (err.message !== 'youtubei.js absent') {
-        console.warn(`⚠️ Flux YouTube (youtubei.js) : ${err.message} — essai avec play-dl.`);
-      }
+      console.warn(`⚠️ Flux YouTube (ytdl-core) : ${err.message} — essai avec play-dl.`);
     }
   }
   const flux = await p.stream(morceau.url, { discordPlayerCompatibility: false, quality: 2 });

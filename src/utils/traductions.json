@@ -20123,5 +20123,33 @@
     "es": " — probando con play-dl.",
     "pl": " — próba z play-dl.",
     "ru": " — пробуем play-dl."
+  },
+  "✅ Client YouTube (ytdl-core) chargé.": {
+    "en": "✅ YouTube client (ytdl-core) loaded.",
+    "de": "✅ YouTube-Client (ytdl-core) geladen.",
+    "es": "✅ Cliente de YouTube (ytdl-core) cargado.",
+    "pl": "✅ Klient YouTube (ytdl-core) załadowany.",
+    "ru": "✅ Клиент YouTube (ytdl-core) загружен."
+  },
+  "❌ Client YouTube (ytdl-core) : ": {
+    "en": "❌ YouTube client (ytdl-core): ",
+    "de": "❌ YouTube-Client (ytdl-core): ",
+    "es": "❌ Cliente de YouTube (ytdl-core): ",
+    "pl": "❌ Klient YouTube (ytdl-core): ",
+    "ru": "❌ Клиент YouTube (ytdl-core): "
+  },
+  "⚠️ Flux YouTube (ytdl-core) : ": {
+    "en": "⚠️ YouTube stream (ytdl-core): ",
+    "de": "⚠️ YouTube-Stream (ytdl-core): ",
+    "es": "⚠️ Flujo de YouTube (ytdl-core): ",
+    "pl": "⚠️ Strumień YouTube (ytdl-core): ",
+    "ru": "⚠️ Поток YouTube (ytdl-core): "
+  },
+  "module chargé mais API getInfo absente": {
+    "en": "module loaded but getInfo API missing",
+    "de": "Modul geladen, aber getInfo-API fehlt",
+    "es": "módulo cargado pero falta la API getInfo",
+    "pl": "moduł załadowany, ale brak API getInfo",
+    "ru": "модуль загружен, но API getInfo отсутствует"
   }
 }

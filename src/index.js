@@ -124,11 +124,11 @@ if (mode === 'check') {
   // 📺 Le client YouTube qui ouvre les flux audio (play-dl ne sait plus).
   require('./utils/musiqueMoteur').verifierClientYouTube()
     .then(() => {
-      console.log('✅ Client YouTube (youtubei.js) chargé.');
+      console.log('✅ Client YouTube (ytdl-core) chargé.');
       console.log(`✅ Auto-test OK : base de données initialisée, ${commands.length} commande(s) chargée(s).`);
       process.exit(0);
     })
-    .catch((err) => fatal(`❌ Client YouTube (youtubei.js) : ${err.message}`));
+    .catch((err) => fatal(`❌ Client YouTube (ytdl-core) : ${err.message}`));
   return;
 } else if (mode === 'deploy') {
   require('./deploy-commands')
