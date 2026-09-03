@@ -65,6 +65,9 @@ module.exports = {
 
   async execute(interaction) {
     const sub = interaction.options.getSubcommand();
+    // 🎵 Mêmes salons réservés que /musique (⚙️ /config → Musique).
+    const refus = require('../utils/musiqueReglages').refusSalon(interaction);
+    if (refus) return interaction.reply({ content: refus, flags: MessageFlags.Ephemeral });
     try {
       if (sub === 'stop') {
         return await interaction.reply({

@@ -688,6 +688,114 @@ console.log('\n14) Branchements');
     V('… en disant que la connexion vocale n\'aboutira pas', /n'aboutira pas/.test(rd));
   }
 
+  console.log('\n15) Spotify sans identifiants : playlists et albums ENTIERS');
+  {
+    // La page embed publique porte un JSON __NEXT_DATA__ : c'est lui qui donne
+    // la liste des titres — l'oEmbed ne connaît que le nom de la liste.
+    const page = (entity) => `<html><script id="__NEXT_DATA__" type="application/json">${
+      JSON.stringify({ props: { pageProps: { state: { data: { entity } } } } })}</script></html>`;
+
+    const liste = S.extraireEmbedSpotify(page({
+      type: 'playlist', name: 'Ma liste',
+      coverArt: { sources: [{ url: 'https://img/cov.jpg' }] },
+      trackList: [
+        { title: 'Un', subtitle: 'Artiste A', duration: 200000 },
+        { title: 'Deux', subtitle: 'Artiste B', duration: 150000 },
+      ],
+    }));
+    V('une playlist donne TOUTES ses pistes', liste.length === 2, String(liste.length));
+    V('… titre + artiste, prêts pour la recherche', liste[0].titre === 'Un Artiste A', liste[0].titre);
+    V('… durée convertie en secondes', liste[0].duree === 200, String(liste[0].duree));
+    V('… vignette de la liste reprise', liste[0].vignette === 'https://img/cov.jpg');
+
+    const seule = S.extraireEmbedSpotify(page({
+      type: 'track', title: 'Instant Crush', artists: [{ name: 'Daft Punk' }],
+      duration: 337000, coverArt: { sources: [{ url: 'https://img/t.jpg' }] },
+    }));
+    V('une piste seule garde titre + artiste', seule.length === 1 && seule[0].titre === 'Instant Crush Daft Punk', seule[0]?.titre);
+
+    let erreur = null;
+    try { S.extraireEmbedSpotify('<html>rien</html>'); } catch (e) { erreur = e; }
+    V('une page sans données lève une erreur claire', /Spotify/.test(erreur?.message || ''), erreur?.message);
+
+    // Bout en bout : un lien playlist se résout en pistes jouables via YouTube.
+    global.fetch = async (url) => {
+      if (String(url).includes('open.spotify.com/embed/playlist/')) {
+        return { ok: true, text: async () => page({
+          type: 'playlist', name: 'Ma liste', coverArt: { sources: [{ url: 'https://img/cov.jpg' }] },
+          trackList: [
+            { title: 'Un', subtitle: 'Artiste A', duration: 200000 },
+            { title: 'Deux', subtitle: 'Artiste B', duration: 150000 },
+          ],
+        }) };
+      }
+      throw new Error(`appel réseau non prévu : ${url}`);
+    };
+    const pistes = await moteur.resoudre('https://open.spotify.com/playlist/xyz123');
+    V('le lien playlist donne des pistes jouables', pistes.length === 2, String(pistes.length));
+    V('… audio YouTube, origine Spotify', pistes[0].source === 'youtube' && pistes[0].origine === 'spotify');
+    V('… au titre de Spotify', pistes[1].titre === 'Deux Artiste B', pistes[1].titre);
+  }
+
+  console.log('\n16) La carte de lecture SUIT les morceaux');
+  {
+    labo.reinitialiser();
+    const S16 = require('../src/utils/musiqueSources');
+    const envois = [];
+    let dernier = null;
+    const salonTexte = {
+      id: 'TXT1',
+      isTextBased: () => true,
+      get lastMessageId() { return dernier?.id || null; },
+      send: async (p) => {
+        const m = {
+          id: `M${envois.length + 1 + Math.random().toString(36).slice(2, 6)}`,
+          contenu: p, edits: [], flags: 0, guild: null, client: null,
+          edit: async (q) => { m.edits.push(q); return m; },
+        };
+        envois.push(m);
+        dernier = m;
+        return m;
+      },
+      messages: {
+        fetch: async (id) => envois.find((x) => x.id === id) || null,
+        delete: async (id) => { const i = envois.findIndex((x) => x.id === id); if (i >= 0) envois.splice(i, 1); },
+      },
+    };
+    const sc = scene();
+    sc.client = { channels: { fetch: async () => salonTexte } };
+    await musique.ajouterPiste(sc, S16.piste({ titre: 'Un', url: 'u1', source: 'youtube' }));
+    await new Promise((r) => setTimeout(r, 40));
+    const s = musique.fileDe('G1');
+    V('la carte part au premier morceau', envois.length === 1 && s?.carteMessage?.id === envois[0].id,
+      `${envois.length} envoi(s)`);
+    V('… avec les boutons de pilotage', JSON.stringify(envois[0]?.contenu?.components || []).includes('mus:'));
+
+    // Nouveau morceau, carte encore dernier message → MODIFIÉE sur place.
+    s.pistes.push(S16.piste({ titre: 'Deux', url: 'u2', source: 'youtube' }));
+    s.lecteur.terminer();
+    await new Promise((r) => setTimeout(r, 60));
+    V('carte dernier message → modifiée, pas renvoyée',
+      envois.length === 1 && envois[0].edits.length >= 1, `${envois.length} envoi(s), ${envois[0]?.edits.length} édition(s)`);
+
+    // Un message est passé derrière elle → au titre suivant, elle redescend.
+    dernier = { id: 'MSG-ETRANGER' };
+    s.pistes.push(S16.piste({ titre: 'Trois', url: 'u3', source: 'youtube' }));
+    s.lecteur.terminer();
+    await new Promise((r) => setTimeout(r, 60));
+    V('carte enterrée → supprimée puis renvoyée en bas',
+      envois.length === 1 && s.carteMessage?.id === envois[0].id && envois[0].edits.length === 0,
+      JSON.stringify({ envois: envois.length, carte: s.carteMessage }));
+
+    // Fin de lecture → la carte est refermée, ses boutons ne promettent plus rien.
+    const carteFinale = envois[0];
+    musique.quitter('G1', 'fin de test');
+    await new Promise((r) => setTimeout(r, 40));
+    V('à l\'arrêt, la carte est refermée',
+      carteFinale.edits.some((e) => /terminée/i.test(e?.content || '')), JSON.stringify(carteFinale.edits));
+    labo.reinitialiser();
+  }
+
   global.fetch = vraiFetch;
   fs.rmSync(RACINE, { recursive: true, force: true });
   console.log(`\n${ko === 0 ? '✅' : '❌'} ${ok} réussis, ${ko} échoués`);

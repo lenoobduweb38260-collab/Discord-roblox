@@ -593,6 +593,10 @@ for (const column of [
   'autorole_role_ids TEXT',
   // 🤖 Rôles automatiques des BOTS à leur arrivée (liste JSON)
   'autorole_bot_role_ids TEXT',
+  // 🎵 Salons où les commandes musique sont AUTORISÉES (liste JSON, vide = partout)
+  'musique_channel_ids TEXT',
+  // 🎛️ Salon de la carte « en cours de lecture » (vide = salon de la commande)
+  'musique_annonce_channel_id TEXT',
   // 👋 Apparence des messages d'arrivée / de départ, réglée depuis le site
   'welcome_color TEXT',        // couleur de la barre de l'embed (#RRGGBB)
   'welcome_image TEXT',        // grande image de fond de l'embed
@@ -853,6 +857,8 @@ const DEFAULT_CONFIG = {
   welcome_mention: 0,
   autorole_role_ids: null,
   autorole_bot_role_ids: null,
+  musique_channel_ids: null,
+  musique_annonce_channel_id: null,
   welcome_color: null,
   embed_style: 1,
   embed_accent: null,

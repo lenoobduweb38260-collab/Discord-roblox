@@ -68,6 +68,7 @@ class Session {
     this.debutLecture = 0;
     this.pause = false;
     this.radioPassee = false; // un skip volontaire n'est pas une panne
+    this.carteMessage = null; // LA carte « en cours » : { salonId, id }
     this.brancher();
   }
 
@@ -102,12 +103,47 @@ class Session {
     return Math.floor((this.ressource?.playbackDuration ?? 0) / 1000);
   }
 
-  // Un mot dans le salon d'où vient la commande. Ne lève jamais : la musique
-  // continue même si le salon a été supprimé entre-temps.
+  // 🎛️ Le salon où vivent la carte de lecture et les mots de gestion : celui
+  // configuré dans /config → 🎵 Musique, sinon celui d'où vient la commande.
+  salonAnnonces() {
+    try {
+      return require('./musiqueReglages').salonAnnonces(this.guildId) || this.salonTexteId;
+    } catch {
+      return this.salonTexteId;
+    }
+  }
+
+  // Un mot dans le salon de gestion. Ne lève jamais : la musique continue
+  // même si le salon a été supprimé entre-temps.
   annoncer(contenu) {
-    this.client?.channels?.fetch(this.salonTexteId)
+    this.client?.channels?.fetch(this.salonAnnonces())
       .then((salon) => (salon?.isTextBased() ? salon.send({ content: contenu }) : null))
       .catch(() => null);
+  }
+
+  // 🎴 LA carte « en cours de lecture » — une seule par serveur, avec les
+  // boutons de pilotage. À chaque nouveau morceau elle suit la lecture :
+  // encore dernier message du salon → MODIFIÉE sur place ; sinon supprimée
+  // puis renvoyée en bas — une carte qu'il faut remonter chercher ne pilote
+  // rien.
+  async publierCarte() {
+    const cmd = require('../commands/musique');
+    const e = etat(this.guildId);
+    if (!e?.encours || pour(this.guildId) !== this) return;
+    const salon = await this.client?.channels?.fetch(this.salonAnnonces()).catch(() => null);
+    if (!salon?.isTextBased?.()) return;
+    const contenu = { embeds: [cmd.carteLecture(e)], components: [cmd.boutons(e)] };
+    const ancienne = this.carteMessage;
+    if (ancienne?.salonId === salon.id) {
+      if (salon.lastMessageId && salon.lastMessageId === ancienne.id) {
+        const message = await salon.messages?.fetch?.(ancienne.id).catch(() => null);
+        if (message && await editerCarte(message, contenu)) return;
+      }
+      salon.messages?.delete?.(ancienne.id).catch(() => null);
+      this.carteMessage = null;
+    }
+    const envoye = await salon.send(contenu).catch(() => null);
+    if (envoye?.id) this.carteMessage = { salonId: salon.id, id: envoye.id };
   }
 
   // ── Le fil de la lecture ────────────────────────────────────────
@@ -142,6 +178,7 @@ class Session {
       // n'arrive qu'après. Le compteur ne se remet à zéro qu'une fois le
       // direct PROUVÉ (15 s de lecture), dans finDePiste().
       if (suivante.source !== 'radio') this.echecs = 0;
+      this.publierCarte().catch(() => null);
       return suivante;
     } catch (err) {
       // La session a pu être arrêtée pendant l'ouverture : annoncer un échec
@@ -322,8 +359,37 @@ function quitter(guildId, raison = null) {
   try { session.lecteur.stop(true); } catch {}
   try { session.connexion.destroy(); } catch {}
   sessions.delete(String(guildId));
+  // 🎴 La carte de pilotage ne doit pas survivre à la lecture : des boutons
+  // qui répondraient « la lecture est terminée » sont une promesse cassée.
+  const carte = session.carteMessage;
+  session.carteMessage = null;
+  if (carte && session.client) {
+    session.client.channels?.fetch?.(carte.salonId)
+      .then((salon) => salon?.messages?.fetch?.(carte.id))
+      .then((message) => (message ? editerCarte(message, { content: '⏹️ Lecture terminée.', embeds: [], components: [] }) : null))
+      .catch(() => null);
+  }
   if (raison) console.log(`🎵 Musique arrêtée sur ${guildId} : ${raison}.`);
   return true;
+}
+
+// ✏️ Modifie un message déjà envoyé, carte ou embed classique — la carte est
+// reconstruite en composants (une carte n'a ni content ni embeds : les lui
+// donner en edit() est refusé par Discord). true si la modification a pris.
+async function editerCarte(message, contenu) {
+  try {
+    const { estCarte, enComposants } = require('./reponse');
+    if (estCarte(message)) {
+      const composants = enComposants(message.guild || null, message.client, contenu);
+      if (!composants?.length) return false;
+      await message.edit({ components: composants, flags: require('./cartes').DRAPEAU_V2 });
+      return true;
+    }
+    await message.edit(contenu);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function passer(guildId) {

@@ -79,6 +79,52 @@ async function ficheSpotifyPublique(url) {
   return { titre: String(data.title), vignette: data.thumbnail_url || null };
 }
 
+// La page EMBED publique — celle des lecteurs intégrés aux blogs — porte un
+// JSON complet (« __NEXT_DATA__ ») : pour une playlist ou un album, il liste
+// les titres avec artiste et durée. C'est ce qui permet de lire une liste
+// entière SANS identifiants d'application, là où l'oEmbed ne donne que le nom
+// de la liste — introuvable sur YouTube.
+const SPOTIFY = /open\.spotify\.com\/(?:intl-[a-z]{2}(?:-[A-Za-z]{2})?\/)?(track|album|playlist)\/([A-Za-z0-9]+)/i;
+
+// Extrait les fiches du HTML d'une page embed. Séparée du réseau pour être
+// testable : le format du JSON a déjà changé, un test fixe le contrat.
+function extraireEmbedSpotify(html) {
+  const m = /<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/.exec(String(html || ''));
+  if (!m) throw new Error('page Spotify sans données');
+  const entite = JSON.parse(m[1])?.props?.pageProps?.state?.data?.entity;
+  if (!entite) throw new Error('données Spotify sans entité');
+  const sources = entite.coverArt?.sources || [];
+  const vignette = sources[sources.length - 1]?.url || sources[0]?.url || null;
+  if (Array.isArray(entite.trackList) && entite.trackList.length) {
+    return entite.trackList.slice(0, MAX_LOT).map((t) => ({
+      titre: `${t.title || ''} ${t.subtitle || ''}`.trim(),
+      duree: Math.round((Number(t.duration) || 0) / 1000),
+      vignette,
+    })).filter((t) => t.titre);
+  }
+  const artistes = (entite.artists || []).map((a) => a?.name).filter(Boolean).join(' ');
+  const titre = `${entite.title || entite.name || ''} ${artistes || entite.subtitle || ''}`.trim();
+  if (!titre) throw new Error('fiche Spotify sans titre');
+  return [{ titre, duree: Math.round((Number(entite.duration) || 0) / 1000), vignette }];
+}
+
+async function fichesSpotifyPubliques(url) {
+  const m = SPOTIFY.exec(url);
+  if (!m) throw new Error('Lien Spotify non reconnu (piste, album ou playlist attendus)');
+  const [, genre, id] = m;
+  const reponse = await fetch(`https://open.spotify.com/embed/${genre}/${id}`, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
+      'Accept-Language': 'fr,en;q=0.8',
+    },
+    signal: AbortSignal.timeout(10000),
+  });
+  if (!reponse.ok) throw new Error(`Spotify a répondu ${reponse.status}`);
+  const fiches = extraireEmbedSpotify(await reponse.text());
+  if (!fiches.length) throw new Error('Cette sélection Spotify est vide');
+  return fiches;
+}
+
 // ── Deezer sans identifiants ─────────────────────────────────────
 //
 // L'API publique de Deezer ne demande aucune clé. On y va directement plutôt
@@ -116,4 +162,7 @@ async function ficheDeezer(url) {
 // commande mettrait plusieurs minutes à répondre.
 const MAX_LOT = 50;
 
-module.exports = { reconnaitre, RELAYEES, NOMS, piste, ficheSpotifyPublique, ficheDeezer, MAX_LOT, DEEZER };
+module.exports = {
+  reconnaitre, RELAYEES, NOMS, piste, ficheSpotifyPublique, ficheDeezer, MAX_LOT, DEEZER,
+  SPOTIFY, extraireEmbedSpotify, fichesSpotifyPubliques,
+};

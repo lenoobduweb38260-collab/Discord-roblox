@@ -166,6 +166,19 @@ function mainView(guild) {
         inline: false,
       },
       {
+        name: '🎵 Musique',
+        value: (() => {
+          const R = require('./musiqueReglages');
+          const salons = R.salonsCommandes(guild.id);
+          const annonce = R.salonAnnonces(guild.id);
+          return [
+            `Commandes : ${salons.length ? salons.map((id) => `<#${id}>`).join(' ') : '*partout*'}`,
+            `Carte de lecture : ${annonce ? `<#${annonce}>` : '*le salon de la commande*'}`,
+          ].join('\n');
+        })(),
+        inline: false,
+      },
+      {
         name: '📅 Absences',
         value: (() => {
           const salons = require('./absences').listeSalons(guild.id);
@@ -203,6 +216,7 @@ function mainView(guild) {
         { label: 'Whitelist métiers', value: 'whitelist', emoji: '📋', description: 'Autorisations des gérants' },
         { label: 'Tickets', value: 'tickets', emoji: '🎫', description: 'Types de tickets, catégories, rôles support' },
         { label: 'Vocal', value: 'vocal', emoji: '🎧', description: 'File d\'attente, salons d\'assistance, salons perso' },
+        { label: 'Musique', value: 'musique', emoji: '🎵', description: 'Salons des commandes, carte de lecture' },
         { label: 'Absences', value: 'absences', emoji: '📅', description: 'Les salons où partent les annonces d\'absence' },
         { label: 'Réseaux sociaux', value: 'reseaux', emoji: '📡', description: 'Annonces des lives et nouvelles vidéos' }
       )
@@ -919,6 +933,48 @@ function vocalView(guild) {
   };
 }
 
+// ----- Catégorie : musique (salons réservés + carte de lecture) -----
+function musiqueView(guild) {
+  const R = require('./musiqueReglages');
+  const salons = R.salonsCommandes(guild.id);
+  const annonce = R.salonAnnonces(guild.id);
+  const embed = new EmbedBuilder()
+    .setColor(COLORS.INFO)
+    .setTitle('🎵 Configuration — Musique')
+    .setDescription(
+      [
+        `🎵 Salons des commandes musique : ${salons.length ? salons.map((id) => `<#${id}>`).join(' ') : '*Partout*'}`,
+        `🎛️ Salon de la carte de lecture : ${annonce ? `<#${annonce}>` : '*le salon où la commande est lancée*'}`,
+        '',
+        '🎵 Avec des salons choisis, `/musique` et `/radio` ne répondent **que là** — ailleurs, le bot renvoie vers le bon salon.',
+        '🎛️ La carte « Lecture en cours » (titre + boutons) part dans le salon choisi ; sans choix, elle suit la commande.',
+        '-# La sélection **remplace** la liste. La vider remet le réglage à zéro.',
+      ].join('\n')
+    );
+  const menuCommandes = new ChannelSelectMenuBuilder()
+    .setCustomId('cfgmuschans')
+    .setPlaceholder('🎵 Les salons des commandes (vide = partout)')
+    .setChannelTypes(ChannelType.GuildText)
+    .setMinValues(0)
+    .setMaxValues(10);
+  if (salons.length) menuCommandes.setDefaultChannels(salons.slice(0, 10));
+  const menuAnnonce = new ChannelSelectMenuBuilder()
+    .setCustomId('cfgmusannonce')
+    .setPlaceholder('🎛️ Le salon de la carte de lecture (vide = celui de la commande)')
+    .setChannelTypes(ChannelType.GuildText)
+    .setMinValues(0)
+    .setMaxValues(1);
+  if (annonce) menuAnnonce.setDefaultChannels(annonce);
+  return {
+    embeds: [embed],
+    components: [
+      new ActionRowBuilder().addComponents(menuCommandes),
+      new ActionRowBuilder().addComponents(menuAnnonce),
+      backRow(),
+    ],
+  };
+}
+
 // ----- Catégorie : absences (les salons d'annonce, sans plafond) -----
 function absencesView(guild) {
   const salons = require('./absences').listeSalons(guild.id);
@@ -956,7 +1012,7 @@ function absencesView(guild) {
   };
 }
 
-const CATEGORY_VIEWS = { rp: rpView, roles: rolesView, arrivees: arriveesView, salons: salonsView, xp: xpView, securite: securiteView, whitelist: whitelistView, tickets: ticketsView, vocal: vocalView, absences: absencesView, reseaux: reseauxView };
+const CATEGORY_VIEWS = { rp: rpView, roles: rolesView, arrivees: arriveesView, salons: salonsView, xp: xpView, securite: securiteView, whitelist: whitelistView, tickets: ticketsView, vocal: vocalView, musique: musiqueView, absences: absencesView, reseaux: reseauxView };
 const SECURITY_TOGGLES = new Set(['antispam_enabled', 'antinuke_enabled', 'captcha_enabled']);
 
 function xpModal(cfg) {
@@ -1423,6 +1479,30 @@ async function handleConfigInteraction(interaction) {
       await sendLog(
         interaction.guild,
         logEmbed('⚙️ Configuration modifiée', `🏁 Salons d'assistance → ${salons.length ? salons.map((s) => `<#${s}>`).join(' ') : '*aucun*'}\nPar <@${interaction.user.id}>`, COLORS.INFO)
+      );
+      return;
+    }
+
+    // 🎵 Musique : les salons réservés — la sélection REMPLACE la liste.
+    if (id === 'cfgmuschans') {
+      const salons = (interaction.values || []).map(String);
+      setGuildConfig(interaction.guildId, 'musique_channel_ids', salons.length ? JSON.stringify(salons) : null);
+      await mettreAJour(interaction, musiqueView(interaction.guild));
+      await sendLog(
+        interaction.guild,
+        logEmbed('⚙️ Configuration modifiée', `🎵 Salons des commandes musique → ${salons.length ? salons.map((s) => `<#${s}>`).join(' ') : '*partout*'}\nPar <@${interaction.user.id}>`, COLORS.INFO)
+      );
+      return;
+    }
+
+    // 🎛️ Musique : le salon de la carte de lecture — vide = celui de la commande.
+    if (id === 'cfgmusannonce') {
+      const channelId = interaction.values[0] || null;
+      setGuildConfig(interaction.guildId, 'musique_annonce_channel_id', channelId);
+      await mettreAJour(interaction, musiqueView(interaction.guild));
+      await sendLog(
+        interaction.guild,
+        logEmbed('⚙️ Configuration modifiée', `🎛️ Salon de la carte de lecture → ${channelId ? `<#${channelId}>` : '*le salon de la commande*'}\nPar <@${interaction.user.id}>`, COLORS.INFO)
       );
       return;
     }

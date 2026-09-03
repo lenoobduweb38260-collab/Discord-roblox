@@ -117,6 +117,12 @@ module.exports = {
 
   async execute(interaction) {
     const sub = interaction.options.getSubcommand();
+    // 🎵 Salons réservés (⚙️ /config → Musique). Les fiches éphémères
+    // (sources, diagnostic) restent lisibles partout : elles ne jouent rien.
+    if (!['sources', 'diagnostic'].includes(sub)) {
+      const refus = require('../utils/musiqueReglages').refusSalon(interaction);
+      if (refus) return interaction.reply({ content: refus, flags: MessageFlags.Ephemeral });
+    }
     try {
       if (sub === 'play') return await jouer(interaction);
       if (sub === 'sources') return await interaction.reply({ embeds: [carteSources()], flags: MessageFlags.Ephemeral });
@@ -280,6 +286,14 @@ async function jouer(interaction) {
     if (noteRegion) {
       lignes.push(`-# 🔁 Le flux vocal n'aboutissait pas : j'ai changé la région du salon (${noteRegion.originale || 'automatique'} → ${noteRegion.nouvelle}), et c'est elle qui a débloqué la connexion.`);
     }
+    // 🎛️ Les boutons vivent sur LA carte de lecture, que la session envoie et
+    // fait suivre à chaque nouveau morceau — pas sur chaque réponse de
+    // commande, sinon dix ajouts sèment dix jeux de boutons périmés.
+    if (premiere) {
+      const salonCarte = require('../utils/musiqueReglages').salonAnnonces(interaction.guildId);
+      lignes.push(`-# 🎛️ Les boutons de pilotage sont sur la carte « Lecture en cours »${
+        salonCarte && salonCarte !== interaction.channelId ? ` dans <#${salonCarte}>` : ''}.`);
+    }
 
     const embed = new EmbedBuilder()
       .setColor(premiere ? COLORS.SUCCESS : COLORS.INFO)
@@ -287,7 +301,7 @@ async function jouer(interaction) {
       .setDescription(M.description(lignes));
     if (p.vignette) embed.setThumbnail(p.vignette);
 
-    return { embeds: [embed], components: premiere && etat ? [boutons(etat)] : [] };
+    return { embeds: [embed] };
   });
 }
 
@@ -394,7 +408,7 @@ function carteSources() {
         '📻 **Radios françaises** — `/radio ecouter` *(exige FFmpeg)*',
       ], { prefixe: '✅', compte: null }),
       M.bloc('Lu, puis rejoué depuis YouTube', [
-        `🟢 **Spotify**${e.spotify ? ' — albums et playlists complets' : ' — piste seule *(sans identifiants d\'application)*'}`,
+        '🟢 **Spotify** — pistes, albums et playlists',
         '🟣 **Deezer** — pistes, albums et playlists',
       ], { prefixe: '🔁', compte: null }),
       '-# ⚠️ Spotify et Deezer ne laissent **personne** diffuser leur audio : leurs flux sont réservés à leurs propres applications. '

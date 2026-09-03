@@ -20277,5 +20277,187 @@
     "es": " — sin ningún recurso más.",
     "pl": " — nie ma już żadnego zapasu.",
     "ru": " — резервов больше нет."
+  },
+  "-# 🎛️ Les boutons de pilotage sont sur la carte « Lecture en cours »": {
+    "en": "-# 🎛️ The control buttons live on the “Now playing” card",
+    "de": "-# 🎛️ Die Steuertasten sitzen auf der Karte „Läuft gerade“",
+    "es": "-# 🎛️ Los botones de control están en la tarjeta «Reproduciendo»",
+    "pl": "-# 🎛️ Przyciski sterowania są na karcie „Teraz odtwarzane”",
+    "ru": "-# 🎛️ Кнопки управления находятся на карточке «Сейчас играет»"
+  },
+  "🟢 **Spotify** — pistes, albums et playlists": {
+    "en": "🟢 **Spotify** — tracks, albums and playlists",
+    "de": "🟢 **Spotify** — Titel, Alben und Playlists",
+    "es": "🟢 **Spotify** — pistas, álbumes y playlists",
+    "pl": "🟢 **Spotify** — utwory, albumy i playlisty",
+    "ru": "🟢 **Spotify** — треки, альбомы и плейлисты"
+  },
+  "🎵 Musique": {
+    "en": "🎵 Music",
+    "de": "🎵 Musik",
+    "es": "🎵 Música",
+    "pl": "🎵 Muzyka",
+    "ru": "🎵 Музыка"
+  },
+  "Carte de lecture : ": {
+    "en": "Now-playing card: ",
+    "de": "Wiedergabekarte: ",
+    "es": "Tarjeta de reproducción: ",
+    "pl": "Karta odtwarzania: ",
+    "ru": "Карточка воспроизведения: "
+  },
+  "*le salon de la commande*": {
+    "en": "*the command's channel*",
+    "de": "*der Kanal des Befehls*",
+    "es": "*el canal del comando*",
+    "pl": "*kanał komendy*",
+    "ru": "*канал команды*"
+  },
+  "Salons des commandes, carte de lecture": {
+    "en": "Command channels, now-playing card",
+    "de": "Befehlskanäle, Wiedergabekarte",
+    "es": "Canales de comandos, tarjeta de reproducción",
+    "pl": "Kanały komend, karta odtwarzania",
+    "ru": "Каналы команд, карточка воспроизведения"
+  },
+  "🎵 Configuration — Musique": {
+    "en": "🎵 Configuration — Music",
+    "de": "🎵 Konfiguration — Musik",
+    "es": "🎵 Configuración — Música",
+    "pl": "🎵 Konfiguracja — Muzyka",
+    "ru": "🎵 Настройка — Музыка"
+  },
+  "🎵 Salons des commandes musique : ": {
+    "en": "🎵 Music command channels: ",
+    "de": "🎵 Kanäle für Musikbefehle: ",
+    "es": "🎵 Canales de comandos de música: ",
+    "pl": "🎵 Kanały komend muzycznych: ",
+    "ru": "🎵 Каналы музыкальных команд: "
+  },
+  "🎛️ Salon de la carte de lecture : ": {
+    "en": "🎛️ Now-playing card channel: ",
+    "de": "🎛️ Kanal der Wiedergabekarte: ",
+    "es": "🎛️ Canal de la tarjeta de reproducción: ",
+    "pl": "🎛️ Kanał karty odtwarzania: ",
+    "ru": "🎛️ Канал карточки воспроизведения: "
+  },
+  "*le salon où la commande est lancée*": {
+    "en": "*the channel where the command is run*",
+    "de": "*der Kanal, in dem der Befehl gestartet wird*",
+    "es": "*el canal donde se lanza el comando*",
+    "pl": "*kanał, w którym uruchomiono komendę*",
+    "ru": "*канал, где запущена команда*"
+  },
+  "🎵 Avec des salons choisis, `/musique` et `/radio` ne répondent **que là** — ailleurs, le bot renvoie vers le bon salon.": {
+    "en": "🎵 With channels selected, `/musique` and `/radio` only answer **there** — elsewhere, the bot points to the right channel.",
+    "de": "🎵 Mit ausgewählten Kanälen antworten `/musique` und `/radio` **nur dort** — anderswo verweist der Bot auf den richtigen Kanal.",
+    "es": "🎵 Con canales elegidos, `/musique` y `/radio` solo responden **allí** — en otro lugar, el bot remite al canal correcto.",
+    "pl": "🎵 Przy wybranych kanałach `/musique` i `/radio` odpowiadają **tylko tam** — gdzie indziej bot odsyła do właściwego kanału.",
+    "ru": "🎵 С выбранными каналами `/musique` и `/radio` отвечают **только там** — в других местах бот отсылает в нужный канал."
+  },
+  "🎛️ La carte « Lecture en cours » (titre + boutons) part dans le salon choisi ; sans choix, elle suit la commande.": {
+    "en": "🎛️ The “Now playing” card (title + buttons) goes to the chosen channel; without a choice, it follows the command.",
+    "de": "🎛️ Die Karte „Läuft gerade“ (Titel + Tasten) geht in den gewählten Kanal; ohne Wahl folgt sie dem Befehl.",
+    "es": "🎛️ La tarjeta «Reproduciendo» (título + botones) va al canal elegido; sin elección, sigue al comando.",
+    "pl": "🎛️ Karta „Teraz odtwarzane” (tytuł + przyciski) trafia do wybranego kanału; bez wyboru podąża za komendą.",
+    "ru": "🎛️ Карточка «Сейчас играет» (название + кнопки) отправляется в выбранный канал; без выбора — следует за командой."
+  },
+  "-# La sélection **remplace** la liste. La vider remet le réglage à zéro.": {
+    "en": "-# The selection **replaces** the list. Clearing it resets the setting.",
+    "de": "-# Die Auswahl **ersetzt** die Liste. Sie zu leeren setzt die Einstellung zurück.",
+    "es": "-# La selección **reemplaza** la lista. Vaciarla restablece el ajuste.",
+    "pl": "-# Wybór **zastępuje** listę. Wyczyszczenie jej zeruje ustawienie.",
+    "ru": "-# Выбор **заменяет** список. Очистка сбрасывает настройку."
+  },
+  "🎵 Les salons des commandes (vide = partout)": {
+    "en": "🎵 Command channels (empty = everywhere)",
+    "de": "🎵 Die Befehlskanäle (leer = überall)",
+    "es": "🎵 Los canales de comandos (vacío = en todas partes)",
+    "pl": "🎵 Kanały komend (puste = wszędzie)",
+    "ru": "🎵 Каналы команд (пусто = везде)"
+  },
+  "🎛️ Le salon de la carte de lecture (vide = celui de la commande)": {
+    "en": "🎛️ The now-playing card channel (empty = the command's)",
+    "de": "🎛️ Der Kanal der Wiedergabekarte (leer = der des Befehls)",
+    "es": "🎛️ El canal de la tarjeta de reproducción (vacío = el del comando)",
+    "pl": "🎛️ Kanał karty odtwarzania (puste = kanał komendy)",
+    "ru": "🎛️ Канал карточки воспроизведения (пусто = канал команды)"
+  },
+  "🎵 Salons des commandes musique → ": {
+    "en": "🎵 Music command channels → ",
+    "de": "🎵 Kanäle für Musikbefehle → ",
+    "es": "🎵 Canales de comandos de música → ",
+    "pl": "🎵 Kanały komend muzycznych → ",
+    "ru": "🎵 Каналы музыкальных команд → "
+  },
+  "🎛️ Salon de la carte de lecture → ": {
+    "en": "🎛️ Now-playing card channel → ",
+    "de": "🎛️ Kanal der Wiedergabekarte → ",
+    "es": "🎛️ Canal de la tarjeta de reproducción → ",
+    "pl": "🎛️ Kanał karty odtwarzania → ",
+    "ru": "🎛️ Канал карточки воспроизведения → "
+  },
+  "⚠️ Spotify (page publique) : ": {
+    "en": "⚠️ Spotify (public page): ",
+    "de": "⚠️ Spotify (öffentliche Seite): ",
+    "es": "⚠️ Spotify (página pública): ",
+    "pl": "⚠️ Spotify (strona publiczna): ",
+    "ru": "⚠️ Spotify (публичная страница): "
+  },
+  " — repli sur le titre seul.": {
+    "en": " — falling back to the title alone.",
+    "de": " — Rückfall auf den Titel allein.",
+    "es": " — repliegue al título solo.",
+    "pl": " — powrót do samego tytułu.",
+    "ru": " — откат к одному названию."
+  },
+  "⛔ Les commandes musique se font dans ": {
+    "en": "⛔ Music commands go in ",
+    "de": "⛔ Musikbefehle gehören in ",
+    "es": "⛔ Los comandos de música se hacen en ",
+    "pl": "⛔ Komendy muzyczne wpisuje się w ",
+    "ru": "⛔ Музыкальные команды выполняются в "
+  },
+  "⏹️ Lecture terminée.": {
+    "en": "⏹️ Playback finished.",
+    "de": "⏹️ Wiedergabe beendet.",
+    "es": "⏹️ Reproducción terminada.",
+    "pl": "⏹️ Odtwarzanie zakończone.",
+    "ru": "⏹️ Воспроизведение завершено."
+  },
+  "page Spotify sans données": {
+    "en": "Spotify page without data",
+    "de": "Spotify-Seite ohne Daten",
+    "es": "página de Spotify sin datos",
+    "pl": "strona Spotify bez danych",
+    "ru": "страница Spotify без данных"
+  },
+  "données Spotify sans entité": {
+    "en": "Spotify data without entity",
+    "de": "Spotify-Daten ohne Entität",
+    "es": "datos de Spotify sin entidad",
+    "pl": "dane Spotify bez encji",
+    "ru": "данные Spotify без сущности"
+  },
+  "fiche Spotify sans titre": {
+    "en": "Spotify sheet without title",
+    "de": "Spotify-Datenblatt ohne Titel",
+    "es": "ficha de Spotify sin título",
+    "pl": "karta Spotify bez tytułu",
+    "ru": "карточка Spotify без названия"
+  },
+  "Lien Spotify non reconnu (piste, album ou playlist attendus)": {
+    "en": "Spotify link not recognized (track, album or playlist expected)",
+    "de": "Spotify-Link nicht erkannt (Titel, Album oder Playlist erwartet)",
+    "es": "Enlace de Spotify no reconocido (se espera pista, álbum o playlist)",
+    "pl": "Nierozpoznany link Spotify (oczekiwano utworu, albumu lub playlisty)",
+    "ru": "Ссылка Spotify не распознана (ожидается трек, альбом или плейлист)"
+  },
+  "Cette sélection Spotify est vide": {
+    "en": "This Spotify selection is empty",
+    "de": "Diese Spotify-Auswahl ist leer",
+    "es": "Esta selección de Spotify está vacía",
+    "pl": "Ten wybór Spotify jest pusty",
+    "ru": "Эта подборка Spotify пуста"
   }
 }

@@ -1637,5 +1637,20 @@
    "🩺 En cas d'echec, le message dit la vraie cause — par exemple le controle anti-robot de YouTube, avec la parade (`YTDLP_COOKIES` dans le .env) — au lieu d'un « Invalid URL » muet. `/musique diagnostic` et `/musique sources` montrent l'etat du lecteur yt-dlp"
   ],
   "retrait": []
+ },
+ {
+  "id": "musique-carte-2026-09cn",
+  "title": "Carte de lecture, salons musique et playlists Spotify",
+  "ajout": [
+   "🎴 **La carte « Lecture en cours »** : titre, progression et boutons (pause, passer, boucle, file, stop) sur UN message qui suit la lecture — modifie sur place tant qu'il reste en bas du salon, sinon renvoye en bas a chaque nouveau morceau, et referme a l'arret",
+   "🎵 **/config → 🎵 Musique** : choisissez les salons ou `/musique` et `/radio` repondent (ailleurs, le bot renvoie vers le bon salon) et le salon de la carte de lecture — sans choix, elle suit la commande"
+  ],
+  "fix": [
+   "🟢 **Les playlists et albums Spotify entiers** se lisent desormais sans aucun identifiant d'application : la page publique de Spotify donne tous les titres, joues via YouTube (50 par ajout au maximum)"
+  ],
+  "amelioration": [
+   "▶️ La reponse de `/musique play` ne porte plus ses propres boutons : le pilotage vit sur la carte, unique — dix ajouts ne sement plus dix jeux de boutons perimes"
+  ],
+  "retrait": []
  }
 ]

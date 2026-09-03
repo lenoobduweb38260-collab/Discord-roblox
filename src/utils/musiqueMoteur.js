@@ -237,8 +237,9 @@ async function resoudre(requete) {
   );
 }
 
-// Fiches Spotify : par l'API si le serveur a des identifiants (albums et
-// listes complètes), sinon par le point d'entrée public (une piste).
+// Fiches Spotify : par l'API si le serveur a des identifiants, sinon par la
+// page embed publique (pistes, albums ET playlists — sans rien configurer),
+// et en tout dernier recours l'oEmbed (le titre seul d'une piste).
 async function fichesSpotify(url) {
   const p = play();
   if (etat.spotify) {
@@ -259,9 +260,14 @@ async function fichesSpotify(url) {
         vignette: t.thumbnail?.url || null,
       }));
     } catch (err) {
-      // On ne s'arrête pas là : le chemin public marche encore pour une piste.
+      // On ne s'arrête pas là : le chemin public marche aussi pour une liste.
       console.warn(`⚠️ Spotify (API) : ${err.message} — repli sur le lien public.`);
     }
+  }
+  try {
+    return await S.fichesSpotifyPubliques(url);
+  } catch (err) {
+    console.warn(`⚠️ Spotify (page publique) : ${err.message} — repli sur le titre seul.`);
   }
   const fiche = await S.ficheSpotifyPublique(url);
   return [{ titre: fiche.titre, duree: 0, vignette: fiche.vignette }];

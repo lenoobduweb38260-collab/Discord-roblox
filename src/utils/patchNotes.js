@@ -1662,6 +1662,21 @@ const RELEASES = [
     ajout: [],
     retrait: [],
   },
+  {
+    id: 'musique-carte-2026-09cn',
+    title: 'Carte de lecture, salons musique et playlists Spotify',
+    ajout: [
+      '🎴 **La carte « Lecture en cours »** : titre, progression et boutons (pause, passer, boucle, file, stop) sur UN message qui suit la lecture — modifie sur place tant qu\'il reste en bas du salon, sinon renvoye en bas a chaque nouveau morceau, et referme a l\'arret',
+      '🎵 **/config → 🎵 Musique** : choisissez les salons ou `/musique` et `/radio` repondent (ailleurs, le bot renvoie vers le bon salon) et le salon de la carte de lecture — sans choix, elle suit la commande',
+    ],
+    fix: [
+      '🟢 **Les playlists et albums Spotify entiers** se lisent desormais sans aucun identifiant d\'application : la page publique de Spotify donne tous les titres, joues via YouTube (50 par ajout au maximum)',
+    ],
+    amelioration: [
+      '▶️ La reponse de `/musique play` ne porte plus ses propres boutons : le pilotage vit sur la carte, unique — dix ajouts ne sement plus dix jeux de boutons perimes',
+    ],
+    retrait: [],
+  },
 ];
 
 // Construit l'embed d'une note à partir d'une entrée { title, ajout, fix,
