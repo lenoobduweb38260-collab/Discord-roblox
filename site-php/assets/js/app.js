@@ -3077,6 +3077,10 @@
             <button type="button" class="btn ghost small" data-action="bot-move" data-dir="-1" ${index === 0 ? "disabled" : ""}>▲</button>
             <button type="button" class="btn ghost small" data-action="bot-move" data-dir="1" ${index === bots.length - 1 ? "disabled" : ""}>▼</button>
             <button type="button" class="btn small" data-action="bot-test">🔌 Tester</button>
+            ${bot.agentName ? `<button type="button" class="btn small" data-action="bot-env" data-nom="${esc(bot.agentName)}">⚙️ .env</button>` : ""}
+            ${bot.agentName ? ((ui.agentBots || []).find(b => b.nom === bot.agentName)?.demarre
+              ? `<button type="button" class="btn small" data-action="bot-arreter" data-nom="${esc(bot.agentName)}">⏹ Arrêter</button>`
+              : `<button type="button" class="btn success small" data-action="bot-demarrer" data-nom="${esc(bot.agentName)}">▶ Démarrer</button>`) : ""}
             ${inviteUrl(bot) ? `<button type="button" class="btn small" data-action="invite-bot" data-bot-id="${esc(bot.id)}">🔗 Lien d'invitation</button>` : ""}
             <button type="button" class="btn danger small" data-action="bot-remove">🗑</button>
           </div>
@@ -3088,7 +3092,8 @@
           <div class="field full"><label>Description</label><input class="input" data-f="description" value="${esc(bot.description || "")}" placeholder="Ce que fait ce bot"></div>
           <div class="field"><label>1️⃣ Nom chez l'agent</label>${agentNameField(bot)}
             <span class="field-note">Le nom EXACT du bot chez votre agent (dossier <code>bots/&lt;nom&gt;</code>). C'est ce qui relie le site au bot.
-              Choisissez-le dans la liste — ou <b>➕ Créer un nouveau bot</b> pour taper un nom libre : son dossier sera créé chez l'agent au premier démarrage.</span></div>
+              Choisissez-le dans la liste — ou <b>➕ Créer un nouveau bot</b> pour taper un nom libre : à l'enregistrement, son dossier est créé chez l'agent,
+              puis <b>⚙️ .env</b> pour coller son token Discord et <b>▶ Démarrer</b> pour le lancer — tout se fait d'ici.</span></div>
           <div class="field"><label>2️⃣ Client ID Discord <span style="color:var(--muted-2);font-weight:400">(facultatif)</span></label>
             <input class="input" data-f="clientId" value="${esc(bot.clientId || "")}" placeholder="1528910533183541308" inputmode="numeric">
             <span class="field-note">${clientIdNote(bot.clientId)}</span></div>
@@ -4369,11 +4374,71 @@
           render();
           break;
         }
-        case "bots-save":
+        case "bots-save": {
           await api("bots.save", { bots: collectBots() });
+          // 🆕 Un nom tapé à la main (« ➕ Créer un nouveau bot ») devient un
+          // bot RÉEL chez l'agent tout de suite : lire son .env crée son
+          // dossier bots/<nom> avec une configuration vierge.
+          const connus = new Set((ui.agentBots || []).map(b => b.nom));
+          const nouveaux = [...new Set((state.bots || []).map(b => b.agentName).filter(n => n && !connus.has(n)))];
+          for (const nom of nouveaux) {
+            try {
+              await api("bot.env.lire", { nom });
+              toast("🆕 BOT CRÉÉ CHEZ L'AGENT", `« ${nom} » existe maintenant. Ouvrez ⚙️ .env pour coller son token Discord, puis ▶ Démarrer.`);
+            } catch (e) {
+              toast("AGENT", `Impossible de créer « ${nom} » : ${e.message}`, "error");
+            }
+          }
+          if (nouveaux.length) await chargerBotsAgent();
           render();
           toast("BOTS ENREGISTRÉS", `${(state.bots || []).length} bot(s) sur votre site.`);
           break;
+        }
+        // ⚙️ Le config.env du bot chez l'agent : lecture, édition, écriture —
+        // tout depuis le site. C'est là que se collent DISCORD_TOKEN et
+        // CLIENT_ID du bot.
+        case "bot-env": {
+          const nom = target.dataset.nom;
+          let contenu = "";
+          try {
+            contenu = (await api("bot.env.lire", { nom })).contenu || "";
+          } catch (e) {
+            toast("AGENT", e.message, "error");
+            break;
+          }
+          openModal(`⚙️ Configuration de ${esc(nom)}`, `
+            <p style="color:var(--muted);font-size:12.5px;margin-bottom:10px">
+              Le fichier <code>config.env</code> de ce bot chez votre agent.
+              Remplissez <code>DISCORD_TOKEN</code> et <code>CLIENT_ID</code>, enregistrez,
+              puis <b>▶ Démarrer</b> (ou redémarrez) le bot pour appliquer.</p>
+            <form data-form="bot-env" data-nom="${esc(nom)}">
+              <textarea class="textarea" name="contenu" rows="14" spellcheck="false"
+                style="font-family:ui-monospace,monospace;font-size:12px;white-space:pre">${esc(contenu)}</textarea>
+              <div class="form-actions">
+                <button class="btn ghost" type="button" data-action="close-modal">Annuler</button>
+                <button class="btn success" type="submit">💾 Enregistrer chez l'agent</button>
+              </div>
+            </form>`, true);
+          break;
+        }
+        case "bot-demarrer":
+        case "bot-arreter": {
+          const nom = target.dataset.nom;
+          const demarrage = action === "bot-demarrer";
+          try {
+            await api(demarrage ? "bot.demarrer" : "bot.arreter", { nom });
+            toast(demarrage ? "▶ DÉMARRAGE" : "⏹ ARRÊT",
+              demarrage
+                ? `« ${nom} » démarre — sa console chez l'hébergeur raconte la suite.`
+                : `« ${nom} » est arrêté.`);
+          } catch (e) {
+            toast("AGENT", e.message, "error");
+            break;
+          }
+          await chargerBotsAgent();
+          render();
+          break;
+        }
         case "agent-bots":
           // Relance la détection : la liste déroulante « Nom chez l'agent »
           // se remplit avec les noms exacts vus chez l'agent.
@@ -5112,6 +5177,13 @@
 
     try {
       switch (form.dataset.form) {
+        case "bot-env": {
+          const nom = form.dataset.nom;
+          await api("bot.env.ecrire", { nom, contenu: form.elements.contenu.value });
+          closeModal();
+          toast("⚙️ CONFIGURATION ENREGISTRÉE", `Le config.env de « ${nom} » est écrit chez l'agent — démarrez (ou redémarrez) le bot pour appliquer.`);
+          break;
+        }
         case "blacklist-add": {
           const values = formToObject(form);
           const r = await api("blacklist.add", values);

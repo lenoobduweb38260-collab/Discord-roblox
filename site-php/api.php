@@ -320,6 +320,48 @@ function agent_post_json(string $path, array $corps, int $timeout = 20): array {
   return [$code, is_array($data) ? $data : []];
 }
 
+// Comme agent_post_json, mais en PUT — pour écrire le config.env d'un bot.
+function agent_put_json(string $path, array $corps, int $timeout = 20): array {
+  $base = agent_url();
+  if ($base === '') return [0, []];
+  $json = json_encode($corps, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+  $headers = ['x-cle: ' . agent_key(), 'Content-Type: application/json'];
+  if (function_exists('curl_init')) {
+    $ch = curl_init($base . $path);
+    curl_setopt_array($ch, [
+      CURLOPT_RETURNTRANSFER => true,
+      CURLOPT_CUSTOMREQUEST => 'PUT',
+      CURLOPT_POSTFIELDS => $json,
+      CURLOPT_HTTPHEADER => $headers,
+      CURLOPT_TIMEOUT => $timeout,
+    ]);
+    $raw = curl_exec($ch);
+    $code = (int) (curl_getinfo($ch, CURLINFO_RESPONSE_CODE) ?: 0);
+    curl_close($ch);
+  } else {
+    $ctx = stream_context_create(['http' => [
+      'method' => 'PUT', 'header' => implode("\r\n", $headers), 'content' => $json,
+      'timeout' => $timeout, 'ignore_errors' => true,
+    ]]);
+    $raw = @file_get_contents($base . $path, false, $ctx);
+    $code = 0;
+    foreach ($http_response_header ?? [] as $h) {
+      if (preg_match('#^HTTP/\S+\s+(\d{3})#', $h, $m)) $code = (int) $m[1];
+    }
+  }
+  $data = $raw === false ? null : json_decode((string) $raw, true);
+  return [$code, is_array($data) ? $data : []];
+}
+
+// Message d'erreur d'un échec agent : le sien s'il en donne un, sinon le nôtre.
+function erreur_agent(int $code, array $data): string {
+  $detail = trim((string) ($data['error'] ?? ''));
+  if ($detail !== '') return $detail;
+  return $code === 0
+    ? "Agent injoignable — vérifiez « 🔗 Connexion à votre agent »."
+    : "L'agent a répondu HTTP $code.";
+}
+
 // Petit identifiant stable à partir d'un nom (« Colmar RP » → « colmar-rp »).
 function slugify(string $value, string $fallback = 'bot'): string {
   $value = strtolower(trim($value));
@@ -1275,6 +1317,38 @@ if ($action === 'moi.grade') {
 }
 
 // 🤖 Liste des bots déclarés chez l'agent (pour remplir « Nom chez l'agent »).
+// ── 🆕 Cycle de vie d'un bot chez l'agent, piloté depuis le site ──────
+// Lire le .env d'un nom inconnu CRÉE son dossier bots/<nom> chez l'agent :
+// c'est ainsi qu'un nom tapé dans « ➕ Créer un nouveau bot » devient un
+// bot réel, configurable et démarrable sans quitter le site.
+if ($action === 'bot.env.lire') {
+    exiger_admin();
+    $nom = trim((string) (body()['nom'] ?? ''));
+    if ($nom === '') respond(['ok' => false, 'error' => 'Nom du bot manquant.'], 422);
+    [$code, $data] = agent_get('/agent/bots/' . rawurlencode($nom) . '/env', 12);
+    if ($code !== 200) respond(['ok' => false, 'error' => erreur_agent($code, $data)], 502);
+    respond(['ok' => true, 'contenu' => (string) ($data['content'] ?? '')]);
+}
+if ($action === 'bot.env.ecrire') {
+    exiger_admin();
+    $in = body();
+    $nom = trim((string) ($in['nom'] ?? ''));
+    if ($nom === '') respond(['ok' => false, 'error' => 'Nom du bot manquant.'], 422);
+    [$code, $data] = agent_put_json('/agent/bots/' . rawurlencode($nom) . '/env',
+        ['content' => (string) ($in['contenu'] ?? '')], 12);
+    if ($code !== 200) respond(['ok' => false, 'error' => erreur_agent($code, $data)], 502);
+    respond(['ok' => true]);
+}
+if ($action === 'bot.demarrer' || $action === 'bot.arreter') {
+    exiger_admin();
+    $nom = trim((string) (body()['nom'] ?? ''));
+    if ($nom === '') respond(['ok' => false, 'error' => 'Nom du bot manquant.'], 422);
+    $route = $action === 'bot.demarrer' ? 'demarrer' : 'arreter';
+    [$code, $data] = agent_post('/agent/bots/' . rawurlencode($nom) . '/' . $route, 30);
+    if ($code !== 200) respond(['ok' => false, 'error' => erreur_agent($code, $data)], 502);
+    respond(['ok' => true] + $data);
+}
+
 if ($action === 'agent.bots') {
     // L'adresse de l'agent ne sort que pour l'administration connectée.
     $reglages = admin_connecte() ? agent_reglages() : null;
