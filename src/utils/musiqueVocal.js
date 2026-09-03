@@ -43,6 +43,7 @@ const FERMETURES_VOCALES = {
   4014: 'déconnexion demandée par Discord (expulsion, salon supprimé, ou région changée)',
   4015: 'le serveur vocal de Discord a planté',
   4016: 'mode de chiffrement refusé par Discord',
+  4017: 'chiffrement de bout en bout (DAVE) exigé — cette version du bot ne le parle pas',
 };
 
 const nouveauReleveReseau = () => ({ etapeMax: -1, fermeture: null, erreur: null, endpoint: null, udp: null });
@@ -244,6 +245,18 @@ function expliquerEchecVocal(etatAtteint, salonVocal, preuves = {}, regionTentee
       ? `\n-# Le serveur vocal a fermé la connexion : code ${r.fermeture}${FERMETURES_VOCALES[r.fermeture] ? ` — ${FERMETURES_VOCALES[r.fermeture]}` : ''}.`
       : '';
 
+    // 🔒 4017 : depuis mars 2026, Discord n'accepte que les clients vocaux
+    // parlant le chiffrement de bout en bout (protocole DAVE). Le serveur
+    // raccroche PENDANT l'identification — ni le réseau ni les permissions
+    // n'y sont pour rien.
+    if (r.fermeture === 4017) {
+      return conclure(
+        'Discord exige le chiffrement de bout en bout de la voix (DAVE) — cette version du bot ne le parle pas.',
+        '➜ Le serveur vocal a raccroché pendant l\'identification (code 4017) : c\'est une exigence de Discord depuis mars 2026, pas un problème réseau.',
+        '➜ Mettez le bot à jour (`/update`, ou ⚙️ Créateur → 🔄 Mises à jour) : les versions récentes embarquent la brique DAVE.',
+        noteRegion.trim() ? noteRegion.trimStart() : null
+      );
+    }
     if (r.fermeture === 4016 || r.etapeMax === 3) {
       return conclure(
         'Discord a refusé le chiffrement de la voix.',
@@ -434,6 +447,13 @@ function lireDiagnostic(e) {
   }
   if (e.serveurRecu) {
     const r = e.reseau || {};
+    if (r.fermeture === 4017) {
+      return {
+        verdict: '❌ Discord exige le chiffrement de bout en bout de la voix (DAVE) — cette version du bot ne le parle pas.',
+        suite: 'Le serveur vocal a raccroché pendant l\'identification (code 4017) : exigence de Discord depuis mars 2026, ni réseau ni permissions. '
+          + 'Mettez le bot à jour (`/update`, ou ⚙️ Créateur → 🔄 Mises à jour) : les versions récentes embarquent la brique DAVE.',
+      };
+    }
     if (r.fermeture === 4016 || r.etapeMax === 3) {
       return {
         verdict: '❌ Discord a refusé le chiffrement de la voix.',

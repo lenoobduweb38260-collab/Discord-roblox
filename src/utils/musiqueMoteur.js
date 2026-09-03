@@ -349,6 +349,10 @@ function rapportDependances() {
   try { natif = require('crypto').getCiphers().includes('aes-256-gcm'); } catch { natif = false; }
   rapport.chiffrement = (natif ? 'crypto natif de Node' : null)
     || trouver(['sodium-native', 'libsodium-wrappers', 'sodium', 'tweetnacl']);
+  // 🔊 Depuis mars 2026, Discord EXIGE le chiffrement de bout en bout de la
+  // voix (protocole DAVE) : sans la brique @snazzah/davey, le serveur vocal
+  // raccroche pendant l'identification avec le code 4017.
+  rapport.dave = trouver(['@snazzah/davey']);
   rapport.ffmpeg = cheminFfmpeg();
   return rapport;
 }
@@ -359,6 +363,7 @@ function briquesManquantes() {
   const manque = [];
   if (!r.opus) manque.push('un **encodeur Opus** (`npm install opusscript`)');
   if (!r.chiffrement) manque.push('une **bibliothèque de chiffrement** (`npm install libsodium-wrappers`)');
+  if (!r.dave) manque.push('la **brique DAVE** — le chiffrement de bout en bout exigé par Discord depuis mars 2026 (`npm install @snazzah/davey`, ou reprenez le dernier exécutable). Sans elle, le serveur vocal raccroche avec le code 4017');
   return manque.length ? manque : null;
 }
 

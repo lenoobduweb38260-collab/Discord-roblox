@@ -1627,6 +1627,18 @@ const RELEASES = [
     amelioration: [],
     retrait: [],
   },
+  {
+    id: 'vocal-dave-2026-09ck',
+    title: 'Le son revient : chiffrement de bout en bout (DAVE)',
+    fix: [
+      '🔊 **Le bot rejoignait le vocal mais restait muet** : depuis mars 2026, Discord n\'accepte plus que les clients parlant le chiffrement de bout en bout (protocole DAVE) et raccrochait avec le code 4017. La brique DAVE est maintenant embarquee — la musique et les radios diffusent a nouveau',
+    ],
+    amelioration: [
+      '🔬 `/musique diagnostic` verifie aussi la brique DAVE et reconnait le code 4017 : le message dit exactement quoi faire au lieu de suggerer un changement de region',
+    ],
+    ajout: [],
+    retrait: [],
+  },
 ];
 
 // Construit l'embed d'une note à partir d'une entrée { title, ajout, fix,

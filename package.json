@@ -17,11 +17,13 @@
     "scripts": "src/**/*.js",
     "assets": [
       "node_modules/better-sqlite3/build/Release/*.node",
+      "node_modules/@snazzah/**",
       "package.json"
     ]
   },
   "dependencies": {
-    "@discordjs/voice": "^0.18.0",
+    "@discordjs/voice": "^0.19.2",
+    "@snazzah/davey": "^0.1.6",
     "better-sqlite3": "^11.9.1",
     "discord.js": "^14.16.3",
     "dotenv": "^16.4.5",

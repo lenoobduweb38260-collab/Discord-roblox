@@ -350,6 +350,7 @@ async function diagnostic(interaction) {
           `${oui(!preuves.salonPlein)} Le salon n'est pas plein`,
           `${oui(d.opus)} Encodeur Opus${d.opus ? ` — \`${d.opus}\`` : ''}`,
           `${oui(d.chiffrement)} Chiffrement de la voix${d.chiffrement ? ` — \`${d.chiffrement}\`` : ''}`,
+          `${oui(d.dave)} Chiffrement de bout en bout (DAVE)${d.dave ? ` — \`${d.dave}\`` : ' — exigé par Discord depuis mars 2026'}`,
         ], { prefixe: '🔎', compte: null }),
       ].filter(Boolean)))
       .setFooter({ text: `État final : ${e.statutFinal}${e.erreur ? ` · ${e.erreur}` : ''}` });

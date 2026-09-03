@@ -19983,5 +19983,82 @@
     "es": "⚠️ Rastreador de invitaciones: ",
     "pl": "⚠️ Tracker zaproszeń: ",
     "ru": "⚠️ Трекер приглашений: "
+  },
+  "✅ Brique DAVE (chiffrement de bout en bout de la voix) chargée.": {
+    "en": "✅ DAVE brick (end-to-end voice encryption) loaded.",
+    "de": "✅ DAVE-Baustein (Ende-zu-Ende-Sprachverschlüsselung) geladen.",
+    "es": "✅ Pieza DAVE (cifrado de extremo a extremo de la voz) cargada.",
+    "pl": "✅ Moduł DAVE (szyfrowanie głosu od końca do końca) załadowany.",
+    "ru": "✅ Модуль DAVE (сквозное шифрование голоса) загружен."
+  },
+  "chiffrement de bout en bout (DAVE) exigé — cette version du bot ne le parle pas": {
+    "en": "end-to-end encryption (DAVE) required — this bot version does not speak it",
+    "de": "Ende-zu-Ende-Verschlüsselung (DAVE) verlangt — diese Bot-Version beherrscht sie nicht",
+    "es": "cifrado de extremo a extremo (DAVE) exigido — esta versión del bot no lo habla",
+    "pl": "wymagane szyfrowanie od końca do końca (DAVE) — ta wersja bota go nie obsługuje",
+    "ru": "требуется сквозное шифрование (DAVE) — эта версия бота его не поддерживает"
+  },
+  "Discord exige le chiffrement de bout en bout de la voix (DAVE) — cette version du bot ne le parle pas.": {
+    "en": "Discord requires end-to-end voice encryption (DAVE) — this bot version does not speak it.",
+    "de": "Discord verlangt Ende-zu-Ende-Sprachverschlüsselung (DAVE) — diese Bot-Version beherrscht sie nicht.",
+    "es": "Discord exige el cifrado de extremo a extremo de la voz (DAVE) — esta versión del bot no lo habla.",
+    "pl": "Discord wymaga szyfrowania głosu od końca do końca (DAVE) — ta wersja bota go nie obsługuje.",
+    "ru": "Discord требует сквозное шифрование голоса (DAVE) — эта версия бота его не поддерживает."
+  },
+  "➜ Le serveur vocal a raccroché pendant l'identification (code 4017) : c'est une exigence de Discord depuis mars 2026, pas un problème réseau.": {
+    "en": "➜ The voice server hung up during identification (code 4017): a Discord requirement since March 2026, not a network problem.",
+    "de": "➜ Der Sprachserver hat während der Identifikation aufgelegt (Code 4017): eine Discord-Anforderung seit März 2026, kein Netzwerkproblem.",
+    "es": "➜ El servidor de voz colgó durante la identificación (código 4017): es una exigencia de Discord desde marzo de 2026, no un problema de red.",
+    "pl": "➜ Serwer głosowy rozłączył się podczas identyfikacji (kod 4017): to wymóg Discorda od marca 2026, nie problem z siecią.",
+    "ru": "➜ Голосовой сервер разорвал соединение во время идентификации (код 4017): это требование Discord с марта 2026, а не проблема сети."
+  },
+  "➜ Mettez le bot à jour (`/update`, ou ⚙️ Créateur → 🔄 Mises à jour) : les versions récentes embarquent la brique DAVE.": {
+    "en": "➜ Update the bot (`/update`, or ⚙️ Creator → 🔄 Updates): recent versions ship the DAVE brick.",
+    "de": "➜ Aktualisieren Sie den Bot (`/update`, oder ⚙️ Ersteller → 🔄 Updates): Neuere Versionen bringen den DAVE-Baustein mit.",
+    "es": "➜ Actualiza el bot (`/update`, o ⚙️ Creador → 🔄 Actualizaciones): las versiones recientes incluyen la pieza DAVE.",
+    "pl": "➜ Zaktualizuj bota (`/update` lub ⚙️ Twórca → 🔄 Aktualizacje): nowsze wersje zawierają moduł DAVE.",
+    "ru": "➜ Обновите бота (`/update` или ⚙️ Создатель → 🔄 Обновления): свежие версии включают модуль DAVE."
+  },
+  "❌ Discord exige le chiffrement de bout en bout de la voix (DAVE) — cette version du bot ne le parle pas.": {
+    "en": "❌ Discord requires end-to-end voice encryption (DAVE) — this bot version does not speak it.",
+    "de": "❌ Discord verlangt Ende-zu-Ende-Sprachverschlüsselung (DAVE) — diese Bot-Version beherrscht sie nicht.",
+    "es": "❌ Discord exige el cifrado de extremo a extremo de la voz (DAVE) — esta versión del bot no lo habla.",
+    "pl": "❌ Discord wymaga szyfrowania głosu od końca do końca (DAVE) — ta wersja bota go nie obsługuje.",
+    "ru": "❌ Discord требует сквозное шифрование голоса (DAVE) — эта версия бота его не поддерживает."
+  },
+  "Le serveur vocal a raccroché pendant l'identification (code 4017) : exigence de Discord depuis mars 2026, ni réseau ni permissions. ": {
+    "en": "The voice server hung up during identification (code 4017): a Discord requirement since March 2026 — neither network nor permissions. ",
+    "de": "Der Sprachserver hat während der Identifikation aufgelegt (Code 4017): Discord-Anforderung seit März 2026 — weder Netzwerk noch Berechtigungen. ",
+    "es": "El servidor de voz colgó durante la identificación (código 4017): exigencia de Discord desde marzo de 2026 — ni red ni permisos. ",
+    "pl": "Serwer głosowy rozłączył się podczas identyfikacji (kod 4017): wymóg Discorda od marca 2026 — ani sieć, ani uprawnienia. ",
+    "ru": "Голосовой сервер разорвал соединение во время идентификации (код 4017): требование Discord с марта 2026 — ни сеть, ни права. "
+  },
+  "Mettez le bot à jour (`/update`, ou ⚙️ Créateur → 🔄 Mises à jour) : les versions récentes embarquent la brique DAVE.": {
+    "en": "Update the bot (`/update`, or ⚙️ Creator → 🔄 Updates): recent versions ship the DAVE brick.",
+    "de": "Aktualisieren Sie den Bot (`/update`, oder ⚙️ Ersteller → 🔄 Updates): Neuere Versionen bringen den DAVE-Baustein mit.",
+    "es": "Actualiza el bot (`/update`, o ⚙️ Creador → 🔄 Actualizaciones): las versiones recientes incluyen la pieza DAVE.",
+    "pl": "Zaktualizuj bota (`/update` lub ⚙️ Twórca → 🔄 Aktualizacje): nowsze wersje zawierają moduł DAVE.",
+    "ru": "Обновите бота (`/update` или ⚙️ Создатель → 🔄 Обновления): свежие версии включают модуль DAVE."
+  },
+  "la **brique DAVE** — le chiffrement de bout en bout exigé par Discord depuis mars 2026 (`npm install @snazzah/davey`, ou reprenez le dernier exécutable). Sans elle, le serveur vocal raccroche avec le code 4017": {
+    "en": "the **DAVE brick** — the end-to-end encryption Discord requires since March 2026 (`npm install @snazzah/davey`, or grab the latest executable). Without it, the voice server hangs up with code 4017",
+    "de": "der **DAVE-Baustein** — die von Discord seit März 2026 verlangte Ende-zu-Ende-Verschlüsselung (`npm install @snazzah/davey`, oder die neueste ausführbare Datei nehmen). Ohne ihn legt der Sprachserver mit Code 4017 auf",
+    "es": "la **pieza DAVE** — el cifrado de extremo a extremo que Discord exige desde marzo de 2026 (`npm install @snazzah/davey`, o toma el último ejecutable). Sin ella, el servidor de voz cuelga con el código 4017",
+    "pl": "**moduł DAVE** — szyfrowanie od końca do końca wymagane przez Discorda od marca 2026 (`npm install @snazzah/davey` lub weź najnowszy plik wykonywalny). Bez niego serwer głosowy rozłącza się z kodem 4017",
+    "ru": "**модуль DAVE** — сквозное шифрование, требуемое Discord с марта 2026 (`npm install @snazzah/davey`, или возьмите свежий исполняемый файл). Без него голосовой сервер разрывает связь с кодом 4017"
+  },
+  " Chiffrement de bout en bout (DAVE)": {
+    "en": " End-to-end encryption (DAVE)",
+    "de": " Ende-zu-Ende-Verschlüsselung (DAVE)",
+    "es": " Cifrado de extremo a extremo (DAVE)",
+    "pl": " Szyfrowanie od końca do końca (DAVE)",
+    "ru": " Сквозное шифрование (DAVE)"
+  },
+  " — exigé par Discord depuis mars 2026": {
+    "en": " — required by Discord since March 2026",
+    "de": " — von Discord seit März 2026 verlangt",
+    "es": " — exigido por Discord desde marzo de 2026",
+    "pl": " — wymagane przez Discorda od marca 2026",
+    "ru": " — требуется Discord с марта 2026"
   }
 }

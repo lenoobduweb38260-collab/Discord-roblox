@@ -109,6 +109,11 @@ if (mode === 'check') {
   // et charge toutes les commandes, sans se connecter à Discord.
   require('./database');
   const commands = loadCommandFiles();
+  // 🔊 Depuis mars 2026, Discord EXIGE le chiffrement de bout en bout de la
+  // voix (protocole DAVE) : sans cette brique, le serveur vocal raccroche
+  // avec le code 4017 et le bot reste muet. On refuse de livrer ça.
+  require('@snazzah/davey');
+  console.log('✅ Brique DAVE (chiffrement de bout en bout de la voix) chargée.');
   console.log(`✅ Auto-test OK : base de données initialisée, ${commands.length} commande(s) chargée(s).`);
   process.exit(0);
 } else if (mode === 'deploy') {
