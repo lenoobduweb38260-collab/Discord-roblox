@@ -1,0 +1,1888 @@
+// ----- 📝 Notes de mise à jour (patch notes) automatiques -----
+// Le bot publie lui-même ses notes de mise à jour dans le salon configuré par
+// serveur (patch_channel_id). Elles sont TOUJOURS découpées en 4 catégories —
+// 🆕 Ajout / 🔧 Fix / ✨ Amélioration / ➖ Retrait — et indiquent clairement que
+// les changements prennent effet immédiatement.
+//
+// Fonctionnement :
+//  • La 1re entrée (id « initial ») récapitule TOUT ce qui a été fait depuis le
+//    début et n'est annoncée QU'UNE SEULE FOIS.
+//  • Chaque entrée suivante = une version (ses changements uniquement).
+//  • La mention éventuelle (@everyone, @here ou un rôle) est un réglage PAR
+//    SERVEUR — `patch_mention`. Par défaut, aucune mention n'est faite.
+//  • Un marqueur en base (app_state『patch_notes_pos』) mémorise la dernière
+//    entrée déjà publiée : à chaque démarrage, seules les nouvelles sont
+//    envoyées.
+//
+// ⚠️ Règle : les notes ne concernent QUE les utilisateurs. Rien de ce qui
+// touche l'équipe/le staff du bot n'y figure.
+
+const { EmbedBuilder } = require('discord.js');
+const { db, getGuildConfig } = require('../database');
+const M = require('./miseEnPage');
+
+const IMMEDIATE = '⚡ **Ces changements prennent effet immédiatement.**';
+
+// ----- Journal des versions -----
+const RELEASES = [
+  {
+    id: 'initial',
+    title: 'Récapitulatif complet — tout ce que le bot propose',
+    ajout: [
+      '🪪 Cartes d\'identité RP partagées sur tous les serveurs (`/carte`)',
+      '🚗 Permis de conduire à points (`/permis`)',
+      '🏢 Entreprises avec patrons & employés (`/entreprise`)',
+      '🛡️ Assurances véhicule (`/assurance`)',
+      '🌐 Identité RP globale : cartes, permis et entreprises suivent le joueur partout',
+      '🧑‍💼 Prises de service et pointage (`/service`, `/arrivee`, `/depart`)',
+      '📋 Whitelist métiers avec attribution automatique du rôle (`/whitelist`)',
+      '📈 Niveaux écrit & vocal avec carte personnalisable (`/niveau`)',
+      '🎫 Tickets avec catégories et plusieurs rôles support (`/ticket`)',
+      '🔨 Modération : `/ban`, `/kick`, `/mute`, `/unmute`, `/banglobal`',
+      '⚠️ Avertissements RP à points (`/warnrp`)',
+      '⛔ Blacklist RP & ✅ Whitelist RP (recherche intégrée, tri auto)',
+      '🗂️ Casier RP pour suivre les blacklists (`/casier`)',
+      '🕵️ Snipe : récupération des messages supprimés/modifiés (`/snipe`)',
+      '🛡️ Sécurité : anti-nuke, anti-spam et anti-injection',
+      '🤖 Captcha de vérification à l\'arrivée des membres',
+      '👋 Messages de bienvenue et de départ (salon de départ séparé)',
+      '🤝 Partenariats : proposition → validation staff → publication auto',
+      '🎮 Interactions façon Nekotina : câlins, bisous, tapes… (`/interact`)',
+      '🎴 Vgache : gacha de VTubeuses Twitch francophones (`/vgache`)',
+      '⚔️ Aventure SAO : 100 étages d\'Aincrad, boss, badges, XP auto & AFK (`/sao`)',
+      '🎵 Musique en vocal : YouTube, Spotify, Deezer, SoundCloud (`/musique`)',
+      '🔊 Logs vocaux et logs de rôles (création / modification / suppression)',
+      '📢 Réseaux sociaux : lives Twitch, vidéos YouTube/TikTok/X/Reddit (`/reseaux`)',
+      '🛑 Protection anti-scam par image',
+      '📝 Salon de patch notes configurable + ces notes automatiques',
+      '⚙️ Panneau `/config` centralisé avec aperçus d\'embed en direct',
+    ],
+    fix: [
+      '🏢 Les médias d\'entreprise acceptent désormais un fichier ET un lien',
+      '🔒 Diverses corrections de stabilité et de sécurité',
+    ],
+    amelioration: [
+      '🔎 Aperçu en direct de chaque message/embed avant son envoi dans un salon',
+      '🎫 Plusieurs rôles support configurables par type de ticket',
+      '🔤 Blacklist/Whitelist RP triées par ordre alphabétique avec recherche',
+      '🌍 Interactions traduites automatiquement selon la langue de chaque membre',
+      '🎭 Modules activables par serveur (RP, Interactions, Aventure SAO)',
+      '⚙️ Toute la configuration regroupée dans `/config`, mise à jour en direct',
+    ],
+    retrait: ['Aucun retrait — c\'est la version de lancement 🎉'],
+  },
+  {
+    id: 'entreprises-police-2026-07',
+    title: 'Entreprises, assurances, police & whitelist',
+    ajout: [
+      '🎨 Assurance véhicule : la **couleur** du véhicule est désormais demandée et affichée',
+      '⚖️ Nouveau **casier judiciaire** (`/casierjudiciaire`) réservé aux rôles Police',
+      '🎭 La **Whitelist RP** attribue automatiquement un rôle configurable au membre',
+    ],
+    fix: [
+      '🏢 Correction d\'un plantage de `/entreprise` quand le média n\'était pas un lien valide',
+      '🛡️ Correction du message « entreprise introuvable » lors du choix des types d\'assurance',
+    ],
+    amelioration: [
+      '📋 Un gérant peut être autorisé à whitelister **plusieurs rôles métier** d\'un coup',
+      '🚗 Retrait de points de permis désormais possible pour la **police** (en plus du staff)',
+      '🏢 `/entreprise modifier` : nouveau champ **« type d\'assurance »** pour changer les types',
+      '⚙️ `/config` : rôles **Police** et **rôle Whitelist RP** configurables',
+    ],
+    retrait: [],
+  },
+  {
+    id: 'assurance-carte-warn-2026-07b',
+    title: 'Assurances, cartes & warns',
+    ajout: [
+      '🚗 Assurance véhicule : **photo** du véhicule et **dates de validité** (validation → expiration, avec valide/expirée)',
+      '🚓 Statut police d\'un véhicule : 🚨 recherché et 🅿️ fourrière, via `/assurance statut`',
+      '🔎 `/assurance voir <n°>` : consulter un contrat (photo, validité, statut police)',
+      '🏢 `/carte voir` affiche désormais l\'**entreprise et le métier** de la personne (patron/employé)',
+    ],
+    amelioration: [
+      '👁️ `/warnrp voir` est désormais **visible par tout le monde** (les actions warn/points restent privées)',
+      '⚙️ `/config` : les rôles (Staff, Admin, Police, support tickets) **s\'accumulent** à l\'ajout au lieu de se remplacer',
+    ],
+    fix: [],
+    retrait: [],
+  },
+  {
+    id: 'ticket-emoji-picker-2026-07c',
+    title: 'Emoji des tickets en un clic',
+    amelioration: [
+      '🎫 Création d\'un type de ticket : l\'emoji se choisit désormais dans une **bulle cliquable** — plus besoin de le taper à la main',
+      '😀 La bulle propose les **emojis du serveur** ainsi que des emojis classiques prêts à l\'emploi',
+    ],
+    ajout: [],
+    fix: [
+      '🎫 Correction d\'un **plantage du panneau de tickets** (`/ticket panneau`) lorsqu\'un type utilisait un emoji non valide : les emojis incorrects sont désormais ignorés au lieu de bloquer l\'affichage',
+    ],
+    retrait: [],
+  },
+  {
+    id: 'ticket-panneau-2026-07d',
+    title: 'Panneau de tickets : contenu, image & modification',
+    ajout: [
+      '🖼️ Image/GIF du panneau de tickets : vous pouvez maintenant **l\'uploader depuis votre PC** (en plus de l\'URL)',
+    ],
+    amelioration: [
+      '✏️ Le **texte du panneau** (titre, description, message, pied de page) se saisit dans un **formulaire** : on peut enfin y faire de **vrais retours à la ligne**',
+      '🗂️ `/ticket panneau-modifier` : quand plusieurs panneaux existent, un **menu permet de choisir lequel modifier**',
+    ],
+    fix: [],
+    retrait: [],
+  },
+  {
+    id: 'ticket-bloquer-2026-07e',
+    title: 'Bloquer / réactiver une raison de ticket',
+    ajout: [
+      '🔒 Nouvelle commande `/ticket bloquer` : **ferme temporairement** une raison de ticket — plus personne ne peut l\'ouvrir',
+      '🔓 `/ticket debloquer` : **réactive** une raison mise en pause, sans avoir à la recréer',
+    ],
+    amelioration: [
+      '🎫 `/ticket types` indique désormais les raisons **bloquées** 🔒',
+    ],
+    fix: [],
+    retrait: [],
+  },
+  {
+    id: 'ticket-fermeture-auto-2026-07f',
+    title: 'Tickets : fermeture, archive & suppression auto',
+    ajout: [
+      '📄 Nouveau **salon de transcripts** configurable dans `/config` → Salons (par défaut : le salon de logs)',
+    ],
+    amelioration: [
+      '🔒 Fermer un ticket **envoie le transcript** (100 derniers messages) puis **supprime le salon automatiquement** — plus besoin du bouton « Supprimer »',
+      '📄 Le transcript part dans le **salon dédié** s\'il est configuré, sinon dans le **salon de logs** par défaut',
+    ],
+    fix: [],
+    retrait: [],
+  },
+  {
+    id: 'ticket-fiabilite-2026-07g',
+    title: 'Tickets plus fiables à l\'ouverture',
+    fix: [
+      '🎫 Ouverture de ticket plus fiable : le bot **répond immédiatement** avant de créer le salon, ce qui réduit les erreurs « interaction expirée » sur les connexions un peu lentes',
+    ],
+    ajout: [],
+    amelioration: [],
+    retrait: [],
+  },
+  {
+    id: 'ticket-membres-2026-07h',
+    title: 'Tickets : ajouter un membre & ouvrir pour quelqu\'un',
+    ajout: [
+      '➕ `/ticket ajouter` : **ajouter un membre** à un ticket en cours (à utiliser dans le salon du ticket)',
+      '🎫 `/ticket creer-pour` : **ouvrir un ticket au nom d\'un membre** (par le staff)',
+    ],
+    fix: [
+      '🔁 Menu déroulant des raisons : on peut désormais **re-sélectionner la même raison** (le menu se réinitialise après chaque choix)',
+    ],
+    amelioration: [],
+    retrait: [],
+  },
+  {
+    id: 'heure-francaise-2026-07i',
+    title: 'Heures toujours en heure française',
+    amelioration: [
+      '🕐 Toutes les dates/heures affichées par le bot (dont les **transcripts** de tickets) sont désormais **toujours en heure française** (Europe/Paris), quel que soit l\'hébergement',
+    ],
+    ajout: [],
+    fix: [],
+    retrait: [],
+  },
+  {
+    id: 'ticket-fermeture-robuste-2026-07j',
+    title: 'Fermeture de ticket plus fiable',
+    fix: [
+      '🔒 Fermer un ticket ne renvoie plus « Ticket introuvable » à tort : le ticket est retrouvé **par son salon**, et le salon est **fermé/supprimé quand même** même si la base est momentanément désynchronisée',
+    ],
+    ajout: [],
+    amelioration: [],
+    retrait: [],
+  },
+  {
+    id: 'assurance-types-niveaux-2026-07k',
+    title: '4 types d\'assurance, niveaux par serveur',
+    ajout: [
+      '🛡️ `/assurance assigner` propose désormais **4 types de contrat** : 🚗 Véhicule, 🏠 Maison (bâtiment + unité), 🏢 Entreprise et ⚕️ Santé — chacun avec ses propres champs',
+      '📊 `/config` → 📈 XP & niveaux : le **système de niveaux s\'active/désactive par serveur**',
+    ],
+    amelioration: [
+      '📢 Les montées de niveau ne s\'annoncent plus que dans le **salon dédié** configuré (plus d\'annonces dans n\'importe quel salon)',
+      '🔴 Un véhicule **recherché** ou **en fourrière** est signalé par un **rond rouge** bien visible (fiche et liste des contrats)',
+      '📅 L\'option `debut` des assurances s\'appelle désormais **`delivrance`**',
+      '🏢 Chaque type de contrat vérifie que l\'assureur a coché le **type d\'assurance correspondant** (Véhicule/Habitation/Entreprise/Maladie)',
+    ],
+    fix: [],
+    retrait: [],
+  },
+  {
+    id: 'dashboard-sao-2026-08a',
+    title: 'Dashboard web : thème Aincrad & connexion simplifiée',
+    ajout: [
+      '⚔️ Le **dashboard web** fait peau neuve avec un **thème Sword Art Online / Aincrad** (ciel nocturne, panneaux d\'acier bleuté, lueurs cyan)',
+    ],
+    amelioration: [
+      '🔗 **Connexion Discord fiabilisée** : l\'URL de redirection est **détectée automatiquement** (https/www/sous-dossier/proxy) — fini les erreurs « redirect_uri non valide »',
+      '📋 L\'URL exacte à enregistrer côté Discord s\'affiche sur la page d\'accueil et le diagnostic du dashboard, avec un **bouton Copier**',
+    ],
+    fix: [],
+    retrait: [],
+  },
+  {
+    id: 'dashboard-monde-2026-08b',
+    title: 'Dashboard : entrez dans l\'Aincrad 🗡️',
+    ajout: [
+      '🗡️ **Page d\'accueil immersive** : séquence LINK START, château d\'Aincrad flottant, étoiles filantes et citations de la série',
+      '📜 **Composez votre page d\'accueil** : messages défilants (annonces, événements…) éditables depuis l\'espace Créateur — ajoutez, réordonnez, supprimez',
+      '🤖 **Choix du bot à inviter** : la page d\'accueil propose chaque bot (Shadow Community, Colmar RP…) — le visiteur ajoute exactement celui qu\'il veut',
+      '👑 **Sections créateur par bot** : le créateur voit TOUS les serveurs de chaque bot (même sans y être membre) et peut les configurer à distance',
+    ],
+    amelioration: [
+      '✨ **Interface connectée refaite** : fenêtres système translucides, cartes serveur façon carte de quête, barre de vie SAO sous le pseudo, lueurs cyan',
+    ],
+    fix: [
+      '🚫 **/blacklist répond à nouveau** : l\'action est accusée immédiatement puis exécutée (MP + bans multi-serveurs) — fini « l\'application ne répond pas »',
+    ],
+    retrait: [],
+  },
+  {
+    id: 'dashboard-nexus-2026-08c',
+    title: 'Dashboard : interface « NEXUS » 💠',
+    ajout: [],
+    amelioration: [
+      '💠 **Nouveau design complet du dashboard** façon interface système SAO : fond quadrillé, panneaux à coins coupés, typographies Orbitron/Exo 2, lueurs cyan, balayage lumineux et particules',
+      '🤖 Le choix du bot sur la page d\'accueil devient de **grandes cartes de sélection** (une couleur par bot) avec « Inviter sur mon serveur → »',
+      '🔧 Page de diagnostic assortie au nouveau style',
+    ],
+    fix: [],
+    retrait: [],
+  },
+  {
+    id: 'site-builder-2026-08d',
+    title: 'Site personnalisable : construisez votre site 🎨',
+    ajout: [
+      '🎨 **Nouveau site web complet** (`pack-site-builder.zip`) que vous construisez vous-même depuis l\'onglet **Site builder**, sans toucher au code',
+      '🌌 **Fond au choix** : votre image ou **GIF animé** téléversé depuis le PC, ou un fond animé généré (Aurora, Étoiles, Grille), avec assombrissement et flou réglables',
+      '🖌️ **Thème libre** : couleur d\'accent, police, style des boutons (pilule, arrondi, carré, coins coupés) et arrondi des cartes — le tout en **aperçu direct**',
+      '🧭 **Navigation composable** : renommez, masquez et réordonnez les onglets du menu',
+      '🧪 **CSS personnalisé** injecté sur tout le site pour un contrôle total du style',
+    ],
+    amelioration: [],
+    fix: [],
+    retrait: [],
+  },
+  {
+    id: 'page-builder-2026-08e',
+    title: 'Constructeur de page & diagnostic des bots 🧱',
+    ajout: [
+      '🧱 **Constructeur de page** dans l\'espace Créateur : composez votre page d\'accueil **bloc par bloc** (bannière, cartes, chiffres, galerie, FAQ, annonces défilantes, appel à l\'action, texte, pied de page) — ajout, duplication, réordonnancement et édition de chaque bloc',
+      '🏠 **Vraie page d\'accueil** : le logo/nom en haut à gauche y ramène **en restant connecté**',
+      '🤖 **État des bots** (⚙️ Créateur et page de diagnostic) : dit précisément **quel bot** est injoignable et **pourquoi**',
+    ],
+    amelioration: [
+      '🔁 **Bascule automatique entre bots** : si plusieurs bots sont sur un serveur et que l\'un ne répond pas, le dashboard utilise l\'autre au lieu d\'échouer',
+    ],
+    fix: [
+      '🩹 Fini le message « Bot injoignable » sans explication : la cause exacte est affichée (bot arrêté, API interne muette, version trop ancienne, délai dépassé)',
+      '⏱️ Délai des appels aux bots porté à 25 s — les bots présents sur beaucoup de serveurs ne sont plus considérés à tort comme injoignables',
+    ],
+    retrait: [],
+  },
+  {
+    id: 'site-grades-2026-08f',
+    title: 'Site : fonctions par grade, archives & écran de chargement 🔐',
+    ajout: [
+      '🔐 **Toutes les fonctions du bot** listées dans l\'espace Créateur (RP, modération, configuration, communauté, équipe du bot, pages et modules) : autorisez chacune **grade par grade**',
+      '🎭 **Grades pris en compte** : ceux du serveur (Membre, Police/Métier, Staff, Administration) **et** ceux de l\'équipe du bot (Support, Modérateur, Responsable, Créateur)',
+      '👁 **Aperçu par grade** : le site s\'affiche exactement comme le voit le grade choisi — menu, pages et modules non autorisés sont masqués',
+      '🗄️ **Archives des tickets** : un ticket fermé quitte les tickets en cours et rejoint les archives avec toute sa conversation (recherche, réouverture, suppression définitive)',
+      '⏳ **Écran de chargement personnalisable** : titre, sous-titre, logo, durée et anneau animé',
+    ],
+    amelioration: [
+      '🖼️ **Photos de profil Discord** des bots et **icônes des serveurs** affichées partout, sur le site comme sur le dashboard',
+    ],
+    fix: [
+      '🩹 Renommer un bot ne détache plus ses serveurs : les liens sont reportés sur le nouveau nom (auparavant les serveurs disparaissaient après enregistrement)',
+    ],
+    retrait: [],
+  },
+  {
+    id: 'site-connexion-agent-2026-08g',
+    title: 'Site : la connexion à vos bots se fait dans le site 🔌',
+    ajout: [
+      '🔌 **« Connexion à votre agent »** dans ⚙️ Créateur → 🤖 Mes bots : collez l\'adresse et la clé, cliquez sur **Tester et enregistrer** — plus aucun fichier à modifier',
+      '🧪 **Test avant enregistrement** : rien n\'est sauvegardé tant que l\'agent n\'a pas répondu, et la liste de vos bots s\'affiche aussitôt en cas de succès',
+      '🧹 **Bouton Effacer** : le site retombe alors sur les réglages du dashboard installé à côté',
+    ],
+    amelioration: [
+      '🗣️ **Messages d\'erreur qui disent quoi faire** : clé refusée, port fermé, adresse d\'un autre service, identifiant Discord saisi à la place de l\'adresse — chaque cas a son explication',
+      '🔐 La clé est rangée hors d\'atteinte du web et **n\'est jamais renvoyée au navigateur** ; laissée vide, elle est conservée telle quelle',
+    ],
+    fix: [
+      '🩹 Une adresse d\'agent invalide n\'envoie plus chercher la panne dans `config.php` : le message pointe désormais l\'encadré à corriger, dans le site',
+    ],
+    retrait: [
+      '🗑️ `SITE_AGENT_URL` et `SITE_AGENT_KEY` ne sont plus à remplir dans `config.php` (les valeurs déjà en place continuent de fonctionner)',
+    ],
+  },
+  {
+    id: 'site-discord-video-2026-08h',
+    title: 'Site : connexion avec son compte Discord & fond vidéo 🎮',
+    ajout: [
+      '🎮 **Connexion au site avec son compte Discord** : plus de mot de passe à créer, c\'est le même compte que sur vos serveurs — photo de profil et pseudo affichés dans le bandeau',
+      '👑 **Le premier compte connecté devient propriétaire** du site, et choisit ensuite qui peut l\'administrer (⚙️ Créateur → 🔑 Connexion Discord)',
+      '📋 **L\'adresse de retour à déclarer chez Discord est affichée toute prête** à copier : plus d\'erreur « redirect_uri non valide »',
+      '🎬 **Fond vidéo MP4** dans l\'apparence du site : votre vidéo en boucle et en plein écran, avec l\'assombrissement et le flou déjà réglables',
+      '🖼️ L\'image de fond sert d\'**image d\'attente** le temps que la vidéo se charge',
+    ],
+    amelioration: [
+      '📏 **Les limites de votre hébergeur sont expliquées** au lieu d\'un échec sec : taille maximale affichée sous le champ, et message clair si la vidéo est trop lourde',
+      '🔐 Identifiants Discord **vérifiés auprès de Discord avant d\'être enregistrés**, et rangés hors d\'atteinte du web',
+    ],
+    fix: [
+      '🩹 **Faille corrigée** : avec des administrateurs Discord déclarés mais aucun mot de passe de secours, un mot de passe vide ouvrait l\'administration',
+    ],
+    retrait: [],
+  },
+  {
+    id: 'site-equipe-maj-2026-08i',
+    title: 'Site : équipe par identifiant, propriétaire épinglé & mises à jour auto 🔄',
+    ajout: [
+      '👑 **`SITE_OWNER_ID` dans `config.php`** : collez votre identifiant Discord et vous êtes le **seul et unique propriétaire**, définitivement — personne ne peut vous retirer ce grade depuis le site',
+      '🔒 **Site verrouillé dès l\'installation** dès que cette ligne est remplie : aucun inconnu ne peut s\'en emparer en se connectant avant vous',
+      '🎭 **L\'équipe se compose identifiant par identifiant**, chacun avec son grade : seuls les comptes listés entrent dans l\'espace de gestion',
+      '🔄 **Mise à jour automatique** : le site va chercher la dernière version publiée, se remplace lui-même, puis **met à jour tous les bots qu\'il pilote** dans la foulée',
+      '▶️ Bouton **« Tout mettre à jour »** pour déclencher la même chose à la demande, avec un rapport ligne par ligne',
+    ],
+    amelioration: [
+      '🛡️ **Les tickets, la blacklist et les serveurs ne sont plus envoyés aux visiteurs** qui ne font pas partie de l\'équipe — le serveur ne les transmet même pas à la page',
+      '💾 Une mise à jour n\'écrase jamais `data/`, `uploads/` ni `config.php` : réglages, images et données restent intacts',
+      '🧯 Verrou anti-collision pendant la mise à jour, et annulation si l\'archive téléchargée n\'est pas celle du site',
+    ],
+    fix: [],
+    retrait: [],
+  },
+  {
+    id: 'site-compte-cache-2026-08j',
+    title: 'Site : fiche du compte Discord & fin du cache périmé 👤',
+    ajout: [
+      '👤 **Cliquez sur votre profil en haut à droite** : photo Discord, pseudo, identifiant, grade et nombre de serveurs — tout ce que le site sait de vous',
+      '📋 **Bouton « Copier mon identifiant »** : plus besoin d\'activer le mode développeur de Discord pour remplir `SITE_OWNER_ID`',
+      '🔑 Raccourci direct de la fiche vers **Connexion & équipe**, et déconnexion en un clic',
+    ],
+    amelioration: [
+      '🎭 Le bandeau affiche le **grade réel** avec sa couleur (ou 👑 Propriétaire), à la place du compte de démonstration',
+      '🖼️ Si la photo Discord ne charge pas, les initiales prennent le relais au lieu d\'une image cassée',
+      '⏻ **Bouton de déconnexion directement dans le bandeau**, à côté de votre profil — un clic, une confirmation, c\'est fait',
+      '🔁 **« Changer de compte »** : le site vous déconnecte puis vous renvoie chez Discord, qui vous laisse choisir un autre compte',
+      '🔑 Connecté avec le **mot de passe de secours**, le bandeau le dit clairement et propose de basculer sur votre compte Discord',
+    ],
+    fix: [
+      '🩹 **Le navigateur ne sert plus une version périmée du site** : l\'adresse des fichiers CSS et JavaScript change à chaque mise à jour. Sans ce correctif, une mise à jour pouvait rester invisible tant que le cache n\'était pas vidé à la main',
+    ],
+    retrait: [],
+  },
+  {
+    id: 'site-mobile-menu-2026-08k',
+    title: 'Site : affichage téléphone repensé & menu du profil 📱',
+    ajout: [
+      '📂 **Menu déroulant sur le profil** : aperçu de la page d\'accueil, synchronisation, notifications, mon compte, changer de compte et déconnexion — tout au même endroit',
+      '🚨 **Alerte permanente quand le site n\'est protégé par personne** : elle rappelle que n\'importe qui peut tout modifier, et donne votre identifiant à coller dans `SITE_OWNER_ID`',
+    ],
+    amelioration: [
+      '📱 **Téléphone** : le bandeau ne garde que le nom du site et votre avatar — les boutons ne débordent plus sur le titre',
+      '📐 Formulaires, onglets, cartes et fenêtres s\'empilent sur une colonne ; plus aucun débordement horizontal, quel que soit l\'écran',
+      '💬 Les encarts d\'aide ne découpent plus leurs phrases en colonnes',
+    ],
+    fix: [
+      '🩹 Le voile de fermeture du menu ne couvrait que le bandeau (et non la page) : un clic à côté ne refermait pas le menu',
+    ],
+    retrait: [
+      '🗑️ Les boutons isolés du bandeau (horloge, œil, éclair, losange) : ils sont désormais dans le menu du profil',
+    ],
+  },
+  {
+    id: 'site-perfs-2026-08l',
+    title: 'Site : interface nettement plus fluide ⚡',
+    amelioration: [
+      '⚡ **Frappe 15 fois plus légère** dans le Site builder : l\'aperçu était recalculé à chaque caractère, il ne l\'est plus qu\'une fois par image affichée',
+      '🖼️ **Fin des à-coups au défilement sur téléphone** : sans flou demandé, le fond n\'est plus placé sur une couche graphique séparée qui se repeignait en permanence',
+      '📱 Sur téléphone : moitié moins de particules, plus d\'aura de curseur (inutile sans souris), plus de ligne de scan, et le flou d\'arrière-plan des barres remplacé par un fond opaque',
+      '🖱️ Le suivi de la souris n\'écrit plus dans le style à chaque mouvement, mais une fois par image',
+      '♿ Le réglage système « réduire les animations » est respecté : plus aucune animation ni particule',
+      '🎨 Les réglages d\'apparence ne sont réécrits que s\'ils ont réellement changé (la feuille de style personnalisée n\'est plus réanalysée pour rien)',
+    ],
+    ajout: [],
+    fix: [],
+    retrait: [],
+  },
+  {
+    id: 'site-base-donnees-2026-08m',
+    title: 'Site : vraie base de données & fiche de sanction 🗄️',
+    ajout: [
+      '🗄️ **Base de données MySQL / MariaDB** (ou SQLite si vous n\'avez pas de serveur) : sanctions, preuves, tickets, messages, archives, journal et réglages y sont enregistrés',
+      '📥 **Import automatique** de vos données existantes à la première connexion, et **création des tables** toute seule — rien à faire en SQL',
+      '📂 **Fiche d\'une sanction** : cliquez sur une ligne de la blacklist pour voir motif, gravité, serveur, auteur, date et **toutes les preuves** — images en vignettes (clic pour agrandir), PDF et journaux ouvrables',
+    ],
+    amelioration: [
+      '🔌 La connexion est **testée avant d\'être enregistrée**, avec un message adapté : identifiants refusés, base inexistante, port fermé, extension PHP manquante',
+      '🛟 **Si la base tombe**, le site reste consultable et refuse les modifications avec un message clair, au lieu de les perdre en silence',
+      '🖼️ Une preuve dont le fichier a disparu du serveur est signalée au lieu d\'afficher une image cassée',
+      '🔒 **Un visiteur non identifié ne voit plus que la vue d\'ensemble** : serveurs, blacklist, tickets et espace créateur disparaissent du menu, et forcer l\'adresse d\'une de ces pages ramène à l\'accueil',
+      '👋 La vue d\'ensemble s\'adapte alors : présentation du bot et invitation à se connecter, au lieu de panneaux vides et de boutons qui refusent',
+    ],
+    fix: [],
+    retrait: [],
+  },
+  {
+    id: 'site-mes-serveurs-grade-2026-08n',
+    title: 'Site : vos serveurs et votre grade, récupérés depuis Discord 🌐',
+    ajout: [
+      '🌐 **Le site reconnaît vos serveurs** : à la connexion, ceux où vous êtes réellement présent sont marqués « vous y êtes », avec votre rôle Discord (Propriétaire, Administrateur, Gestionnaire)',
+      '🔀 Bascule **« Mes serveurs / Tous »** quand le bot est sur plus de serveurs que les vôtres',
+      '➕ Section **« Vos serveurs sans le bot »** : ceux que vous administrez et où le bot manque encore, avec le lien d\'invitation',
+      '🎭 **Votre grade réel s\'affiche sur chaque serveur** — Membre, Staff ou Administration selon les rôles configurés **dans le bot**, plus les mentions 🚓 Police et propriétaire, et la liste de vos rôles',
+    ],
+    amelioration: [
+      '🔄 Bouton **Synchroniser** directement sur la page des serveurs',
+      '⚡ Le grade est mémorisé 5 minutes : afficher une page ne relance pas d\'interrogation du bot',
+    ],
+    fix: [],
+    retrait: [],
+  },
+  {
+    id: 'site-gestion-ses-serveurs-2026-08o',
+    title: 'Site : chacun gère ses propres serveurs 🏠',
+    ajout: [
+      '🏠 **Vous administrez un serveur Discord où le bot est présent ? Vous pouvez le configurer**, sans avoir à être ajouté à l\'équipe du site : connectez-vous avec Discord et vos serveurs apparaissent',
+      '🎛️ Les **huit modules** de configuration sont accessibles pour chacun de vos serveurs, ainsi que leurs tickets',
+    ],
+    amelioration: [
+      '🔐 Chacun ne voit et ne modifie que **ses** serveurs : impossible de configurer celui d\'un autre',
+      '💬 Un message explique quoi faire selon la situation : inviter le bot sur son serveur, ou demander à rejoindre l\'équipe',
+    ],
+    fix: [
+      '🩹 **Un propriétaire de serveur ne voyait rien** : l\'accès exigeait d\'être inscrit dans l\'équipe du site, alors qu\'administrer son propre serveur devrait suffire',
+    ],
+    retrait: [],
+  },
+  {
+    id: 'site-diagnostic-acces-2026-08p',
+    title: 'Site : « pourquoi je ne peux rien gérer ? » répond enfin 🩺',
+    ajout: [
+      '🩺 **Panneau de diagnostic** quand l\'accès est refusé : le site affiche ce qu\'il constate — nombre de vos serveurs Discord, ceux que vous administrez, ceux que le bot connaît, votre appartenance à l\'équipe',
+      '🎯 La **cause précise** est nommée et accompagnée du remède : synchronisation jamais faite, bot absent de vos serveurs, ou compte hors de l\'équipe',
+      '📋 Votre identifiant est affiché et copiable, pour être collé dans `SITE_OWNER_ID`',
+    ],
+    amelioration: [
+      '🔎 Le site détecte qu\'il affiche encore des **serveurs de démonstration** — signe qu\'aucune synchronisation n\'a abouti — et le dit clairement au lieu de laisser croire à un problème de droits',
+    ],
+    fix: [],
+    retrait: [],
+  },
+  {
+    id: 'version-2-listes-paginees-2026-08q',
+    title: '🎉 Version 2.0 — listes RP paginées',
+    ajout: [
+      '◀️▶️ **Boutons « Page précédente » et « Page suivante »** de part et d\'autre de la recherche, sur les panneaux **Whitelist RP** et **Blacklist RP**',
+      '📄 **39 entrées par page**, et l\'embed change selon la page — la liste complète est enfin consultable, quel que soit le nombre d\'inscrits',
+      '🔢 Le pied de page indique où vous en êtes : « Page 2/4 — entrées 40 à 78 sur 145 »',
+    ],
+    amelioration: [
+      '🔎 Les **résultats de recherche se paginent aussi** : plus de résultats perdus au-delà de la limite d\'affichage',
+      '📐 Si les motifs sont longs, la page se réduit d\'elle-même pour rester lisible — jamais au prix d\'une entrée coupée',
+    ],
+    fix: [
+      '🩹 **La 40ᵉ entrée n\'est plus tronquée en plein milieu** : la liste était collée d\'un bloc puis coupée à un nombre de caractères fixe, ce qui sectionnait la dernière ligne affichée et masquait tout le reste',
+    ],
+    retrait: [],
+  },
+  {
+    id: 'site-modules-dashboard-2026-08r',
+    title: 'Site : tous les modules configurables, et envoi de messages 🎛️',
+    ajout: [
+      '📋 **Listes déroulantes partout** : salons, catégories et rôles viennent directement de votre serveur Discord — plus rien à taper à la main',
+      '📨 **Constructeur de messages** : texte, embeds (titre, description, auteur, images, champs), boutons et menu déroulant, avec un **aperçu fidèle façon Discord** à côté',
+      '🚀 **Bouton « Envoyer sur Discord »** : le bot publie dans le salon choisi ce que vous venez de composer. Un bouton « Vérifier » valide le rendu sans rien publier',
+      '🤖 **Rôles automatiques à l\'arrivée**, choisis dans la liste des rôles du serveur (plusieurs possibles)',
+      '👋 **Arrivées & départs entièrement personnalisables** : salon, couleur, titre, image de fond, cadre de la photo de profil (vignette, grande image ou aucune) et affichage des informations — avec aperçu',
+    ],
+    amelioration: [
+      '💾 **Les réglages partent enfin dans le bot** : ils ne restaient auparavant que dans le site, sans effet sur Discord',
+      '🎚️ Modules RP, Niveaux, Interactions et Aventure SAO activables d\'un interrupteur',
+      '📁 Onze salons (logs, arrivées, départs, staff, service, niveaux, preuves, partenariats, notes de mise à jour, transcriptions) se choisissent dans une liste',
+    ],
+    fix: [],
+    retrait: [],
+  },
+  {
+    id: 'autorole-visiteur-2026-08s',
+    title: 'Le rôle d\'accueil est enfin donné 🎭',
+    ajout: [
+      '⏱️ **Rattrapage en un clic** : dans ⚙️ Mes serveurs → 🎭 Rôles, le bouton « Donner le rôle à tous les membres » attribue les rôles automatiques à **tout le monde**, y compris ceux arrivés avant que vous ne les configuriez. Ceux qui les ont déjà sont ignorés',
+      '📊 Le site affiche le résultat : combien de membres ont été mis à jour, combien étaient déjà en règle',
+    ],
+    amelioration: [
+      '🧾 Quand un rôle ne peut pas être donné, la raison est écrite dans les logs du bot au lieu d\'échouer en silence : rôle supprimé, rôle placé **au-dessus** de celui du bot, rôle géré par une intégration, ou permission « Gérer les rôles » manquante',
+      '🛡️ Un rôle impossible n\'annule plus les autres — le bot donne tout ce qu\'il peut donner',
+    ],
+    fix: [
+      '🩹 **Les nouveaux membres ne restent plus bloqués en « Visiteur » quand le captcha est actif.** Le rôle automatique n\'était alors jamais attribué : le donner à l\'arrivée aurait contourné la vérification, mais ne jamais le donner laissait le membre sans aucun accès. Il est maintenant attribué **juste après la validation du captcha**',
+    ],
+    retrait: [],
+  },
+  {
+    id: 'blacklist-discord-captcha-2026-08t',
+    title: 'La blacklist du site agit enfin sur Discord 🚫',
+    ajout: [
+      '🌍 **Deux portées au choix** : une blacklist **globale** (tous vos bots) ou ciblée sur **un seul bot**',
+      '📊 **Rapport par bot** après chaque sanction : combien de serveurs, message privé remis ou non — et la raison exacte quand un bot n\'a pas pu',
+      '🔁 **Bouton « Réappliquer sur Discord »** dans la fiche de sanction : rattrape les fiches créées avant cette version, et celles posées pendant qu\'un bot était éteint',
+      '🔢 **Captcha : nombre d\'erreurs tolérées** (3 par défaut) puis **expulsion** — le membre peut revenir et réessayer. L\'expulsion se désactive si vous préférez',
+      '🧹 **Captcha : rôle retiré en cas de réussite**, à choisir dans une liste — typiquement « Visiteur », celui qui bloquait l\'accès',
+      '🔤 **Un code neuf à chaque tentative**, mêlant toujours lettres ET chiffres',
+      '📥 **Les sanctions prononcées sur Discord remontent dans le panel**, avec la preuve saisie par le staff. Automatique en arrivant sur la page, et un bouton « Importer depuis Discord » pour forcer',
+      '🏷️ Chaque fiche indique son **origine** : 💬 Discord ou 🖥️ Panel',
+    ],
+    amelioration: [
+      '🗑️ Retirer une sanction **débannit** l\'utilisateur des serveurs concernés, au lieu de seulement effacer la fiche',
+      '🔄 **La synchronisation va dans les deux sens** : panel → Discord et Discord → panel. Une sanction levée sur Discord est *signalée* sur sa fiche, jamais supprimée — les preuves téléversées restent. Un bot éteint n\'est pas confondu avec une sanction levée',
+      '🧩 Réimporter ne crée jamais de doublon : l\'identifiant de fiche est déduit de l\'identifiant Discord',
+      '⚡ **Les pop-ups du site ne rament plus** : le décor animé du fond est mis en pause tant qu\'une fenêtre est ouverte. Mesuré sur un appareil lent : 850 ms de travail par 3 s → 69 ms',
+      '📱 La page derrière une pop-up ne défile plus sous le doigt sur téléphone',
+    ],
+    fix: [
+      '🩹 **La blacklist du site n\'était qu\'une fiche** : rien n\'était transmis aux bots, l\'utilisateur sanctionné pouvait rester sur vos serveurs. Elle est maintenant appliquée sur Discord au moment de l\'enregistrement, et refusée si aucun bot ne peut l\'appliquer — plus de fiche « fantôme »',
+      '🩹 **N\'importe qui pouvait valider le captcha d\'un autre** : le bouton porte désormais l\'identifiant du membre à qui il s\'adresse',
+      '🩹 Le code de vérification pouvait ne contenir **que des lettres** (une fois sur trois) : les caractères sont maintenant tirés pour garantir le mélange, et les signes ambigus (I, L, O, 0, 1) restent exclus',
+      '🩹 Le flou d\'arrière-plan des pop-ups n\'était jamais désactivé sur téléphone : la règle prévue pour ça visait le mauvais élément',
+    ],
+    retrait: [],
+  },
+  {
+    id: 'antispam-exemptions-2026-08u',
+    title: 'Anti-spam : des salons laissés tranquilles 🔕',
+    ajout: [
+      '🔕 **Salons épargnés par l\'anti-spam**, à choisir dans une liste (plusieurs possibles) : pour vos salons de flood, de commandes ou de comptage, où enchaîner les messages est normal',
+      '🗂️ **Catégories entières épargnées** : tout ce qu\'elles contiennent l\'est aussi, y compris les fils',
+      '🧵 Un **fil** hérite de son salon : inutile de l\'ajouter à la main',
+      '🤝 Option séparée pour **désactiver aussi le filtre arnaques et invitations** dans ces salons — utile pour un salon de partenariats, où poster une invitation Discord est le but',
+    ],
+    amelioration: [
+      '🛡️ Par défaut, un salon épargné reste protégé des **liens d\'arnaque et des invitations** : seule la limite de fréquence y est levée. Il faut le demander explicitement pour aller plus loin',
+      '📋 L\'interrupteur Anti-spam explique désormais ce qu\'il fait : plus de 5 messages en 7 secondes, et le staff n\'est jamais concerné',
+    ],
+    fix: [],
+    retrait: [],
+  },
+  {
+    id: 'niveaux-tickets-logs-2026-08v',
+    title: 'Un seul niveau, tickets relancés et logs plus propres 📊',
+    ajout: [
+      '🔔 **Bouton « Relancer » sur les tickets** : le bot repingue l\'auteur avec un message taquin tiré au hasard (« Je crois que vous êtes passé sous un tunnel 🚇 »). Réservé au staff',
+      '📋 **Réponses types** (`/preset ajouter|modifier|supprimer|liste|apercu|menu`) : écrivez vos messages récurrents une fois, puis envoyez-les dans un ticket depuis une **liste déroulante**. Texte, embed, ou les deux — avec `{membre}`, `{staff}` et `{serveur}` remplacés à l\'envoi',
+      '🚨 **Les échantillons anti-scam sont communs à tous vos bots** : ajouté sur l\'un, il protège tous les autres. Seules les empreintes circulent, jamais les images',
+    ],
+    amelioration: [
+      '📊 **L\'écrit et le vocal ne font plus qu\'un seul niveau.** Vos XP existantes sont additionnées et le niveau recalculé — rien n\'est perdu. `/niveau voir` montre une barre de progression et le détail des deux sources ; `/niveau classement` n\'a plus d\'option à choisir',
+      '📥 **Plus rien à synchroniser à la main** : les sanctions Discord et les échantillons anti-scam remontent au chargement du site, puis toutes les 5 minutes. Rien ne part si l\'onglet est en arrière-plan',
+    ],
+    fix: [
+      '🩹 **Dans les logs, l\'« Après » était collé au texte d\'avant, dans la même citation.** `>>>` ouvre sur Discord une citation qui s\'étend jusqu\'à la fin du message : le titre et le nouveau texte y étaient aspirés. Avant/Après sont maintenant deux champs distincts — de même pour la ligne des pièces jointes d\'un message supprimé',
+      '🔇 **Fin des logs qui ne disent rien** : plus de « Auteur inconnu / Contenu indisponible » pour un message hors cache, et plus aucun log pour une suppression **dans le salon de logs** — effacer un vieux log y créait un nouveau log',
+    ],
+    retrait: [],
+  },
+  {
+    id: 'accueil-style-banniere-2026-08w',
+    title: 'Un accueil qui a de l\'allure 🎨',
+    ajout: [
+      '🎨 **Style d\'accueil « Détaillé »** : un vrai panneau de bienvenue composé tout seul — présentation du serveur, renvoi vers le règlement et vers le staff, nom du membre et **numéro d\'inscription**, ligne d\'auteur et pied de page',
+      '📌 **Salon du règlement** et **💡 salon d\'aide** à choisir dans une liste : ils sont cités automatiquement, et utilisables partout via `{regles}` et `{support}`',
+      '🖼️ **Bannière fabriquée par le bot** : photo de profil ronde, pseudo, numéro de membre et nom du serveur dessinés sur un fond de votre choix',
+    ],
+    amelioration: [
+      '👁️ **L\'aperçu suit vos réglages en direct**, avant d\'enregistrer : changez le style, un salon ou la couleur, l\'aperçu se met à jour aussitôt',
+      '🔤 L\'aperçu affiche enfin le **gras et l\'italique** au lieu des `**astérisques**`',
+    ],
+    fix: [
+      '🩹 **Les pseudos accentués ou décorés ne sortiront pas en « □□□□ » sur la bannière.** Les polices d\'image ne connaissent que l\'alphabet latin sans accent : « Émilie » devient « Emilie », et un pseudo entièrement intraçable laisse place au nom d\'utilisateur plutôt qu\'à des carrés',
+    ],
+    retrait: [],
+  },
+  {
+    id: 'identite-embeds-2026-08x',
+    title: 'Votre identité sur TOUS les embeds 🎨',
+    ajout: [
+      '🎨 **Module « Identité des embeds »** : une couleur d\'accent et une signature appliquées à **tout ce que le bot envoie** — arrivées, logs, sanctions, tickets, niveaux, réponses de commandes. Un seul réglage, partout à la fois',
+      '✍️ **Signature en pied de page** « NomDuBot • NomDuServeur » avec l\'icône du serveur, et horodatage automatique',
+      '👁️ Aperçu montrant **trois messages de natures différentes** côte à côte, pour voir l\'effet avant d\'enregistrer',
+    ],
+    amelioration: [
+      '🎯 **Les couleurs qui portent un sens sont respectées par défaut** : rouge pour une sanction, vert pour une réussite, orange pour un avertissement. Une option « même couleur pour tous » permet de tout uniformiser si vous préférez',
+      '🤝 Un pied de page déjà écrit par le bot (« Page 2/4 », « Relancé par… ») n\'est jamais remplacé',
+      '🔌 Tout est désactivable par serveur, d\'un seul interrupteur',
+    ],
+    fix: [],
+    retrait: [],
+  },
+  {
+    id: 'esthetique-listes-2026-08y',
+    title: 'Une esthétique commune, et rattrapable 🧱',
+    ajout: [
+      '🧱 **Grammaire visuelle partagée** pour les listes du bot : en-tête `◆ 🌟 · **Grade** • 2 membres`, entrées en `➜`, séparateurs entre sections, et *Aucun membre* en italique quand c\'est vide',
+      '🕒 **Pied de page unifié** : « 1972 membres • Mis à jour à 16:07 • Page 1/2 », le même partout',
+      '🎨 **Ligne d\'identité en haut de chaque embed** : nom et icône du serveur, pour que l\'identité soit visible en permanence',
+      '🪄 **`/esthetique appliquer`** : réhabille les messages **déjà envoyés** par le bot avec l\'identité actuelle — au choix sur un salon ou tout le serveur',
+    ],
+    amelioration: [
+      '🛡️ `/esthetique` ne touche QUE l\'habillage : titre, texte, champs, images et boutons restent identiques au caractère près',
+      '🧠 Ce qui porte du sens est préservé : un pied de page « Page 2/4 » ou une ligne « Avis de @membre » ne sont jamais remplacés — seule la signature d\'identité l\'est',
+      '📋 Liste du staff du bot et whitelist reprises dans le nouveau format',
+    ],
+    fix: [],
+    retrait: [],
+  },
+  {
+    id: 'embeds-carte-2026-08z',
+    title: 'Des embeds qui ne ressemblent plus a ceux de Discord 🖼️',
+    ajout: [
+      '📏 **Filet sous le titre** sur chaque embed : la fine ligne qui separe le titre du texte, celle qui donne l\'allure « carte » au lieu d\'un bloc brut',
+      '🖼️ **Banniere de bas de carte** : une image large qui termine chaque embed, comme une signature visuelle. Un embed qui a deja son image la garde',
+    ],
+    amelioration: [
+      '🎛️ Les deux se reglent depuis le site, avec un apercu de trois messages cote a cote — plus besoin de s\'occuper des couleurs message par message',
+      '🛟 Le filet n\'est pose que s\'il reste de la place : jamais au prix d\'un texte tronque',
+    ],
+    fix: [],
+    retrait: [],
+  },
+  {
+    id: 'embeds-sections-2026-08aa',
+    title: 'Fini la grille de champs de Discord 🧱',
+    ajout: [
+      '🧱 **Les champs d\'embed deviennent des sections** : au lieu de la grille de petites etiquettes grises de Discord, chaque information s\'affiche en `◆ **Intitule**` puis `➜ valeur`, separee par un filet. C\'est ce qui restait de « Discord de base » — ca s\'applique a TOUS les embeds, meme ceux que personne ne reconstruit',
+      '📏 **Longueur du filet reglable** (6 a 30 signes)',
+    ],
+    amelioration: [
+      '🛟 Rien n\'est jamais perdu : si le tout ne tient pas dans une description, les champs sont conserves tels quels',
+      '💬 Une valeur deja mise en forme (citation, liste) garde sa forme au lieu de recevoir une fleche en double',
+    ],
+    fix: [
+      '🩹 **Le filet sous le titre debordait sur telephone** : a 28 signes il repassait a la ligne et affichait deux traits l\'un sous l\'autre. Ramene a 16, et le meme exces corrige sur le separateur des listes',
+      '🩹 Sur le site, les interrupteurs des reglages **actifs par defaut** s\'affichaient eteints : ils mentaient sur l\'etat reel du bot, et le premier clic les eteignait pour de bon',
+    ],
+    retrait: [],
+  },
+  {
+    id: 'esthetique-anciens-2026-08ab',
+    title: 'Les anciens messages passent au nouveau style 🎨',
+    ajout: [
+      '🎨 `/esthetique appliquer` **reconstruit** desormais les anciens embeds au lieu de simplement les repeindre : les champs deviennent des sections `◆` / `➜`, le filet et la banniere sont poses, la signature refaite. Un vieux message devient rigoureusement identique a un message envoye aujourd\'hui',
+      '🗂️ **Rien n\'est perdu** : le contenu de l\'ancien embed sert de reserve d\'informations — titre, texte, intitule et valeur de chaque champ, liens, images. Seule la forme change',
+    ],
+    amelioration: [
+      '♻️ Les embeds sont refaits **sur place**. Un bot peut reecrire integralement ses propres embeds : supprimer puis republier aurait donne le meme resultat visuel, mais aurait detruit les reactions, les epingles, les reponses accrochees et les liens partages vers ces messages — et remonte de vieux messages en bas des salons',
+      '🕰️ La date affichee reste **celle du message**, pas celle du rehabillage : un message de mars ne se retrouve plus date d\'aujourd\'hui',
+      '📊 Le compte rendu detaille ce qui a ete refait, serveur par serveur',
+    ],
+    fix: [
+      '🩹 **Les vieux filets de 28 signes restaient en place** : le style avait change, le trait trop long non — c\'est ce qui donnait l\'impression de « toujours les vieilles embeds ». Tous les filets, celui du haut comme ceux qui separent les sections, sont remis a la longueur du jour',
+      '🩹 Un message deja au bon format etait **re-modifie a chaque passage** de la commande : la comparaison dependait de l\'ordre des cles JSON, que la reecriture changeait. Le compte « deja au bon format » restait donc a zero',
+      '🩹 La liste des serveurs du compte rendu affichait une **double fleche** `➜ ➜`',
+    ],
+    retrait: [],
+  },
+  {
+    id: 'da-couleurs-neutres-2026-08ac',
+    title: 'Cette note est la premiere a porter le nouveau style 🎨',
+    ajout: [
+      '🎨 **La note de mise a jour passe a la direction artistique** : sections `◆` / `➜` au lieu de la grille de champs grise, filet entre les rubriques, accent du serveur, signature du bot. C\'est le message que vous voyez le plus souvent : c\'etait a lui de montrer l\'exemple',
+    ],
+    amelioration: [
+      '🎯 **Une couleur neutre n\'est plus prise pour un choix.** Le bleu de Discord, le bleu « info », les gris de carte, le noir et le blanc etaient poses faute de mieux — mais l\'identite les voyait comme des decisions et n\'y touchait pas. Resultat : l\'accent du serveur n\'apparaissait presque jamais. Ces couleurs sont desormais traitees comme du vide, et **34 embeds** prennent enfin les couleurs du serveur',
+      '🔴 **Ce qui a un sens reste intact** : rouge pour une sanction, vert pour une reussite, jaune pour une alerte, or pour une recompense. **80 embeds** gardent leur couleur',
+      '♻️ `/esthetique appliquer` rattrape aussi les anciens messages restes au bleu de Discord',
+    ],
+    fix: [
+      '🩹 **Les pieds de page decoratifs prenaient la place de la signature** : « Note de mise a jour du bot » sous un titre « Note de mise a jour », « Annonce automatique de mise a jour » sous « Mise a jour prete ». Ils ne disaient rien de neuf et empechaient « NomDuBot • NomDuServeur » de se poser',
+    ],
+    retrait: [],
+  },
+  {
+    id: 'cartes-sans-bordure-2026-08ad',
+    title: 'Fini la barre de couleur a gauche des messages 🃏',
+    ajout: [
+      '🃏 **Les messages ne sont plus des embeds mais des cartes.** La barre verticale coloree collee au bord gauche de chaque embed n\'est pas un reglage : elle fait partie du composant. La seule facon de s\'en debarrasser etait de ne plus envoyer d\'embed du tout — c\'est desormais le cas',
+      '📏 **De vrais separateurs.** Nos « ───── » etaient dessines a la main : leur largeur dependait de la taille de police du lecteur, d\'ou les traits casses en deux sur telephone. Discord trace maintenant lui-meme le filet, a la largeur exacte de la carte',
+      '🕰️ **L\'heure s\'affiche dans le fuseau de chaque lecteur**, plus dans celui du serveur',
+      '🎛️ Deux reglages sur le site : **Cartes sans bordure** (actif par defaut) et **Barre coloree a gauche** pour ceux qui la preferent, avec apercu en direct',
+      '♻️ `/esthetique appliquer` recoit une option **mode** : « recreer » republie les anciens messages en cartes',
+    ],
+    amelioration: [
+      '🛟 **Si Discord refuse une carte, le message part quand meme** dans l\'ancien style : jamais de message perdu. Apres trois refus, le bot cesse d\'insister',
+      '🗂️ **Aucune troncature silencieuse** : une carte trop longue (plus de 4000 signes ou 40 composants) n\'est pas convertie, l\'embed complet est envoye tel quel',
+      '🔘 Les boutons et menus deja presents sont conserves, au meme endroit',
+    ],
+    fix: [],
+    retrait: [],
+  },
+  {
+    id: 'balises-barres-2026-08ae',
+    title: 'Tapez « && », le bot trace une barre 🏷️',
+    ajout: [
+      '🏷️ **Une mise en forme qui tient en quatre signes.** En debut de ligne : `&&` trace une barre, `&& Titre` trace une barre puis un titre de section ◆, `&>` fait une entree de liste ➜, `&&&` aere davantage. Plus besoin de connaitre la grammaire du bot pour ecrire un beau message',
+      '📐 **La barre est un vrai separateur** quand les cartes sont actives : Discord la trace lui-meme, sur toute la largeur, au lieu d\'une suite de tirets qui cassait sur telephone',
+      '📖 **Le rappel est la ou vous ecrivez** : encart avec exemple avant/apres sur le site, ligne de rappel dans l\'editeur d\'embed, et mention dans les options de `/preset`',
+    ],
+    amelioration: [
+      '🧩 Actif partout ou l\'on ecrit du texte : message d\'arrivee, message de depart, panneau de tickets, reponses types, editeur d\'embed',
+      '🛡️ **Votre code reste intact** : une balise n\'est lue qu\'en debut de ligne et jamais dans un bloc de code, donc un `if (a && b)` dans une reponse type n\'est pas coupe en deux',
+      '🧹 Une barre qui ne separe rien — en tete, en queue, ou deux d\'affilee — est retiree automatiquement',
+      '👤 Les balises sont appliquees avant les variables : un pseudo contenant « && » ne devient pas une barre au milieu du message',
+    ],
+    fix: [],
+    retrait: [],
+  },
+  {
+    id: 'entete-panneau-2026-08af',
+    title: 'Un vrai en-tete de panneau 🔠',
+    ajout: [
+      '🔠 **Le titre ouvre la carte, en grand.** Il passe en titre de niveau 1 : un en-tete large et lisible, comme sur un vrai panneau, au lieu d\'un titre noye dans le texte',
+      '🎛️ Reglage **Taille du titre** sur le site : « grand » (defaut) ou « moyen » pour rester discret',
+    ],
+    amelioration: [
+      '🧹 **Le nom du serveur ne s\'affiche plus deux fois.** Il etait ecrit en haut de carte ET dans la signature en bas : la meme information repetee, qui ecrasait le titre. Seule la signature reste. Une ligne porteuse de sens (« Avis de @membre ») est evidemment conservee',
+      '👀 L\'apercu du site montre les deux reglages en direct',
+    ],
+    fix: [],
+    retrait: [],
+  },
+  {
+    id: 'mentions-notes-2026-08ag',
+    title: 'Les notes de version ne sonnent plus chez personne 🔕',
+    ajout: [
+      '🔔 **Reglage « Mentionner a chaque note »** : personne, `@everyone`, `@here`, ou **un role precis** de votre serveur',
+      '⚙️ Disponible **dans `/config` → Salons → 📝 Salon des patch notes** ET sur le site : le reglage etait sur le site uniquement, donc invisible pour qui configure depuis Discord',
+    ],
+    amelioration: [
+      '🔕 **Par defaut, aucune mention.** Une note de version ne justifie pas de faire sonner le telephone de tout le serveur — c\'est le genre de notification qui fait couper le salon. Le silence est desormais le comportement par defaut, et c\'est a vous de demander autre chose',
+      '🛡️ **Sans mention, rien ne peut sonner** : meme un pseudo ou un role cite dans le texte de la note ne notifie personne',
+      '🎯 La mention est decidee **par serveur**, plus par l\'entree du journal : deux serveurs peuvent avoir des reglages differents pour la meme note',
+    ],
+    fix: [
+      '🩹 **Le `@here` etait envoye d\'office** a chaque nouvelle version, et `@everyone` sur le recapitulatif complet — sans qu\'aucun reglage ne permette de l\'eviter',
+    ],
+    retrait: [
+      '➖ Plus aucune mention codee en dur dans le bot',
+    ],
+  },
+  {
+    id: 'apercu-editable-2026-08ah',
+    title: 'Ecrivez directement dans l\'apercu ✍️',
+    ajout: [
+      '✍️ **L\'apercu du tableau de bord est devenu la zone de saisie.** Cliquez sur le titre ou le texte de la carte et ecrivez : plus de formulaire d\'un cote et d\'apercu de l\'autre. Pendant la frappe vous voyez le texte brut (les `&&` restent lisibles), et des que vous sortez de la zone tout est rendu — comme la zone de message de Discord',
+      '🃏 **L\'apercu montre enfin une vraie carte** : pas de barre coloree, grand titre, separateurs traces, sections `◆` / `➜`, signature du bot. L\'ancien apercu dessinait un embed classique, il ne ressemblait plus au resultat',
+      '📊 **Une jauge de longueur** previent avant la limite des cartes : au-dela, Discord refuse la carte et le message part en embed classique',
+      '🎨 L\'apercu des reglages d\'identite passe au meme moteur : changer l\'accent, le filet ou la barre se voit immediatement sur trois messages de natures differentes',
+    ],
+    amelioration: [
+      '🔗 **Le site et le bot partagent le MEME code de rendu.** Les trois modules qui decident de l\'apparence tournent des deux cotes, et un test echoue si les copies different d\'un seul octet. C\'est ce qui permet de promettre que l\'apercu ne ment pas',
+      '🏷️ Le texte ecrit depuis le tableau de bord passe par les balises, comme partout ailleurs : `&&` trace une barre a l\'envoi comme dans l\'apercu',
+      '🔒 La signature et l\'image de bas de carte ne sont pas modifiables dans l\'apercu : elles sont posees par l\'identite, pas ecrites par vous',
+    ],
+    fix: [
+      '🩹 L\'apercu du constructeur de messages affichait encore l\'ancien style — barre coloree a gauche et grille de champs grise — alors que le bot envoyait des cartes depuis plusieurs versions',
+    ],
+    retrait: [],
+  },
+  {
+    id: 'esthetique-bloquee-2026-08ai',
+    title: '/esthetique restait bloquee sur « chargement » ⏳',
+    ajout: [],
+    amelioration: [
+      '⏱️ **L\'avancement s\'affiche vraiment** : serveur et salon en cours, compteurs, et le temps restant avant l\'arret automatique. Avant, le point d\'avancement n\'etait envoye qu\'apres une modification — sur un serveur ou le bot a peu ecrit, l\'ecran restait muet pendant tout le balayage',
+      '🛡️ **Un serveur en echec n\'emporte plus le balayage** : il est signale dans la liste et les autres continuent',
+      '📨 Si la reponse a malgre tout expire, le compte rendu arrive **en message prive** plutot que de disparaitre',
+    ],
+    fix: [
+      '🩹 **La commande pouvait rester sur « chargement » pour toujours.** Un jeton d\'interaction Discord vit 15 minutes ; au-dela, la reponse ne peut plus etre modifiee et l\'echec etait avale silencieusement. Sur un serveur fourni — beaucoup de salons, 250 ms par message modifie — le balayage depassait ce delai. Il s\'arrete desormais a 13 minutes et rend compte de ce qui a ete fait',
+      '🩹 **Le compte rendu explique enfin pourquoi la barre coloree est toujours la.** En mode « modifier », un ancien embed reste un embed : Discord fige la famille de composants d\'un message a sa creation. La commande travaillait bien, mais rien ne changeait a l\'oeil. Elle indique maintenant combien de messages sont concernes et comment les convertir',
+      '🩹 Si le membre « bot » n\'etait pas en cache, TOUS les salons etaient declares illisibles et la commande se terminait sur « rien a changer » sans avoir rien regarde',
+    ],
+    retrait: [],
+  },
+  {
+    id: 'esthetique-sans-decompte-2026-08aj',
+    title: 'Plus de decompte sur /esthetique ⏱️',
+    ajout: [],
+    amelioration: [
+      '🏁 **Le balayage va jusqu\'au bout**, quel que soit le nombre de salons. Il s\'arretait a 13 minutes pour pouvoir encore afficher son compte rendu — la reponse d\'une commande Discord expirant au bout de 15 minutes. Mais cette limite ne contraint que l\'AFFICHAGE, pas le travail',
+      '📬 **Le compte rendu arrive en message prive** si le balayage a dure plus longtemps que la reponse. La destination est annoncee des le lancement, pour ne pas laisser croire a une commande plantee',
+      '⏱️ **Plus de decompte a l\'ecran** : il affichait le temps restant avant un arret qui n\'a plus lieu d\'etre. C\'est le temps ecoule qui s\'affiche desormais, avec le serveur et le salon en cours',
+      '🏁 **Aucune echeance, plus du tout.** La fin de mission du bot, c\'est d\'avoir fait ce qu\'on lui a demande. Le travail est fini par nature — serveurs × salons × messages — donc toute borne de temps ne pouvait que le tronquer',
+      '📨 Si le balayage depasse la duree de la reponse, un message prive previent que **ca continue**, puis le compte rendu arrive a la fin. Vingt minutes d\'ecran fige passeraient pour une commande plantee',
+      '🕰️ Une longue duree s\'affiche en minutes : « en 71 min 12 s » plutot que « en 4272 s »',
+    ],
+    fix: [],
+    retrait: [
+      '➖ L\'arret automatique a 13 minutes, qui tronquait les gros balayages',
+      '➖ Le garde-fou d\'une heure, qui abandonnait le travail en cours',
+    ],
+  },
+  {
+    id: 'reponses-differees-2026-08ak',
+    title: 'Les commandes lentes rendaient encore de vieux embeds 🩹',
+    ajout: [],
+    amelioration: [
+      '🃏 **Le compte rendu de `/esthetique` est enfin une carte**, comme tout le reste — c\'etait le comble pour la commande qui refait l\'esthetique',
+    ],
+    fix: [
+      '🩹 **Toute commande qui travaille plus de 3 secondes rendait un embed a l\'ancienne**, barre coloree comprise. La raison etait invisible sans regarder la couche reseau : `deferReply` cree deja le message (« reflechit… »), et Discord fige la famille de composants d\'un message a sa creation. Tout ce qui arrivait ensuite par modification ne pouvait donc plus etre une carte',
+      '🩹 Corrige sur `/esthetique`, `/musique`, `/temps` et les interactions RP : le message d\'attente est referme, et le contenu part en envoi — donc en carte',
+    ],
+    retrait: [],
+  },
+  {
+    id: 'listes-rp-tickets-2026-08al',
+    title: 'Les listes RP et les tickets rejoignent la refonte 📋',
+    ajout: [],
+    amelioration: [
+      '📋 **Les listes Whitelist et Blacklist RP passent a la grammaire du bot** : entrees marquees `➜` au lieu d\'une numerotation, en-tete de section `◆` avec le compte, pied de page unifie. Le pseudo Roblox est mis en avant, la raison passe en sous-texte',
+      '🧹 **L\'identifiant brut disparait des lignes** : la mention le portait deja, et il occupait a lui seul un cinquieme de la largeur sur telephone',
+      '🎫 **L\'embed d\'ouverture d\'un ticket** suit la meme grammaire : une phrase d\'accueil, puis une section `◆` qui dit qui repond',
+      '♻️ **Les panneaux se reparent tout seuls.** Un panneau publie a l\'epoque des embeds ne peut pas devenir une carte par modification — Discord fige la famille de composants a la creation. A la premiere modification, il est donc republie UNE fois, puis tout reprend normalement. Vaut pour les listes RP comme pour les panneaux de tickets',
+      '🕰️ L\'heure de mise a jour n\'est plus ecrite deux fois : la carte porte deja un horodatage, affiche a l\'heure de chaque lecteur',
+    ],
+    fix: [
+      '🩹 **Le nom du serveur s\'affichait au-dessus du titre** des listes alors qu\'il n\'ajoutait rien : c\'est de l\'identite, pas du sens, et il ecrasait le titre',
+      '🩹 **`compte: null` etait ignore** : les sections qui demandaient a ne pas etre comptees affichaient quand meme « • 2 membres ». Le compte rendu de `/esthetique` en souffrait aussi',
+      '🩹 Le pied de page « Utilisez le bouton ci-dessous pour fermer le ticket » repetait le libelle du bouton juste en dessous, et prenait la place de la signature',
+    ],
+    retrait: [],
+  },
+  {
+    id: 'actions-staff-tickets-2026-08am',
+    title: 'Un menu « Actions staff » dans chaque ticket 🛠️',
+    ajout: [
+      '🛠️ **Menu deroulant dans le message du ticket**, avec sept actions : `🚀 Ticket pris en charge`, `🔓 Ticket libere`, `➕ Ajouter un membre`, `➖ Retirer un membre`, `🔔 Avez-vous toujours besoin de ce ticket ?`, `ℹ️ Ticket` (les details), `🗑️ Supprimer le ticket`',
+      '🚀 **Prise en charge** : un membre du staff s\'assigne le ticket, et tout le monde voit qui s\'en occupe. Une reprise indique qui l\'avait avant',
+      'ℹ️ **Fiche du ticket** : demandeur, responsable, date d\'ouverture, etat — a l\'heure de chaque lecteur',
+      '👥 **Ajouter / retirer un membre** via un selecteur de membres natif : plus besoin de retenir une commande',
+    ],
+    amelioration: [
+      '🔒 **Reserve au staff DU SERVEUR** : le grade staff, ou l\'un des roles support du type de ticket. Rien a voir avec l\'equipe du bot, celle qu\'on previent des mises a jour. Le menu est visible de tous — Discord ne sait pas masquer un composant par role — mais chaque action verifie les droits et refuse en prive',
+      '🛡️ **Le demandeur ne peut pas etre retire de son propre ticket** : il faut le fermer, ce qui archive la conversation',
+      '⚠️ **La suppression demande confirmation** et rappelle que « Fermer le ticket » archive avant de supprimer, la ou « Supprimer » efface tout',
+      '🔁 Le menu se remet a zero apres chaque action : on peut rechoisir la meme deux fois de suite',
+    ],
+    fix: [],
+    retrait: [],
+  },
+  {
+    id: 'esthetique-status-2026-08an',
+    title: 'Savoir ou en est l\'esthetique : `/esthetique status` 🩺',
+    ajout: [
+      '🩺 **Nouvelle sous-commande `/esthetique status`** : elle ne modifie rien, elle raconte ou en est le bot',
+      '🃏 **Discord accepte-t-il encore les cartes ?** C\'etait un angle mort complet : apres trois refus le bot repasse aux embeds classiques SILENCIEUSEMENT. On aurait cherche longtemps pourquoi la barre coloree etait revenue partout',
+      '🌍 **Les reglages reellement en vigueur, serveur par serveur** : cartes ou embeds, barre ou pas, taille de titre, accent, et ce qui est desactive',
+      '🕰️ **Le dernier passage de la commande** : quand, par qui, dans quel mode, et ce qu\'il a fait',
+      '⚠️ **Ce qui reste a convertir** : combien de messages gardaient leur barre coloree, et la commande exacte pour les passer en cartes',
+    ],
+    amelioration: [
+      '🛡️ La memoire du dernier passage est un confort : si la base bronche, la commande fonctionne quand meme au lieu de disparaitre',
+    ],
+    fix: [
+      '🩹 **Double fleche `➜ ➜`** dans deux sections de `/esthetique`. Plutot que de la corriger une troisieme fois, `entree()` est devenue idempotente : un texte qui porte deja sa fleche ressort tel quel, et l\'erreur est desormais impossible',
+    ],
+    retrait: [],
+  },
+  {
+    id: 'echec-interaction-cartes-2026-08ao',
+    title: '« Echec de l\'interaction » sur les boutons 🩹',
+    ajout: [],
+    amelioration: [],
+    fix: [
+      '🩹 **Les boutons « Rendre » des animations echouaient** — pat, kiss, hug, toutes. Le message part en carte, et une carte n\'a ni texte ni embed : TOUT son contenu vit dans ses composants. Retirer les boutons revenait donc a vider le message, ce que Discord refuse. D\'ou « Echec de l\'interaction », sans la moindre trace cote bot',
+      '🩹 **Le meme defaut touchait bien plus que les animations** : `/config` (navigation entre categories), l\'aventure SAO, les tickets du QG, les partenariats, le constructeur d\'embed, les patch notes — soit **67 endroits** ou un bouton met un message a jour. Tous corriges d\'un coup',
+      '🩹 Si une mise a jour est malgre tout refusee, le bot accuse desormais reception au lieu de laisser « Echec de l\'interaction » a l\'ecran',
+    ],
+    retrait: [],
+  },
+  {
+    id: 'panneaux-recrees-2026-08ap',
+    title: 'Convertir un panneau ne le casse plus 🔗',
+    ajout: [],
+    amelioration: [
+      '🔗 **Un panneau republie reste un panneau.** `/esthetique appliquer mode:Recreer` supprime le message et en renvoie un neuf : les tables qui referencent les panneaux de tickets et les listes Whitelist / Blacklist RP suivent desormais le nouvel identifiant',
+      '🩹 Sans cela, la liste Whitelist aurait cesse de se mettre a jour a chaque ajout, et « /ticket panneau modifier » aurait repondu « panneau introuvable » — **sans le moindre message d\'erreur** au moment de la conversion',
+      '♻️ Rappel : les panneaux se reparent aussi tout seuls. La liste RP se republie au prochain ajout ou retrait, le panneau de tickets a la prochaine modification. Aucun besoin de les recreer a la main',
+    ],
+    fix: [],
+    retrait: [],
+  },
+  {
+    id: 'esthetique-un-message-2026-08aq',
+    title: 'Refaire UN message precis : `/esthetique message` 🎯',
+    ajout: [
+      '🎯 **Nouvelle sous-commande `/esthetique message`** : plus besoin de balayer tous les serveurs pour reprendre un seul panneau',
+      '🔗 **Par lien** : clic droit sur le message → « Copier le lien » → collez-le dans l\'option `lien`. La paire « salon-message » du bouton « Copier l\'ID » marche aussi',
+      '📋 **Par selection** : sans lien, le bot demande le salon puis propose les messages — **uniquement les siens**, avec leur titre et leur date de publication',
+      '🎛️ Les options **mode** et **couleurs** de `appliquer` sont disponibles ici aussi',
+    ],
+    amelioration: [
+      '🚫 **Les messages intouchables ne sont pas proposes** : ceux d\'un membre, ceux d\'un autre bot, et ceux deja en carte. Proposer un choix qui ne peut que refuser n\'aide personne',
+      '💬 **Chaque refus dit pourquoi et quoi faire** : message d\'un autre auteur, deja converti, identite desactivee, lien mal copie, salon hors de portee',
+      '🔁 Le lien du message traite est rappele dans la reponse : un clic pour verifier le resultat',
+    ],
+    fix: [],
+    retrait: [],
+  },
+  {
+    id: 'logs-pieces-jointes-2026-08ar',
+    title: 'Les images supprimees sont conservees 📎',
+    ajout: [
+      '📎 **La piece jointe d\'un message supprime est desormais RECUPEREE et RENVOYEE avec le journal.** L\'image reste visible, en grand, exactement comme dans le message d\'origine',
+      '🖼️ Nom et taille de chaque fichier sont indiques, avec ce qui a pu etre conserve ou non',
+    ],
+    amelioration: [
+      '⚠️ **Noter l\'URL ne servait a rien** : un lien de piece jointe Discord est signe et meurt avec son message. Quelques minutes apres la suppression, le journal n\'affichait plus qu\'un lien mort — la preuve disparue au moment precis ou l\'on en aurait besoin',
+      '🛟 **Trois garde-fous** : un plafond de 8 Mo (limite de televersement d\'un bot), un delai de 6 secondes pour ne pas retarder le journal, et jamais d\'echec silencieux — un fichier perdu est ecrit noir sur blanc',
+      '📦 Jusqu\'a 10 fichiers par message, comme Discord l\'autorise ; au-dela, le nombre restant est indique au lieu d\'etre passe sous silence',
+      '🧱 Le journal de suppression passe aussi a la grammaire du bot : sections `◆` pour l\'auteur et le salon',
+    ],
+    fix: [],
+    retrait: [],
+  },
+  {
+    id: 'archives-sans-limite-2026-08as',
+    title: 'Les fichiers supprimes sont archives, sans limite de taille 💾',
+    ajout: [
+      '💾 **Plus aucun plafond de taille.** Le fichier d\'un message supprime est telecharge et ecrit sur l\'hebergeur, qu\'il pese 20 Ko ou 400 Mo. La base ne garde que la fiche — qui, quand, ou, et l\'emplacement du fichier',
+      '📂 **Les archives se relisent depuis le tableau de bord** : liste par serveur, et telechargement du fichier d\'origine',
+      '📊 Un etat des archives donne le nombre de fichiers, la place occupee et la place restante',
+    ],
+    amelioration: [
+      '📎 **Un fichier trop lourd pour Discord est archive quand meme.** Avant, au-dela de 8 Mo, il etait simplement perdu. Desormais il est conserve : seul son reaffichage dans le journal est impossible, et le journal le dit (`💾 archive sur l\'hebergeur`)',
+      '🗄️ **Pourquoi pas le fichier en base ?** Un SQLite gonfle de videos devient lent pour TOUT le bot : chaque lecture de configuration trainerait le poids des archives. Le disque sait faire ca, pas une base',
+      '⏱️ Le delai de telechargement passe de 6 secondes a 2 minutes : un gros fichier a le temps d\'arriver. Il protege d\'un serveur muet, plus d\'un fichier volumineux',
+      '🧹 **Le disque de l\'hebergeur est fini, lui.** Deux garde-fous reglables : une duree de conservation (90 jours par defaut) et un budget total (5 Go par defaut). Quand le budget est atteint, les archives **les plus anciennes** partent en premier — jamais les recentes',
+      '🔒 Le nom du fichier est desinfecte avant ecriture, et le telechargement depuis le tableau de bord revalide le chemin : rien ne peut sortir du dossier d\'archives',
+    ],
+    fix: [],
+    retrait: [],
+  },
+  {
+    id: 'embed-roles-modifier-2026-08at',
+    title: 'Roles au clic, messages modifiables, apercu qui ne ment plus 🎭',
+    ajout: [
+      '🎭 **Des roles au clic sur vos messages.** Dans `/embed`, choisissez jusqu\'a 5 roles : un bouton par role apparait sous la carte. Un clic donne le role, un second le retire, et le membre recoit la confirmation pour lui seul',
+      '✋ **Ou a la reaction**, pour qui prefere la facon historique : un bouton bascule entre les deux modes. Le bot pose les emojis lui-meme ; reagir donne le role, retirer sa reaction le rend',
+      '✏️ **`/embed modifier`** : rouvrez un message DEJA publie dans le meme editeur et corrigez-le. Le message garde ses reactions, ses reponses accrochees, ses epingles, les liens partages vers lui et sa date — republier detruisait tout cela',
+      '🧠 **Le texte source est memorise** a l\'envoi : rouvrir un message rend les `&&` et `&>` tels qu\'ils ont ete tapes, pas leur rendu. Sans cela chaque passage dans l\'editeur aurait abime un peu le message',
+      '✂️ **Un texte trop long part en plusieurs cartes** au lieu de retomber dans l\'ancien style. La coupe se fait entre deux blocs — jamais au milieu d\'une regle',
+    ],
+    amelioration: [
+      '📊 **Un compteur de signes** dans l\'editeur : on voit venir la limite au lieu de la decouvrir a l\'envoi',
+      '💬 Chaque refus dit quoi faire : role au-dessus du mien, role supprime, permission manquante, emoji absent en mode reaction',
+    ],
+    fix: [
+      '🩹 **L\'apercu de `/embed` montrait l\'ancien embed — barre coloree comprise — des que le texte devenait long.** Le decor de l\'editeur (ligne d\'explication, selecteurs, boutons) compte dans le budget d\'une carte : un reglement qui tenait une fois envoye depassait DANS l\'editeur, et l\'apercu mentait exactement sur ce qu\'il devait montrer. Le decor cede desormais la place au contenu',
+    ],
+    retrait: [],
+  },
+  {
+    id: 'echec-interaction-2026-08au',
+    title: 'Fin des « Echec de l\'interaction » 🛑',
+    ajout: [
+      '🎭 **Les boutons du constructeur de messages du site donnent un role.** Choisissez-le dans la liste a cote du bouton ; un clic le donne, un second le retire',
+      '📋 **Le menu deroulant aussi** : chaque option porte un role, et decocher une option la retire. Le menu affiche donc l\'etat des roles, comme des cases a cocher',
+      '🛡️ **Un filet sous tous les boutons et menus du bot.** Un composant qu\'aucun code ne reconnait, une garde silencieuse ou une erreur imprevue recoivent desormais une reponse claire au lieu du rectangle rouge',
+    ],
+    amelioration: [
+      '🔇 **Le message « ✅ Termine. » a disparu.** Il s\'intercalait entre la commande et son resultat : sur un `/interact pat` on lisait « Termine » avant meme de voir l\'animation. Le message d\'attente est maintenant efface, pas rempli',
+      '💬 Un bouton venu d\'une version precedente du bot le dit et explique quoi faire, au lieu d\'echouer sans raison visible',
+      '📓 Ces cas sont desormais traces cote bot : ils etaient jusqu\'ici totalement invisibles, puisque aucun code ne s\'executait',
+    ],
+    fix: [
+      '🩹 **Les boutons publies depuis le site ne fonctionnaient pas du tout.** Un bouton sans lien partait avec un identifiant qu\'aucun code n\'ecoutait : chaque clic donnait « Echec de l\'interaction ». Le site le disait a demi-mot (« il ne declenche encore aucune action »), mais publiait quand meme. Un bouton sans lien ni role est desormais refuse a l\'envoi, avec la raison',
+      '🩹 **Les boutons, menus et modaux n\'avaient aucune protection contre les erreurs**, la ou les commandes en avaient une depuis toujours. La moindre exception, ou la moindre sortie discrete (« ce bouton n\'est pas pour vous »), laissait le membre devant un echec rouge',
+      '🩹 Un bouton du bot clique en message prive echouait sans un mot ; il explique maintenant qu\'il lui faut un serveur',
+    ],
+    retrait: [],
+  },
+  {
+    id: 'un-seul-message-2026-08av',
+    title: 'Une interaction, un seul message 📮',
+    ajout: [],
+    amelioration: [
+      '⚡ **`/interact` repond directement** au lieu d\'afficher « reflechit… » : le GIF arrive en general en quelques centaines de millisecondes, largement dans le delai que Discord accorde. La reponse part donc en carte, en un seul message. Si la recherche traine, la commande differe au dernier moment — le message part alors dans l\'ancien style, mais il part',
+      '🧮 Les compteurs et les badges ne sont joues qu\'une fois, meme quand la commande a du differer',
+    ],
+    fix: [
+      '🩹 **Le message s\'affichait puis s\'effacait sous les yeux.** Pour eviter la barre coloree d\'une reponse differee, le bot envoyait le resultat a cote puis effacait le message d\'attente. Mais le client Discord rattache ce second message a la reponse d\'origine : effacer celle-ci faisait disparaitre les deux',
+      '🩹 **Et avant cela, « ✅ Termine. » s\'affichait a la place du resultat.** Meme cause : le message d\'attente etait referme par une ligne de texte, et quand l\'envoi du resultat echouait, il ne restait que cette ligne',
+      '🧭 **La regle qui en sort** : jamais deux messages pour une interaction. Un second message est un second point de rupture, et il n\'y a rien a nettoyer quand on n\'a rien laisse trainer. Les deux impasses sont ecrites noir sur blanc dans le code, pour qu\'on n\'y revienne pas',
+    ],
+    retrait: [],
+  },
+  {
+    id: 'niveaux-recompenses-jeux-2026-08aw',
+    title: 'Recompenses de niveau, et le RP parle la langue de votre jeu 🎖️',
+    ajout: [
+      '🏅 **Recompenses de niveau configurables** : un role donne en atteignant un palier. **Aucune par defaut** — le bot ne distribue rien de lui-meme. Cela se regle dans `/config` → 📈 XP & niveaux',
+      '🧱 **Cumul ou remplacement** : les roles s\'ajoutent les uns aux autres (defaut), ou le palier atteint remplace le precedent si vous preferez une seule couleur a la fois',
+      '📋 **`/niveau recompenses`** montre les paliers du serveur et coche ceux que vous avez deja debloques',
+      '🎮 **Le Module RP s\'adapte a votre jeu** : Roblox, **FiveM**, **Garry\'s Mod**, **Red Dead Redemption** et **Arma**. Le choix se fait dans `/config` → 🎭 Module RP',
+      '🎖️ Sur **Arma**, la carte d\'identite devient un **livret matricule**, le permis une **habilitation operationnelle** et l\'entreprise une **unite**. Sur **Red Dead**, un **registre de citoyen** et une **autorisation de port d\'arme** — il n\'y avait pas d\'automobile en 1899. Sur **Gmod**, une **fiche citoyenne** et une **licence de port d\'arme**. Sur **FiveM**, une **carte de resident** delivree par la mairie de Los Santos',
+    ],
+    amelioration: [
+      '⚡ **Une minute de vocal rapporte autant qu\'un message ecrit.** Le vocal etait reste a la moitie de l\'ecrit ; un seul systeme de niveaux et deux baremes, cela revenait a dire que le vocal compte moins. Il n\'y a plus qu\'**un seul reglage de gain**',
+      '🔁 **Les roles de rattrapage** : un membre absent pendant que vous configurez les recompenses, ou qui prend trois niveaux d\'un coup, recoit TOUS les paliers qu\'il a atteints',
+      '🩺 `/config` **dit pourquoi** une recompense ne partirait pas : role supprime, role au-dessus du mien, role gere par une integration',
+      '📴 `/niveau` previent quand le systeme est desactive, au lieu d\'afficher des niveaux figes que plus rien ne fait monter',
+      '🎨 **Le document imprime suit le jeu** : l\'image de la carte porte le bon titre et les bons intitules',
+      '🔄 **Changer de jeu ne perd aucune fiche** : seuls les mots changent, et on peut revenir en arriere',
+    ],
+    fix: [
+      '🛡️ **Une suppression d\'un message du bot etait totalement muette.** Le journal ignorait les messages de bot : un panneau de tickets ou une liste RP disparaissait sans que rien n\'indique quand, ni par qui. C\'est desormais journalise, **avec le nom de la personne** (permission « Voir le journal d\'audit » requise)',
+      '🔁 **Et le panneau revient** : un panneau de tickets ou une liste RP supprime est **republie automatiquement**, sa reference remise a jour. L\'effacer ne le fait donc plus disparaitre',
+    ],
+    retrait: [],
+  },
+  {
+    id: 'bouton-rendre-2026-08ax',
+    title: 'Le bouton « Rendre » des animations 🖐️',
+    ajout: [],
+    amelioration: [
+      '🔍 **Deux controles automatiques** empechent ce defaut de revenir : l\'un releve tout appel de fonction non importe, l\'autre CHARGE les 91 modules du bot pour de bon. Un import mort ne casse qu\'au chargement — donc au demarrage, ou jamais si le module est appele plus tard',
+    ],
+    fix: [
+      '🩹 **Rendre un calin, un bisou ou une caresse echouait a tous les coups.** La fonction qui met a jour la carte etait appelee sans avoir ete importee : le code est syntaxiquement parfait, `node --check` ne voit rien, et l\'erreur disparaissait dans le filet de la commande — remplacee par un « ❌ Une erreur est survenue » qui ne disait rien',
+      '🃏 En repondant desormais **sans differer**, `/interact` envoie une vraie carte : c\'est ce passage qui a fait sortir le defaut de l\'ombre, puisque le bouton touchait une carte pour la premiere fois',
+    ],
+    retrait: [],
+  },
+  {
+    id: 'listes-rp-pages-ids-2026-08ay',
+    title: 'Listes RP : les identifiants reviennent, les pages tournent 📋',
+    ajout: [],
+    amelioration: [
+      '🆔 **L\'identifiant est de retour** sous chaque entree des listes Blacklist et Whitelist RP. Il avait ete retire pour gagner de la largeur sur telephone — c\'etait echanger l\'utile contre le joli : c\'est lui qu\'on copie pour bannir, ou pour retrouver un compte qui a quitte le serveur et n\'affiche donc plus aucun nom',
+      '📄 Il occupe la ligne discrete sous l\'entree, avec la raison : lisible et copiable, sans manger la ligne principale',
+    ],
+    fix: [
+      '🩹 **Les boutons ◀️ / ▶️ ne changeaient plus de page.** Le panneau est devenu une carte, et une carte n\'a ni texte ni embed : tout son contenu vit dans ses composants. Discord refusait donc la mise a jour — en silence. Le bouton tournait dans le vide',
+      '🩹 **Et le panneau ne se mettait plus a jour du tout.** Meme cause : apres un ajout ou un retrait, le bot tentait de reecrire des embeds sur une carte. Le refus etant muet, la liste restait figee sans la moindre erreur visible',
+    ],
+    retrait: [],
+  },
+  {
+    id: 'matricules-communaute-2026-08az',
+    title: 'Matricules RP, entreprises sous cle, tickets repares 🔢',
+    ajout: [
+      '🔢 **`/matricule` — le numero qui relie le jeu et Discord.** En jeu on connait quelqu\'un par son pseudo ou son matricule ; pour agir sur Discord il faut son identifiant. Les trois se retrouvent desormais l\'un par l\'autre : `/matricule chercher` accepte le matricule, le pseudo du jeu, le pseudo Discord, une mention ou un identifiant',
+      '📋 **Un panneau de matricules** dans un salon, comme les listes Whitelist RP : recherche, pages, mise a jour automatique. `/matricule panneau`',
+      '🎖️ Le matricule appartient au **Module RP** : module coupe, il disparait de la liste du serveur',
+      '🔎 Une recherche sans resultat exact **propose ce qui ressemble** au lieu d\'un « introuvable » devant lequel il n\'y a rien a faire',
+      '🏢 **Les entreprises ne sont plus partagees d\'office.** Un serveur doit demander a rejoindre une communaute, et seul le **proprietaire** — celui qui porte la couronne 👑 — peut l\'accepter. Un administrateur peut etre nomme le matin et parti le soir',
+      '📨 Si le demandeur n\'a pas la couronne, le proprietaire recoit un **message prive** avec Valider / Refuser, et ce qu\'il partage exactement. Tant qu\'il n\'a pas repondu, rien n\'est partage',
+      '👥 **Plusieurs membres a la fois** dans un ticket : ajouter trois renforts demandait de rouvrir le menu a chaque fois',
+    ],
+    amelioration: [
+      '🎛️ **Les boutons et menus sont DANS la carte**, plus en dessous. Une rangee posee apres la carte s\'affichait detachee, comme si elle appartenait a un autre message — c\'est ce qui donnait au menu d\'un ticket l\'air d\'etre a cote',
+      '🔁 **Le menu d\'un ticket se rechoisit** : Discord gardait l\'option cochee, et resselectionner la meme entree ne declenchait plus rien',
+      '🎞️ **Beaucoup moins d\'echecs de GIF.** Un bisou sur la joue partait systematiquement en 404 sur la premiere source, qui ne connait pas cette categorie. Et chaque GIF obtenu est desormais mis en reserve : quand les trois API tombent en meme temps, on ressert une image deja vue au lieu d\'afficher « GIF indisponible »',
+    ],
+    fix: [
+      '🩹 **Le transcript ne partait plus a la fermeture d\'un ticket.** Une carte ne peut porter que les fichiers qu\'un de ses composants designe ; le fichier du transcript, lui, est libre — Discord refusait donc le message entier. Un message a piece jointe libre garde l\'ancien style, et si le fichier est refuse malgre tout, la conversation part en clair plutot que d\'etre perdue avec le salon',
+      '💬 La fermeture dit maintenant **dans quel salon** part le transcript, ou previent qu\'aucun n\'est configure — au lieu d\'un « si un salon est configure » que personne ne verifiait',
+    ],
+    retrait: [],
+  },
+  {
+    id: 'interaction-not-replied-2026-08ba',
+    title: 'Le panneau /config levait une erreur apres certaines actions ⚙️',
+    ajout: [],
+    amelioration: [
+      '🔍 **Un controle automatique** interdit desormais ce motif : tout message envoye apres une mise a jour doit passer par la fonction qui verifie l\'etat reel. Verifie sur l\'ancien code, il signale les 6 endroits concernes',
+      '🛡️ **La mise a jour garantit l\'accuse de reception** : meme refusee, elle accuse — sans quoi l\'action suivante partait sur une interaction que Discord considerait comme sans reponse',
+    ],
+    fix: [
+      '🩹 **« InteractionNotReplied » dans `/config`.** Apres avoir cree un type de ticket, supprime un type, active le Module RP ou demande une liaison d\'entreprises, le message de confirmation levait une erreur au lieu de s\'afficher',
+      '🩹 La cause : la mise a jour du panneau **avale ses erreurs** — c\'est voulu, une mise a jour ratee ne doit pas emporter l\'action. Mais quand elle rate, l\'interaction n\'est pas accusee, et le message qui suit ne peut plus partir. Le choix se faisait sur « d\'ou vient l\'interaction » au lieu de « ou en est-elle »',
+      '🩹 Le meme motif dormait dans les **tickets** (menu staff, relance, ajout de membre), les **animations** et l\'**editeur d\'IA** : tous corriges d\'un coup',
+    ],
+    retrait: [],
+  },
+  {
+    id: 'musique-refonte-2026-08bb',
+    title: 'La musique refaite : YouTube, SoundCloud, Spotify, Deezer 🎶',
+    ajout: [
+      '🎧 **Les quatre plateformes demandees fonctionnent** : YouTube (videos et playlists), SoundCloud (pistes et playlists), Spotify et Deezer (pistes, albums et listes)',
+      '🎛️ **Des boutons sous la lecture** : pause, morceau suivant, boucle, file, arret — sans retaper une commande. Ils n\'obeissent qu\'aux personnes presentes dans le salon vocal',
+      '📃 **`/musique file`**, **`melanger`**, **`retirer`**, **`boucle`** (le morceau ou toute la file), **`volume`** reglable en direct sans relancer le morceau, et **`maintenant`** avec une barre de progression',
+      '🩺 **`/musique sources`** dit ce que le bot sait lire, et signale ce qui manque a la configuration',
+      '👥 **Le bot part quand il reste seul** dans le salon, et quand la file se termine',
+    ],
+    amelioration: [
+      'ℹ️ **Spotify et Deezer ne laissent personne diffuser leur audio** — leurs flux sont reserves a leurs propres applications. Le bot lit donc la fiche du lien puis joue la meme chanson depuis YouTube, **et il le dit** : sans cela on prendrait pour un defaut ce qui est une regle de leur cote. Le titre affiche reste celui de la plateforme d\'origine, jamais la version enjolivee de YouTube',
+      '🔑 **Spotify sans configuration** : sans identifiants d\'application, le bot passe par le lien public et lit quand meme une piste. Avec identifiants (`SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET`, `SPOTIFY_REFRESH_TOKEN`), il lit les albums et listes entiers',
+      '⚠️ **Un titre sans equivalent trouvable est nomme**, au lieu de disparaitre silencieusement de la file',
+      '🧪 **Les tests vivent enfin dans le depot** (`npm test`), au lieu d\'un dossier temporaire',
+    ],
+    fix: [
+      '🩹 **Le bot rejoignait le vocal et restait muet.** La lecture demarrait AVANT que la connexion soit prete : l\'audio partait dans le vide, sans la moindre erreur. Le bot attend desormais l\'etat « pret »',
+      '🩹 **Tout lien SoundCloud echouait** : la bibliotheque audio exige une cle d\'acces qui n\'etait demandee nulle part',
+      '🩹 **Les liens Deezer n\'etaient pas traites du tout** : le bot cherchait sur YouTube l\'adresse elle-meme, ce qui ne donnait rien',
+      '🩹 **Un seul morceau illisible coupait toute la session** — une video supprimee et le bot quittait le vocal. Il est desormais passe, en le disant, et trois echecs de suite arretent proprement',
+      '🩹 Un changement de region vocale coupait la musique : il est maintenant distingue d\'une vraie deconnexion',
+    ],
+    retrait: [],
+  },
+  {
+    id: 'musique-vraie-cause-2026-08bc',
+    title: 'Le vocal qui ne s\'ouvre pas dit enfin POURQUOI 🩺',
+    ajout: [
+      '🔧 **`/musique sources` montre l\'etat des briques audio** : encodeur Opus et chiffrement de la voix, avec la commande d\'installation quand il en manque une',
+      '📣 **Le bot le signale au demarrage** : une brique manquante apparait dans la console de l\'hebergeur, sans avoir a lancer quoi que ce soit',
+    ],
+    amelioration: [],
+    fix: [
+      '🩹 **« Verifiez que j\'ai les permissions » s\'affichait meme avec toutes les permissions.** Le message accusait une cause que le bot n\'avait pas verifiee — et il les verifie pourtant AVANT d\'essayer de se connecter : si ce message apparaissait, les permissions etaient forcement bonnes. On cherchait donc des heures du mauvais cote',
+      '🩺 **Le message nomme desormais la vraie cause**, d\'apres l\'endroit ou la connexion s\'est arretee : brique audio manquante, intent **Server Voice States** absent, bot deja connecte ailleurs, ou ports **UDP** bloques par l\'hebergeur — le cas le plus frequent sur un hebergement mutualise, avec le changement de region du salon comme contournement',
+    ],
+    retrait: [],
+  },
+  {
+    id: 'vocal-constat-2026-08bd',
+    title: 'Le bot constate au lieu de supposer 🔬',
+    ajout: [
+      '🔁 **Une seconde tentative de connexion** avant de renoncer : Discord laisse parfois tomber le premier signal vocal, et rien ne revient jamais',
+      '🧹 Une connexion vocale orpheline est nettoyee avant d\'en ouvrir une neuve — sinon la nouvelle demande recuperait l\'ancienne, qui n\'attend plus rien',
+    ],
+    amelioration: [
+      '🔬 **Le message d\'echec vocal ne suppose plus rien : il constate.** Le bot lit lui-meme s\'il est membre du serveur, si son intent vocal est actif, si le salon est plein, et surtout **si Discord l\'a place dans le salon**. Ce dernier point tranche tout : si Discord a repondu, le blocage est dans le flux audio (ports UDP de l\'hebergeur) ; sinon, la demande a ete ignoree',
+      '📓 Les constats partent aussi dans la console de l\'hebergeur, avec le detail technique a lui transmettre',
+    ],
+    fix: [
+      '🩹 **Le message demandait de verifier l\'intent vocal — que le bot peut lire lui-meme.** Comme la version d\'avant qui accusait les permissions deja verifiees, il envoyait chercher partout au lieu de designer un endroit',
+      '🩹 Deux croix « ❌❌ » s\'affichaient : la commande ajoutait la sienne par-dessus celle du message',
+    ],
+    retrait: [],
+  },
+  {
+    id: 'musique-diagnostic-2026-08be',
+    title: 'La poignee de main vocale, etape par etape 🔬',
+    ajout: [
+      '🔬 **`/musique diagnostic`** ouvre une vraie connexion vocale, note chaque etape de la poignee de main, puis la referme. Il ne joue rien : il cherche l\'endroit exact ou ca s\'arrete',
+      '📶 **Les cinq etapes sont affichees** : connexion a Discord, envoi de ma demande, reponse « ou je suis », attribution du serveur vocal, ouverture du flux audio. Chacune accuse un coupable different',
+      '📓 La meme fiche part dans la console de l\'hebergeur, prete a lui etre transmise',
+    ],
+    amelioration: [
+      '📡 **Une precision qui change tout** : les quatre premieres etapes passent par le WebSocket de la passerelle, **aucune n\'utilise l\'UDP**. Il n\'entre en jeu qu\'a la cinquieme. Un pare-feu UDP ouvert n\'innocente donc rien tant qu\'on n\'a pas passe les quatre premieres — et le bot ne parle plus d\'UDP avant d\'y etre arrive',
+      '🎯 Chaque etape manquante a maintenant sa cause et son remede : passerelle qui redemarre, defaut interne au bot, passerelle qui ne relaie pas les paquets vocaux (un redemarrage suffit), region du salon a changer, ou brique audio absente',
+    ],
+    fix: [],
+    retrait: [],
+  },
+  {
+    id: 'langues-annonce-2026-08bf',
+    title: 'Le bot parle cinq langues, et une commande d\'annonce 🌍',
+    ajout: [
+      '🌍 **Langue du bot, par serveur** : Francais, English, Deutsch, Русский, Espanol. Cela se choisit dans `/config` → 🎭 Module RP',
+      '📣 **`/annonce`** (createur) : ecrire un message au nom du bot et le publier ou l\'on veut, avec apercu en direct. Embed ou message simple, image, vignette, couleur — et `/annonce modifier` pour le corriger plus tard',
+      '📄 **Un fichier pour les traducteurs** : `traductions.csv`, 1 871 lignes, une colonne par langue. Il s\'ouvre dans Excel ou Google Sheets, et plusieurs personnes peuvent s\'y partager le travail',
+    ],
+    amelioration: [
+      '🔤 **La traduction est posee sur la couche reseau**, la ou l\'identite visuelle l\'est deja. Aucune ligne de code a modifier pour ajouter une langue, et **aucun risque de casser le bot** : seuls les champs d\'affichage sont traduits, jamais un identifiant de bouton, une valeur d\'option ou une URL',
+      '⚠️ **87 chaines sont signalees « a ne pas traduire »** dans le fichier : ce sont des valeurs comparees par le code, pas des phrases. « aucune », « piste » et « file » sont les trois modes de repetition de la musique — les traduire couperait la fonction sans le moindre message d\'erreur. L\'import les refuse meme si la case est remplie',
+      '🇬🇧 **163 textes deja traduits en anglais**, les plus vus par les membres. Le reste s\'affiche en francais tant qu\'il n\'est pas traduit : mieux vaut une ligne en francais qu\'une ligne fausse',
+    ],
+    fix: [],
+    retrait: [],
+  },
+  {
+    id: 'anglais-complet-2026-08bg',
+    title: 'Le bot au complet en anglais 🇬🇧',
+    ajout: [
+      '🇬🇧 **Tout le bot est traduit en anglais** : 2 395 textes, soit la totalite de ce qu\'il affiche. Rien ne reste en francais sur un serveur regle en English',
+      '📝 **Les descriptions des commandes suivent la langue de chaque membre.** C\'est Discord qui les affiche, pas le bot : elles partent donc traduites a l\'enregistrement. Le NOM d\'une commande, lui, ne bouge jamais — c\'est ce qu\'on tape, et ce que les messages d\'aide citent',
+      '🪪 **La carte d\'identite et le permis RP sont dessines dans la langue du serveur** : titre, mention legale et intitules des champs. Le russe reprend l\'anglais, faute de police cyrillique dessinable — un document qui se lit vaut mieux qu\'un document en carres vides',
+    ],
+    amelioration: [
+      '🧩 **Les phrases a trous se traduisent enfin.** « ✅ @membre a ete ajoute au ticket. » n\'existe jamais entiere : elle porte un pseudo au milieu et change a chaque envoi. Le bot traduit desormais ses morceaux, ce qui represente pres de la moitie de ce qu\'il dit',
+      '🤖 **L\'IA repond dans la langue du serveur.** Sa consigne disait « en francais » en dur : tout etait traduit sauf la seule phrase ecrite a la volee',
+      '📄 **Le fichier des traducteurs passe a 2 401 lignes**, colonne anglaise deja remplie. Elle sert de seconde source : quand une tournure francaise est ambigue, la version anglaise dit comment elle a ete comprise',
+      '🎭 **/interact recoit le russe** qui lui manquait. Cette commande suit la langue Discord de chaque membre, pas celle du serveur : deux personnes y lisent le meme message dans deux langues',
+    ],
+    fix: [
+      '🩹 **Le releve de textes lisait mal le code.** Une apostrophe dans une phrase — « c\'est le demandeur … plutot que de l\'en sortir » — lui faisait relever le morceau ENTRE les deux apostrophes : un texte qui n\'existe nulle part, a faire traduire pour rien',
+      '🩹 **Les morceaux de phrases n\'etaient pas releves du tout**, alors qu\'ils sont exactement ce qui arrive a l\'ecran. 2 401 textes releves au lieu de 1 871',
+      '🩹 **Un saut de ligne ecrit dans le code restait deux caracteres** au lieu d\'en devenir un vrai : la traduction ne correspondait alors a aucun message reel, et ne sortait jamais',
+      '🩹 **80 vraies phrases etaient declarees « valeur technique, ne pas traduire ».** Un choix entre deux tournures etait pris pour une cle de tableau. Il n\'en reste que 6, toutes legitimes',
+    ],
+    retrait: [],
+  },
+  {
+    id: 'radio-et-constat-udp-2026-08bh',
+    title: 'Les radios francaises debarquent, et le vocal dit enfin ou ca coince 📻',
+    ajout: [
+      '📻 **`/radio`** : les radios francaises en direct dans le vocal. `/radio ecouter` puis tapez un nom — la liste se remplit toute seule, des milliers de stations repondent (France Inter, Skyrock, Cherie FM…). `/radio liste` montre les plus ecoutees, `/radio stop` coupe',
+      '🔁 **La radio partage la file de `/musique`** : memes boutons, meme volume, meme stop. Une radio est simplement un morceau sans fin',
+      '🔄 **Le bot change LUI-MEME la region du salon** quand le flux vocal coince a l\'etape UDP et qu\'il a la permission « Gerer les salons » : changer de region change de serveur vocal, donc d\'adresse a joindre. Si ca debloque, il garde la region et le dit ; sinon il remet tout comme avant',
+    ],
+    amelioration: [
+      '🔬 **« Le flux vocal n\'aboutit pas » cachait quatre sous-etapes** : ouverture du WebSocket vocal, identification, decouverte d\'adresse UDP, choix du chiffrement. Le bot les ecoute desormais une a une et dit LAQUELLE s\'arrete — un blocage TLS n\'a rien a voir avec un blocage UDP, et accuser l\'un quand c\'est l\'autre a deja fait perdre des jours',
+      '🎯 **Chaque sous-etape designe son coupable et sa phrase exacte pour l\'hebergeur** : « autoriser l\'UDP sortant et ses reponses vers les serveurs vocaux de Discord, ports 50000-65535 » — avec l\'adresse constatee du serveur vocal quand elle est connue',
+      '🔎 **`/musique diagnostic` montre l\'interieur de l\'etape 5** : les quatre sous-etapes cochees une a une, l\'adresse du serveur vocal, le code de fermeture',
+      '🧱 **`/musique sources` affiche la brique FFmpeg**, exigee par les radios seulement — avec la marche a suivre quand elle manque : `apt install ffmpeg` chez l\'hebergeur, ou poser `ffmpeg.exe` a cote de l\'executable',
+    ],
+    fix: [
+      '🩹 **Le message accusait l\'UDP sans preuve.** Il conclut desormais sur ce qui est CONSTATE : si la machine s\'arrete avant l\'UDP, l\'UDP est innocente — et c\'est ecrit noir sur blanc',
+      '🩹 **Le bot pouvait dire « intent vocal desactive » alors que Discord venait de le placer dans le salon** — ce qui prouve l\'inverse. La preuve passe desormais avant l\'hypothese',
+      '🩹 **Une « brique audio manquante » n\'est plus accusee** quand la poignee de main a depasse l\'identification : y arriver prouve que les bibliotheques ont charge',
+      '🩹 Le chiffrement de la voix est reconnu **natif dans Node 18+** : plus de fausse alerte « bibliotheque de chiffrement manquante »',
+    ],
+    retrait: [],
+  },
+  {
+    id: 'absences-2026-08bi',
+    title: 'Les absences se declarent en un clic, et s\'effacent toutes seules 📅',
+    ajout: [
+      '📅 **Le panneau d\'absences** : un staff le publie avec `/absence panneau`, et n\'importe qui declare son absence en un clic — date de debut (vide = maintenant), date de fin, duree (`5j`, `12h`, `2sem`)… ou rien du tout pour une absence sans date de fin',
+      '📣 **L\'annonce part dans plusieurs salons a la fois** — pour que personne ne puisse la manquer',
+      '🧹 **Chaque annonce disparait toute seule a la fin de l\'absence**, dans tous les salons a la fois. Une absence sans date de fin s\'efface d\'un clic sur **✅ Je suis de retour** — la personne concernee, ou le staff',
+      '📋 **`/absence liste`** : qui manque en ce moment, avec la date de retour de chacun',
+    ],
+    amelioration: [
+      '⏰ **Les horaires s\'affichent a l\'heure de chaque lecteur** (horodatages Discord) : « retour dans 3 jours » se lit pareil a Paris et a Montreal',
+      '🛡️ **Une seule absence a la fois** : en declarer une seconde renvoie vers l\'annonce en cours, au lieu d\'empiler des doublons',
+      '🔁 **Le rattrapage au demarrage** : les absences arrivees a echeance pendant que le bot etait eteint sont nettoyees des qu\'il revient',
+    ],
+    fix: [],
+    retrait: [],
+  },
+  {
+    id: 'absences-trente-salons-2026-08bj',
+    title: 'Les salons d\'absences, sans plafond 📣',
+    ajout: [
+      '📣 **Autant de salons d\'annonces qu\'il en faut — trente, ou plus.** Une commande plafonne a 25 options : la liste se gere donc en ADDITIF. `/absence salons ajouter` ouvre un menu de 25 salons a la fois, rejouable autant de fois que necessaire',
+      '🗂️ **`/absence salons categorie`** ajoute d\'un coup tous les salons textuels d\'une categorie entiere',
+      '🧰 **`/absence salons liste` / `retirer` / `vider`** : voir, elaguer, repartir de zero',
+    ],
+    amelioration: [
+      '🛡️ **Republier le panneau ne detruit plus la liste** : trente salons montes a la main ne disparaissent pas parce qu\'on a redeploye le panneau',
+      '⏱️ **Trente envois depassent les 3 secondes que Discord accorde** : la confirmation de declaration est differee (en ephemere) avant l\'eventail, et les copies partent en parallele',
+    ],
+    fix: [],
+    retrait: [],
+  },
+  {
+    id: 'refonte-moteur-musique-2026-08bk',
+    title: 'Le moteur de musique, refait de fond en comble 🧱',
+    ajout: [],
+    amelioration: [
+      '🧱 **Le moteur de musique est retape en trois modules nets** : la LECTURE (une session par serveur : file, lecteur, boucles, volume, radios), la CONNEXION (deux essais, rotation de region, l\'espion des sous-etapes reseau, les diagnostics) et les SOURCES (YouTube, SoundCloud, Spotify, Deezer, radios). L\'ancien fichier melangait les trois — chaque correctif rajoutait une piece au puzzle',
+      '⏲️ **Les minuteries de lecture sont NOMMEES** (solitude, file terminee, relance d\'une radio tombee) : on n\'annule plus que celle qu\'on vise, au lieu de tout couper d\'un coup',
+      '🎛️ Aucune commande ne change : /musique et /radio fonctionnent exactement pareil — seuls les murs porteurs ont ete refaits',
+    ],
+    fix: [
+      '🩹 **Deux demandes lancees en meme temps** (deux membres qui tapent /musique a 100 ms d\'ecart) ne se sabotaient plus proprement : la seconde detruisait la connexion que la premiere etait en train d\'ouvrir, et deux lectures fantomes se marchaient dessus. La creation de session passe sous un verrou par serveur',
+      '🩹 **Un /musique stop pendant l\'ouverture d\'un flux** laissait la lecture demarrer dans le vide — un processus FFmpeg que plus personne ne pouvait arreter. La session verifie qu\'elle est toujours vivante avant de jouer, et avant d\'annoncer un echec',
+      '🩹 **Un morceau demande pendant la relance d\'une radio tombee** passait DERRIERE elle : la carte annoncait le morceau, la radio repartait a sa place, et le morceau ne jouait jamais (coince derriere un flux sans fin). Il passe desormais devant, et le direct reprend apres lui',
+      '🩹 **Le compte a rebours de solitude repartait de zero a chaque evenement vocal** (un autre bot qui se mute suffisait) : arme une fois, il court desormais jusqu\'au bout',
+      '🧹 L\'arrivee de quelqu\'un dans le salon n\'annule plus TOUTES les minuteries — seule celle de solitude ; la relance d\'une radio tombee y survit',
+    ],
+    retrait: [],
+  },
+  {
+    id: 'mentions-silencieuses-2026-08bl',
+    title: 'Les mentions des cartes ne sonnent plus 🔕',
+    ajout: [],
+    amelioration: [
+      '🔕 **Une mention ecrite dans une carte s\'affiche sans notifier.** Un embed n\'a jamais fait sonner personne — mais converti en carte, son texte devenait du contenu ordinaire et chaque @mention s\'etait mise a notifier : les annonces d\'absence pinguaient leurs membres, les journaux pinguaient le staff. La conversion restaure la regle d\'origine',
+      '🔔 **Les tickets, eux, sonnent toujours** : leur ping part dans le message lui-meme (pas dans l\'embed), exactement comme du temps des embeds — l\'ouverture d\'un ticket et la relance continuent de notifier la personne et les roles support',
+      '🎛️ Un envoi qui regle explicitement ses mentions autorisees garde son reglage : la regle ne comble que le vide',
+    ],
+    fix: [],
+    retrait: [],
+  },
+  {
+    id: 'vocal-perso-alerte-absences-2026-08bm',
+    title: 'Salons vocaux personnels, alerte vocale au staff, absences modifiables 🎧',
+    ajout: [
+      '🎧 **Les salons vocaux personnels** : un staff definit un vocal « createur » (`/vocal perso`) — s\'y connecter fabrique un salon a votre pseudo, vous y etes deplace, et sa carte de gestion arrive dans le chat du vocal. Le salon disparait tout seul en se vidant (meme si ca s\'est passe pendant que le bot dormait)',
+      '🎛️ **La carte du salon pilote tout par les permissions Discord** : couper cameras & streams *(une seule permission « Video » chez Discord — la carte le dit)*, bloquer les statuts du salon, mode prive (visible par tous, connexion reservee au proprietaire, au staff et a la whitelist), blacklist (salon cache, connexion coupee, deconnexion immediate) et whitelist (connexion garantie meme en prive)',
+      '🎙️ **L\'alerte vocale** (`/vocal alerte`) : a chaque connexion en vocal, une carte part dans le salon choisi — qui vient d\'arriver, qui est present — et les roles staff sont mentionnes dans le message lui-meme, donc ils SONNENT (c\'est le seul champ dont les mentions notifient encore)',
+      '✏️ **Le bouton « Modifier » sur les annonces d\'absence** : la modale revient preremplie, la declaration est corrigee sans etre cloturee, et CHAQUE copie de l\'annonce est reeditee sur place — reactions et liens intacts',
+    ],
+    amelioration: [
+      '🛡️ Le proprietaire d\'un salon perso garde TOUJOURS sa porte : ni le mode prive ni une blacklist ne peuvent l\'enfermer dehors — et blacklister le proprietaire ou un membre du staff est refuse, avec la raison',
+      '📝 Dans la modale de modification d\'absence, un debut laisse vide GARDE la date d\'origine — « vide = maintenant » vaut pour une declaration, pas pour une correction',
+    ],
+    fix: [],
+    retrait: [],
+  },
+  {
+    id: 'file-attente-vocale-2026-08bn',
+    title: 'L\'alerte vocale devient une file d\'attente d\'assistance 🎧',
+    ajout: [
+      '🎧 **La file d\'attente vocale** (`/vocal alerte`) : un vocal d\'ATTENTE est surveille — s\'y connecter ouvre un ticket dans le salon ecrit choisi, avec la personne, DEPUIS QUAND elle attend (l\'horodatage Discord vit tout seul, « il y a 4 minutes ») et les roles staff mentionnes dans le message, donc ils sonnent',
+      '🙋 **Le bouton « Prendre en charge »** : un membre du staff clique, la carte dit qui s\'en occupe et depuis quand — et le second clic informe au lieu d\'ecraser',
+      '🏁 **Les salons d\'assistance** (`/vocal assistance`, jusqu\'a quatre) : deplacer la personne de l\'attente vers l\'un d\'eux clot le ticket tout seul — la carte affiche qui a aide et le temps d\'attente exact',
+    ],
+    amelioration: [
+      '👋 Quitter l\'attente sans etre aide clot aussi le ticket, en le disant — aucun ticket fantome ne reste ouvert',
+      '🔄 Tout survit a un redemarrage : au reveil, chaque attente encore ouverte est remise en face de la realite du salon (toujours la → gardee, deplacee en assistance → aidee, partie → close)',
+    ],
+    fix: [],
+    retrait: [
+      '🎙️ L\'ancienne alerte « une carte a chaque connexion vocale » disparait au profit de la file : elle annoncait tout le monde, la file n\'annonce que ceux qui demandent de l\'aide',
+    ],
+  },
+  {
+    id: 'deplacement-config-centrale-2026-08bo',
+    title: 'Le ticket vocal se déplace en un clic, et /config devient la base centrale 🎛️',
+    ajout: [
+      '📥 **Le bouton « Déplacer en assistance »** apparait sur le ticket des qu\'il est pris en charge : un clic cherche un salon d\'assistance VIDE, y deplace la personne, et le ticket se clot tout seul',
+      '📨 **Aucun salon libre ?** Un membre du staff present dans un des salons d\'assistance, tire au sort, est prevenu en message prive — qui attend, et depuis combien de temps',
+      '🎛️ **`/config` → 🎧 Vocal** : le vocal d\'attente, le salon des tickets, les salons d\'assistance et le salon createur des salons perso se reglent desormais au meme endroit — les menus vides coupent le reglage',
+      '🎛️ **`/config` → 📅 Absences** : la liste des salons d\'annonce s\'ajoute, se retire et se vide depuis le panneau — et la vue d\'ensemble de `/config` affiche tout, vocal et absences compris',
+    ],
+    amelioration: [
+      '🧹 **Un ticket clos disparait tout seul** : la carte finale (qui a aide, temps d\'attente) reste affichee une minute — le temps de la lire — puis le message est supprime. Le salon des tickets ne garde que le vif, meme apres un redemarrage',
+    ],
+    fix: [],
+    retrait: [],
+  },
+  {
+    id: 'journal-exhaustif-2026-08bp',
+    title: 'Le journal voit tout : le moindre changement laisse sa ligne 📖',
+    ajout: [
+      '📢 **Les salons** : creation, suppression, et CHAQUE reglage modifie — nom, sujet, mode lent, categorie, NSFW, qualite audio, limite, region… et chaque surcharge de permissions, cible par cible, permission par permission',
+      '🧵 **Les fils** : crees, supprimes, renommes, archives, verrouilles',
+      '👤 **Les membres** : surnom, roles ajoutes/retires, exclusion temporaire (posee ET levee), boost, avatar de serveur — et les changements de profil (pseudo, avatar) dans chaque serveur commun',
+      '😀 **Emojis, stickers, invitations, webhooks, epingles, evenements planifies** : ajouts, retraits, renommages — tout se journalise, avec l\'auteur quand le journal d\'audit le dit',
+      '🏰 **Le serveur lui-meme** : nom, icone, banniere, proprietaire, niveau de verification, salon AFK/systeme/reglement, palier de boost',
+      '🔓 **Les debans** et 🧹 **les suppressions en masse** (avec le compte et les auteurs touches)',
+      '🎚️ **Les etats vocaux fins** : micro, casque, sourdine serveur, partage d\'ecran, camera — chaque geste en vocal laisse sa ligne',
+    ],
+    amelioration: [
+      '🧭 Une exception assumee : la POSITION des salons n\'est pas journalisee — glisser un salon decale tous ceux d\'en dessous, un seul geste ferait vingt lignes',
+    ],
+    fix: [],
+    retrait: [],
+  },
+  {
+    id: 'annonces-maj-silencieuses-2026-08bq',
+    title: 'Les annonces de mise à jour ne sonnent plus 🔕',
+    ajout: [],
+    amelioration: [
+      '🔕 **Plus aucune mention du staff a chaque mise a jour du bot.** L\'annonce arrive toujours dans le salon des mises a jour (ou #shadow-logs, deja reserve au staff) — mais elle n\'y sonne plus personne : la carte suffit, la notification etait du bruit',
+    ],
+    fix: [],
+    retrait: [],
+  },
+  {
+    id: 'journal-noms-et-ids-2026-08br',
+    title: 'Fini les « @utilisateur-inconnu » dans les logs 🪪',
+    ajout: [],
+    amelioration: [
+      '🪪 **Chaque personne des logs est nommee EN CLAIR, avec son identifiant** : « **Bayouss** (@mention · 123456789) ». Une mention seule s\'affichait « @utilisateur-inconnu » des que le client Discord du lecteur ne connaissait pas ce membre — desormais, quoi qu\'affiche la mention, le nom et l\'ID restent lisibles',
+      '🎭 **Les roles ajoutes/retires aussi** : nom en clair + ID a cote de la mention — un role supprime depuis reste identifiable',
+      '🔎 Partout ou le journal d\'audit donne l\'auteur d\'une action (« par… »), il est nomme et identifie de la meme facon — vocal, messages, purges, invitations, fils et evenements compris',
+    ],
+    fix: [],
+    retrait: [],
+  },
+  {
+    id: 'fil-staff-tickets-2026-08bs',
+    title: 'Chaque ticket a son fil privé de concertation staff 🔒',
+    ajout: [
+      '🔒 **Un fil PRIVE est accroche a chaque nouveau ticket**, invisible pour son auteur : le staff s\'y concerte a cote de la conversation, sans salon supplementaire et sans risque de repondre au mauvais endroit',
+      '🤫 **Le staff y est ajoute en silence**, membre par membre (roles support du type de ticket + roles staff du serveur) : aucune mention, aucune sonnerie — le ping du ticket vient deja de partir dans le salon',
+      '📝 Le mot d\'ouverture du fil rappelle qui n\'y voit rien et ou repondre au membre',
+    ],
+    amelioration: [
+      '🎟️ Si le fil ne peut pas etre cree (permission manquante), le ticket s\'ouvre quand meme — le fil est un plus, jamais un prealable',
+    ],
+    fix: [],
+    retrait: [],
+  },
+  {
+    id: 'panneau-v2-transcript-carte-2026-08bt',
+    title: 'Le panneau se modifie a nouveau, et le transcript devient une vraie carte 📄',
+    ajout: [
+      '📎 **Le moteur de cartes sait desormais afficher les pieces jointes** : un fichier libre (le transcript d\'un ticket, par exemple) recoit son bloc « fichier » DANS la carte — ces messages restaient jusqu\'ici dans l\'ancien style, barre coloree comprise',
+      '📄 **La carte du transcript est refaite** : le ticket et son type, le SALON nomme en clair (sa mention afficherait « #inconnu » une fois le salon supprime), qui a ouvert et qui a ferme — nommes et identifies —, la date d\'ouverture et le nombre de messages conserves',
+    ],
+    amelioration: [
+      '🪪 Les logs « Ticket ouvert » et « Ticket ferme » ecrivent aussi le nom du salon en clair, pour rester lisibles apres sa suppression',
+    ],
+    fix: [
+      '🎫 **Modifier un panneau de tickets publie en carte ne renvoie plus « Invalid Form Body / MESSAGE_CANNOT_USE_LEGACY_FIELDS_WITH_COMPONENTS_V2 »** : une carte n\'a pas d\'embeds, la modification reconstruit desormais son contenu en composants — meme moteur que l\'envoi, meme rendu',
+    ],
+    retrait: [],
+  },
+  {
+    id: 'panneaux-epingles-2026-08bu',
+    title: 'Les panneaux s\'épinglent tout seuls 📌',
+    ajout: [
+      '📌 **Un panneau publie est epingle automatiquement** — tickets (publication ET republication) comme absences : un panneau est fait pour etre retrouve, meme apres des semaines de messages',
+      '🧹 **La notification systeme « X a epingle un message » est effacee dans la foulee** : elle n\'apprend rien et passerait pour du bruit laisse par le bot sous son propre panneau',
+    ],
+    amelioration: [
+      '🔑 Sans la permission « Gerer les messages », le panneau part quand meme, simplement non epingle — et la reponse de `/ticket panneau` le dit, avec la permission a donner',
+    ],
+    fix: [],
+    retrait: [],
+  },
+  {
+    id: 'rappel-bump-2026-08bv',
+    title: 'Le rappel de bump : DISBOARD surveillé, fenêtre jamais ratée ⏰',
+    ajout: [
+      '⏰ **`/rappel-bump activer`** : le bot surveille les reponses de DISBOARD — a chaque `/bump` REUSSI, il note l\'heure et previent DEUX HEURES plus tard dans le salon choisi : « C\'est l\'heure du bump ! »',
+      '🔔 **Un role a sonner, au choix** : mentionne dans le message du rappel (pas dans la carte), donc il notifie vraiment ceux qui bumpent',
+      '🛠️ `/rappel-bump etat` dit ou on en est (dernier bump vu, prochain rappel), `/rappel-bump desactiver` coupe tout — et le salon se regle aussi depuis `/config` → 📢 Salons',
+    ],
+    amelioration: [
+      '🔄 Les rappels survivent aux redemarrages : l\'heure du dernier bump vit en base, le demarrage rearme chaque rappel — un rappel echu pendant le sommeil du bot part immediatement, et jamais deux fois',
+    ],
+    fix: [],
+    retrait: [],
+  },
+  {
+    id: 'logs-sans-ping-2026-08bw',
+    title: 'Le journal ne sonne plus jamais personne 🔕',
+    ajout: [],
+    amelioration: [],
+    fix: [
+      '🔕 **Les mentions des cartes de logs ne notifient plus.** Un embed n\'a jamais fait sonner personne — mais converti en carte, son texte devient des composants ou une mention pouvait pinguer. Le journal (et l\'archive des transcripts) coupe desormais TOUTES ses mentions explicitement : elles s\'affichent, en silence',
+    ],
+    retrait: [],
+  },
+  {
+    id: 'menu-panneau-decoche-2026-08bx',
+    title: 'Re-choisir la même raison de ticket fonctionne à nouveau 🎫',
+    ajout: [],
+    amelioration: [],
+    fix: [
+      '🎫 **Le menu du panneau de tickets se decoche apres chaque ouverture.** Discord garde l\'option cochee, et re-choisir la MEME entree ne declenche alors plus rien : impossible de rouvrir un ticket avec la meme raison. La reinitialisation echouait en silence sur les panneaux publies en carte (reedition avec embeds, refusee) — elle passe desormais par le meme moteur que l\'envoi',
+    ],
+    retrait: [],
+  },
+  {
+    id: 'bouton-claim-tickets-2026-08by',
+    title: 'Le bouton « Prendre en charge » sur chaque ticket 🙋',
+    ajout: [
+      '🙋 **Un bouton « Prendre en charge » sur la carte de chaque ticket** : un clic (staff ou role support du type) et le ticket est assigne — la base le note, la carte change de tete, et l\'annonce « X s\'occupe desormais de ce ticket » part dans le salon',
+      '🔄 **Le bouton reste cliquable apres le claim** (« Pris en charge — reprendre ») : un autre membre du staff peut reprendre le ticket, la reprise nomme l\'ancien assigne',
+    ],
+    amelioration: [
+      '🧭 Bouton et menu staff (« Ticket pris en charge » / « Ticket libere ») partagent desormais LE MEME chemin : quel que soit le geste, la carte se met a jour et les menus se decochent',
+    ],
+    fix: [],
+    retrait: [],
+  },
+  {
+    id: 'update-blinde-erreurs-parlantes-2026-08bz',
+    title: 'Les mises à jour de cartes encaissent tout, et les erreurs disent leur cause 🛡️',
+    ajout: [],
+    amelioration: [
+      '🗣️ **« Une erreur est survenue sur ce ticket » dit desormais LA CAUSE**, en petit sous le message : de quoi comprendre — ou rapporter — au lieu de deviner',
+    ],
+    fix: [
+      '🛡️ **Une mise a jour de carte qui echoue n\'emporte plus l\'action.** discord.js peut LEVER pendant la validation au lieu de rejeter proprement : cet echec-la passait entre les mailles et cassait le geste entier (bouton de prise en charge compris). Toutes les mises a jour l\'encaissent desormais, et accusent reception quoi qu\'il arrive',
+    ],
+    retrait: [],
+  },
+  {
+    id: 'refus-staff-fiable-2026-08ca',
+    title: 'Un membre sur les actions staff reçoit le refus, pas une erreur ⛔',
+    ajout: [],
+    amelioration: [],
+    fix: [
+      '⛔ **Un membre qui touche au menu « Actions staff » ou au bouton de prise en charge recoit bien « reserve au staff »** — plus jamais « une erreur est survenue ». Le refus partait en `reply` alors que la remise a zero du menu venait de consommer l\'interaction : Discord levait « InteractionAlreadyReplied », et le membre recevait l\'erreur generique. Le refus regarde desormais l\'etat REEL de l\'interaction avant de choisir sa porte',
+    ],
+    retrait: [],
+  },
+  {
+    id: 'log-suppression-effaceur-2026-08cb',
+    title: 'Le log d\'un message supprimé dit QUI a effacé 🧹',
+    ajout: [
+      '🧹 **« Supprimé par » sur chaque log de suppression** : le moderateur qui a efface est nomme et identifie via le journal d\'audit — l\'entree doit viser le MEME salon ET le MEME auteur, pour ne jamais accuser le mauvais',
+      '👤 Pas d\'entree d\'audit ? C\'est que **l\'auteur a efface son propre message** — Discord n\'audite que les suppressions faites par un tiers, et le log le dit tel quel',
+    ],
+    amelioration: [],
+    fix: [],
+    retrait: [],
+  },
+  {
+    id: 'choix-langue-arrivee-2026-08cc',
+    title: 'Le bot parle 6 langues, et le demande en arrivant 🌍',
+    ajout: [
+      '🌍 **Carte de choix de langue a l\'arrivee** : quand le bot rejoint un serveur, il envoie une carte avec un menu — Français, English, Deutsch, Español, Polski, Русский — et repond ensuite dans la langue choisie',
+      '🇵🇱 **Le polonais rejoint le registre** des langues du bot, au meme rang que les cinq autres',
+      '📚 **Traduction integrale** : les 2819 textes du bot sont traduits dans CHAQUE langue — commandes, panneaux, tickets, logs, musique, erreurs, jusqu\'au moindre detail',
+    ],
+    amelioration: [
+      '🧪 Le test de couverture exige desormais 100 % de traduction pour TOUTES les langues, pas seulement l\'anglais : un texte oublie fait echouer la suite',
+    ],
+    fix: [],
+    retrait: [],
+  },
+  {
+    id: 'tickets-reserves-support-2026-08cd',
+    title: 'Les tickets ne s\'ouvrent qu\'aux roles support choisis 🎫🔒',
+    fix: [
+      '🎫 **Un type de ticket AVEC roles support leur est reserve** : le salon et le fil prive staff ne s\'ouvrent qu\'a ces roles — le rôle staff generaliste n\'est plus ajoute d\'office, comme demande quand seuls les responsables tickets sont qualifies',
+      '🛎️ **Sans role support configure**, tout le staff garde l\'acces (liste ET ancien champ unique) : un ticket sans repondant n\'existe pas',
+    ],
+    ajout: [],
+    amelioration: [
+      '⚙️ Le panneau `/config` → 🎫 Tickets explique la regle en une ligne, pour choisir en connaissance de cause',
+    ],
+    retrait: [],
+  },
+  {
+    id: 'assurances-cartes-donnees-2026-08ce',
+    title: 'Assurances paginees, cartes lisibles, donnees RP protegees 🛡️',
+    ajout: [
+      '📄 **`/assurance liste` est paginee** : fini la coupe muette a 25 contrats — des pages entieres avec fleches ◀️ ▶️, comme les panneaux Blacklist/Whitelist RP',
+      '🚪 **Les assures partis du serveur sont marques** dans la liste, pour reperer d\'un coup d\'oeil qui a quitte',
+      '🏠 **`/entreprise rapatrier`** (admin) ramene une entreprise restee dans la reserve partagee — avec ses contrats — sur le serveur ou travaillent ses patrons : c\'est la que sont passees les entreprises « disparues »',
+    ],
+    fix: [
+      '🪪 **Plus de carte d\'identite muette** : quand les polices d\'ecriture manquent sur l\'hebergement, le bot renonce a l\'image (photo seule, aucun texte) et repond avec l\'embed complet',
+      '🛡️ **`/assurance` regarde la meme reserve que `/entreprise`** : un serveur non relie voyait ses assureurs dans une commande et pas dans l\'autre',
+      '🗃️ **Une migration ne supprime plus jamais** : les fiches en doublon (cartes, permis, entreprises) sont mises de cote dans la base au lieu d\'etre effacees — c\'etait la cause des « pertes de donnees »',
+    ],
+    amelioration: [],
+    retrait: [],
+  },
+  {
+    id: 'dashboard-neon-2026-08cf',
+    title: 'Le dashboard fait peau neuve : neon, halos et documents RP ✨',
+    ajout: [
+      '🎨 **Nouveau design integral du site** : halos animes, cartes en verre depoli, boutons biseautes a reflet, compteurs qui montent, menu regroupe (Pilotage / Moderation / Administration)',
+      '🪪 **Aperçus des documents RP dans le dashboard** : la carte d\'identite et le permis s\'affichent en direct au theme du serveur (Roblox, GTA, DarkRP, Red Dead, Militaire) depuis Serveur → Module RP',
+      '🔗 **Liens profonds** : `?page=…&server=…&module=…` ouvrent directement un ecran precis du dashboard, pratique a partager entre staff',
+    ],
+    amelioration: [
+      '⚙️ Le Site builder garde la main sur tout : accent, police, style de bouton, fond image/video — le nouveau design les respecte',
+    ],
+    fix: [],
+    retrait: [],
+  },
+  {
+    id: 'site-notes-support-2026-08cg',
+    title: 'Le site s\'etoffe : plein ecran, notes de mise a jour et support',
+    ajout: [
+      '📝 **Les notes de mise a jour se lisent sur le site** : le menu « Mises a jour » de la page d\'accueil montre le journal du bot, version par version',
+      '🎫 **Une section Support sur la page d\'accueil** : ou ouvrir un ticket, comment joindre le staff, et le serveur d\'entraide si le staff en a configure un',
+      '🔒 **Le dashboard exige un compte Discord connecte** : la page d\'accueil reste publique, tout le reste passe par « Se connecter avec Discord » — et par rien d\'autre',
+    ],
+    amelioration: [
+      '🖥️ Le site occupe enfin tout l\'ecran : plus de bandes noires sur les grands moniteurs, du menu du haut au pied de page',
+    ],
+    fix: [],
+    retrait: [],
+  },
+  {
+    id: 'absences-auteur-2026-08ch',
+    title: 'Une absence n\'appartient qu\'a son auteur',
+    fix: [
+      '⛔ Plus personne d\'autre que l\'auteur d\'une absence ne peut la modifier ni cliquer « ✅ Je suis de retour » a sa place — le staff non plus. Avant, n\'importe qui du staff pouvait clore ou reecrire l\'absence de quelqu\'un d\'autre',
+    ],
+    ajout: [],
+    amelioration: [],
+    retrait: [],
+  },
+  {
+    id: 'preset-editeur-2026-09ci',
+    title: 'Reponses types : un vrai editeur avec retours a la ligne',
+    ajout: [
+      '📝 **/preset ajouter** (sans texte) et **/preset modifier** (avec le seul numero) ouvrent un **editeur multiligne** : la touche Entree fait un vrai retour a la ligne, et l\'embed ressort exactement comme ecrit',
+    ],
+    amelioration: [
+      '✏️ A la modification, l\'editeur arrive prerempli avec les textes actuels — on corrige sur place au lieu de tout retaper. Les balises restent valables partout : && = barre, &> = liste, \\n = saut de ligne',
+    ],
+    fix: [],
+    retrait: [],
+  },
+  {
+    id: 'arrivees-invites-2026-09cj',
+    title: 'Arrivees & departs : roles automatiques, traqueur d\'invitations',
+    ajout: [
+      '👋 **Nouvelle categorie « Arrivees & departs » dans /config** : salon des arrivees, salon des departs (separe), roles automatiques — tout au meme endroit',
+      '🎭 **Roles automatiques des membres** reglables dans /config (ils existaient deja cote site) — donnes a l\'arrivee, ou apres le captcha s\'il est actif',
+      '🤖 **Roles automatiques des BOTS** : leur propre liste, donnee des leur arrivee — un rôle « Bots » range a part, jamais les roles des joueurs',
+      '📨 **Traqueur d\'invitations** : le bot note qui a invite chaque nouveau membre. `/invites voir` (ses invitations, et par qui il est arrive), `/invites classement` (les meilleurs inviteurs), et l\'embed d\'arrivee affiche « Invite par »',
+    ],
+    fix: [],
+    amelioration: [],
+    retrait: [],
+  },
+  {
+    id: 'vocal-dave-2026-09ck',
+    title: 'Le son revient : chiffrement de bout en bout (DAVE)',
+    fix: [
+      '🔊 **Le bot rejoignait le vocal mais restait muet** : depuis mars 2026, Discord n\'accepte plus que les clients parlant le chiffrement de bout en bout (protocole DAVE) et raccrochait avec le code 4017. La brique DAVE est maintenant embarquee — la musique et les radios diffusent a nouveau',
+    ],
+    amelioration: [
+      '🔬 `/musique diagnostic` verifie aussi la brique DAVE et reconnait le code 4017 : le message dit exactement quoi faire au lieu de suggerer un changement de region',
+    ],
+    ajout: [],
+    retrait: [],
+  },
+  {
+    id: 'musique-sources-2026-09cl',
+    title: 'Musique : YouTube lisible a nouveau, radios reparees',
+    fix: [
+      '📺 **« Invalid URL » a la lecture YouTube** : l\'ancien lecteur (play-dl, abandonne) ne suit plus les changements de YouTube. Le flux passe desormais par ytdl-core, un client maintenu — play-dl ne reste qu\'en secours. Les liens Spotify et Deezer, joues via YouTube, refonctionnent du meme coup',
+      '📻 **Les radios plantaient (« wasm not included »)** : le fichier WASM de l\'encodeur Opus manquait dans l\'executable. Il est embarque, et l\'auto-test de publication le charge desormais reellement — un build muet ne peut plus sortir',
+    ],
+    ajout: [],
+    amelioration: [],
+    retrait: [],
+  },
+  {
+    id: 'musique-ytdlp-2026-09cm',
+    title: 'YouTube : lecture confiee a yt-dlp, le moteur qui tient',
+    fix: [
+      '📺 **Les liens YouTube ne jouaient toujours pas** : depuis 2026, YouTube exige des jetons d\'origine et bloque les adresses IP d\'hebergeurs — les bibliotheques Node (ytdl-core est archive, play-dl abandonne) ne suivent plus. Le bot s\'appuie desormais sur **yt-dlp**, l\'outil maintenu qu\'utilisent les bots qui marchent encore : un binaire pose a cote du bot, telecharge automatiquement a la premiere lecture, et remis a jour tout seul des qu\'il a plus de sept jours',
+    ],
+    amelioration: [
+      '🩺 En cas d\'echec, le message dit la vraie cause — par exemple le controle anti-robot de YouTube, avec la parade (`YTDLP_COOKIES` dans le .env) — au lieu d\'un « Invalid URL » muet. `/musique diagnostic` et `/musique sources` montrent l\'etat du lecteur yt-dlp',
+    ],
+    ajout: [],
+    retrait: [],
+  },
+  {
+    id: 'musique-carte-2026-09cn',
+    title: 'Carte de lecture, salons musique et playlists Spotify',
+    ajout: [
+      '🎴 **La carte « Lecture en cours »** : titre, progression et boutons (pause, passer, boucle, file, stop) sur UN message qui suit la lecture — modifie sur place tant qu\'il reste en bas du salon, sinon renvoye en bas a chaque nouveau morceau, et referme a l\'arret',
+      '🎵 **/config → 🎵 Musique** : choisissez les salons ou `/musique` et `/radio` repondent (ailleurs, le bot renvoie vers le bon salon) et le salon de la carte de lecture — sans choix, elle suit la commande',
+    ],
+    fix: [
+      '🟢 **Les playlists et albums Spotify entiers** se lisent desormais sans aucun identifiant d\'application : la page publique de Spotify donne tous les titres, joues via YouTube (50 par ajout au maximum)',
+    ],
+    amelioration: [
+      '▶️ La reponse de `/musique play` ne porte plus ses propres boutons : le pilotage vit sur la carte, unique — dix ajouts ne sement plus dix jeux de boutons perimes',
+    ],
+    retrait: [],
+  },
+  {
+    id: 'musique-affichage-2026-09co',
+    title: 'Le morceau s\'affiche partout, la qualite suit les boosts',
+    ajout: [
+      '🪧 **Le statut du salon vocal** affiche le morceau en cours (« 🎵 Titre ») juste sous le nom du salon, et s\'efface a l\'arret — donnez au bot la permission « Definir le statut des salons vocaux »',
+      '🎧 **Le statut du bot** passe en « Ecoute <titre> » pendant la lecture (quand un seul serveur joue) ; le statut configure reprend sa place des la fin',
+    ],
+    amelioration: [
+      '🎚️ **La qualite audio suit les boosts** : le bot encode au debit du salon vocal — 96, 128, 256 ou 384 kb/s selon le niveau de boost du serveur et le reglage du salon — et la carte de lecture affiche le debit retenu',
+    ],
+    fix: [],
+    retrait: [],
+  },
+  {
+    id: 'tuto-guides-2026-09cp',
+    title: 'Deux guides des commandes : /tuto et /tutos',
+    ajout: [
+      '📖 **/tuto** : le guide des commandes ouvertes a tous les membres — chaque commande avec ses sous-commandes et leurs descriptions, classees par theme, en pages (reponse ephemere, rien ne remplit le salon)',
+      '📖 **/tutos** (staff) : le guide complet — commandes staff et administration incluses, chacune avec son badge (👮 staff, 🛡️ admin). Les commandes du createur du bot n\'apparaissent dans aucun des deux guides',
+    ],
+    amelioration: [
+      '🔁 Les guides ne sont pas rediges a la main : ils se generent depuis les definitions reelles des commandes chargees — ils ne peuvent donc jamais etre en retard sur le bot. Un module desactive sur un serveur (Interactions, SAO…) y est tu sur ce serveur',
+    ],
+    fix: [],
+    retrait: [],
+  },
+];
+
+// Construit l'embed d'une note à partir d'une entrée { title, ajout, fix,
+// amelioration, retrait }. Chaque catégorie accepte un tableau OU un texte.
+// La note de mise à jour est le message que les membres voient le plus
+// souvent : c'est donc elle qui doit porter la direction artistique en
+// premier, pas en dernier.
+//
+// Trois choses volontairement ABSENTES ici :
+//  • aucune couleur — l'accent du serveur s'applique tout seul ;
+//  • aucun pied de page décoratif — « Note de mise à jour du bot » ne disait
+//    rien que le titre ne dise déjà, et il empêchait la signature
+//    « NomDuBot • NomDuServeur » de se poser ;
+//  • aucun champ d'embed — la grille grise de Discord est remplacée par les
+//    sections ◆ / ➜.
+const RUBRIQUES = [
+  { cle: 'ajout', titre: 'Ajout', prefixe: '🆕' },
+  { cle: 'fix', titre: 'Correction', prefixe: '🔧', mot: 'correction' },
+  { cle: 'amelioration', titre: 'Amélioration', prefixe: '✨', mot: 'amélioration' },
+  { cle: 'retrait', titre: 'Retrait', prefixe: '➖', mot: 'retrait' },
+];
+
+function lignesDe(valeur) {
+  const brut = Array.isArray(valeur) ? valeur.slice() : String(valeur || '').split('\n');
+  return brut.map((l) => String(l).trim().replace(/^➜\s*/, '')).filter(Boolean);
+}
+
+function buildEmbed(entry) {
+  const blocs = [IMMEDIATE];
+  for (const r of RUBRIQUES) {
+    const lignes = lignesDe(entry[r.cle]);
+    // Une rubrique vide n'a pas à occuper de place : on ne l'affiche pas.
+    if (!lignes.length) continue;
+    blocs.push(M.bloc(r.titre, lignes, { prefixe: r.prefixe, motCompte: r.mot || 'ajout' }));
+  }
+
+  // Une note de version peut être longue. `paginer` coupe ENTRE deux
+  // rubriques, jamais au milieu de l'une d'elles.
+  const pages = M.paginer(blocs, { maxParPage: 99 });
+
+  const embed = new EmbedBuilder()
+    .setTitle(`📝 ${entry.title || 'Note de mise à jour'}`)
+    .setDescription(M.borner(M.description(pages[0] || [IMMEDIATE]), M.MAX_DESCRIPTION));
+
+  // Rien ne doit disparaître d'une note de version : ce qui n'a pas tenu dans
+  // la description repasse en champs. Moins beau, mais complet — et ce cas ne
+  // se produit que pour une version exceptionnellement fournie.
+  for (const page of pages.slice(1)) {
+    for (const champ of enChamps(page)) {
+      if (embed.data.fields?.length >= 25) return embed;
+      embed.addFields(champ);
+    }
+  }
+
+  return embed;
+}
+
+// Transforme des blocs en champs d'embed, en respectant la limite de 1024
+// signes par valeur et sans jamais couper une ligne en deux.
+function enChamps(blocs) {
+  const champs = [];
+  for (const b of blocs) {
+    const [entete, ...lignes] = b.split('\n');
+    const nom = M.borner(entete.replace(/[*◆·]/g, '').trim(), 256) || 'Suite';
+    let tampon = [];
+    let taille = 0;
+    let part = 0;
+    const vider = () => {
+      if (!tampon.length) return;
+      champs.push({ name: part === 0 ? nom : `${nom} (suite)`, value: tampon.join('\n') });
+      tampon = [];
+      taille = 0;
+      part += 1;
+    };
+    for (const l of lignes) {
+      if (taille + l.length + 1 > M.MAX_CHAMP) vider();
+      tampon.push(l);
+      taille += l.length + 1;
+    }
+    vider();
+  }
+  return champs;
+}
+
+const getPos = db.prepare("SELECT value FROM app_state WHERE key = 'patch_notes_pos'");
+const setPos = db.prepare("INSERT OR REPLACE INTO app_state (key, value) VALUES ('patch_notes_pos', ?)");
+
+// 🔔 Qui prévenir quand une note paraît ?
+//
+// Par défaut : PERSONNE. Une note de version ne justifie pas de faire sonner
+// le téléphone de tout le serveur — c'est le genre de notification qui fait
+// couper le salon, voire quitter. Chaque serveur décide, et le silence est
+// le choix par défaut.
+//
+// `patch_mention` vaut : rien (aucune mention), 'everyone', 'here', ou
+// l'identifiant d'un rôle.
+function mentionDe(cfg) {
+  const v = String(cfg?.patch_mention || '').trim();
+  if (!v || v === 'aucune') return null;
+  // @everyone et @here relèvent tous deux du type « everyone » côté API.
+  if (v === 'everyone') return { content: '@everyone', allowedMentions: { parse: ['everyone'] } };
+  if (v === 'here') return { content: '@here', allowedMentions: { parse: ['everyone'] } };
+  if (/^\d{5,}$/.test(v)) return { content: `<@&${v}>`, allowedMentions: { roles: [v] } };
+  return null;
+}
+
+// Le message à envoyer, mention comprise — ou muet.
+// ⚠️ Sans mention, on pose quand même `allowedMentions: { parse: [] }` :
+// sinon un pseudo ou un rôle cité DANS la note sonnerait chez l'intéressé.
+function envoiDe(embed, cfg) {
+  const m = mentionDe(cfg);
+  return {
+    ...(m ? { content: m.content } : {}),
+    embeds: [embed],
+    allowedMentions: m ? m.allowedMentions : { parse: [] },
+  };
+}
+
+// Publie une note dans le salon patch note de chaque serveur qui en a configuré un.
+async function broadcast(client, entry) {
+  const embed = buildEmbed(entry);
+  let count = 0;
+  for (const guild of client.guilds.cache.values()) {
+    try {
+      const cfg = getGuildConfig(guild.id);
+      if (!cfg.patch_channel_id) continue;
+      const channel = await guild.channels.fetch(cfg.patch_channel_id).catch(() => null);
+      if (!channel?.isTextBased()) continue;
+      const ok = await channel
+        .send(envoiDe(embed, cfg))
+        .then(() => true)
+        .catch(() => false);
+      if (ok) count += 1;
+    } catch {
+      // un serveur en échec ne doit pas bloquer les autres
+    }
+  }
+  return count;
+}
+
+function currentPos() {
+  try {
+    const row = getPos.get();
+    const n = row ? parseInt(row.value, 10) : -1;
+    return Number.isNaN(n) ? -1 : n;
+  } catch {
+    return -1;
+  }
+}
+
+// Au démarrage : publie toute entrée pas encore annoncée (dans l'ordre).
+async function start(client) {
+  for (let i = currentPos() + 1; i < RELEASES.length; i++) {
+    const count = await broadcast(client, RELEASES[i]);
+    setPos.run(String(i));
+    console.log(`📝 Patch note « ${RELEASES[i].id} » publiée dans ${count} salon(s).`);
+  }
+}
+
+// Publication forcée (commande créateur) :
+//  • 'attente'  → publie les entrées pas encore annoncées (comme au démarrage,
+//                 fait avancer le marqueur : pas de renvoi au prochain reboot)
+//  • 'initial'  → renvoie le récapitulatif complet sans toucher au marqueur
+//  • 'derniere' → renvoie la dernière entrée du journal sans toucher au marqueur
+async function forcePublish(client, which = 'derniere') {
+  if (which === 'attente') {
+    let entries = 0;
+    let count = 0;
+    for (let i = currentPos() + 1; i < RELEASES.length; i++) {
+      count += await broadcast(client, RELEASES[i]);
+      setPos.run(String(i));
+      entries += 1;
+    }
+    return { mode: 'attente', entries, count };
+  }
+  const entry = which === 'initial' ? RELEASES[0] : RELEASES[RELEASES.length - 1];
+  const count = await broadcast(client, entry);
+  // La mention n'est plus décidée par l'entrée mais par chaque serveur : on
+  // n'en annonce donc aucune ici.
+  return { mode: which, title: entry.title, count };
+}
+
+module.exports = { start, forcePublish, buildEmbed, mentionDe, envoiDe, RELEASES };

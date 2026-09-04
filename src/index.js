@@ -1,0 +1,372 @@
+// Masque les avertissements de dépréciation de Node (ex : punycode DEP0040)
+// qui polluent la console sans être des erreurs.
+process.noDeprecation = true;
+
+const fs = require('fs');
+const path = require('path');
+
+// En exécutable packagé (pkg), les fichiers de l'utilisateur (.env, data.sqlite)
+// vivent à côté de l'exécutable ; en mode Node classique, à la racine du projet.
+// BOT_DIR (agent hébergeur multi-bots) : chaque bot a son propre dossier de
+// données même quand plusieurs bots partagent le même exécutable.
+const baseDir =
+  process.env.BOT_DIR?.trim() || (process.pkg ? path.dirname(process.execPath) : path.join(__dirname, '..'));
+const envPath = path.join(baseDir, '.env');
+
+const ENV_TEMPLATE = `# Token du bot (Portail développeur Discord > Bot > Token)
+DISCORD_TOKEN=
+
+# ID de l'application (Portail développeur Discord > General Information > Application ID)
+CLIENT_ID=
+
+# Optionnel : ID de votre serveur pour un enregistrement instantané des commandes.
+# Laissez vide pour un enregistrement global (propagation jusqu'à 1 h).
+GUILD_ID=
+
+# Optionnel : votre ID Discord (autorisé à utiliser /stop et reconnu créateur par /info)
+OWNER_ID=
+
+# Optionnel : IDs Discord de l'équipe du bot, séparés par des virgules (reconnus staff par /info)
+BOT_TEAM=
+
+# Module interactions (/interact) : "on" (défaut) ou "off" pour le désactiver sur CE bot
+MODULE_INTERACT=on
+
+# Optionnel : limite /interact à certains serveurs (IDs séparés par des virgules ; vide = partout)
+INTERACT_GUILDS=
+`;
+
+// Premier lancement de l'exécutable : on crée un .env à remplir à côté de l'exe.
+// (sauf en mode géré : le gestionnaire ou l'agent hébergeur fournit déjà la
+// configuration par variables d'environnement — un .env modèle vide créerait
+// de la confusion avec le config.env de l'hébergeur)
+if (process.pkg && process.env.BOT_MANAGED !== '1' && !fs.existsSync(envPath)) {
+  try {
+    fs.writeFileSync(envPath, ENV_TEMPLATE, { flag: 'wx' });
+  } catch {
+    // impossible d'écrire : on continuera avec les variables d'environnement
+  }
+}
+require('dotenv').config({ path: envPath });
+
+// 🎛️ FFmpeg posé à côté du bot : prism-media honore FFMPEG_PATH. C'est le
+// seul moyen d'avoir les radios avec l'exécutable packagé — un binaire dans
+// l'instantané pkg ne peut pas être lancé.
+if (!process.env.FFMPEG_PATH) {
+  const ffmpegLocal = path.join(baseDir, process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg');
+  if (fs.existsSync(ffmpegLocal)) process.env.FFMPEG_PATH = ffmpegLocal;
+}
+
+// Toute erreur fatale est aussi consignée dans erreur.log à côté de
+// l'exécutable, pour pouvoir diagnostiquer même si la fenêtre s'est fermée.
+function logErrorFile(message) {
+  try {
+    fs.appendFileSync(path.join(baseDir, 'erreur.log'), `[${new Date().toISOString()}] ${message}\n`);
+  } catch {}
+}
+
+// En exécutable lancé par double-clic, la fenêtre se ferme dès la fin du
+// processus : on attend Entrée pour que l'utilisateur puisse lire l'erreur.
+function fatal(message) {
+  console.error(message);
+  logErrorFile(message);
+  if (process.pkg && process.stdin.isTTY) {
+    console.log('\nAppuyez sur Entrée pour fermer cette fenêtre…');
+    const rl = require('readline').createInterface({ input: process.stdin, output: process.stdout });
+    rl.question('', () => process.exit(1));
+    return;
+  }
+  process.exit(1);
+}
+
+// Garde-fous : la fenêtre ne doit jamais se fermer sans explication.
+process.on('uncaughtException', (err) => {
+  logErrorFile(`uncaughtException : ${err?.stack || err}`);
+  fatal(`❌ Erreur inattendue : ${err?.message || err}`);
+});
+process.on('unhandledRejection', (err) => {
+  console.error('Unhandled rejection :', err);
+  logErrorFile(`unhandledRejection : ${err?.stack || err}`);
+});
+
+function loadCommandFiles() {
+  const commandsPath = path.join(__dirname, 'commands');
+  const commands = [];
+  for (const file of fs.readdirSync(commandsPath).filter((f) => f.endsWith('.js'))) {
+    const mod = require(path.join(commandsPath, file));
+    for (const command of Array.isArray(mod) ? mod : [mod]) {
+      if (command?.data && command?.execute) commands.push(command);
+      else console.warn(`⚠️ Commande invalide ignorée dans ${file}`);
+    }
+  }
+  return commands;
+}
+
+const mode = (process.argv[2] || 'start').toLowerCase();
+
+if (mode === 'check') {
+  // Auto-test (utilisé par la CI) : initialise la base SQLite (module natif)
+  // et charge toutes les commandes, sans se connecter à Discord.
+  require('./database');
+  const commands = loadCommandFiles();
+  // 🔊 Depuis mars 2026, Discord EXIGE le chiffrement de bout en bout de la
+  // voix (protocole DAVE) : sans cette brique, le serveur vocal raccroche
+  // avec le code 4017 et le bot reste muet. On refuse de livrer ça.
+  require('@snazzah/davey');
+  console.log('✅ Brique DAVE (chiffrement de bout en bout de la voix) chargée.');
+  // 🎚️ L'encodeur Opus est INSTANCIÉ, pas seulement résolu : son fichier
+  // WASM doit être dans l'exécutable, et seul un vrai chargement le prouve
+  // (on a déjà livré un build où il manquait — radios et volume muets).
+  const OpusScript = require('opusscript');
+  const opus = new OpusScript(48000, 2, OpusScript.Application.AUDIO);
+  if (typeof opus.delete === 'function') opus.delete();
+  console.log('✅ Encodeur Opus (WASM) chargé.');
+  // 📺 Le client YouTube qui ouvre les flux audio (play-dl ne sait plus).
+  require('./utils/musiqueMoteur').verifierClientYouTube()
+    .then(() => {
+      console.log('✅ Client YouTube (ytdl-core) chargé.');
+      console.log(`✅ Auto-test OK : base de données initialisée, ${commands.length} commande(s) chargée(s).`);
+      process.exit(0);
+    })
+    .catch((err) => fatal(`❌ Client YouTube (ytdl-core) : ${err.message}`));
+  return;
+} else if (mode === 'deploy') {
+  require('./deploy-commands')
+    .deployCommands()
+    .then(() => process.exit(0))
+    .catch((err) => fatal(`❌ Échec de l'enregistrement des commandes : ${err.message}`));
+} else {
+  start().catch((err) => {
+    logErrorFile(`start() : ${err?.stack || err}`);
+    fatal(`❌ Démarrage impossible : ${err?.message || err}`);
+  });
+}
+
+// ----- Verrou d'instance unique -----
+// Empêche de lancer deux fois le bot : deux instances connectées avec le même
+// token se disputent les interactions (erreurs « Unknown interaction ») et une
+// ancienne instance peut rester en ligne avec du vieux code après une mise à
+// jour. Au redémarrage (update), la nouvelle instance patiente le temps que
+// l'ancienne se ferme.
+function pidAlive(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function acquireLock() {
+  // Défini ICI (et pas au niveau du module) : start() s'exécute avant la fin
+  // du chargement du module, une constante déclarée plus bas serait encore
+  // dans sa « zone morte » (ReferenceError).
+  const lockPath = path.join(baseDir, 'bot.lock');
+  for (let attempt = 0; attempt < 16; attempt++) {
+    let existing = null;
+    try {
+      existing = parseInt(fs.readFileSync(lockPath, 'utf8'), 10);
+    } catch {}
+    if (existing && existing !== process.pid && pidAlive(existing)) {
+      if (attempt === 0) console.log('⏳ Une autre instance se ferme peut-être, patientez…');
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      continue;
+    }
+    try {
+      fs.writeFileSync(lockPath, String(process.pid));
+      process.on('exit', () => {
+        try {
+          if (parseInt(fs.readFileSync(lockPath, 'utf8'), 10) === process.pid) fs.unlinkSync(lockPath);
+        } catch {}
+      });
+    } catch (err) {
+      // Non bloquant : on continue sans verrou, mais on affiche la cause réelle
+      // (EPERM = droits/antivirus, EROFS = dossier en lecture seule, etc.)
+      console.warn(`⚠️ Verrou bot.lock non écrit (${err.code || err.message}) — démarrage sans verrou d'instance.`);
+      logErrorFile(`bot.lock non écrit : ${err.stack || err}`);
+    }
+    return true;
+  }
+  return false;
+}
+
+async function start() {
+  console.log(`🤖 Bot Discord RP — version v${(() => { try { return require('../package.json').version; } catch { return '?'; } })()}`);
+
+  // Lancement manuel = prise de main : sur Windows, on ferme d'office toutes
+  // les autres instances du même exécutable (anciennes versions comprises),
+  // pour éviter les doublons connectés avec le même token. Les instances
+  // issues d'un redémarrage automatique (update/restart) ne balaient pas :
+  // elles attendent le verrou, ce qui évite qu'elles s'entretuent.
+  const isRespawn = Boolean(process.env.BOT_JUST_UPDATED || process.env.BOT_RESTARTED);
+  const isManaged = process.env.BOT_MANAGED === '1'; // lancé par le Gestionnaire de bots
+  if (!isRespawn && !isManaged && process.pkg && process.platform === 'win32') {
+    try {
+      const { spawnSync } = require('child_process');
+      spawnSync(
+        'taskkill',
+        ['/F', '/FI', `PID ne ${process.pid}`, '/IM', path.basename(process.execPath)],
+        { stdio: 'ignore' }
+      );
+    } catch {}
+  }
+
+  if (!(await acquireLock())) {
+    fatal(
+      '❌ Le bot est déjà lancé (une autre fenêtre/instance est en cours d\'exécution).\n' +
+        'Fermez l\'autre fenêtre du bot puis relancez, ou utilisez la commande /update sur Discord pour le redémarrer.'
+    );
+    return;
+  }
+
+  // Mise à jour automatique depuis les releases GitHub (exécutable uniquement).
+  if (process.pkg && process.env.AUTO_UPDATE !== 'off' && !process.env.BOT_JUST_UPDATED) {
+    try {
+      if (await require('./updater').autoUpdate()) return; // redémarrage en cours
+    } catch (err) {
+      console.warn(`⚠️ Mise à jour automatique ignorée : ${err.message}`);
+    }
+  }
+
+  if (!process.env.DISCORD_TOKEN?.trim()) {
+    fatal(
+      `❌ DISCORD_TOKEN manquant.\n\n` +
+        `1. Ouvrez le fichier .env ici : ${envPath}\n` +
+        `2. Collez le token de votre bot (Portail développeur Discord > Bot > Reset Token)\n` +
+        `   ainsi que le CLIENT_ID (General Information > Application ID).\n` +
+        `3. Relancez le bot.`
+    );
+    return;
+  }
+
+  const { Client, Collection, GatewayIntentBits, Partials, Events } = require('discord.js');
+  require('./database'); // initialise la base de données au démarrage
+
+  const client = new Client({
+    intents: [
+      GatewayIntentBits.Guilds,
+      GatewayIntentBits.GuildMembers,
+      GatewayIntentBits.GuildMessages,
+      GatewayIntentBits.MessageContent,
+      GatewayIntentBits.GuildVoiceStates,
+      GatewayIntentBits.GuildModeration,
+      // 🎭 Rôles à la réaction : sans cet intent, réagir à un panneau ne
+      // déclenche rien du tout. Il ne demande aucune autorisation
+      // privilégiée sur le portail développeur.
+      GatewayIntentBits.GuildMessageReactions,
+      // 📖 Le journal exhaustif : émojis et stickers, invitations,
+      // événements planifiés. Aucun des trois n'est privilégié.
+      GatewayIntentBits.GuildExpressions,
+      GatewayIntentBits.GuildInvites,
+      GatewayIntentBits.GuildScheduledEvents,
+    ],
+    // Reaction et User : un panneau publié avant le dernier redémarrage n'est
+    // pas en cache. Sans ces partiels, Discord n'envoie tout simplement pas
+    // l'événement — le panneau semblerait mort sans la moindre erreur.
+    partials: [Partials.GuildMember, Partials.Message, Partials.Channel, Partials.Reaction, Partials.User],
+  });
+
+  // 🎨 Identité visuelle des embeds, posée au seul passage obligé : la couche
+  // REST. Tout ce que le bot envoie — salon, réponse de commande, message
+  // privé, webhook — reçoit la même couleur d'accent et le même pied de page.
+  try {
+    require('./utils/styleEmbeds').installer(client);
+  } catch (err) {
+    console.warn(`⚠️ Identité des embeds non installée : ${err.message}`);
+  }
+
+  client.commands = new Collection();
+  for (const command of loadCommandFiles()) {
+    client.commands.set(command.data.name, command);
+  }
+  console.log(`📦 ${client.commands.size} commande(s) chargée(s) : ${[...client.commands.keys()].join(', ')}`);
+
+  const eventsPath = path.join(__dirname, 'events');
+  for (const file of fs.readdirSync(eventsPath).filter((f) => f.endsWith('.js'))) {
+    const event = require(path.join(eventsPath, file));
+    if (event.once) client.once(event.name, (...args) => event.execute(...args));
+    else client.on(event.name, (...args) => event.execute(...args));
+  }
+
+  // API locale pour le Gestionnaire de bots (dashboard + créateur d'embed).
+  // Démarrée TOUT DE SUITE, pas à la connexion Discord : un bot qui n'arrive
+  // pas à se connecter (token refusé, réseau, démarrage long) doit pouvoir le
+  // DIRE au site. Avant, api.port gardait le port d'un ancien démarrage et
+  // l'agent répondait 502 « injoignable » sans explication, alors que tout
+  // semblait à jour. Tant que le bot n'est pas prêt, l'API répond 503 avec la
+  // cause.
+  if (process.env.BOT_MANAGED === '1') {
+    (() => {
+      try {
+        require('./managedApi').startManagedApi(client, baseDir);
+      } catch (err) {
+        console.warn(`⚠️ API locale non démarrée : ${err.message}`);
+      }
+    })();
+  }
+
+  // Synchronisation des commandes au démarrage : globales (app utilisateur)
+  // + jeu par serveur selon le Module RP. Resynchronisation quand le bot
+  // rejoint un nouveau serveur.
+  client.once(Events.ClientReady, () => {
+    require('./commandSync')
+      .syncAll(client)
+      .catch((err) => console.warn(`⚠️ Synchronisation des commandes : ${err.message}`));
+  });
+
+  // 📨 Traqueur d'invitations : photo de départ des compteurs de chaque
+  // serveur — sans elle, impossible de dire quelle invitation a servi.
+  client.once(Events.ClientReady, () => {
+    require('./utils/invitations')
+      .primerTout(client)
+      .catch((err) => console.warn(`⚠️ Traqueur d'invitations : ${err.message}`));
+  });
+
+  // Annonces de mise à jour au staff : « installée » après une mise à jour,
+  // « prête » quand une nouvelle release est publiée (vérification périodique).
+  client.once(Events.ClientReady, () => {
+    try {
+      require('./utils/updateAnnounce').start(client);
+    } catch (err) {
+      console.warn(`⚠️ Annonces de mise à jour non démarrées : ${err.message}`);
+    }
+  });
+
+  // Annonces réseaux sociaux : lives Twitch et nouvelles vidéos/publications
+  // (YouTube, TikTok, X, Reddit) des comptes suivis via /reseaux.
+  client.once(Events.ClientReady, () => {
+    try {
+      require('./utils/socialWatch').start(client);
+    } catch (err) {
+      console.warn(`⚠️ Veille des réseaux sociaux non démarrée : ${err.message}`);
+    }
+  });
+
+  // Notes de mise à jour automatiques : publie dans chaque salon patch note
+  // configuré les versions pas encore annoncées (la 1re fois : récapitulatif
+  // complet ; ensuite : chaque nouvelle version). La mention éventuelle est
+  // un réglage par serveur — aucune par défaut.
+  client.once(Events.ClientReady, () => {
+    require('./utils/patchNotes')
+      .start(client)
+      .catch((err) => console.warn(`⚠️ Notes de mise à jour non publiées : ${err.message}`));
+  });
+
+  // Statut personnalisé du bot : appliqué par events/ready.js via
+  // utils/presence.js — une seule logique, aussi utilisée quand la musique
+  // rend le statut après un « Écoute … ».
+  client.on(Events.GuildCreate, (guild) => {
+    require('./commandSync').syncGuild(guild.id).catch(() => null);
+  });
+
+  client
+    .login(process.env.DISCORD_TOKEN)
+    .catch((err) =>
+      fatal(
+        `❌ Connexion à Discord impossible : ${err.message}\n\n` +
+          `Vérifiez le DISCORD_TOKEN dans ${envPath}\n` +
+          `et que les intents "Server Members" et "Message Content" sont activés\n` +
+          `(Portail développeur Discord > Bot > Privileged Gateway Intents).`
+      )
+    );
+}

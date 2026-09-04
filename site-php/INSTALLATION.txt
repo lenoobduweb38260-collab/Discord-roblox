@@ -1,0 +1,101 @@
+AINCRAD CONTROL PANEL — INSTALLATION RAPIDE
+
+1. Déposez ce dossier chez votre hébergeur PHP (version 8.0 ou plus récente).
+2. Ouvrez l'adresse de votre site dans le navigateur.
+   (Pour essayer sur votre PC : ouvrez un terminal dans ce dossier,
+    lancez « php -S localhost:8000 » puis allez sur http://localhost:8000)
+
+DOSSIERS À RENDRE MODIFIABLES PAR PHP (chmod 775) :
+- data/                  (données du site + connexion à votre agent)
+- uploads/proofs/
+- uploads/backgrounds/   (images de fond téléversées depuis le Site builder)
+
+RELIER VOS BOTS — TOUT SE FAIT DANS LE SITE, AUCUN FICHIER À MODIFIER :
+  Créateur (⚙️) > Mes bots (🤖) > encadré « 🔗 Connexion à votre agent »
+    • Adresse de l'agent : http://IP-de-votre-serveur:PORT
+      (la même valeur que AGENT_URL dans votre dashboard ;
+       ce n'est NI le Client ID du bot, NI l'adresse de votre site)
+    • Clé de l'agent : la valeur AGENT_KEY du config.env de votre agent
+    • Cliquez sur « 🔌 Tester et enregistrer »
+
+  Le site appelle vraiment votre agent :
+    ✅ il répond        -> c'est enregistré, et vos bots apparaissent
+                           aussitôt dans la liste « Nom chez l'agent »
+    ❌ il ne répond pas -> RIEN n'est enregistré, et le site vous dit
+                           précisément pourquoi (clé refusée, port fermé,
+                           adresse d'un autre service…)
+
+  Ensuite : choisissez le bot dans « Nom chez l'agent »,
+  cliquez sur « 💾 Enregistrer les bots » puis « 🔄 Synchroniser ».
+
+  À noter : si votre dashboard est installé dans un sous-dossier
+  « dashboard », le site reprend automatiquement ses réglages —
+  vous n'avez alors rien à saisir.
+
+  Sans agent joignable, le site tourne avec des données de démonstration.
+
+SE CONNECTER AVEC SON COMPTE DISCORD :
+  Créateur (⚙️) > Connexion Discord (🔑)
+    1. Le site affiche une ADRESSE DE RETOUR toute prête. Copiez-la dans
+       le Portail développeur Discord > votre application > OAuth2 >
+       Redirects > Add Redirect > Save Changes.
+    2. Collez le Client ID et la clé secrète (OAuth2 > Reset Secret),
+       puis « Vérifier et enregistrer ».
+       (Si le dashboard est installé à côté, c'est déjà fait tout seul.)
+    3. Cliquez sur « Se connecter » en haut à droite.
+
+ÊTRE LE SEUL PROPRIÉTAIRE (à faire en premier) :
+  Ouvrez config.php et collez VOTRE identifiant Discord :
+      const SITE_OWNER_ID = '123456789012345678';
+
+  Pour l'obtenir : Discord > Paramètres > Avancés > activez le
+  « Mode développeur », puis clic droit sur votre nom > Copier l'identifiant.
+
+  Dès cette ligne remplie :
+    • vous êtes propriétaire pour toujours, personne ne peut vous
+      l'enlever depuis le site ;
+    • le site est VERROUILLÉ immédiatement : aucun inconnu ne peut s'en
+      emparer, même s'il trouve l'adresse avant vous.
+  Laissée vide, le site se rabat sur « le premier compte connecté devient
+  propriétaire » — pratique, mais moins sûr.
+
+QUI ENTRE DANS L'ESPACE DE GESTION :
+  Créateur (⚙️) > Connexion & équipe (🔑) > section 3.
+  Vous ajoutez les identifiants Discord un par un, chacun avec son grade
+  (Membre, Police, Staff, Administration, Support du bot, Modérateur,
+  Responsable, Créateur).
+
+  Un visiteur NON listé ne voit que la page d'accueil publique : ni les
+  tickets, ni la blacklist, ni les serveurs — le serveur ne les lui envoie
+  même pas.
+
+  Accès de secours facultatif : un mot de passe dans config.php
+  (SITE_ADMIN_PASSWORD) vous dépanne si vous perdez votre compte Discord.
+
+MISES À JOUR AUTOMATIQUES :
+  Créateur (⚙️) > Mises à jour (🔄) > interrupteur « Mise à jour
+  automatique ».
+  Le site va chercher la dernière version publiée, se remplace lui-même,
+  puis met à jour TOUS les bots pilotés par votre agent, à la même version.
+    • Vos données sont préservées : data/, uploads/ et config.php ne sont
+      jamais écrasés.
+    • Un hébergeur mutualisé n'a pas de tâche planifiée : la vérification
+      a lieu lors d'une visite du site, au plus une fois toutes les 6 h.
+    • Bouton « Tout mettre à jour » pour le faire à la demande, avec un
+      rapport ligne par ligne.
+
+METTRE UNE VIDÉO EN FOND :
+  Créateur (⚙️) > Apparence du site (🎨) > Fond du site > vignette
+  « Vidéo MP4 », puis téléversez votre MP4 (ou collez son adresse).
+  La vidéo tourne en boucle et SANS SON (les navigateurs l'imposent).
+  Gardez-la courte et compressée : chaque visiteur la télécharge.
+
+PERSONNALISER LE SITE :
+Ouvrez l'onglet « Site builder » dans le menu : couleur, police, style des
+boutons, arrondi, fond (votre image/GIF ou un fond animé), navigation,
+effets et CSS libre. Tout se prévisualise en direct, puis « Enregistrer ».
+
+EN CAS DE PROBLÈME :
+Ouvrez votre-site/api.php?action=selftest — cette page liste en clair ce
+qui va et ce qui bloque (droits d'écriture, version de PHP, agent joignable
+ou non, mot de passe configuré ou non).

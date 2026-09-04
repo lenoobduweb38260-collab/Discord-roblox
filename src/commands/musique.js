@@ -1,0 +1,436 @@
+const {
+  SlashCommandBuilder, EmbedBuilder, MessageFlags,
+  ActionRowBuilder, ButtonBuilder, ButtonStyle,
+} = require('discord.js');
+const { COLORS } = require('../utils/embeds');
+const { GRADES } = require('../utils/permissions');
+const { repondreVite, mettreAJour, suivre } = require('../utils/reponse');
+const M = require('../utils/miseEnPage');
+const musique = require('../utils/music');
+const S = require('../utils/musiqueSources');
+
+// 🎶 /musique — YouTube, SoundCloud, Spotify et Deezer.
+//
+// ⚠️ Ce que le bot dit, et qu'il faut dire : **Spotify et Deezer ne laissent
+// personne diffuser leur audio.** Le bot lit la fiche du lien puis joue la
+// même chanson depuis YouTube. C'est ce que font tous les bots, et le seul
+// moyen légal. L'afficher évite qu'on prenne pour un défaut ce qui est une
+// règle de leur côté.
+
+// Les dépendances audio peuvent manquer sur un hébergement minimal.
+const ABSENTE = /Cannot find module|@discordjs\/voice|play-dl|opus|sodium|ffmpeg/i;
+const MESSAGE_ABSENTE =
+  '❌ Les bibliothèques audio ne sont pas installées sur cet hébergement.\n'
+  + '➜ Lancez `npm install` à côté du bot, puis redémarrez-le.';
+
+const mmss = (s) => {
+  const n = Math.max(0, Math.floor(Number(s) || 0));
+  const h = Math.floor(n / 3600);
+  const m = Math.floor((n % 3600) / 60);
+  const sec = n % 60;
+  return h
+    ? `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`
+    : `${m}:${String(sec).padStart(2, '0')}`;
+};
+
+// D'où vient l'audio, et d'où venait la demande. La ligne n'apparaît que
+// lorsque les deux diffèrent — sinon elle n'apprendrait rien.
+function ligneSource(p) {
+  if (p.origine === p.source) return `${S.NOMS[p.source]}`;
+  return `${S.NOMS[p.origine]} → diffusé depuis ${S.NOMS[p.source]}`;
+}
+
+function barre(ecoule, duree, largeur = 18) {
+  if (!duree) return '';
+  const part = Math.min(1, Math.max(0, ecoule / duree));
+  const curseur = Math.round(part * (largeur - 1));
+  return `\`${'─'.repeat(curseur)}🔘${'─'.repeat(largeur - 1 - curseur)}\` ${mmss(ecoule)} / ${mmss(duree)}`;
+}
+
+function carteLecture(etat) {
+  const p = etat.encours;
+  const embed = new EmbedBuilder()
+    .setColor(COLORS.SUCCESS)
+    .setTitle(etat.pause ? '⏸️ En pause' : '▶️ Lecture en cours')
+    .setDescription(M.description([
+      `**${p.titre}**${p.auteur ? `\n-# par ${p.auteur}` : ''}`,
+      barre(etat.ecoule, p.duree),
+      M.bloc('Source', [ligneSource(p)], { prefixe: '🎧', compte: null }),
+      etat.pistes.length
+        ? M.bloc('À suivre', etat.pistes.slice(0, 5).map((s) => s.titre), { prefixe: '📃', compte: etat.pistes.length, motCompte: 'morceau' })
+        : null,
+    ].filter(Boolean)))
+    .setFooter({
+      text: [
+        `🔊 ${etat.volume} %`,
+        etat.boucle !== 'aucune' ? `🔁 ${etat.boucle === 'piste' ? 'ce morceau' : 'la file'}` : null,
+        // 🎚️ Le débit suivi : celui du salon vocal, borné par le boost.
+        etat.qualite?.debit
+          ? `🎚️ ${Math.round(etat.qualite.debit / 1000)} kb/s${etat.qualite.niveau ? ` (Boost niv. ${etat.qualite.niveau})` : ''}`
+          : null,
+      ].filter(Boolean).join(' • '),
+    });
+  if (p.vignette) embed.setThumbnail(p.vignette);
+  if (p.url) embed.setURL(p.url);
+  return embed;
+}
+
+const boutons = (etat) => new ActionRowBuilder().addComponents(
+  new ButtonBuilder().setCustomId('mus:pp').setEmoji(etat.pause ? '▶️' : '⏸️').setStyle(ButtonStyle.Secondary),
+  new ButtonBuilder().setCustomId('mus:skip').setEmoji('⏭️').setStyle(ButtonStyle.Secondary).setDisabled(!etat.pistes.length && etat.boucle === 'aucune'),
+  new ButtonBuilder().setCustomId('mus:loop').setEmoji('🔁').setStyle(etat.boucle === 'aucune' ? ButtonStyle.Secondary : ButtonStyle.Primary),
+  new ButtonBuilder().setCustomId('mus:file').setEmoji('📃').setStyle(ButtonStyle.Secondary),
+  new ButtonBuilder().setCustomId('mus:stop').setEmoji('⏹️').setStyle(ButtonStyle.Danger)
+);
+
+module.exports = {
+  grade: GRADES.EVERYONE,
+  public: true,
+  guildModule: null,
+
+  data: new SlashCommandBuilder()
+    .setName('musique')
+    .setDescription('Musique en vocal — YouTube, SoundCloud, Spotify, Deezer')
+    .addSubcommand((s) => s.setName('play')
+      .setDescription('Jouer un lien (YouTube, SoundCloud, Spotify, Deezer) ou chercher un titre')
+      .addStringOption((o) => o.setName('lien').setDescription('Lien ou recherche').setRequired(true).setMaxLength(400)))
+    .addSubcommand((s) => s.setName('maintenant').setDescription('Ce qui joue en ce moment'))
+    .addSubcommand((s) => s.setName('file').setDescription('La file d\'attente'))
+    .addSubcommand((s) => s.setName('skip').setDescription('Passer au morceau suivant'))
+    .addSubcommand((s) => s.setName('pause').setDescription('Mettre en pause'))
+    .addSubcommand((s) => s.setName('reprendre').setDescription('Reprendre la lecture'))
+    .addSubcommand((s) => s.setName('stop').setDescription('Arrêter et quitter le vocal'))
+    .addSubcommand((s) => s.setName('melanger').setDescription('Mélanger la file d\'attente'))
+    .addSubcommand((s) => s.setName('retirer')
+      .setDescription('Retirer un morceau de la file')
+      .addIntegerOption((o) => o.setName('position').setDescription('Sa position dans la file').setRequired(true).setMinValue(1)))
+    .addSubcommand((s) => s.setName('boucle')
+      .setDescription('Répéter le morceau ou toute la file')
+      .addStringOption((o) => o.setName('mode').setDescription('Quoi répéter').setRequired(true)
+        .addChoices(
+          { name: 'Aucune', value: 'aucune' },
+          { name: 'Ce morceau', value: 'piste' },
+          { name: 'Toute la file', value: 'file' },
+        )))
+    .addSubcommand((s) => s.setName('volume')
+      .setDescription('Régler le volume (0 à 200 %)')
+      .addIntegerOption((o) => o.setName('niveau').setDescription('En pourcentage').setRequired(true).setMinValue(0).setMaxValue(200)))
+    .addSubcommand((s) => s.setName('sources').setDescription('Ce que le bot sait lire, et comment'))
+    .addSubcommand((s) => s.setName('diagnostic')
+      .setDescription('Tester la connexion vocale et dire précisément où elle bloque')),
+
+  async execute(interaction) {
+    const sub = interaction.options.getSubcommand();
+    // 🎵 Salons réservés (⚙️ /config → Musique). Les fiches éphémères
+    // (sources, diagnostic) restent lisibles partout : elles ne jouent rien.
+    if (!['sources', 'diagnostic'].includes(sub)) {
+      const refus = require('../utils/musiqueReglages').refusSalon(interaction);
+      if (refus) return interaction.reply({ content: refus, flags: MessageFlags.Ephemeral });
+    }
+    try {
+      if (sub === 'play') return await jouer(interaction);
+      if (sub === 'sources') return await interaction.reply({ embeds: [carteSources()], flags: MessageFlags.Ephemeral });
+      if (sub === 'diagnostic') return await diagnostic(interaction);
+
+      const etat = musique.etat(interaction.guildId);
+      if (!etat && sub !== 'file') {
+        return interaction.reply({ content: '📭 Je ne joue rien pour le moment.', flags: MessageFlags.Ephemeral });
+      }
+
+      if (sub === 'maintenant') {
+        if (!etat?.encours) return interaction.reply({ content: '📭 Rien en lecture.', flags: MessageFlags.Ephemeral });
+        return interaction.reply({ embeds: [carteLecture(etat)], components: [boutons(etat)] });
+      }
+
+      if (sub === 'file') {
+        if (!etat?.encours && !etat?.pistes?.length) {
+          return interaction.reply({ content: '📭 La file est vide.', flags: MessageFlags.Ephemeral });
+        }
+        return interaction.reply({ embeds: [carteFile(etat)], flags: MessageFlags.Ephemeral });
+      }
+
+      if (sub === 'skip') {
+        // Si rien ne suit, « passé. » promettrait une suite qui n'existe pas
+        // — le cas d'une radio seule qu'on coupe au skip.
+        const derniere = !etat?.pistes?.length && etat?.boucle === 'aucune';
+        const passee = musique.passer(interaction.guildId);
+        return interaction.reply({
+          content: passee
+            ? (derniere ? `⏭️ **${passee.titre}** passé — plus rien en file : je quitte le vocal dans 30 s.` : `⏭️ **${passee.titre}** passé.`)
+            : '❌ Rien à passer.',
+        });
+      }
+
+      if (sub === 'pause') {
+        return interaction.reply({ content: musique.pause(interaction.guildId) ? '⏸️ En pause.' : '❌ Déjà en pause, ou rien en lecture.' });
+      }
+
+      if (sub === 'reprendre') {
+        return interaction.reply({ content: musique.reprendre(interaction.guildId) ? '▶️ On reprend.' : '❌ Rien n\'est en pause.' });
+      }
+
+      if (sub === 'stop') {
+        return interaction.reply({ content: musique.quitter(interaction.guildId, 'demandé') ? '⏹️ Terminé, je quitte le vocal.' : '❌ Rien en lecture.' });
+      }
+
+      if (sub === 'melanger') {
+        return interaction.reply({
+          content: musique.melanger(interaction.guildId)
+            ? '🔀 File mélangée.'
+            : '❌ Il faut au moins deux morceaux en attente pour mélanger.',
+        });
+      }
+
+      if (sub === 'retirer') {
+        const retiree = musique.retirer(interaction.guildId, interaction.options.getInteger('position'));
+        return interaction.reply({
+          content: retiree ? `🗑️ **${retiree.titre}** retiré de la file.` : '❌ Aucun morceau à cette position.',
+        });
+      }
+
+      if (sub === 'boucle') {
+        const mode = musique.boucler(interaction.guildId, interaction.options.getString('mode'));
+        const mots = { aucune: '➡️ Plus de répétition.', piste: '🔂 Ce morceau tournera en boucle.', file: '🔁 Toute la file tournera en boucle.' };
+        return interaction.reply({ content: mots[mode] });
+      }
+
+      if (sub === 'volume') {
+        const v = musique.volume(interaction.guildId, interaction.options.getInteger('niveau'));
+        return interaction.reply({
+          content: `🔊 Volume à **${v} %**.${v > 100 ? '\n-# Au-delà de 100 %, le son peut saturer.' : ''}`,
+        });
+      }
+      return null;
+    } catch (err) {
+      // ⚠️ Pas de « ❌ » ajouté ici : les messages du moteur portent déjà le
+      // leur, et on lisait « ❌❌ ».
+      const m = err.message || '';
+      const texte = ABSENTE.test(m) ? MESSAGE_ABSENTE : (/^[❌⛔⚠️]/.test(m.trim()) ? m : `❌ ${m}`);
+      return dire(interaction, texte);
+    }
+  },
+
+  // Boutons de la carte de lecture.
+  async handleComposant(interaction) {
+    const action = interaction.customId.split(':')[1];
+    const etatAvant = musique.etat(interaction.guildId);
+    if (!etatAvant?.encours) {
+      return mettreAJour(interaction, { content: '📭 La lecture est terminée.', embeds: [], components: [] });
+    }
+    // 🔊 On n'agit que pour quelqu'un du salon vocal : sinon n'importe qui,
+    // depuis n'importe où, coupe la musique des autres.
+    if (interaction.member?.voice?.channelId !== etatAvant.salonVocalId) {
+      return suivre(interaction, {
+        content: `⛔ Rejoignez <#${etatAvant.salonVocalId}> pour piloter la lecture.`,
+        flags: MessageFlags.Ephemeral,
+      });
+    }
+
+    if (action === 'stop') {
+      musique.quitter(interaction.guildId, 'bouton stop');
+      return mettreAJour(interaction, { content: '⏹️ Terminé, je quitte le vocal.', embeds: [], components: [] });
+    }
+    if (action === 'file') {
+      return suivre(interaction, { embeds: [carteFile(etatAvant)], flags: MessageFlags.Ephemeral });
+    }
+    if (action === 'pp') {
+      if (etatAvant.pause) musique.reprendre(interaction.guildId);
+      else musique.pause(interaction.guildId);
+    }
+    if (action === 'skip') musique.passer(interaction.guildId);
+    if (action === 'loop') {
+      const suite = { aucune: 'piste', piste: 'file', file: 'aucune' };
+      musique.boucler(interaction.guildId, suite[etatAvant.boucle]);
+    }
+
+    // ⏭️ Passer change de morceau de façon asynchrone : on laisse le lecteur
+    // enchaîner avant de redessiner, sinon la carte montrerait l'ancien titre.
+    if (action === 'skip') await new Promise((r) => setTimeout(r, 700));
+    const apres = musique.etat(interaction.guildId);
+    if (!apres?.encours) {
+      return mettreAJour(interaction, { content: '⏹️ File terminée.', embeds: [], components: [] });
+    }
+    return mettreAJour(interaction, { embeds: [carteLecture(apres)], components: [boutons(apres)] });
+  },
+
+  carteLecture, carteFile, carteSources, mmss, ligneSource, boutons,
+};
+
+async function jouer(interaction) {
+  // ⏱️ Résoudre un lien Spotify de 30 titres demande autant de recherches
+  // YouTube : bien plus que les 3 secondes de Discord. `repondreVite` ne
+  // diffère qu'à la dernière seconde — un lien direct répond donc en carte.
+  return repondreVite(interaction, async () => {
+    const { pistes, introuvables, premiere, noteRegion } = await musique.ajouter(
+      interaction,
+      interaction.options.getString('lien')
+    );
+    const etat = musique.etat(interaction.guildId);
+    const p = pistes[0];
+
+    const lignes = [];
+    if (pistes.length > 1) {
+      lignes.push(M.bloc('Ajoutés à la file', pistes.slice(0, 8).map((x) => x.titre),
+        { prefixe: '➕', compte: pistes.length, motCompte: 'morceau' }));
+    } else {
+      lignes.push(`**${p.titre}**${p.auteur ? `\n-# par ${p.auteur}` : ''}`);
+      if (p.duree) lignes.push(`-# ⏱️ ${mmss(p.duree)}`);
+    }
+    lignes.push(M.bloc('Source', [ligneSource(p)], { prefixe: '🎧', compte: null }));
+    // Une plateforme relayée le dit une fois, clairement : sans cela on croit
+    // à un défaut quand le son ne vient pas de « chez Spotify ».
+    if (S.RELAYEES.has(p.origine)) {
+      lignes.push(`-# ℹ️ ${S.NOMS[p.origine]} ne permet à personne de diffuser son audio : je joue le même titre depuis YouTube.`);
+    }
+    if (introuvables.length) {
+      lignes.push(M.bloc('Sans équivalent trouvé', introuvables.slice(0, 5),
+        { prefixe: '⚠️', compte: introuvables.length, motCompte: 'titre' }));
+    }
+    if (!premiere) lignes.push(`-# 📃 Position dans la file : **${etat.pistes.length}**`);
+    if (noteRegion) {
+      lignes.push(`-# 🔁 Le flux vocal n'aboutissait pas : j'ai changé la région du salon (${noteRegion.originale || 'automatique'} → ${noteRegion.nouvelle}), et c'est elle qui a débloqué la connexion.`);
+    }
+    // 🎛️ Les boutons vivent sur LA carte de lecture, que la session envoie et
+    // fait suivre à chaque nouveau morceau — pas sur chaque réponse de
+    // commande, sinon dix ajouts sèment dix jeux de boutons périmés.
+    if (premiere) {
+      const salonCarte = require('../utils/musiqueReglages').salonAnnonces(interaction.guildId);
+      lignes.push(`-# 🎛️ Les boutons de pilotage sont sur la carte « Lecture en cours »${
+        salonCarte && salonCarte !== interaction.channelId ? ` dans <#${salonCarte}>` : ''}.`);
+    }
+
+    const embed = new EmbedBuilder()
+      .setColor(premiere ? COLORS.SUCCESS : COLORS.INFO)
+      .setTitle(premiere ? '▶️ Lecture' : '➕ Ajouté à la file')
+      .setDescription(M.description(lignes));
+    if (p.vignette) embed.setThumbnail(p.vignette);
+
+    return { embeds: [embed] };
+  });
+}
+
+// 🔬 Le test qui remplace les hypothèses.
+//
+// Il ouvre une vraie connexion, en notant chaque étape de la poignée de main,
+// puis la referme. Rien n'est joué : on ne cherche que l'endroit où ça
+// s'arrête.
+async function diagnostic(interaction) {
+  const salonVocal = interaction.member?.voice?.channel;
+  if (!salonVocal) {
+    return interaction.reply({
+      content: '🔬 Rejoignez d\'abord un salon vocal : le test a besoin d\'un salon où essayer.',
+      flags: MessageFlags.Ephemeral,
+    });
+  }
+  if (musique.etat(interaction.guildId)) {
+    return interaction.reply({
+      content: '🔬 Je joue déjà : la connexion vocale fonctionne donc. Arrêtez avec `/musique stop` pour relancer le test.',
+      flags: MessageFlags.Ephemeral,
+    });
+  }
+
+  return repondreVite(interaction, async () => {
+    const e = await musique.diagnostiquerVocal(interaction, salonVocal);
+    const { verdict, suite } = musique.lireDiagnostic(e);
+    const preuves = musique.releverPreuves(interaction, salonVocal);
+    const d = require('../utils/musiqueMoteur').rapportDependances();
+    const oui = (v) => (v ? '✅' : '❌');
+
+    const embed = new EmbedBuilder()
+      .setColor(e.statutFinal === 'ready' ? COLORS.SUCCESS : COLORS.DANGER)
+      .setTitle('🔬 Diagnostic de la connexion vocale')
+      .setDescription(M.description([
+        `**${verdict}**`,
+        suite,
+        // Les quatre étapes, dans l'ordre. Aucune n'utilise l'UDP : il
+        // n'entre en jeu qu'APRÈS la quatrième.
+        M.bloc('La poignée de main, étape par étape', [
+          `${e.passerelle === 0 ? '✅' : '❌'} 1. Connexion à Discord ${e.passerelle === 0 ? 'établie' : `— état ${e.passerelle}`}`,
+          `${oui(e.demandeEnvoyee !== false)} 2. Ma demande de connexion vocale est partie`,
+          `${oui(e.etatRecu)} 3. Discord m'a dit où je suis`,
+          `${oui(e.serveurRecu)} 4. Discord m'a donné le serveur vocal`,
+          `${oui(e.statutFinal === 'ready')} 5. Flux audio ouvert`,
+        ], { prefixe: '📶', compte: null }),
+        // 🔬 L'intérieur de l'étape 5 : quatre sous-étapes, quatre coupables
+        // différents — et une seule utilise l'UDP.
+        e.serveurRecu && e.statutFinal !== 'ready' && e.reseau
+          ? M.bloc('Dans l\'étape 5, où ça s\'arrête', musique.ETAPES_RESEAU.map((etape, i) => {
+            const marque = i < e.reseau.etapeMax ? '✅' : (i === e.reseau.etapeMax ? '🛑' : '⬜');
+            return `${marque} ${etape}`;
+          }).concat([
+            e.reseau.udp ? `-# Serveur vocal : \`${e.reseau.udp}\`` : null,
+            e.reseau.fermeture ? `-# Fermeture : code ${e.reseau.fermeture}` : null,
+          ].filter(Boolean)), { prefixe: '🔬', compte: null })
+          : null,
+        M.bloc('Constats', [
+          `${oui(preuves.membre)} Je suis membre du serveur`,
+          `${oui(preuves.intentVocal)} Mon intent vocal est actif`,
+          `${oui(!preuves.salonPlein)} Le salon n'est pas plein`,
+          `${oui(d.opus)} Encodeur Opus${d.opus ? ` — \`${d.opus}\`` : ''}`,
+          `${oui(d.chiffrement)} Chiffrement de la voix${d.chiffrement ? ` — \`${d.chiffrement}\`` : ''}`,
+          `${oui(d.dave)} Chiffrement de bout en bout (DAVE)${d.dave ? ` — \`${d.dave}\`` : ' — exigé par Discord depuis mars 2026'}`,
+          `${oui(d.ytdlp)} Lecteur YouTube (yt-dlp)${d.ytdlp ? ` — \`${d.ytdlp}\`` : ' — sera téléchargé à la première lecture'}`,
+        ], { prefixe: '🔎', compte: null }),
+      ].filter(Boolean)))
+      .setFooter({ text: `État final : ${e.statutFinal}${e.erreur ? ` · ${e.erreur}` : ''}` });
+
+    // La même fiche part dans la console : c'est elle qu'on transmet à
+    // l'hébergeur, et on ne recopie pas un embed à la main.
+    console.log(`🔬 Diagnostic vocal ${interaction.guildId} : ${JSON.stringify({ ...e, ...preuves })}`);
+    return { embeds: [embed], flags: MessageFlags.Ephemeral };
+  });
+}
+
+function carteFile(etat) {
+  const lignes = [];
+  if (etat?.encours) lignes.push(M.bloc('En lecture', [`**${etat.encours.titre}**`], { prefixe: '▶️', compte: null }));
+  if (etat?.pistes?.length) {
+    lignes.push(M.bloc('À suivre',
+      etat.pistes.slice(0, 20).map((p, i) => `**${i + 1}.** ${p.titre} · ${p.source === 'radio' ? '🔴 direct' : mmss(p.duree)}`),
+      { prefixe: '📃', compte: etat.pistes.length, motCompte: 'morceau' }));
+    const total = etat.pistes.reduce((n, p) => n + (p.duree || 0), 0);
+    if (total) lignes.push(`-# ⏱️ Environ ${mmss(total)} d'attente`);
+  } else {
+    lignes.push('*Rien d\'autre en attente.*');
+  }
+  return new EmbedBuilder().setColor(COLORS.PRIMARY).setTitle('🎶 File d\'attente')
+    .setDescription(M.borner(M.description(lignes), M.MAX_DESCRIPTION));
+}
+
+function carteSources() {
+  const moteur = require('../utils/musiqueMoteur');
+  const e = moteur.etatSources();
+  const d = moteur.rapportDependances();
+  const manque = moteur.briquesManquantes();
+  return new EmbedBuilder()
+    .setColor(COLORS.INFO)
+    .setTitle('🎧 Ce que je sais lire')
+    .setDescription(M.description([
+      M.bloc('Diffusé directement', [
+        '▶️ **YouTube** — vidéos et playlists',
+        `🔊 **SoundCloud** — pistes et playlists${e.soundcloud ? '' : ' *(clé d\'accès non obtenue)*'}`,
+        '📻 **Radios françaises** — `/radio ecouter` *(exige FFmpeg)*',
+      ], { prefixe: '✅', compte: null }),
+      M.bloc('Lu, puis rejoué depuis YouTube', [
+        '🟢 **Spotify** — pistes, albums et playlists',
+        '🟣 **Deezer** — pistes, albums et playlists',
+      ], { prefixe: '🔁', compte: null }),
+      '-# ⚠️ Spotify et Deezer ne laissent **personne** diffuser leur audio : leurs flux sont réservés à leurs propres applications. '
+      + 'Je lis donc la fiche du lien, puis je joue la même chanson depuis YouTube. Aucun bot Discord ne fait autrement.',
+      // 🩺 Les briques audio. Sans elles, le bot rejoint le salon et reste
+      // muet — et tout ressemble à un défaut de permissions.
+      M.bloc('Briques audio', [
+        `${d.opus ? '✅' : '❌'} Encodeur Opus${d.opus ? ` — \`${d.opus}\`` : ' — **manquant**'}`,
+        `${d.chiffrement ? '✅' : '❌'} Chiffrement de la voix${d.chiffrement ? ` — \`${d.chiffrement}\`` : ' — **manquant**'}`,
+        `${d.ffmpeg ? '✅' : '❌'} FFmpeg (radios)${d.ffmpeg ? ` — \`${d.ffmpeg}\`` : ' — **manquant** : les radios ne peuvent pas jouer'}`,
+        `${d.ytdlp ? '✅' : '❌'} Lecteur YouTube (yt-dlp)${d.ytdlp ? ` — \`${d.ytdlp}\`` : ' — sera téléchargé à la première lecture'}`,
+      ], { prefixe: '🔧', compte: null }),
+      manque
+        ? `⚠️ **Il manque ${manque.length === 1 ? 'une brique' : 'des briques'} :**\n${manque.map((m) => `➜ ${m}`).join('\n')}\n`
+          + '-# Sans elle, la connexion vocale est acceptée puis n\'aboutit jamais.'
+        : null,
+      e.erreurs.length ? M.bloc('Soucis au démarrage', e.erreurs, { prefixe: '⚠️', compte: null }) : null,
+    ].filter(Boolean)));
+}
+
+const dire = (interaction, contenu) => suivre(interaction, { content: contenu, flags: MessageFlags.Ephemeral });

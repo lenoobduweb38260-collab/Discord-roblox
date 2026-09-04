@@ -1,0 +1,38 @@
+{
+  "name": "discord-roblox-rp-bot",
+  "version": "2.0.0",
+  "description": "Bot Discord RP (Roblox) : cartes d'identité, permis, entreprises, assurances, niveaux, service, whitelist et modération staff.",
+  "main": "src/index.js",
+  "bin": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "deploy": "node src/deploy-commands.js",
+    "build": "pkg . --targets node22-win-x64 --output dist/discord-roblox-bot-win-x64.exe",
+    "test": "node tests/lancer.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "pkg": {
+    "scripts": "src/**/*.js",
+    "assets": [
+      "node_modules/better-sqlite3/build/Release/*.node",
+      "node_modules/@snazzah/**",
+      "node_modules/opusscript/build/**",
+      "package.json"
+    ]
+  },
+  "dependencies": {
+    "@discordjs/voice": "^0.19.2",
+    "@snazzah/davey": "^0.1.6",
+    "better-sqlite3": "^11.9.1",
+    "discord.js": "^14.16.3",
+    "dotenv": "^16.4.5",
+    "ffmpeg-static": "^5.2.0",
+    "jimp": "^0.22.12",
+    "libsodium-wrappers": "^0.7.15",
+    "opusscript": "^0.1.1",
+    "play-dl": "^1.9.7",
+    "@distube/ytdl-core": "^4.16.12"
+  }
+}

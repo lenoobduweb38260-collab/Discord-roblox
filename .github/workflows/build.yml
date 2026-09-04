@@ -1,0 +1,161 @@
+name: Build des exécutables
+
+# Chaque push compile les exécutables et publie automatiquement une release
+# versionnée v1.0.<n° de run>. Les exécutables déjà installés détectent la
+# nouvelle version au lancement et se mettent à jour tout seuls.
+
+on:
+  push:
+    branches: ['**']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.output }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            target: node22-win-x64
+            output: discord-roblox-bot-win-x64.exe
+            manager_output: gestionnaire-bots-win-x64.exe
+          - os: ubuntu-latest
+            target: node22-linux-x64
+            output: discord-roblox-bot-linux-x64
+            manager_output: gestionnaire-bots-linux-x64
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Installer les dépendances
+        run: npm install
+
+      - name: Versionner le build (v2.0.${{ github.run_number }})
+        run: npm version --no-git-tag-version "1.0.${{ github.run_number }}"
+
+      - name: Compiler l'exécutable
+        run: npx --yes @yao-pkg/pkg . --targets ${{ matrix.target }} --output dist/${{ matrix.output }}
+
+      - name: Auto-test de l'exécutable (SQLite + chargement des commandes)
+        run: ./dist/${{ matrix.output }} check
+        shell: bash
+
+      - name: Versionner le gestionnaire
+        run: echo "module.exports = '1.0.${{ github.run_number }}';" > src/manager/version.gen.js
+        shell: bash
+
+      - name: Compiler le Gestionnaire de bots
+        run: npx --yes @yao-pkg/pkg src/manager/index.js --targets ${{ matrix.target }} --output dist/${{ matrix.manager_output }}
+
+      - name: Auto-test du gestionnaire
+        run: ./dist/${{ matrix.manager_output }} check
+        shell: bash
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.output }}
+          path: dist/${{ matrix.output }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.manager_output }}
+          path: dist/${{ matrix.manager_output }}
+
+  release:
+    name: Publier la release v2.0.${{ github.run_number }}
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Créer le pack hébergeur (agent + configuration)
+        run: |
+          cd hebergeur
+          zip -r ../dist/pack-hebergeur.zip index.js config.env LISEZMOI.md
+
+      - name: Créer le pack dashboard web
+        run: |
+          cd dashboard
+          zip -r ../dist/pack-dashboard.zip index.js config.env LISEZMOI.md
+
+      - name: Créer le pack dashboard PHP (public_html)
+        run: |
+          cd dashboard-php
+          sed -i "s/const DASH_BUILD = 'dev';/const DASH_BUILD = 'v2.0.${{ github.run_number }}';/" index.php
+          zip -r ../dist/pack-dashboard-php.zip index.php config.php LISEZMOI.md
+
+      - name: Créer le pack site personnalisable (Site builder)
+        run: |
+          cd site-php
+          # Version installée, pour que la mise à jour automatique sache où
+          # elle en est dès la première visite (sinon elle se retéléchargerait).
+          echo "v2.0.${{ github.run_number }}" > data/version.txt
+          zip -r ../dist/pack-site-builder.zip . -x '*.git*' 'data/agent.php' 'data/discord.php' 'data/maj.php' 'data/maj.lock'
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v2.0.${{ github.run_number }}
+          target_commitish: ${{ github.sha }}
+          name: Bot Discord RP v2.0.${{ github.run_number }}
+          body: |
+            ## 📦 Exécutables (aucune installation de Node.js nécessaire)
+
+            | Système | Bot | Gestionnaire de bots (pour le développeur) |
+            |---|---|---|
+            | 🪟 Windows | `discord-roblox-bot-win-x64.exe` | `gestionnaire-bots-win-x64.exe` |
+            | 🐧 Linux | `discord-roblox-bot-linux-x64` | `gestionnaire-bots-linux-x64` |
+
+            ### 🌍 Pack hébergeur (`pack-hebergeur.zip`)
+            À envoyer chez votre hébergeur (commande : `node index.js`, Node 18+) : l'agent
+            télécharge la dernière version du bot depuis GitHub, le fait tourner, et votre
+            **panel se relie à distance** (console, ▶/⏹, .env, dashboard, page 🌐 Serveurs)
+            via ➕ Nouveau bot → 🌍 Bot hébergé (URL + clé). Voir le LISEZMOI.md inclus.
+
+            ### 🎛️ Pack dashboard web (`pack-dashboard.zip` / `pack-dashboard-php.zip`)
+            Un dashboard **façon DraftBot** : connexion **avec Discord**, chaque staff
+            configure les serveurs qu'il administre (Module RP, rôles, salons, niveaux,
+            bienvenue, whitelist, tickets). Relié aux bots via l'agent.
+            - `pack-dashboard.zip` : hébergeur **Node.js** 18+ (`node index.js`)
+            - `pack-dashboard-php.zip` : hébergement web classique **PHP/public_html**
+              (2 fichiers à déposer, rien à installer)
+            Voir le LISEZMOI.md inclus dans chaque pack.
+
+            ### 🎨 Site personnalisable (`pack-site-builder.zip`)
+            Un site complet en PHP que vous **construisez vous-même** depuis l'onglet
+            **Site builder** : couleur d'accent libre, police, style des boutons, arrondi,
+            **fond au choix** (votre image ou GIF animé téléversé, ou un fond animé
+            Aurora / Étoiles / Grille), navigation renommable et réordonnable, effets
+            activables un par un et **CSS personnalisé**. Aperçu en direct, puis
+            « Enregistrer ». Déposez le dossier chez votre hébergeur PHP 8+.
+
+            ### 🤖 Gestionnaire de bots
+            Application locale pour gérer **plusieurs bots** (chacun relié à son propre dépôt GitHub) :
+            démarrage/arrêt, console en direct, console d'erreurs, éditeur `.env`, mises à jour en un clic
+            et bouton « Copier le diagnostic ». Lancez-la : l'interface s'ouvre sur http://localhost:43550
+            (un second lancement rouvre simplement l'interface).
+
+            ### 🔄 Mise à jour automatique
+            Si vous avez déjà l'exécutable (v1.0.3 ou plus récente), **rien à faire** :
+            au prochain lancement il détecte cette version, se télécharge et redémarre tout seul.
+
+            ### 🚀 Premier lancement
+            1. Téléchargez le fichier pour votre système (ci-dessous) et placez-le dans un dossier dédié
+            2. Lancez-le une première fois : un fichier `.env` est créé à côté de l'exécutable
+            3. Ouvrez ce `.env` et remplissez `DISCORD_TOKEN`, `CLIENT_ID` (et `GUILD_ID` recommandé)
+            4. Relancez : le bot se connecte et **enregistre automatiquement les commandes slash**
+
+            La base de données `data.sqlite` est créée à côté de l'exécutable — sauvegardez-la !
+          files: dist/*
