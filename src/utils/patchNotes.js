@@ -1690,6 +1690,19 @@ const RELEASES = [
     fix: [],
     retrait: [],
   },
+  {
+    id: 'tuto-guides-2026-09cp',
+    title: 'Deux guides des commandes : /tuto et /tutos',
+    ajout: [
+      '📖 **/tuto** : le guide des commandes ouvertes a tous les membres — chaque commande avec ses sous-commandes et leurs descriptions, classees par theme, en pages (reponse ephemere, rien ne remplit le salon)',
+      '📖 **/tutos** (staff) : le guide complet — commandes staff et administration incluses, chacune avec son badge (👮 staff, 🛡️ admin). Les commandes du createur du bot n\'apparaissent dans aucun des deux guides',
+    ],
+    amelioration: [
+      '🔁 Les guides ne sont pas rediges a la main : ils se generent depuis les definitions reelles des commandes chargees — ils ne peuvent donc jamais etre en retard sur le bot. Un module desactive sur un serveur (Interactions, SAO…) y est tu sur ce serveur',
+    ],
+    fix: [],
+    retrait: [],
+  },
 ];
 
 // Construit l'embed d'une note à partir d'une entrée { title, ajout, fix,

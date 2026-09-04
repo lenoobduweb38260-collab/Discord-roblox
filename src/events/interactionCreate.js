@@ -302,6 +302,17 @@ module.exports = {
       return require('../commands/musique').handleComposant(interaction);
     }
 
+    // ----- Pages des guides /tutos (staff) et /tuto (membres) -----
+    // ⚠️ « tutost » AVANT « tutom » n'a pas d'importance (préfixes disjoints),
+    // mais aucun des deux ne doit s'appeler « tuto: » tout court : l'un
+    // avalerait l'autre.
+    if (interaction.isButton() && interaction.customId?.startsWith('tutost:')) {
+      return require('../commands/tutos').handleComposant(interaction);
+    }
+    if (interaction.isButton() && interaction.customId?.startsWith('tutom:')) {
+      return require('../commands/tuto').handleComposant(interaction);
+    }
+
     // ----- Panneau des matricules RP : pages et recherche -----
     if (
       (interaction.isButton() && /^matr(page:|search$)/.test(interaction.customId || ''))

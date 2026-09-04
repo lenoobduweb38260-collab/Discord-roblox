@@ -20466,5 +20466,103 @@
     "es": "⚠️ Estado del bot no aplicado: ",
     "pl": "⚠️ Status bota nie został zastosowany: ",
     "ru": "⚠️ Статус бота не применён: "
+  },
+  "Le guide des commandes ouvertes à tous les membres": {
+    "en": "The guide to commands open to all members",
+    "de": "Der Leitfaden zu den Befehlen für alle Mitglieder",
+    "es": "La guía de los comandos abiertos a todos los miembros",
+    "pl": "Przewodnik po komendach dostępnych dla wszystkich członków",
+    "ru": "Путеводитель по командам, доступным всем участникам"
+  },
+  "Le guide complet des commandes pour le staff (commandes staff incluses)": {
+    "en": "The complete command guide for staff (staff commands included)",
+    "de": "Der vollständige Befehlsleitfaden für das Team (Team-Befehle inbegriffen)",
+    "es": "La guía completa de comandos para el staff (comandos de staff incluidos)",
+    "pl": "Kompletny przewodnik po komendach dla staffu (z komendami staffu)",
+    "ru": "Полный путеводитель по командам для стаффа (включая команды стаффа)"
+  },
+  "Musique et vocal": {
+    "en": "Music and voice",
+    "de": "Musik und Sprachkanäle",
+    "es": "Música y voz",
+    "pl": "Muzyka i kanały głosowe",
+    "ru": "Музыка и голосовые каналы"
+  },
+  "Communauté": {
+    "en": "Community",
+    "de": "Community",
+    "es": "Comunidad",
+    "pl": "Społeczność",
+    "ru": "Сообщество"
+  },
+  "Whitelists et fiches": {
+    "en": "Whitelists and records",
+    "de": "Whitelists und Akten",
+    "es": "Whitelists y fichas",
+    "pl": "Whitelisty i kartoteki",
+    "ru": "Вайтлисты и досье"
+  },
+  "Modération et sécurité": {
+    "en": "Moderation and security",
+    "de": "Moderation und Sicherheit",
+    "es": "Moderación y seguridad",
+    "pl": "Moderacja i bezpieczeństwo",
+    "ru": "Модерация и безопасность"
+  },
+  "Organisation du serveur": {
+    "en": "Server organization",
+    "de": "Server-Organisation",
+    "es": "Organización del servidor",
+    "pl": "Organizacja serwera",
+    "ru": "Организация сервера"
+  },
+  "👮 staff": {
+    "en": "👮 staff",
+    "de": "👮 Team",
+    "es": "👮 staff",
+    "pl": "👮 staff",
+    "ru": "👮 стафф"
+  },
+  "🛡️ admin": {
+    "en": "🛡️ admin",
+    "de": "🛡️ Admin",
+    "es": "🛡️ admin",
+    "pl": "🛡️ admin",
+    "ru": "🛡️ админ"
+  },
+  "S'utilise telle quelle, sans sous-commande.": {
+    "en": "Used as is, with no subcommand.",
+    "de": "Wird so verwendet, ohne Unterbefehl.",
+    "es": "Se usa tal cual, sin subcomando.",
+    "pl": "Używana bez podkomend, taka jaka jest.",
+    "ru": "Используется как есть, без подкоманд."
+  },
+  "-# 👮 staff · 🛡️ admin — sans badge, la commande est ouverte à tout le monde.": {
+    "en": "-# 👮 staff · 🛡️ admin — without a badge, the command is open to everyone.",
+    "de": "-# 👮 Team · 🛡️ Admin — ohne Abzeichen steht der Befehl allen offen.",
+    "es": "-# 👮 staff · 🛡️ admin — sin insignia, el comando está abierto a todos.",
+    "pl": "-# 👮 staff · 🛡️ admin — bez odznaki komenda jest dostępna dla wszystkich.",
+    "ru": "-# 👮 стафф · 🛡️ админ — без значка команда открыта всем."
+  },
+  "-# Toutes les commandes ouvertes aux membres. Le staff a son guide complet : `/tutos`.": {
+    "en": "-# Every command open to members. Staff have their complete guide: `/tutos`.",
+    "de": "-# Alle Befehle für Mitglieder. Das Team hat seinen vollständigen Leitfaden: `/tutos`.",
+    "es": "-# Todos los comandos abiertos a los miembros. El staff tiene su guía completa: `/tutos`.",
+    "pl": "-# Wszystkie komendy dostępne dla członków. Staff ma swój pełny przewodnik: `/tutos`.",
+    "ru": "-# Все команды, доступные участникам. У стаффа есть полный путеводитель: `/tutos`."
+  },
+  "📖 Guide du staff — toutes les commandes": {
+    "en": "📖 Staff guide — every command",
+    "de": "📖 Team-Leitfaden — alle Befehle",
+    "es": "📖 Guía del staff — todos los comandos",
+    "pl": "📖 Przewodnik staffu — wszystkie komendy",
+    "ru": "📖 Путеводитель стаффа — все команды"
+  },
+  "📖 Guide des commandes": {
+    "en": "📖 Command guide",
+    "de": "📖 Befehlsleitfaden",
+    "es": "📖 Guía de comandos",
+    "pl": "📖 Przewodnik po komendach",
+    "ru": "📖 Путеводитель по командам"
   }
 }
