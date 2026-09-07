@@ -1678,5 +1678,15 @@
    "🔁 Les guides ne sont pas rediges a la main : ils se generent depuis les definitions reelles des commandes chargees — ils ne peuvent donc jamais etre en retard sur le bot. Un module desactive sur un serveur (Interactions, SAO…) y est tu sur ce serveur"
   ],
   "retrait": []
+ },
+ {
+  "id": "absences-modif-2026-09cq",
+  "title": "Absences : la modification refonctionne",
+  "ajout": [],
+  "fix": [
+   "✏️ **Valider la fenetre « Modifier mon absence » repondait « ce bouton vient d'une version precedente »** — et republier le panneau n'y changeait rien, car il n'y etait pour rien : l'aiguillage du bot n'acceptait que la fenetre de declaration, pas celle de modification. Les deux passent desormais, et un test verrouille le cas"
+  ],
+  "amelioration": [],
+  "retrait": []
  }
 ]

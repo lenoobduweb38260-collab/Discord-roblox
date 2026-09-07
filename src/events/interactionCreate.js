@@ -156,10 +156,15 @@ module.exports = {
       return require('../utils/vocalAlerte').handleBouton(interaction);
     }
 
-    // ----- Absences : le bouton du panneau, la modale, le retour -----
+    // ----- Absences : le bouton du panneau, les modales, le retour -----
+    // ⚠️ Les DEUX modales : « abs:decl » (déclarer) ET « abs:modif »
+    // (modifier). N'accepter que la première laissait la validation du
+    // bouton ✏️ Modifier tomber dans le filet « composant inconnu » — la
+    // modale s'ouvrait, puis sa soumission répondait « bouton d'une version
+    // précédente », ce qui accusait le panneau alors qu'il n'y était pour rien.
     if ((interaction.isButton() && interaction.customId?.startsWith('abs:'))
       || (interaction.isChannelSelectMenu?.() && interaction.customId?.startsWith('abs:sel:'))
-      || (interaction.isModalSubmit() && interaction.customId === 'abs:decl')) {
+      || (interaction.isModalSubmit() && interaction.customId?.startsWith('abs:'))) {
       if (!interaction.inGuild()) return horsServeur(interaction);
       const absences = require('../utils/absences');
       if (interaction.isModalSubmit()) return absences.handleModal(interaction);

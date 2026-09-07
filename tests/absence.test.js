@@ -301,7 +301,12 @@ console.log('\n5 bis) Modifier son absence sans la clôturer');
     console.log('\n6) Branchements');
   {
     const ic = fs.readFileSync(`${__dirname}/../src/events/interactionCreate.js`, 'utf8');
-    V('les boutons abs: et la modale sont routés', /abs:/.test(ic) && /abs:decl/.test(ic));
+    V('les boutons abs: sont routés', /isButton\(\) && interaction\.customId\?\.startsWith\('abs:'\)/.test(ic));
+    // ⚠️ Régression vécue : seule « abs:decl » était routée. La modale du
+    // bouton ✏️ Modifier s'ouvrait, puis sa SOUMISSION (« abs:modif »)
+    // tombait dans le filet « composant inconnu » — qui accusait le panneau.
+    V('TOUTES les modales abs: sont routées (décl. ET modif.)',
+      /isModalSubmit\(\) && interaction\.customId\?\.startsWith\('abs:'\)/.test(ic));
     const rd = fs.readFileSync(`${__dirname}/../src/events/ready.js`, 'utf8');
     V('le balayage démarre avec le bot', /absences'\)\.demarrer\(client\)/.test(rd));
     const cmd = fs.readFileSync(`${__dirname}/../src/commands/absence.js`, 'utf8');

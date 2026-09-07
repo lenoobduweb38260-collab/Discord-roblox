@@ -1703,6 +1703,16 @@ const RELEASES = [
     fix: [],
     retrait: [],
   },
+  {
+    id: 'absences-modif-2026-09cq',
+    title: 'Absences : la modification refonctionne',
+    fix: [
+      '✏️ **Valider la fenetre « Modifier mon absence » repondait « ce bouton vient d\'une version precedente »** — et republier le panneau n\'y changeait rien, car il n\'y etait pour rien : l\'aiguillage du bot n\'acceptait que la fenetre de declaration, pas celle de modification. Les deux passent desormais, et un test verrouille le cas',
+    ],
+    ajout: [],
+    amelioration: [],
+    retrait: [],
+  },
 ];
 
 // Construit l'embed d'une note à partir d'une entrée { title, ajout, fix,
