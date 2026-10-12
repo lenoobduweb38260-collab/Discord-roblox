@@ -20564,5 +20564,257 @@
     "es": "📖 Guía de comandos",
     "pl": "📖 Przewodnik po komendach",
     "ru": "📖 Путеводитель по командам"
+  },
+  "[Admin] Débannir TOUS les bannis de ce serveur d'un coup": {
+    "en": "[Admin] Unban ALL banned users of this server at once",
+    "de": "[Admin] ALLE Gebannten dieses Servers auf einmal entbannen",
+    "es": "[Admin] Desbanear a TODOS los baneados de este servidor de una vez",
+    "pl": "[Admin] Odbanuj WSZYSTKICH zbanowanych na tym serwerze naraz",
+    "ru": "[Админ] Разбанить ВСЕХ забаненных этого сервера разом"
+  },
+  "📭 Aucun banni sur ce serveur : rien à lever.": {
+    "en": "📭 No banned users on this server: nothing to lift.",
+    "de": "📭 Keine Gebannten auf diesem Server: nichts aufzuheben.",
+    "es": "📭 Ningún baneado en este servidor: nada que levantar.",
+    "pl": "📭 Brak zbanowanych na tym serwerze: nie ma czego znosić.",
+    "ru": "📭 На этом сервере нет забаненных: снимать нечего."
+  },
+  "Unban général par ": {
+    "en": "Mass unban by ",
+    "de": "Sammel-Entbannung durch ",
+    "es": "Desbaneo general por ",
+    "pl": "Zbiorcze odbanowanie przez ",
+    "ru": "Массовый разбан от "
+  },
+  "🔓 Unban général": {
+    "en": "🔓 Mass unban",
+    "de": "🔓 Sammel-Entbannung",
+    "es": "🔓 Desbaneo general",
+    "pl": "🔓 Zbiorcze odbanowanie",
+    "ru": "🔓 Массовый разбан"
+  },
+  "> a levé **": {
+    "en": "> lifted **",
+    "de": "> hat **",
+    "es": "> ha levantado **",
+    "pl": "> zniósł(a) **",
+    "ru": "> снял(а) **"
+  },
+  "** ban(s) levé(s) sur **": {
+    "en": "** ban(s) lifted out of **",
+    "de": "** Bann(e) aufgehoben von **",
+    "es": "** ban(s) levantado(s) de **",
+    "pl": "** ban(y) zniesione z **",
+    "ru": "** бан(ов) снято из **"
+  },
+  "** sur ce serveur.": {
+    "en": "** on this server.",
+    "de": "** auf diesem Server.",
+    "es": "** en este servidor.",
+    "pl": "** na tym serwerze.",
+    "ru": "** на этом сервере."
+  },
+  " d'entre eux restent **blacklistés ou bannis globalement** : ils seront ": {
+    "en": " of them remain **blacklisted or globally banned**: they will be ",
+    "de": " von ihnen bleiben **auf der Blacklist oder global gebannt**: sie werden ",
+    "es": " de ellos siguen **en la blacklist o baneados globalmente**: serán ",
+    "pl": " z nich pozostaje **na czarnej liście lub zbanowanych globalnie**: zostaną ",
+    "ru": " из них остаются **в чёрном списке или под глобальным баном**: они будут "
+  },
+  "re-bannis à leur retour. Pour lever l'automatisme : `/unban-bl` (staff du bot) ou `/banglobal retirer`.": {
+    "en": "re-banned when they return. To lift the automation: `/unban-bl` (bot staff) or `/banglobal retirer`.",
+    "de": "bei ihrer Rückkehr erneut gebannt. Um die Automatik aufzuheben: `/unban-bl` (Bot-Team) oder `/banglobal retirer`.",
+    "es": "re-baneados a su regreso. Para levantar el automatismo: `/unban-bl` (staff del bot) o `/banglobal retirer`.",
+    "pl": "ponownie zbanowani po powrocie. Aby znieść automat: `/unban-bl` (staff bota) lub `/banglobal retirer`.",
+    "ru": "снова забанены при возвращении. Чтобы снять автоматику: `/unban-bl` (стафф бота) или `/banglobal retirer`."
+  },
+  "[Staff du bot] Lever la blacklist et le ban automatique d'un utilisateur, partout": {
+    "en": "[Bot staff] Lift a user's blacklist and automatic ban, everywhere",
+    "de": "[Bot-Team] Blacklist und automatischen Bann eines Nutzers überall aufheben",
+    "es": "[Staff del bot] Levantar la blacklist y el ban automático de un usuario, en todas partes",
+    "pl": "[Staff bota] Znieś czarną listę i automatyczny ban użytkownika, wszędzie",
+    "ru": "[Стафф бота] Снять чёрный список и автоматический бан пользователя везде"
+  },
+  "L'utilisateur dont on lève l'automatisme de ban": {
+    "en": "The user whose ban automation is being lifted",
+    "de": "Der Nutzer, dessen Bann-Automatik aufgehoben wird",
+    "es": "El usuario cuyo automatismo de ban se levanta",
+    "pl": "Użytkownik, któremu znosimy automat bana",
+    "ru": "Пользователь, с которого снимается автоматика бана"
+  },
+  "⛔ Réservé au **staff du bot** (permission 🚫 blacklist — voir `/botstaff`).": {
+    "en": "⛔ Reserved for the **bot staff** (🚫 blacklist permission — see `/botstaff`).",
+    "de": "⛔ Dem **Bot-Team** vorbehalten (Berechtigung 🚫 blacklist — siehe `/botstaff`).",
+    "es": "⛔ Reservado al **staff del bot** (permiso 🚫 blacklist — ver `/botstaff`).",
+    "pl": "⛔ Zarezerwowane dla **staffu bota** (uprawnienie 🚫 blacklist — zobacz `/botstaff`).",
+    "ru": "⛔ Только для **стаффа бота** (право 🚫 blacklist — см. `/botstaff`)."
+  },
+  "> n'est **ni blacklisté ni banni globalement** : aucun automatisme à lever.\n": {
+    "en": "> is **neither blacklisted nor globally banned**: no automation to lift.\n",
+    "de": "> ist **weder auf der Blacklist noch global gebannt**: keine Automatik aufzuheben.\n",
+    "es": "> no está **ni en la blacklist ni baneado globalmente**: ningún automatismo que levantar.\n",
+    "pl": "> nie jest **ani na czarnej liście, ani zbanowany globalnie**: nie ma automatu do zniesienia.\n",
+    "ru": "> **не в чёрном списке и не под глобальным баном**: автоматики для снятия нет.\n"
+  },
+  "-# Pour un ban posé à la main sur CE serveur : la liste des bannis du serveur, ou `/unban-all`.": {
+    "en": "-# For a ban placed by hand on THIS server: the server's ban list, or `/unban-all`.",
+    "de": "-# Für einen von Hand gesetzten Bann auf DIESEM Server: die Bannliste des Servers oder `/unban-all`.",
+    "es": "-# Para un ban puesto a mano en ESTE servidor: la lista de baneados del servidor, o `/unban-all`.",
+    "pl": "-# Dla bana nałożonego ręcznie na TYM serwerze: lista zbanowanych serwera lub `/unban-all`.",
+    "ru": "-# Для бана, выданного вручную на ЭТОМ сервере: список банов сервера или `/unban-all`."
+  },
+  "Levée du ban automatique par ": {
+    "en": "Automatic ban lifted by ",
+    "de": "Automatischer Bann aufgehoben durch ",
+    "es": "Ban automático levantado por ",
+    "pl": "Automatyczny ban zniesiony przez ",
+    "ru": "Автоматический бан снят: "
+  },
+  "🚫 blacklist du bot": {
+    "en": "🚫 bot blacklist",
+    "de": "🚫 Bot-Blacklist",
+    "es": "🚫 blacklist del bot",
+    "pl": "🚫 czarna lista bota",
+    "ru": "🚫 чёрный список бота"
+  },
+  "🌍 ban global": {
+    "en": "🌍 global ban",
+    "de": "🌍 globaler Bann",
+    "es": "🌍 ban global",
+    "pl": "🌍 globalny ban",
+    "ru": "🌍 глобальный бан"
+  },
+  "🔓 Automatisme de ban levé": {
+    "en": "🔓 Ban automation lifted",
+    "de": "🔓 Bann-Automatik aufgehoben",
+    "es": "🔓 Automatismo de ban levantado",
+    "pl": "🔓 Automat bana zniesiony",
+    "ru": "🔓 Автоматика бана снята"
+  },
+  "`) levé(s) par <@": {
+    "en": "`) lifted by <@",
+    "de": "`) aufgehoben durch <@",
+    "es": "`) levantado(s) por <@",
+    "pl": "`) zniesione przez <@",
+    "ru": "`) снято: <@"
+  },
+  "débanni sur **": {
+    "en": "unbanned on **",
+    "de": "entbannt auf **",
+    "es": "desbaneado en **",
+    "pl": "odbanowany na **",
+    "ru": "разбанен на **"
+  },
+  "🔓 Automatisme de ban **levé** pour <@": {
+    "en": "🔓 Ban automation **lifted** for <@",
+    "de": "🔓 Bann-Automatik **aufgehoben** für <@",
+    "es": "🔓 Automatismo de ban **levantado** para <@",
+    "pl": "🔓 Automat bana **zniesiony** dla <@",
+    "ru": "🔓 Автоматика бана **снята** для <@"
+  },
+  " retiré(s).\n": {
+    "en": " removed.\n",
+    "de": " entfernt.\n",
+    "es": " retirado(s).\n",
+    "pl": " usunięte.\n",
+    "ru": " убрано.\n"
+  },
+  "➜ Débanni sur **": {
+    "en": "➜ Unbanned on **",
+    "de": "➜ Entbannt auf **",
+    "es": "➜ Desbaneado en **",
+    "pl": "➜ Odbanowany na **",
+    "ru": "➜ Разбанен на **"
+  },
+  "** serveur(s) — il peut revenir sans être re-banni.": {
+    "en": "** server(s) — they can come back without being re-banned.",
+    "de": "** Server(n) — die Person kann zurückkommen, ohne erneut gebannt zu werden.",
+    "es": "** servidor(es) — puede volver sin ser re-baneado.",
+    "pl": "** serwerach — może wrócić bez ponownego bana.",
+    "ru": "** сервере(ах) — можно вернуться без повторного бана."
+  },
+  "🚨 Affiche de scam effacée — membre immunisé": {
+    "en": "🚨 Scam poster deleted — immune member",
+    "de": "🚨 Scam-Bild gelöscht — immunes Mitglied",
+    "es": "🚨 Cartel de scam borrado — miembro inmune",
+    "pl": "🚨 Obraz scamu usunięty — członek z immunitetem",
+    "ru": "🚨 Скам-картинка удалена — участник с иммунитетом"
+  },
+  "🛡️ Membre **immunisé** (créateur du bot ou liste d'immunité) : l'affiche est supprimée, aucune sanction.": {
+    "en": "🛡️ **Immune** member (bot creator or immunity list): the poster is deleted, no sanction.",
+    "de": "🛡️ **Immunes** Mitglied (Bot-Ersteller oder Immunitätsliste): das Bild wird gelöscht, keine Sanktion.",
+    "es": "🛡️ Miembro **inmune** (creador del bot o lista de inmunidad): el cartel se borra, sin sanción.",
+    "pl": "🛡️ Członek z **immunitetem** (twórca bota lub lista immunitetu): obraz usunięty, bez sankcji.",
+    "ru": "🛡️ Участник с **иммунитетом** (создатель бота или список иммунитета): картинка удалена, без наказания."
+  },
+  "Affiche de scam détectée (échantillon n°": {
+    "en": "Scam poster detected (sample #",
+    "de": "Scam-Bild erkannt (Muster Nr. ",
+    "es": "Cartel de scam detectado (muestra n.º ",
+    "pl": "Wykryto obraz scamu (próbka nr ",
+    "ru": "Обнаружена скам-картинка (образец №"
+  },
+  " image(s) archivée(s) depuis #": {
+    "en": " image(s) archived from #",
+    "de": " Bild(er) archiviert aus #",
+    "es": " imagen(es) archivada(s) desde #",
+    "pl": " obraz(y) zarchiwizowane z #",
+    "ru": " изображение(й) сохранено из #"
+  },
+  "🚨 Affiche de scam — blacklist automatique": {
+    "en": "🚨 Scam poster — automatic blacklist",
+    "de": "🚨 Scam-Bild — automatische Blacklist",
+    "es": "🚨 Cartel de scam — blacklist automática",
+    "pl": "🚨 Obraz scamu — automatyczna czarna lista",
+    "ru": "🚨 Скам-картинка — автоматический чёрный список"
+  },
+  "🚫🔨 **Blacklisté automatiquement** : banni sur **": {
+    "en": "🚫🔨 **Automatically blacklisted**: banned on **",
+    "de": "🚫🔨 **Automatisch auf die Blacklist gesetzt**: gebannt auf **",
+    "es": "🚫🔨 **Blacklisteado automáticamente**: baneado en **",
+    "pl": "🚫🔨 **Automatycznie na czarnej liście**: zbanowany na **",
+    "ru": "🚫🔨 **Автоматически в чёрном списке**: забанен на **"
+  },
+  "** serveur(s), re-banni à toute ": {
+    "en": "** server(s), re-banned on every ",
+    "de": "** Server(n), erneut gebannt bei jeder ",
+    "es": "** servidor(es), re-baneado en cada ",
+    "pl": "** serwerach, ponownie banowany przy każdym ",
+    "ru": "** сервере(ах), повторный бан при каждом "
+  },
+  "arrivée future, messages des dernières 24 h supprimés": {
+    "en": "future arrival, messages from the last 24 h deleted",
+    "de": "zukünftigen Beitritt, Nachrichten der letzten 24 h gelöscht",
+    "es": "llegada futura, mensajes de las últimas 24 h eliminados",
+    "pl": "przyszłym dołączeniu, wiadomości z ostatnich 24 h usunięte",
+    "ru": "будущем входе, сообщения за последние 24 ч удалены"
+  },
+  ", prévenu en MP": {
+    "en": ", notified by DM",
+    "de": ", per DM benachrichtigt",
+    "es": ", avisado por MD",
+    "pl": ", powiadomiony w DM",
+    "ru": ", предупреждён в ЛС"
+  },
+  "📸 Ses **": {
+    "en": "📸 Their **",
+    "de": "📸 Seine/ihre **",
+    "es": "📸 Sus **",
+    "pl": "📸 Jego/jej **",
+    "ru": "📸 Его/её **"
+  },
+  "** image(s) sont jointes en preuve.\n": {
+    "en": "** image(s) are attached as proof.\n",
+    "de": "** Bild(er) sind als Beweis angehängt.\n",
+    "es": "** imagen(es) van adjuntas como prueba.\n",
+    "pl": "** obraz(y) są załączone jako dowód.\n",
+    "ru": "** изображение(я) приложены как доказательство.\n"
+  },
+  "Annulable par le staff du bot : `/unban-bl`.": {
+    "en": "Reversible by the bot staff: `/unban-bl`.",
+    "de": "Aufhebbar durch das Bot-Team: `/unban-bl`.",
+    "es": "Anulable por el staff del bot: `/unban-bl`.",
+    "pl": "Odwracalne przez staff bota: `/unban-bl`.",
+    "ru": "Отменяется стаффом бота: `/unban-bl`."
   }
 }

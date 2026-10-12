@@ -119,7 +119,9 @@ function staffPermsOf(userId) {
 // Blacklister : enregistrement + MP (raison + serveur de déban) + bannissement
 // sur tous les serveurs du bot. À l'arrivée sur un serveur, un blacklisté est
 // re-banni automatiquement (voir guildMemberAdd) tant qu'il n'est pas retiré.
-async function applyBlacklist(client, userId, reason, byId, proof) {
+// `options.purgeSeconds` supprime aussi les messages récents du banni sur
+// chaque serveur (l'anti-scam s'en sert : ses affiches partent avec lui).
+async function applyBlacklist(client, userId, reason, byId, proof, options = {}) {
   // Immunité : le créateur et les IDs protégés ne peuvent pas être blacklistés.
   if (await isImmune(client, userId)) {
     return { immune: true, dmOk: false, banned: 0, tag: userId };
@@ -153,9 +155,12 @@ async function applyBlacklist(client, userId, reason, byId, proof) {
   }
 
   let banned = 0;
+  const banOptions = { reason: `Blacklist du bot : ${reason || 'Aucune raison'}` };
+  // Discord plafonne la purge à 7 jours.
+  if (options.purgeSeconds) banOptions.deleteMessageSeconds = Math.min(604800, Number(options.purgeSeconds) || 0);
   for (const guild of client.guilds.cache.values()) {
     const ok = await guild.members
-      .ban(userId, { reason: `Blacklist du bot : ${reason || 'Aucune raison'}` })
+      .ban(userId, banOptions)
       .then(() => true)
       .catch(() => false);
     if (ok) banned++;

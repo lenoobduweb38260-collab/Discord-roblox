@@ -1688,5 +1688,20 @@
   ],
   "amelioration": [],
   "retrait": []
+ },
+ {
+  "id": "bans-scam-preuves-2026-10cr",
+  "title": "Anti-scam avec preuves, /unban-all et /unban-bl",
+  "ajout": [
+   "🔓 **/unban-all** (administration) : leve TOUS les bans du serveur d'un coup, et dit honnetement combien restent sous automatisme global (ils seraient re-bannis a leur retour)",
+   "🔓 **/unban-bl** (staff du bot) : annule l'automatisme de ban d'un utilisateur — blacklist ET ban global leves ensemble, debanni sur tous les serveurs du bot. N'en lever qu'un laissait l'autre re-bannir au prochain retour"
+  ],
+  "fix": [
+   "🛡️ La detection anti-scam respecte enfin l'**immunite** : le createur qui reposte un echantillon pour tester ne se bannit plus lui-meme — l'affiche est effacee, sans sanction"
+  ],
+  "amelioration": [
+   "🚨 **Poster une affiche de scam vaut desormais blacklist automatique** : ban sur tous les serveurs avec purge 24 h, re-ban a toute arrivee future, MP avec le serveur de deban — et 📸 **les images envoyees sont jointes en preuve** au journal (et au salon des preuves s'il est configure), telechargees AVANT la suppression, sinon elles seraient perdues avec le message"
+  ],
+  "retrait": []
  }
 ]

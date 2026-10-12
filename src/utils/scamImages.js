@@ -23,9 +23,6 @@ const deleteSample = db.prepare('DELETE FROM scam_images WHERE id = ? AND guild_
 const getSample = db.prepare('SELECT * FROM scam_images WHERE id = ? AND guild_id = ?');
 const getSampleById = db.prepare('SELECT * FROM scam_images WHERE id = ?');
 const listGlobalSamples = db.prepare('SELECT * FROM scam_images WHERE guild_id = ? ORDER BY id');
-const insertGlobalBan = db.prepare(
-  'INSERT OR REPLACE INTO global_bans (user_id, reason, banned_by, banned_at) VALUES (?, ?, ?, ?)'
-);
 
 // jimp est optionnel : sans lui, la détection retombe sur l'empreinte exacte.
 let Jimp = null;
@@ -73,8 +70,10 @@ async function downloadImage(url) {
   return Buffer.from(await res.arrayBuffer());
 }
 
-// Analyse les pièces jointes d'un message ; supprime + bannit en cas de
-// correspondance. Renvoie true si le message a été traité comme scam.
+// Analyse les pièces jointes d'un message ; en cas de correspondance :
+// preuves téléchargées, message supprimé, auteur BLACKLISTÉ (ban partout +
+// re-ban automatique à l'arrivée + MP avec le serveur de déban), images
+// republiées en preuve. Renvoie true si le message a été traité comme scam.
 async function scanMessage(message) {
   // Échantillons de CE serveur + échantillons globaux (ajoutés par le créateur,
   // valables partout).
@@ -91,32 +90,80 @@ async function scanMessage(message) {
     );
     if (!match) continue;
 
+    const { isImmune, applyBlacklist } = require('./botTeam');
+
+    // 🛡️ Immunité : le créateur qui reposte un échantillon pour tester (ou un
+    // ID protégé) ne doit pas se blacklister lui-même. L'affiche est effacée,
+    // personne n'est sanctionné — et le journal dit pourquoi.
+    if (await isImmune(message.client, message.author.id)) {
+      await message.delete().catch(() => null);
+      await sendLog(
+        message.guild,
+        logEmbed(
+          '🚨 Affiche de scam effacée — membre immunisé',
+          `<@${message.author.id}> (\`${message.author.id}\`) a posté une image correspondant à l'échantillon ` +
+            `n°${match.id}${match.name ? ` « ${match.name} »` : ''} dans <#${message.channelId}>.\n` +
+            '🛡️ Membre **immunisé** (créateur du bot ou liste d\'immunité) : l\'affiche est supprimée, aucune sanction.',
+          COLORS.WARNING
+        )
+      );
+      return true;
+    }
+
+    // 📸 LA PREUVE D'ABORD. Les URL des pièces jointes meurent avec le
+    // message, et la purge du ban efface ses autres messages partout : tout
+    // ce qui n'est pas téléchargé MAINTENANT est perdu. On garde TOUTES ses
+    // images (l'image fautive est déjà en mémoire), dans la limite des 10
+    // fichiers d'un message Discord.
+    const preuves = [{ nom: att.name || 'preuve-1.png', donnees: buffer }];
+    for (const piece of message.attachments.values()) {
+      if (piece.id === att.id) continue;
+      if (!piece.contentType?.startsWith('image/') || piece.size > MAX_SIZE) continue;
+      if (preuves.length >= 10) break;
+      const donnees = await downloadImage(piece.url).catch(() => null);
+      if (donnees) preuves.push({ nom: piece.name || `preuve-${preuves.length + 1}.png`, donnees });
+    }
+
     await message.delete().catch(() => null);
 
-    // Ban GLOBAL : enregistré en base (auto-ban à toute arrivée future) puis
-    // appliqué sur tous les serveurs du bot, avec suppression de ses messages
-    // des dernières 24 h sur chacun.
-    const reason = `Image scam détectée (échantillon n°${match.id}${match.name ? ` « ${match.name} »` : ''})`;
-    insertGlobalBan.run(message.author.id, reason, message.client.user.id, new Date().toISOString());
-    let banCount = 0;
-    for (const guild of message.client.guilds.cache.values()) {
-      const ok = await guild.members
-        .ban(message.author.id, { reason: `Ban global anti-scam : ${reason}`, deleteMessageSeconds: 86400 })
-        .then(() => true)
-        .catch(() => false);
-      if (ok) banCount++;
-    }
-    await sendLog(
-      message.guild,
-      logEmbed(
-        '🚨 Image scam détectée — ban global',
-        `<@${message.author.id}> (\`${message.author.id}\`) a posté une image correspondant à l'échantillon ` +
-          `n°${match.id}${match.name ? ` « ${match.name} »` : ''} dans <#${message.channelId}>.\n` +
-          `🌍🔨 **Ban global** appliqué sur **${banCount}** serveur(s) (+ auto-ban à toute arrivée future), ` +
-          `messages des dernières 24 h supprimés.\nAnnulable avec \`/banglobal retirer\`.`,
-        COLORS.DANGER
-      )
+    // 🚫 Blacklist AUTOMATIQUE : enregistrement + MP (raison + serveur de
+    // déban) + ban sur tous les serveurs avec purge 24 h (ses affiches
+    // partent avec lui) + re-ban à toute arrivée future. Un seul circuit,
+    // historisé avec la preuve — et annulable d'un seul geste : /unban-bl.
+    const reason = `Affiche de scam détectée (échantillon n°${match.id}${match.name ? ` « ${match.name} »` : ''})`;
+    const proof = `${preuves.length} image(s) archivée(s) depuis #${message.channel?.name || message.channelId} — serveur ${message.guild?.name || message.guildId}`;
+    const resultat = await applyBlacklist(
+      message.client, message.author.id, reason, message.client.user.id, proof, { purgeSeconds: 86400 }
     );
+
+    // Les images repartent en pièces jointes du journal — un AttachmentBuilder
+    // NEUF par envoi : un builder consommé ne se renvoie pas.
+    const { AttachmentBuilder } = require('discord.js');
+    const fichiersPour = () => preuves.map((p) => new AttachmentBuilder(p.donnees, { name: p.nom }));
+
+    const embed = logEmbed(
+      '🚨 Affiche de scam — blacklist automatique',
+      `<@${message.author.id}> (\`${message.author.id}\`) a posté une image correspondant à l'échantillon ` +
+        `n°${match.id}${match.name ? ` « ${match.name} »` : ''} dans <#${message.channelId}>.\n` +
+        `🚫🔨 **Blacklisté automatiquement** : banni sur **${resultat.banned}** serveur(s), re-banni à toute ` +
+        `arrivée future, messages des dernières 24 h supprimés${resultat.dmOk ? ', prévenu en MP' : ''}.\n` +
+        `📸 Ses **${preuves.length}** image(s) sont jointes en preuve.\n` +
+        'Annulable par le staff du bot : `/unban-bl`.',
+      COLORS.DANGER
+    );
+    await sendLog(message.guild, embed, fichiersPour());
+
+    // 🖼️ Le salon des preuves (⚙️ /config → Salons), s'il est configuré,
+    // reçoit aussi les images : c'est lui que le staff du bot relit.
+    try {
+      const cfg = require('../database').getGuildConfig(message.guildId);
+      if (cfg?.proof_channel_id) {
+        const salon = await message.guild.channels.fetch(cfg.proof_channel_id).catch(() => null);
+        if (salon?.isTextBased?.()) {
+          await salon.send({ embeds: [embed], files: fichiersPour(), allowedMentions: { parse: [] } }).catch(() => null);
+        }
+      }
+    } catch { /* la preuve au journal suffit */ }
     return true;
   }
   return false;

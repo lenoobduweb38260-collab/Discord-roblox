@@ -192,4 +192,56 @@ module.exports = [
       );
     },
   },
+  {
+    // Sécurité grade élevé : lever TOUS les bans d'un coup est réservé à
+    // l'administration — il n'y a pas de retour en arrière groupé.
+    grade: GRADES.ADMIN,
+    data: new SlashCommandBuilder()
+      .setName('unban-all')
+      .setDescription('[Admin] Débannir TOUS les bannis de ce serveur d\'un coup')
+      .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
+    async execute(interaction) {
+      const { repondreVite } = require('../utils/reponse');
+      const { getBlacklistRow } = require('../utils/botTeam');
+      return repondreVite(interaction, async () => {
+        // Discord pagine la liste des bans par 1000 : on ramasse tout.
+        const bannis = new Map();
+        let apres;
+        for (;;) {
+          const page = await interaction.guild.bans.fetch({ limit: 1000, after: apres }).catch(() => null);
+          if (!page?.size) break;
+          for (const [id, ban] of page) bannis.set(id, ban);
+          if (page.size < 1000) break;
+          apres = [...page.keys()].sort((a, b) => (BigInt(a) < BigInt(b) ? -1 : 1)).pop();
+        }
+        if (!bannis.size) return { content: '📭 Aucun banni sur ce serveur : rien à lever.' };
+
+        let leves = 0;
+        const automatiques = []; // blacklist / ban global : re-bannis à leur retour
+        for (const id of bannis.keys()) {
+          const ok = await interaction.guild.members
+            .unban(id, `Unban général par ${interaction.user.tag}`)
+            .then(() => true)
+            .catch(() => false);
+          if (ok) leves++;
+          if (ok && (getBlacklistRow.get(id) || getGlobalBan.get(id))) automatiques.push(id);
+        }
+
+        await sendLog(
+          interaction.guild,
+          logEmbed('🔓 Unban général', `<@${interaction.user.id}> a levé **${leves}** ban(s) sur **${bannis.size}**.`, COLORS.SUCCESS)
+        );
+        const lignes = [`🔓 **${leves}** ban(s) levé(s) sur **${bannis.size}** sur ce serveur.`];
+        // ⚠️ L'unban local ne lève PAS les automatismes globaux : sans ce mot,
+        // on croirait la commande cassée quand ces membres seront re-bannis.
+        if (automatiques.length) {
+          lignes.push(
+            `-# ⚠️ ${automatiques.length} d'entre eux restent **blacklistés ou bannis globalement** : ils seront ` +
+              're-bannis à leur retour. Pour lever l\'automatisme : `/unban-bl` (staff du bot) ou `/banglobal retirer`.'
+          );
+        }
+        return { content: lignes.join('\n') };
+      });
+    },
+  },
 ];

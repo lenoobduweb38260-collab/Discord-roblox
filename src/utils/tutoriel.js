@@ -14,9 +14,11 @@ const { COLORS } = require('./embeds');
 //  • /tutos — tout, avec un badge sur ce qui est réservé (👮 staff, 🛡️ admin).
 // Les commandes du CRÉATEUR du bot n'apparaissent dans aucune des deux.
 
-// Les commandes du créateur : gérées à l'exécution par isCreator(), donc
-// invisibles dans les grades — la liste est ici, à compléter si on en ajoute.
-const CREATRICES = new Set(['annonce', 'forceupdate', 'esthetique', 'patchnote', 'scamimage', 'vgache', 'botstaff']);
+// Les commandes du créateur et de l'ÉQUIPE DU BOT : gérées à l'exécution par
+// isCreator()/hasPerm(), donc invisibles dans les grades — la liste est ici,
+// à compléter si on en ajoute. Elles ne concernent aucun serveur en
+// particulier et n'ont leur place dans aucun des deux guides.
+const CREATRICES = new Set(['annonce', 'forceupdate', 'esthetique', 'patchnote', 'scamimage', 'vgache', 'botstaff', 'blacklist', 'unban-bl']);
 
 // L'ordre de lecture : du quotidien vers l'outillage. Une commande absente de
 // ces listes n'est pas perdue : elle tombe dans « Autres », en fin de guide.
@@ -25,7 +27,7 @@ const CATEGORIES = [
   { emoji: '🎵', titre: 'Musique et vocal', noms: ['musique', 'radio', 'vocal'] },
   { emoji: '👥', titre: 'Communauté', noms: ['niveau', 'invites', 'invite', 'absence', 'report', 'partenariat', 'info', 'tuto', 'tutos'] },
   { emoji: '📋', titre: 'Whitelists et fiches', noms: ['whitelist', 'whitelistrp', 'blacklistrp', 'casier', 'warnrp'] },
-  { emoji: '👮', titre: 'Modération et sécurité', noms: ['ban', 'kick', 'mute', 'unmute', 'banglobal', 'moderation', 'snipe', 'securite', 'blacklist'] },
+  { emoji: '👮', titre: 'Modération et sécurité', noms: ['ban', 'kick', 'mute', 'unmute', 'unban-all', 'banglobal', 'moderation', 'snipe', 'securite'] },
   { emoji: '🎫', titre: 'Organisation du serveur', noms: ['ticket', 'mode', 'preset', 'embed', 'arrivee', 'depart', 'staff', 'reseaux', 'rappel-bump', 'config'] },
   { emoji: '🧰', titre: 'Autres', noms: [] },
 ];
