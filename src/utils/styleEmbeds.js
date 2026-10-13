@@ -123,6 +123,12 @@ function traduire(client, options) {
   }
 }
 
+// Le nom sous lequel le bot parle dans un serveur : son pseudo (identité par
+// serveur, voir utils/identiteBot.js), sinon son nom global.
+function nomDuBot(client, guild) {
+  return guild?.members?.me?.displayName || client?.user?.username || null;
+}
+
 function appliquer(client, options) {
   const listes = listesDEmbeds(options?.body);
   if (!listes.length) return;
@@ -131,7 +137,9 @@ function appliquer(client, options) {
   if (!r.actif) return;
   const contexte = {
     reglages: r,
-    bot: client.user?.username || null,
+    // 🪪 Le pseudo du bot SUR CE SERVEUR, s'il en a un : la signature des
+    // cartes suit l'identité par serveur, pas le nom global du compte.
+    bot: nomDuBot(client, guild),
     serveur: guild?.name || null,
     icone: guild?.iconURL?.({ size: 64 }) || null,
   };
@@ -278,6 +286,7 @@ function installer(client) {
 }
 
 module.exports = {
+  nomDuBot,
   installer, appliquer, styliserUn, reglages, versEntier, guildeDe, listesDEmbeds, noterInteraction,
   couleurNeutre, COULEURS_NEUTRES, DEFAUT_ACCENT, FILET, filetDe, FILET_DEFAUT,
   preparerCartes, routeDEnvoi, refusDeCartes, etatCartes, DRAPEAU_V2, fichiersLibres, traduire,

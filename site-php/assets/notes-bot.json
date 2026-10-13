@@ -1703,5 +1703,21 @@
    "🚨 **Poster une affiche de scam vaut desormais blacklist automatique** : ban sur tous les serveurs avec purge 24 h, re-ban a toute arrivee future, MP avec le serveur de deban — et 📸 **les images envoyees sont jointes en preuve** au journal (et au salon des preuves s'il est configure), telechargees AVANT la suppression, sinon elles seraient perdues avec le message"
   ],
   "retrait": []
+ },
+ {
+  "id": "identite-interact-2026-10cs",
+  "title": "Le bot a un visage par serveur, et /interact frappe plus fort",
+  "ajout": [
+   "🪪 **Identite du bot par serveur** : chaque serveur peut donner au bot un nom et une photo a lui — tout ce que le bot y envoie (reponses, cartes, messages) les porte, les autres serveurs gardent les leurs. Reglable dans `/config → 🪪 Identite du bot` (administration) et dans le dashboard, page Identite. Discord limite le changement de photo a une fois toutes les dix minutes environ",
+   "🎭 **Profils du bot** : le createur definit des profils (nom + photo) a la creation du bot sur le site (ou dans le .env, `BOT_PROFILS`) ; un serveur en choisit un d'un clic, ou saisit son propre nom et sa propre photo",
+   "👊 **/interact bang, punch et kill** : trois nouvelles interactions, traduites dans les cinq langues, avec leurs GIF"
+  ],
+  "fix": [
+   "😚 **Le bisou sur la joue envoyait un vrai baiser** : le GIF demande aux sources etait celui du baiser pour les trois sources. La joue a desormais sa propre image, et sa propre reserve"
+  ],
+  "amelioration": [
+   "🔓 Retirer quelqu'un de la blacklist depuis le dashboard leve aussi son ban global, comme `/unban-bl`"
+  ],
+  "retrait": []
  }
 ]

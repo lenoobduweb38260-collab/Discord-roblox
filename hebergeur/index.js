@@ -80,6 +80,9 @@ const BOT_ENV_TEMPLATE = [
   '# Limite /interact à certains serveurs (IDs séparés par des virgules ; vide = partout)',
   'INTERACT_GUILDS=',
   '',
+  '# Profils du bot (nom + photo) proposés aux serveurs — JSON : [{"nom":"Arès","avatar":"https://…/ares.png"}]',
+  'BOT_PROFILS=',
+  '',
 ].join('\n');
 
 // ----- État par bot -----

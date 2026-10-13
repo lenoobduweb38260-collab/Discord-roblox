@@ -20816,5 +20816,292 @@
     "es": "Anulable por el staff del bot: `/unban-bl`.",
     "pl": "Odwracalne przez staff bota: `/unban-bl`.",
     "ru": "Отменяется стаффом бота: `/unban-bl`."
+  },
+  "Identité du bot : ": {
+    "en": "Bot identity: ",
+    "de": "Bot-Identität: ",
+    "es": "Identidad del bot: ",
+    "pl": "Tożsamość bota: ",
+    "ru": "Личность бота: "
+  },
+  "🪪 Identité du bot": {
+    "en": "🪪 Bot identity",
+    "de": "🪪 Bot-Identität",
+    "es": "🪪 Identidad del bot",
+    "pl": "🪪 Tożsamość bota",
+    "ru": "🪪 Личность бота"
+  },
+  "Sur ce serveur : **": {
+    "en": "On this server: **",
+    "de": "Auf diesem Server: **",
+    "es": "En este servidor: **",
+    "pl": "Na tym serwerze: **",
+    "ru": "На этом сервере: **"
+  },
+  " · photo personnalisée": {
+    "en": " · custom picture",
+    "de": " · eigenes Bild",
+    "es": " · foto personalizada",
+    "pl": " · własne zdjęcie",
+    "ru": " · своя фотография"
+  },
+  "*Profil global du bot* (**": {
+    "en": "*Global bot profile* (**",
+    "de": "*Globales Bot-Profil* (**",
+    "es": "*Perfil global del bot* (**",
+    "pl": "*Globalny profil bota* (**",
+    "ru": "*Глобальный профиль бота* (**"
+  },
+  "Identité du bot": {
+    "en": "Bot identity",
+    "de": "Bot-Identität",
+    "es": "Identidad del bot",
+    "pl": "Tożsamość bota",
+    "ru": "Личность бота"
+  },
+  "Nom et photo du bot sur ce serveur, profils": {
+    "en": "Bot name and picture on this server, profiles",
+    "de": "Name und Bild des Bots auf diesem Server, Profile",
+    "es": "Nombre y foto del bot en este servidor, perfiles",
+    "pl": "Nazwa i zdjęcie bota na tym serwerze, profile",
+    "ru": "Имя и фото бота на этом сервере, профили"
+  },
+  "`/interact` (bisou, câlin, caresse, morsure, coup de poing, tir, élimination… façon Nekotina). Désactivé par défaut.": {
+    "en": "`/interact` (kiss, hug, pat, bite, punch, shot, kill… Nekotina-style). Off by default.",
+    "de": "`/interact` (Kuss, Umarmung, Streicheln, Biss, Fausthieb, Schuss, Eliminierung… à la Nekotina). Standardmäßig aus.",
+    "es": "`/interact` (beso, abrazo, caricia, mordisco, puñetazo, disparo, eliminación… al estilo Nekotina). Desactivado por defecto.",
+    "pl": "`/interact` (buziak, przytulenie, głaskanie, ugryzienie, cios, strzał, eliminacja… w stylu Nekotina). Domyślnie wyłączone.",
+    "ru": "`/interact` (поцелуй, объятие, поглаживание, укус, удар, выстрел, устранение… в стиле Nekotina). По умолчанию выключено."
+  },
+  "🪪 Configuration — Identité du bot": {
+    "en": "🪪 Configuration — Bot identity",
+    "de": "🪪 Konfiguration — Bot-Identität",
+    "es": "🪪 Configuración — Identidad del bot",
+    "pl": "🪪 Konfiguracja — Tożsamość bota",
+    "ru": "🪪 Настройка — Личность бота"
+  },
+  "🤖 Nom affiché sur ce serveur : **": {
+    "en": "🤖 Name shown on this server: **",
+    "de": "🤖 Angezeigter Name auf diesem Server: **",
+    "es": "🤖 Nombre mostrado en este servidor: **",
+    "pl": "🤖 Nazwa widoczna na tym serwerze: **",
+    "ru": "🤖 Имя на этом сервере: **"
+  },
+  " *(nom global du bot)*": {
+    "en": " *(the bot's global name)*",
+    "de": " *(globaler Name des Bots)*",
+    "es": " *(nombre global del bot)*",
+    "pl": " *(globalna nazwa bota)*",
+    "ru": " *(глобальное имя бота)*"
+  },
+  "🖼️ Photo sur ce serveur : ": {
+    "en": "🖼️ Picture on this server: ",
+    "de": "🖼️ Bild auf diesem Server: ",
+    "es": "🖼️ Foto en este servidor: ",
+    "pl": "🖼️ Zdjęcie na tym serwerze: ",
+    "ru": "🖼️ Фото на этом сервере: "
+  },
+  "**personnalisée**": {
+    "en": "**custom**",
+    "de": "**eigenes**",
+    "es": "**personalizada**",
+    "pl": "**własne**",
+    "ru": "**своё**"
+  },
+  "*celle du bot*": {
+    "en": "*the bot's own*",
+    "de": "*die des Bots*",
+    "es": "*la del bot*",
+    "pl": "*zdjęcie bota*",
+    "ru": "*фото бота*"
+  },
+  "🎭 Profil choisi : ": {
+    "en": "🎭 Chosen profile: ",
+    "de": "🎭 Gewähltes Profil: ",
+    "es": "🎭 Perfil elegido: ",
+    "pl": "🎭 Wybrany profil: ",
+    "ru": "🎭 Выбранный профиль: "
+  },
+  " profil(s) proposé(s) par le créateur du bot — choisissez-en un dans le menu, ou saisissez un nom et une photo à vous.": {
+    "en": " profile(s) offered by the bot's creator — pick one in the menu, or enter a name and picture of your own.",
+    "de": " Profil(e) vom Ersteller des Bots — wählen Sie eines im Menü oder geben Sie eigenen Namen und Bild ein.",
+    "es": " perfil(es) propuesto(s) por el creador del bot — elija uno en el menú, o introduzca un nombre y una foto propios.",
+    "pl": " profil(e) od twórcy bota — wybierz jeden z menu lub wpisz własną nazwę i zdjęcie.",
+    "ru": " профиль(ей) от создателя бота — выберите в меню или задайте своё имя и фото."
+  },
+  "📚 Le créateur du bot n'a défini aucun profil : saisissez un nom et une photo à vous (ou laissez le profil global).": {
+    "en": "📚 The bot's creator has defined no profile: enter a name and picture of your own (or keep the global profile).",
+    "de": "📚 Der Ersteller des Bots hat kein Profil festgelegt: geben Sie eigenen Namen und Bild ein (oder behalten Sie das globale Profil).",
+    "es": "📚 El creador del bot no ha definido ningún perfil: introduzca un nombre y una foto propios (o deje el perfil global).",
+    "pl": "📚 Twórca bota nie zdefiniował żadnego profilu: wpisz własną nazwę i zdjęcie (albo zostaw profil globalny).",
+    "ru": "📚 Создатель бота не задал профилей: укажите своё имя и фото (или оставьте глобальный профиль)."
+  },
+  "-# Le changement de photo est limité par Discord à une fois toutes les dix minutes environ. PNG, JPG ou GIF, 8 Mo maximum.": {
+    "en": "-# Discord limits picture changes to about once every ten minutes. PNG, JPG or GIF, 8 MB maximum.",
+    "de": "-# Discord erlaubt Bildwechsel nur etwa alle zehn Minuten. PNG, JPG oder GIF, maximal 8 MB.",
+    "es": "-# Discord limita el cambio de foto a una vez cada diez minutos aproximadamente. PNG, JPG o GIF, 8 MB máximo.",
+    "pl": "-# Discord ogranicza zmianę zdjęcia do mniej więcej raz na dziesięć minut. PNG, JPG lub GIF, maksymalnie 8 MB.",
+    "ru": "-# Discord ограничивает смену фото примерно раз в десять минут. PNG, JPG или GIF, максимум 8 МБ."
+  },
+  "🎭 Choisir un profil du bot pour ce serveur": {
+    "en": "🎭 Pick a bot profile for this server",
+    "de": "🎭 Ein Bot-Profil für diesen Server wählen",
+    "es": "🎭 Elegir un perfil del bot para este servidor",
+    "pl": "🎭 Wybierz profil bota dla tego serwera",
+    "ru": "🎭 Выбрать профиль бота для этого сервера"
+  },
+  "Profil global du bot": {
+    "en": "Global bot profile",
+    "de": "Globales Bot-Profil",
+    "es": "Perfil global del bot",
+    "pl": "Globalny profil bota",
+    "ru": "Глобальный профиль бота"
+  },
+  "Revenir au nom et à la photo d'origine": {
+    "en": "Back to the original name and picture",
+    "de": "Zurück zu ursprünglichem Namen und Bild",
+    "es": "Volver al nombre y la foto originales",
+    "pl": "Powrót do pierwotnej nazwy i zdjęcia",
+    "ru": "Вернуть исходные имя и фото"
+  },
+  "Nom et photo personnalisés": {
+    "en": "Custom name and picture",
+    "de": "Eigener Name und eigenes Bild",
+    "es": "Nombre y foto personalizados",
+    "pl": "Własna nazwa i zdjęcie",
+    "ru": "Своё имя и фото"
+  },
+  "🪪 Le bot sur ce serveur": {
+    "en": "🪪 The bot on this server",
+    "de": "🪪 Der Bot auf diesem Server",
+    "es": "🪪 El bot en este servidor",
+    "pl": "🪪 Bot na tym serwerze",
+    "ru": "🪪 Бот на этом сервере"
+  },
+  "Nom affiché (vide = nom global du bot)": {
+    "en": "Displayed name (empty = the bot's global name)",
+    "de": "Angezeigter Name (leer = globaler Name des Bots)",
+    "es": "Nombre mostrado (vacío = nombre global del bot)",
+    "pl": "Wyświetlana nazwa (puste = globalna nazwa bota)",
+    "ru": "Отображаемое имя (пусто = глобальное имя бота)"
+  },
+  "Arès": {
+    "en": "Ares",
+    "de": "Ares",
+    "es": "Ares",
+    "pl": "Ares",
+    "ru": "Арес"
+  },
+  "Adresse de la photo (vide = photo du bot)": {
+    "en": "Picture URL (empty = the bot's picture)",
+    "de": "Bild-URL (leer = Bild des Bots)",
+    "es": "URL de la foto (vacío = foto del bot)",
+    "pl": "Adres zdjęcia (puste = zdjęcie bota)",
+    "ru": "Адрес фото (пусто = фото бота)"
+  },
+  "⛔ Sécurité : seul un membre de l'**administration** peut changer le nom ou la photo du bot.": {
+    "en": "⛔ Security: only an **administration** member can change the bot's name or picture.",
+    "de": "⛔ Sicherheit: nur ein Mitglied der **Administration** kann Name oder Bild des Bots ändern.",
+    "es": "⛔ Seguridad: solo un miembro de la **administración** puede cambiar el nombre o la foto del bot.",
+    "pl": "⛔ Bezpieczeństwo: tylko członek **administracji** może zmienić nazwę lub zdjęcie bota.",
+    "ru": "⛔ Безопасность: только член **администрации** может менять имя или фото бота."
+  },
+  "profil global rétabli": {
+    "en": "global profile restored",
+    "de": "globales Profil wiederhergestellt",
+    "es": "perfil global restablecido",
+    "pl": "przywrócono profil globalny",
+    "ru": "глобальный профиль восстановлен"
+  },
+  " appliqué": {
+    "en": " applied",
+    "de": " angewendet",
+    "es": " aplicado",
+    "pl": " zastosowano",
+    "ru": " применён"
+  },
+  "❌ Identité du bot : ": {
+    "en": "❌ Bot identity: ",
+    "de": "❌ Bot-Identität: ",
+    "es": "❌ Identidad del bot: ",
+    "pl": "❌ Tożsamość bota: ",
+    "ru": "❌ Личность бота: "
+  },
+  "✅ Identité du bot mise à jour : ": {
+    "en": "✅ Bot identity updated: ",
+    "de": "✅ Bot-Identität aktualisiert: ",
+    "es": "✅ Identidad del bot actualizada: ",
+    "pl": "✅ Tożsamość bota zaktualizowana: ",
+    "ru": "✅ Личность бота обновлена: "
+  },
+  "l'adresse de la photo doit commencer par http(s)://": {
+    "en": "the picture URL must start with http(s)://",
+    "de": "die Bild-URL muss mit http(s):// beginnen",
+    "es": "la URL de la foto debe empezar por http(s)://",
+    "pl": "adres zdjęcia musi zaczynać się od http(s)://",
+    "ru": "адрес фото должен начинаться с http(s)://"
+  },
+  "la photo n'a pas pu être téléchargée (HTTP ": {
+    "en": "the picture could not be downloaded (HTTP ",
+    "de": "das Bild konnte nicht heruntergeladen werden (HTTP ",
+    "es": "no se pudo descargar la foto (HTTP ",
+    "pl": "nie udało się pobrać zdjęcia (HTTP ",
+    "ru": "не удалось загрузить фото (HTTP "
+  },
+  " refusé par Discord — utilisez une image PNG, JPG ou GIF": {
+    "en": " refused by Discord — use a PNG, JPG or GIF image",
+    "de": " von Discord abgelehnt — verwenden Sie ein PNG-, JPG- oder GIF-Bild",
+    "es": " rechazado por Discord — use una imagen PNG, JPG o GIF",
+    "pl": " odrzucony przez Discord — użyj obrazu PNG, JPG lub GIF",
+    "ru": " отклонён Discord — используйте изображение PNG, JPG или GIF"
+  },
+  "photo trop lourde (8 Mo maximum)": {
+    "en": "picture too large (8 MB maximum)",
+    "de": "Bild zu groß (maximal 8 MB)",
+    "es": "foto demasiado pesada (8 MB máximo)",
+    "pl": "zdjęcie za duże (maksymalnie 8 MB)",
+    "ru": "фото слишком большое (максимум 8 МБ)"
+  },
+  "Discord limite les changements de photo de profil : patientez une dizaine de minutes avant de réessayer": {
+    "en": "Discord limits profile picture changes: wait about ten minutes before trying again",
+    "de": "Discord begrenzt Profilbildwechsel: warten Sie etwa zehn Minuten, bevor Sie es erneut versuchen",
+    "es": "Discord limita los cambios de foto de perfil: espere unos diez minutos antes de volver a intentarlo",
+    "pl": "Discord ogranicza zmiany zdjęcia profilowego: odczekaj około dziesięciu minut przed kolejną próbą",
+    "ru": "Discord ограничивает смену фото профиля: подождите около десяти минут перед повтором"
+  },
+  "il me manque la permission « Changer le pseudo » sur ce serveur": {
+    "en": "I am missing the “Change Nickname” permission on this server",
+    "de": "mir fehlt die Berechtigung „Nickname ändern“ auf diesem Server",
+    "es": "me falta el permiso «Cambiar apodo» en este servidor",
+    "pl": "brakuje mi uprawnienia „Zmiana pseudonimu” na tym serwerze",
+    "ru": "у меня нет права «Изменить никнейм» на этом сервере"
+  },
+  "Discord a refusé": {
+    "en": "Discord refused",
+    "de": "Discord hat abgelehnt",
+    "es": "Discord lo rechazó",
+    "pl": "Discord odmówił",
+    "ru": "Discord отказал"
+  },
+  "Identité du bot sur ce serveur": {
+    "en": "Bot identity on this server",
+    "de": "Bot-Identität auf diesem Server",
+    "es": "Identidad del bot en este servidor",
+    "pl": "Tożsamość bota na tym serwerze",
+    "ru": "Личность бота на этом сервере"
+  },
+  "Discord limite les changements de photo : réessayez dans ": {
+    "en": "Discord limits picture changes: try again in ",
+    "de": "Discord begrenzt Bildwechsel: versuchen Sie es erneut in ",
+    "es": "Discord limita los cambios de foto: vuelva a intentarlo en ",
+    "pl": "Discord ogranicza zmiany zdjęcia: spróbuj ponownie za ",
+    "ru": "Discord ограничивает смену фото: повторите через "
+  },
+  "profil introuvable dans la liste du bot": {
+    "en": "profile not found in the bot's list",
+    "de": "Profil nicht in der Liste des Bots gefunden",
+    "es": "perfil no encontrado en la lista del bot",
+    "pl": "profil nie znaleziony na liście bota",
+    "ru": "профиль не найден в списке бота"
   }
 }

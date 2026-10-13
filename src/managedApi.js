@@ -130,6 +130,11 @@ function startManagedApi(client, baseDir) {
     goodbye_title: 't',
     goodbye_fields: 'b',
     level_image_url: 's',
+    // 🪪 Identité du bot par serveur — appliquées à Discord à l'écriture
+    // (voir plus bas), pas seulement enregistrées.
+    bot_nick: 's',
+    bot_avatar_url: 's',
+    bot_profil: 's',
   };
   const NUM_LIMITS = {
     xp_text: [1, 1000], xp_voice: [1, 1000], xp_cooldown: [5, 3600],
@@ -351,7 +356,13 @@ function startManagedApi(client, baseDir) {
           at: b.banned_at,
         }));
         const profils = listProfiles.all(guild.id).map((p) => ({ id: p.id, name: p.name, avatar: p.avatar_url }));
-        return send(200, { config: getGuildConfig(guild.id), roles, channels, categories, whitelist, tickets, bans, profils });
+        // 🪪 Les profils du bot (nom + photo) définis par le créateur, et
+        // l'identité effective sur CE serveur.
+        const identite = require('./utils/identiteBot');
+        return send(200, {
+          config: getGuildConfig(guild.id), roles, channels, categories, whitelist, tickets, bans, profils,
+          profilsBot: identite.profils(), identiteBot: identite.etat(guild),
+        });
       }
 
       // ----- Profils d'envoi (nom + avatar) pour les panneaux -----
@@ -541,6 +552,9 @@ function startManagedApi(client, baseDir) {
         if (url.pathname === '/blacklist-retirer') {
           if (!getBlacklistRow.get(String(body.userId || ''))) return send(404, { error: 'Non blacklisté.' });
           const result = await removeBlacklist(client, String(body.userId), who);
+          // Même geste que /unban-bl : l'ancien ban global re-bannirait à
+          // l'arrivée, on le lève avec la blacklist.
+          db.prepare('DELETE FROM global_bans WHERE user_id = ?').run(String(body.userId));
           return send(200, { ok: true, unbanned: result.unbanned });
         }
       }
@@ -834,6 +848,20 @@ function startManagedApi(client, baseDir) {
           // 10 suffit pour des rôles ; une liste d'exemptions couvre parfois
           // tout un serveur, d'où un plafond plus large sur ces clés-là.
           value = ids.length ? JSON.stringify(ids.slice(0, LIST_LIMITS[key] || 10)) : null;
+        }
+        // 🪪 Nom / photo / profil du bot : on l'applique à Discord d'abord —
+        // enregistrer une photo que Discord refuse mentirait au dashboard.
+        if (key === 'bot_nick' || key === 'bot_avatar_url' || key === 'bot_profil') {
+          const guild = client.guilds.cache.get(body.guildId);
+          try {
+            const identite = require('./utils/identiteBot');
+            if (key === 'bot_profil') await identite.appliquerProfil(guild, value || '');
+            else if (key === 'bot_nick') await identite.appliquer(guild, { nom: value, profil: null });
+            else await identite.appliquer(guild, { avatarUrl: value, profil: null });
+          } catch (err) {
+            return send(400, { error: `Identité du bot : ${err.message}` });
+          }
+          return send(200, { ok: true, value });
         }
         setGuildConfig(body.guildId, key, value);
         // Colonnes historiques mono-rôle synchronisées avec les listes (le

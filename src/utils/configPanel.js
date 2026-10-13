@@ -166,6 +166,16 @@ function mainView(guild) {
         inline: false,
       },
       {
+        name: '🪪 Identité du bot',
+        value: (() => {
+          const e = require('./identiteBot').etat(guild);
+          return e.pseudo || e.avatar
+            ? `Sur ce serveur : **${e.nom}**${e.avatar ? ' · photo personnalisée' : ''}${e.profil ? ` · profil n°${e.profil}` : ''}`
+            : `*Profil global du bot* (**${e.nomGlobal || 'bot'}**)`;
+        })(),
+        inline: false,
+      },
+      {
         name: '🎵 Musique',
         value: (() => {
           const R = require('./musiqueReglages');
@@ -217,6 +227,7 @@ function mainView(guild) {
         { label: 'Tickets', value: 'tickets', emoji: '🎫', description: 'Types de tickets, catégories, rôles support' },
         { label: 'Vocal', value: 'vocal', emoji: '🎧', description: 'File d\'attente, salons d\'assistance, salons perso' },
         { label: 'Musique', value: 'musique', emoji: '🎵', description: 'Salons des commandes, carte de lecture' },
+        { label: 'Identité du bot', value: 'identitebot', emoji: '🪪', description: 'Nom et photo du bot sur ce serveur, profils' },
         { label: 'Absences', value: 'absences', emoji: '📅', description: 'Les salons où partent les annonces d\'absence' },
         { label: 'Réseaux sociaux', value: 'reseaux', emoji: '📡', description: 'Annonces des lives et nouvelles vidéos' }
       )
@@ -592,7 +603,7 @@ function rpView(guild) {
     name: '🎮 Module Interactions',
     value:
       `État : ${interactOn ? '🟢 **Activé**' : '🔴 **Désactivé**'}\n` +
-      '`/interact` (câlin, tape, gifle… façon Nekotina). Désactivé par défaut.',
+      '`/interact` (bisou, câlin, caresse, morsure, coup de poing, tir, élimination… façon Nekotina). Désactivé par défaut.',
   });
   const saoOn = Boolean(cfg.sao_enabled);
   embed.addFields({
@@ -975,6 +986,68 @@ function musiqueView(guild) {
   };
 }
 
+// ----- Catégorie : identité du bot (pseudo + photo PAR SERVEUR) -----
+//
+// Discord laisse un bot avoir un pseudo et une photo propres à chaque serveur
+// (voir utils/identiteBot.js) : tout ce qu'il envoie ICI les porte. Deux
+// façons de régler : un profil de la liste du créateur, ou un nom + une photo
+// personnalisés. Réservé à l'administration — c'est le visage du bot.
+function identiteBotView(guild) {
+  const I = require('./identiteBot');
+  const e = I.etat(guild);
+  const liste = I.profils();
+  const embed = new EmbedBuilder()
+    .setColor(COLORS.INFO)
+    .setTitle('🪪 Configuration — Identité du bot')
+    .setDescription(
+      [
+        `🤖 Nom affiché sur ce serveur : **${e.nom}**${e.pseudo ? '' : ' *(nom global du bot)*'}`,
+        `🖼️ Photo sur ce serveur : ${e.avatar ? '**personnalisée**' : '*celle du bot*'}`,
+        `🎭 Profil choisi : ${e.profil ? `**n°${e.profil}**` : '*aucun*'}`,
+        '',
+        liste.length
+          ? `📚 ${liste.length} profil(s) proposé(s) par le créateur du bot — choisissez-en un dans le menu, ou saisissez un nom et une photo à vous.`
+          : '📚 Le créateur du bot n\'a défini aucun profil : saisissez un nom et une photo à vous (ou laissez le profil global).',
+        '-# Le changement de photo est limité par Discord à une fois toutes les dix minutes environ. PNG, JPG ou GIF, 8 Mo maximum.',
+      ].join('\n')
+    );
+  if (e.avatar) embed.setThumbnail(e.avatar);
+  const components = [];
+  if (liste.length) {
+    components.push(new ActionRowBuilder().addComponents(
+      new StringSelectMenuBuilder()
+        .setCustomId('cfgbotprofil')
+        .setPlaceholder('🎭 Choisir un profil du bot pour ce serveur')
+        .addOptions([
+          { label: 'Profil global du bot', value: '__global__', emoji: '🌐', description: 'Revenir au nom et à la photo d\'origine', default: !e.profil },
+          ...liste.map((p) => ({ label: p.nom.slice(0, 100), value: p.id, emoji: '🪪', description: p.avatar ? 'Nom + photo' : 'Nom seul', default: e.profil === p.id })),
+        ].slice(0, 25))
+    ));
+  }
+  components.push(new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('cfgback').setLabel('⬅ Retour').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('cfgbotident').setLabel('Nom et photo personnalisés').setEmoji('✏️').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId('cfgbotreset').setLabel('Profil global').setEmoji('🌐').setStyle(ButtonStyle.Secondary).setDisabled(!e.pseudo && !e.avatar && !e.profil)
+  ));
+  return { embeds: [embed], components };
+}
+
+function identiteBotModal(e) {
+  const champ = (id, label, placeholder, valeur, max) => {
+    const t = new TextInputBuilder().setCustomId(id).setLabel(label).setPlaceholder(placeholder)
+      .setStyle(TextInputStyle.Short).setRequired(false).setMaxLength(max);
+    if (valeur) t.setValue(String(valeur).slice(0, max));
+    return new ActionRowBuilder().addComponents(t);
+  };
+  return new ModalBuilder()
+    .setCustomId('cfgbotidentmodal')
+    .setTitle('🪪 Le bot sur ce serveur')
+    .addComponents(
+      champ('bot_nick', 'Nom affiché (vide = nom global du bot)', 'Arès', e.pseudo || e.nomEnregistre, 32),
+      champ('bot_avatar_url', 'Adresse de la photo (vide = photo du bot)', 'https://…/photo.png', e.avatarEnregistre, 500)
+    );
+}
+
 // ----- Catégorie : absences (les salons d'annonce, sans plafond) -----
 function absencesView(guild) {
   const salons = require('./absences').listeSalons(guild.id);
@@ -1012,7 +1085,7 @@ function absencesView(guild) {
   };
 }
 
-const CATEGORY_VIEWS = { rp: rpView, roles: rolesView, arrivees: arriveesView, salons: salonsView, xp: xpView, securite: securiteView, whitelist: whitelistView, tickets: ticketsView, vocal: vocalView, musique: musiqueView, absences: absencesView, reseaux: reseauxView };
+const CATEGORY_VIEWS = { rp: rpView, roles: rolesView, arrivees: arriveesView, salons: salonsView, xp: xpView, securite: securiteView, whitelist: whitelistView, tickets: ticketsView, vocal: vocalView, musique: musiqueView, identitebot: identiteBotView, absences: absencesView, reseaux: reseauxView };
 const SECURITY_TOGGLES = new Set(['antispam_enabled', 'antinuke_enabled', 'captcha_enabled']);
 
 function xpModal(cfg) {
@@ -1503,6 +1576,45 @@ async function handleConfigInteraction(interaction) {
       await sendLog(
         interaction.guild,
         logEmbed('⚙️ Configuration modifiée', `🎛️ Salon de la carte de lecture → ${channelId ? `<#${channelId}>` : '*le salon de la commande*'}\nPar <@${interaction.user.id}>`, COLORS.INFO)
+      );
+      return;
+    }
+
+    // 🪪 Identité du bot sur ce serveur — administration uniquement.
+    if (id === 'cfgbotprofil' || id === 'cfgbotident' || id === 'cfgbotidentmodal' || id === 'cfgbotreset') {
+      if (grade < GRADES.ADMIN) {
+        return await interaction.reply({
+          content: '⛔ Sécurité : seul un membre de l\'**administration** peut changer le nom ou la photo du bot.',
+          flags: MessageFlags.Ephemeral,
+        });
+      }
+      const I = require('./identiteBot');
+      if (id === 'cfgbotident') return await interaction.showModal(identiteBotModal(I.etat(interaction.guild)));
+      // Télécharger une photo et la poser prend quelques secondes : on
+      // accuse réception d'abord, la vue suit.
+      let geste;
+      try {
+        if (id === 'cfgbotprofil') {
+          const choix = interaction.values?.[0];
+          await I.appliquerProfil(interaction.guild, choix === '__global__' ? '' : choix);
+          geste = choix === '__global__' ? 'profil global rétabli' : `profil n°${choix} appliqué`;
+        } else if (id === 'cfgbotreset') {
+          await I.appliquer(interaction.guild, { nom: null, avatarUrl: null, profil: null });
+          geste = 'profil global rétabli';
+        } else {
+          const nom = interaction.fields.getTextInputValue('bot_nick').trim();
+          const photo = interaction.fields.getTextInputValue('bot_avatar_url').trim();
+          await I.appliquer(interaction.guild, { nom, avatarUrl: photo, profil: null });
+          geste = `nom « ${nom || I.etat(interaction.guild).nomGlobal} »${photo ? ' + photo' : ''}`;
+        }
+      } catch (err) {
+        return await suivre(interaction, { content: `❌ Identité du bot : ${err.message}.`, flags: MessageFlags.Ephemeral });
+      }
+      if (interaction.isFromMessage()) await mettreAJour(interaction, identiteBotView(interaction.guild));
+      else await interaction.reply({ content: `✅ Identité du bot mise à jour : ${geste}.`, flags: MessageFlags.Ephemeral });
+      await sendLog(
+        interaction.guild,
+        logEmbed('🪪 Identité du bot', `${geste} par <@${interaction.user.id}>.`, COLORS.INFO)
       );
       return;
     }

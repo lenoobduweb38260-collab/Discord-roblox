@@ -32,6 +32,9 @@ const LOCALES = {
       pat: { name: 'Caresses', phrase: (a, b) => `🖐️ **${a}** caresse doucement la tête de **${b}**.`, count: (n) => `✨ **${n}** caresses échangées.`, back: '🖐️ Caresser aussi' },
       bite: { name: 'Morsures', phrase: (a, b) => `😬 **${a}** mordille **${b}** !`, count: (n) => `🦷 **${n}** morsures échangées.`, back: '😬 Mordre aussi' },
       lick: { name: 'Léchouilles', phrase: (a, b) => `👅 **${a}** lèche **${b}**… coquin !`, count: (n) => `👅 **${n}** léchouilles échangées.`, back: '👅 Rendre la léchouille' },
+      bang: { name: 'Tirs', phrase: (a, b) => `🔫 **${a}** tire sur **${b}** ! Pan !`, count: (n) => `🔫 **${n}** coups de feu échangés.`, back: '🔫 Riposter' },
+      punch: { name: 'Coups de poing', phrase: (a, b) => `👊 **${a}** met un coup de poing à **${b}** !`, count: (n) => `👊 **${n}** coups de poing échangés.`, back: '👊 Rendre le coup' },
+      kill: { name: 'Éliminations', phrase: (a, b) => `💀 **${a}** élimine **${b}**… sans pitié !`, count: (n) => `💀 **${n}** éliminations entre eux.`, back: '💀 Se venger' },
     },
     reject: 'Rejeter',
     rejected: (a, b) => `💔 ${a} a rejeté l'interaction de ${b}… aïe.`,
@@ -55,6 +58,9 @@ const LOCALES = {
       pat: { name: 'Pats', phrase: (a, b) => `🖐️ **${a}** gently pats **${b}**'s head.`, count: (n) => `✨ **${n}** headpats shared.`, back: '🖐️ Pat back' },
       bite: { name: 'Bites', phrase: (a, b) => `😬 **${a}** playfully bites **${b}**!`, count: (n) => `🦷 **${n}** bites exchanged.`, back: '😬 Bite back' },
       lick: { name: 'Licks', phrase: (a, b) => `👅 **${a}** licks **${b}**… cheeky!`, count: (n) => `👅 **${n}** licks exchanged.`, back: '👅 Lick back' },
+      bang: { name: 'Shots', phrase: (a, b) => `🔫 **${a}** shoots **${b}**! Bang!`, count: (n) => `🔫 **${n}** shots exchanged.`, back: '🔫 Shoot back' },
+      punch: { name: 'Punches', phrase: (a, b) => `👊 **${a}** punches **${b}**!`, count: (n) => `👊 **${n}** punches exchanged.`, back: '👊 Punch back' },
+      kill: { name: 'Kills', phrase: (a, b) => `💀 **${a}** kills **${b}**… no mercy!`, count: (n) => `💀 **${n}** kills between them.`, back: '💀 Get revenge' },
     },
     reject: 'Reject',
     rejected: (a, b) => `💔 ${a} rejected ${b}'s interaction… ouch.`,
@@ -78,6 +84,9 @@ const LOCALES = {
       pat: { name: 'Caricias', phrase: (a, b) => `🖐️ **${a}** acaricia suavemente la cabeza de **${b}**.`, count: (n) => `✨ **${n}** caricias compartidas.`, back: '🖐️ Acariciar también' },
       bite: { name: 'Mordiscos', phrase: (a, b) => `😬 ¡**${a}** muerde juguetonamente a **${b}**!`, count: (n) => `🦷 **${n}** mordiscos intercambiados.`, back: '😬 Morder también' },
       lick: { name: 'Lametones', phrase: (a, b) => `👅 **${a}** lame a **${b}**… ¡pícaro!`, count: (n) => `👅 **${n}** lametones intercambiados.`, back: '👅 Devolver el lametón' },
+      bang: { name: 'Disparos', phrase: (a, b) => `🔫 **${a}** le dispara a **${b}**. ¡Bang!`, count: (n) => `🔫 **${n}** disparos intercambiados.`, back: '🔫 Devolver el disparo' },
+      punch: { name: 'Puñetazos', phrase: (a, b) => `👊 ¡**${a}** le da un puñetazo a **${b}**!`, count: (n) => `👊 **${n}** puñetazos intercambiados.`, back: '👊 Devolver el golpe' },
+      kill: { name: 'Eliminaciones', phrase: (a, b) => `💀 **${a}** elimina a **${b}**… ¡sin piedad!`, count: (n) => `💀 **${n}** eliminaciones entre ellos.`, back: '💀 Vengarse' },
     },
     reject: 'Rechazar',
     rejected: (a, b) => `💔 ${a} rechazó la interacción de ${b}… ay.`,
@@ -101,6 +110,9 @@ const LOCALES = {
       pat: { name: 'Streicheln', phrase: (a, b) => `🖐️ **${a}** tätschelt sanft **${b}**s Kopf.`, count: (n) => `✨ **${n}** Streicheleinheiten geteilt.`, back: '🖐️ Auch streicheln' },
       bite: { name: 'Bisse', phrase: (a, b) => `😬 **${a}** beißt **${b}** verspielt!`, count: (n) => `🦷 **${n}** Bisse ausgetauscht.`, back: '😬 Zurückbeißen' },
       lick: { name: 'Lecken', phrase: (a, b) => `👅 **${a}** leckt **${b}**… frech!`, count: (n) => `👅 **${n}** Mal geleckt.`, back: '👅 Zurücklecken' },
+      bang: { name: 'Schüsse', phrase: (a, b) => `🔫 **${a}** schießt auf **${b}**! Peng!`, count: (n) => `🔫 **${n}** Schüsse gewechselt.`, back: '🔫 Zurückschießen' },
+      punch: { name: 'Fausthiebe', phrase: (a, b) => `👊 **${a}** verpasst **${b}** einen Fausthieb!`, count: (n) => `👊 **${n}** Fausthiebe gewechselt.`, back: '👊 Zurückschlagen' },
+      kill: { name: 'Eliminierungen', phrase: (a, b) => `💀 **${a}** eliminiert **${b}**… gnadenlos!`, count: (n) => `💀 **${n}** Eliminierungen untereinander.`, back: '💀 Rache nehmen' },
     },
     reject: 'Ablehnen',
     rejected: (a, b) => `💔 ${a} hat die Interaktion von ${b} abgelehnt… autsch.`,
@@ -124,6 +136,9 @@ const LOCALES = {
       pat: { name: 'Поглаживания', phrase: (a, b) => `🖐️ **${a}** нежно гладит **${b}** по голове.`, count: (n) => `✨ **${n}** поглаживаний.`, back: '🖐️ Погладить в ответ' },
       bite: { name: 'Укусы', phrase: (a, b) => `😬 **${a}** игриво кусает **${b}**!`, count: (n) => `🦷 **${n}** укусов.`, back: '😬 Укусить в ответ' },
       lick: { name: 'Облизывания', phrase: (a, b) => `👅 **${a}** облизывает **${b}**… шалун!`, count: (n) => `👅 **${n}** облизываний.`, back: '👅 Облизать в ответ' },
+      bang: { name: 'Выстрелы', phrase: (a, b) => `🔫 **${a}** стреляет в **${b}**! Бах!`, count: (n) => `🔫 Обменялись **${n}** выстрелами.`, back: '🔫 Выстрелить в ответ' },
+      punch: { name: 'Удары', phrase: (a, b) => `👊 **${a}** бьёт **${b}** кулаком!`, count: (n) => `👊 Обменялись **${n}** ударами.`, back: '👊 Ударить в ответ' },
+      kill: { name: 'Устранения', phrase: (a, b) => `💀 **${a}** устраняет **${b}**… без пощады!`, count: (n) => `💀 **${n}** устранений между ними.`, back: '💀 Отомстить' },
     },
     reject: 'Отказать',
     rejected: (a, b) => `💔 ${a} отклонил(а) действие от ${b}… ай.`,
@@ -236,29 +251,44 @@ function memoriserGif(categorie, gif) {
 
 // GIF depuis internet : trois sources essayées dans l'ordre, timeout 5 s
 // chacune, et cause d'échec journalisée dans la console pour diagnostic.
+// 🎞️ Quelle catégorie demander à chaque source pour chaque action.
+//
+// Les trois sources n'ont pas le même catalogue — et c'est ce qui cassait le
+// bisou sur la joue : « peck » était remplacé par « kiss » PARTOUT, donc
+// l'image (l'élément dominant de la carte) montrait toujours un vrai baiser.
+// Ici, une action sans équivalent chez une source saute simplement cette
+// source ; la joue ne retombe plus jamais sur les lèvres.
+const CATEGORIES_GIF = {
+  kiss: { nekos: 'kiss', waifu: 'kiss', otaku: 'kiss' },
+  peck: { nekos: null, waifu: null, otaku: 'airkiss' },   // le bisou soufflé, le plus proche de la joue
+  hug: { nekos: 'hug', waifu: 'hug', otaku: 'hug' },
+  pat: { nekos: 'pat', waifu: 'pat', otaku: 'pat' },
+  bite: { nekos: 'bite', waifu: 'bite', otaku: 'bite' },
+  lick: { nekos: 'lick', waifu: 'lick', otaku: 'lick' },
+  bang: { nekos: 'shoot', waifu: null, otaku: null },
+  punch: { nekos: 'punch', waifu: null, otaku: 'punch' },
+  kill: { nekos: null, waifu: 'kill', otaku: null },
+};
+
 async function fetchGif(category) {
-  const simple = category === 'peck' ? 'kiss' : category;
+  const cat = CATEGORIES_GIF[category] || { nekos: category, waifu: category, otaku: category };
   const sources = [
-    {
+    cat.nekos && {
       name: 'nekos.best',
-      // ⚠️ `simple`, et non `category` : nekos.best ne connaît pas « peck ».
-      // Un bisou sur la joue partait donc systématiquement en 404 sur la
-      // première source — d'où l'impression que les bisous échouent plus que
-      // le reste.
-      url: `https://nekos.best/api/v2/${simple}`,
+      url: `https://nekos.best/api/v2/${cat.nekos}`,
       parse: (data) => ({ url: data.results?.[0]?.url, anime: data.results?.[0]?.anime_name || null }),
     },
-    {
+    cat.waifu && {
       name: 'waifu.pics',
-      url: `https://api.waifu.pics/sfw/${simple}`,
+      url: `https://api.waifu.pics/sfw/${cat.waifu}`,
       parse: (data) => ({ url: data.url, anime: null }),
     },
-    {
+    cat.otaku && {
       name: 'otakugifs',
-      url: `https://api.otakugifs.xyz/gif?reaction=${simple}`,
+      url: `https://api.otakugifs.xyz/gif?reaction=${cat.otaku}`,
       parse: (data) => ({ url: data.url, anime: null }),
     },
-  ];
+  ].filter(Boolean);
   for (const source of sources) {
     try {
       const res = await fetch(source.url, {
@@ -271,7 +301,7 @@ async function fetchGif(category) {
       }
       const gif = source.parse(await res.json());
       if (urlAffichable(gif.url)) {
-        memoriserGif(simple, gif);
+        memoriserGif(category, gif);
         return gif;
       }
       console.warn(`⚠️ GIF ${source.name} (${category}) : réponse sans URL exploitable`);
@@ -282,7 +312,7 @@ async function fetchGif(category) {
 
   // Les trois sources sont tombées : on ressert une image déjà vue plutôt que
   // de rendre une animation sans animation.
-  const secours = gifAuHasard.get(simple);
+  const secours = gifAuHasard.get(category);
   if (secours?.url) {
     console.warn(`⚠️ Sources HS pour « ${category} » — GIF repris de la réserve.`);
     return { url: secours.url, anime: secours.anime || null, reserve: true };
@@ -303,7 +333,7 @@ async function buildInteractionMessage(interaction, actionKey, author, target, w
   const L = LOCALES[lang];
   const action = L.actions[actionKey];
   const counterKey = actionKey === 'peck' ? 'kiss' : actionKey;
-  const gif = await fetchGif(actionKey === 'peck' ? 'peck' : actionKey);
+  const gif = await fetchGif(actionKey);
   const count = incrementCounter(author.id, target.id, counterKey);
 
   // Statistiques personnelles de l'auteur → badges par paliers, envoyés en MP.
@@ -361,6 +391,7 @@ function moduleBlocked(interaction) {
 }
 
 module.exports = {
+  CATEGORIES_GIF, LOCALES,
   grade: GRADES.EVERYONE,
   public: true, // réponses visibles par tout le monde (pas d'éphémère)
   allowDm: true, // utilisable en message privé avec le bot
@@ -370,8 +401,8 @@ module.exports = {
   moduleBlocked,
   data: new SlashCommandBuilder()
     .setName('interact')
-    .setDescription('Interactions : bisous, câlins, caresses, morsures (GIF anime)')
-    .setDescriptionLocalizations({ 'en-US': 'Interactions: kisses, hugs, pats, bites (anime GIFs)', 'en-GB': 'Interactions: kisses, hugs, pats, bites (anime GIFs)' })
+    .setDescription('Interactions : bisous, câlins, caresses, morsures, coups, tirs (GIF anime)')
+    .setDescriptionLocalizations({ 'en-US': 'Interactions: kisses, hugs, pats, bites, punches, shots (anime GIFs)', 'en-GB': 'Interactions: kisses, hugs, pats, bites, punches, shots (anime GIFs)' })
     .setIntegrationTypes(ApplicationIntegrationType.GuildInstall, ApplicationIntegrationType.UserInstall)
     .setContexts(InteractionContextType.Guild, InteractionContextType.BotDM, InteractionContextType.PrivateChannel)
     .addSubcommand((sub) =>
@@ -415,6 +446,27 @@ module.exports = {
         .setDescription('Lécher quelqu\'un 👅')
         .setDescriptionLocalizations({ 'en-US': 'Lick someone in a cheeky way 👅', 'en-GB': 'Lick someone in a cheeky way 👅' })
         .addUserOption((o) => o.setName('membre').setDescription('Qui lécher ?').setRequired(true))
+    )
+    .addSubcommand((sub) =>
+      sub
+        .setName('bang')
+        .setDescription('Tirer sur quelqu\'un 🔫')
+        .setDescriptionLocalizations({ 'en-US': 'Shoot someone 🔫', 'en-GB': 'Shoot someone 🔫' })
+        .addUserOption((o) => o.setName('membre').setDescription('Sur qui tirer ?').setRequired(true))
+    )
+    .addSubcommand((sub) =>
+      sub
+        .setName('punch')
+        .setDescription('Mettre un coup de poing à quelqu\'un 👊')
+        .setDescriptionLocalizations({ 'en-US': 'Punch someone 👊', 'en-GB': 'Punch someone 👊' })
+        .addUserOption((o) => o.setName('membre').setDescription('Qui frapper ?').setRequired(true))
+    )
+    .addSubcommand((sub) =>
+      sub
+        .setName('kill')
+        .setDescription('Éliminer quelqu\'un 💀')
+        .setDescriptionLocalizations({ 'en-US': 'Take someone out 💀', 'en-GB': 'Take someone out 💀' })
+        .addUserOption((o) => o.setName('membre').setDescription('Qui éliminer ?').setRequired(true))
     )
     .addSubcommand((sub) =>
       sub

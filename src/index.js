@@ -34,6 +34,9 @@ MODULE_INTERACT=on
 
 # Optionnel : limite /interact à certains serveurs (IDs séparés par des virgules ; vide = partout)
 INTERACT_GUILDS=
+
+# Optionnel : profils du bot (nom + photo) proposés aux serveurs — JSON : [{"nom":"Arès","avatar":"https://…/ares.png"}]
+BOT_PROFILS=
 `;
 
 // Premier lancement de l'exécutable : on crée un .env à remplir à côté de l'exe.

@@ -164,7 +164,7 @@ module.exports = {
     }
     if (detaille) {
       embed.setAuthor({ name: `Bienvenue sur ${member.guild.name} !`, iconURL: member.guild.iconURL({ size: 128 }) || undefined });
-      embed.setFooter({ text: `${member.client.user.username} • ${member.guild.name}` });
+      embed.setFooter({ text: `${require('../utils/styleEmbeds').nomDuBot(member.client, member.guild)} • ${member.guild.name}` });
     }
     // 📨 Qui l'a invité — une information réelle, quel que soit le style.
     if (invitation?.inviterId) {

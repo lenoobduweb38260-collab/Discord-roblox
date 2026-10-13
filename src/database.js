@@ -627,6 +627,10 @@ for (const column of [
   'goodbye_avatar TEXT',
   'goodbye_title TEXT',
   'goodbye_fields INTEGER',
+  // 🪪 Identité du bot PAR SERVEUR : pseudo, photo de membre, profil choisi
+  'bot_nick TEXT',
+  'bot_avatar_url TEXT',
+  'bot_profil TEXT',
 ]) {
   try {
     db.exec(`ALTER TABLE guild_config ADD COLUMN ${column}`);
@@ -917,6 +921,9 @@ const DEFAULT_CONFIG = {
   bump_role_id: null,
   bump_dernier: null,
   level_image_url: null,
+  bot_nick: null,
+  bot_avatar_url: null,
+  bot_profil: null,
   xp_text: 20,
   xp_voice: 20,
   xp_cooldown: 60,

@@ -144,7 +144,7 @@ function contexteDeGuilde(guild, client) {
     r,
     contexte: {
       reglages: r,
-      bot: client?.user?.username || null,
+      bot: require('./styleEmbeds').nomDuBot(client, guild),
       serveur: guild?.name || null,
       icone: guild?.iconURL?.({ size: 64 }) || null,
     },

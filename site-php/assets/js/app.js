@@ -1215,9 +1215,12 @@
     ui.srvParams[guildId] = null;                 // évite les appels en rafale
     try {
       const r = await api("serveur.parametres", { serveur: guildId });
-      ui.srvParams[guildId] = { config: r.config || {}, roles: r.roles || [], channels: r.channels || [], categories: r.categories || [] };
+      ui.srvParams[guildId] = {
+        config: r.config || {}, roles: r.roles || [], channels: r.channels || [], categories: r.categories || [],
+        profilsBot: r.profilsBot || [], identiteBot: r.identiteBot || null,
+      };
     } catch (e) {
-      ui.srvParams[guildId] = { erreur: e.message, config: {}, roles: [], channels: [], categories: [] };
+      ui.srvParams[guildId] = { erreur: e.message, config: {}, roles: [], channels: [], categories: [], profilsBot: [], identiteBot: null };
     }
     if (ui.route === "server") render();
   }
@@ -1537,8 +1540,33 @@
         ${champNombre("embed_filet_taille", "📏 Longueur du filet", "Sans effet en mode carte : Discord y trace de vrais séparateurs. Ne sert qu'aux embeds classiques — trop long, la ligne passe à la ligne sur téléphone.", 6, 30, 16)}
         ${champTexte("embed_banniere", "🖼️ Bannière de bas de carte (URL)", "Image large affichée en bas de chaque embed, comme une signature visuelle. Laissez vide pour aucune. Un embed qui a déjà son image la garde.", false, "https://…/support.png")}
       </div>
+      ${identiteBotBloc(cfg)}
       ${apercuIdentite(cfg)}`;
     return modulePanel("Identité des embeds", "L'apparence commune à tous les messages du bot.", body, "identite");
+  }
+
+  // 🪪 Le nom et la photo du bot SUR CE SERVEUR. Discord laisse un bot avoir
+  // un pseudo et une photo propres à chaque serveur : tout ce qu'il y envoie
+  // (réponses, cartes, messages) les porte. Un profil de la liste du créateur,
+  // ou un nom + une photo à soi.
+  function identiteBotBloc(cfg) {
+    const p = srvParams();
+    const profils = p?.profilsBot || [];
+    const e = p?.identiteBot || {};
+    const photo = String(cfg.bot_avatar_url || "").trim();
+    const etat = e.pseudo || e.avatar
+      ? `Sur ce serveur, le bot s'appelle <b>${esc(e.nom || "")}</b>${e.avatar ? " avec sa photo personnalisée" : ""}.`
+      : `Ce serveur utilise le <b>profil global</b> du bot (<b>${esc(e.nomGlobal || "bot")}</b>).`;
+    return `<div class="builder-hint mt-16">🪪 <b>Le bot sur ce serveur</b> — ${etat} Le nom et la photo choisis ici ne valent que pour <b>ce serveur</b> : les autres gardent les leurs.</div>
+      <div class="form-grid mt-16">
+        ${profils.length
+          ? champChoix("bot_profil", "🎭 Profil du bot", [["", "Profil global du bot (défaut)"], ...profils.map(x => [x.id, x.nom + (x.avatar ? " — nom + photo" : " — nom seul")])],
+              "Les profils proposés par le créateur du bot (définis dans ⚙️ Créateur → Mes bots). Choisir un profil remplace le nom et la photo ci-dessous.")
+          : `<div class="field"><label>🎭 Profil du bot</label><span class="field-note">Aucun profil proposé par le créateur du bot — définissez-les dans ⚙️ Créateur → 🤖 Mes bots, ou saisissez un nom et une photo ci-contre.</span></div>`}
+        ${champTexte("bot_nick", "🤖 Nom du bot sur ce serveur", "32 caractères maximum. Vide = le nom global du bot. Nécessite la permission « Changer le pseudo » pour le bot.", false, "Arès")}
+        ${champTexte("bot_avatar_url", "🖼️ Photo du bot sur ce serveur (URL)", "PNG, JPG ou GIF, 8 Mo maximum. Vide = la photo du bot. ⏱️ Discord n'accepte qu'un changement de photo toutes les dix minutes environ.", false, "https://…/photo.png")}
+        ${photo ? `<div class="field"><label>Aperçu de la photo</label><img src="${esc(photo)}" alt="" style="width:72px;height:72px;border-radius:50%;object-fit:cover;border:1px solid var(--line)"></div>` : ""}
+      </div>`;
   }
 
   // Aperçu : trois embeds de nature différente, pour montrer l'effet de
@@ -2068,7 +2096,7 @@
     const srv = selectedServer();
     return {
       reglages: r,
-      bot: activeBot()?.name || "Votre bot",
+      bot: (ui.route === "server" && String(cfgCourant().bot_nick || "").trim()) || activeBot()?.name || "Votre bot",
       serveur: srv?.name || "Votre serveur",
       // L'icône n'est pas dessinée dans l'aperçu, mais styliserUn s'en sert
       // pour décider d'écrire ou non icon_url : on lui donne la même valeur
@@ -2985,7 +3013,7 @@
     { id: "cmd.niveau", cat: "📈 Communauté", label: "/niveau", desc: "Niveaux et classements (écrit et vocal)", g: ["membre", "police", "staff", "admin"] },
     { id: "cmd.info", cat: "📈 Communauté", label: "/info", desc: "Fiche d'un membre", g: ["membre", "police", "staff", "admin"] },
     { id: "cmd.musique", cat: "📈 Communauté", label: "/musique", desc: "Musique en vocal (YouTube, Spotify, Deezer…)", g: ["membre", "police", "staff", "admin"] },
-    { id: "cmd.interact", cat: "📈 Communauté", label: "/interact", desc: "Interactions entre membres (câlin, high-five…)", g: ["membre", "police", "staff", "admin"] },
+    { id: "cmd.interact", cat: "📈 Communauté", label: "/interact", desc: "Interactions entre membres (bisou, câlin, coup de poing, tir…)", g: ["membre", "police", "staff", "admin"] },
     { id: "cmd.sao", cat: "📈 Communauté", label: "/sao", desc: "Mini-jeu Aincrad : personnage et progression", g: ["membre", "police", "staff", "admin"] },
     { id: "cmd.vgache", cat: "📈 Communauté", label: "/vgache", desc: "Gacha de VTubeuses", g: ["membre", "police", "staff", "admin"] },
     { id: "cmd.invite", cat: "📈 Communauté", label: "/invite", desc: "Lien d'invitation du bot", g: ["membre", "police", "staff", "admin"] },
@@ -3097,6 +3125,10 @@
           <div class="field"><label>2️⃣ Client ID Discord <span style="color:var(--muted-2);font-weight:400">(facultatif)</span></label>
             <input class="input" data-f="clientId" value="${esc(bot.clientId || "")}" placeholder="1528910533183541308" inputmode="numeric">
             <span class="field-note">${clientIdNote(bot.clientId)}</span></div>
+          <div class="field full"><label>🪪 Profils du bot <span style="color:var(--muted-2);font-weight:400">(un par ligne : <code>Nom | https://adresse-de-la-photo.png</code>)</span></label>
+            <textarea class="textarea" rows="3" data-f="profils" placeholder="Arès | https://…/ares.png
+Oy Bot? | https://…/oy.png">${esc(profilsEnTexte(bot.profils))}</textarea>
+            <span class="field-note">Chaque serveur pourra choisir l'un de ces profils (nom + photo du bot, valables sur ce serveur seulement) depuis sa page ⚙️ Identité ou <code>/config → 🪪 Identité du bot</code>. Enregistrés dans le <code>.env</code> du bot (<code>BOT_PROFILS</code>) ; le bot les lit à son prochain démarrage.</span></div>
         </div>
       </div>`).join("");
     const etatAgent = ui.agentBots === null
@@ -3511,8 +3543,28 @@
       const get = f => card.querySelector(`[data-f="${f}"]`)?.value.trim() || "";
       const index = Number(card.dataset.botIndex);
       const existing = (state.bots || [])[index] || {};
-      return { ...existing, name: get("name"), tag: get("tag"), accent: get("accent"), description: get("description"), agentName: get("agentName"), clientId: get("clientId") };
+      return { ...existing, name: get("name"), tag: get("tag"), accent: get("accent"), description: get("description"), agentName: get("agentName"), clientId: get("clientId"), profils: profilsDepuisTexte(get("profils")) };
     }).filter(bot => bot.name);
+  }
+
+  // 🪪 Profils ⇄ texte « Nom | URL », une ligne par profil.
+  function profilsEnTexte(profils) {
+    return (Array.isArray(profils) ? profils : []).map(p => p.avatar ? `${p.nom} | ${p.avatar}` : p.nom).join("\n");
+  }
+  function profilsDepuisTexte(texte) {
+    return String(texte || "").split(/\r?\n/).map(l => l.trim()).filter(Boolean).slice(0, 25).map(l => {
+      const [nom, ...reste] = l.split("|");
+      const avatar = reste.join("|").trim();
+      return { nom: nom.trim().slice(0, 32), avatar: /^https?:\/\//i.test(avatar) ? avatar.slice(0, 500) : "" };
+    }).filter(p => p.nom);
+  }
+  // Pose (ou remplace) UNE clé dans un .env sans toucher au reste — jamais
+  // réécrire à l'aveugle un fichier où un token est déjà collé.
+  function fusionnerEnv(contenu, cle, valeur) {
+    const re = new RegExp(`^\\s*${cle}\\s*=.*$`, "m");
+    const ligne = `${cle}=${valeur}`;
+    if (re.test(contenu)) return contenu.replace(re, ligne);
+    return `${String(contenu || "").replace(/\s*$/, "")}\n\n# Profils du bot (nom + photo) proposés aux serveurs\n${ligne}\n`;
   }
 
   // ── Constructeur de page : liste des blocs + ajout ──────────────────
@@ -4375,7 +4427,10 @@
           break;
         }
         case "bots-save": {
-          await api("bots.save", { bots: collectBots() });
+          const collectes = collectBots();
+          // Les profils qui ont changé devront être écrits dans le .env du bot.
+          const profilsAvant = new Map((state.bots || []).filter(b => b.agentName).map(b => [b.agentName, JSON.stringify(b.profils || [])]));
+          await api("bots.save", { bots: collectes });
           // 🆕 Un nom tapé à la main (« ➕ Créer un nouveau bot ») devient un
           // bot RÉEL chez l'agent tout de suite : lire son .env crée son
           // dossier bots/<nom> avec une configuration vierge.
@@ -4390,6 +4445,19 @@
             }
           }
           if (nouveaux.length) await chargerBotsAgent();
+          // 🪪 BOT_PROFILS dans le .env de chaque bot dont les profils ont
+          // changé (ou qui vient d'être créé) : le bot les lit au démarrage.
+          for (const bot of collectes) {
+            if (!bot.agentName) continue;
+            const apres = JSON.stringify(bot.profils || []);
+            if (profilsAvant.get(bot.agentName) === apres && !nouveaux.includes(bot.agentName)) continue;
+            try {
+              const r = await api("bot.env.lire", { nom: bot.agentName });
+              await api("bot.env.ecrire", { nom: bot.agentName, contenu: fusionnerEnv(r.contenu || "", "BOT_PROFILS", apres) });
+            } catch (e) {
+              toast("PROFILS DU BOT", `« ${bot.agentName} » : ${e.message}`, "error");
+            }
+          }
           render();
           toast("BOTS ENREGISTRÉS", `${(state.bots || []).length} bot(s) sur votre site.`);
           break;

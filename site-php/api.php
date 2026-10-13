@@ -481,6 +481,22 @@ function body(): array
     return $_POST;
 }
 
+// 🪪 Profils du bot : nom (≤ 32) + URL de photo http(s) (≤ 500), 25 maximum.
+function profils_propres($liste): array {
+    if (!is_array($liste)) return [];
+    $propres = [];
+    foreach ($liste as $p) {
+        if (!is_array($p)) continue;
+        $nom = cleanString($p['nom'] ?? $p['name'] ?? '', 32);
+        if ($nom === '') continue;
+        $avatar = trim((string) ($p['avatar'] ?? $p['avatarUrl'] ?? ''));
+        if (!preg_match('~^https?://~i', $avatar)) $avatar = '';
+        $propres[] = ['nom' => $nom, 'avatar' => mb_substr($avatar, 0, 500)];
+        if (count($propres) >= 25) break;
+    }
+    return $propres;
+}
+
 function cleanString($value, int $max = 500): string
 {
     $value = trim((string) $value);
@@ -1873,6 +1889,8 @@ switch ($action) {
                 // Liaison technique : nom du bot chez l'agent + Client ID Discord.
                 'agentName' => cleanString($raw['agentName'] ?? '', 40),
                 'clientId' => preg_replace('/\D+/', '', (string) ($raw['clientId'] ?? '')),
+                // 🪪 Profils du bot (nom + photo) proposés aux serveurs.
+                'profils' => profils_propres($raw['profils'] ?? []),
                 'servers' => (int) ($raw['servers'] ?? 0),
                 'users' => (int) ($raw['users'] ?? 0),
                 'latency' => (int) ($raw['latency'] ?? 0),

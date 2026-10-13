@@ -320,7 +320,7 @@ async function refaireUnMessage(interaction, message, { mode, couleurs }) {
 
   const contexte = {
     reglages: { ...r, accent: r.accent ?? versEntier(DEFAUT_ACCENT) },
-    bot: interaction.client.user.username,
+    bot: require('../utils/styleEmbeds').nomDuBot(interaction.client, guild),
     serveur: guild.name,
     icone: guild.iconURL({ size: 64 }) || null,
     couleurs,
@@ -717,7 +717,7 @@ module.exports = {
 
         const contexte = {
           reglages: { ...r, accent: r.accent ?? versEntier(DEFAUT_ACCENT) },
-          bot: interaction.client.user.username,
+          bot: require('../utils/styleEmbeds').nomDuBot(interaction.client, guild),
           serveur: guild.name,
           icone: guild.iconURL({ size: 64 }) || null,
           couleurs,
