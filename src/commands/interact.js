@@ -251,44 +251,35 @@ function memoriserGif(categorie, gif) {
 
 // GIF depuis internet : trois sources essayées dans l'ordre, timeout 5 s
 // chacune, et cause d'échec journalisée dans la console pour diagnostic.
-// 🎞️ Quelle catégorie demander à chaque source pour chaque action.
+// 🎞️ Où chercher le GIF de chaque action, DANS L'ORDRE.
 //
 // Les trois sources n'ont pas le même catalogue — et c'est ce qui cassait le
 // bisou sur la joue : « peck » était remplacé par « kiss » PARTOUT, donc
 // l'image (l'élément dominant de la carte) montrait toujours un vrai baiser.
-// Ici, une action sans équivalent chez une source saute simplement cette
-// source ; la joue ne retombe plus jamais sur les lèvres.
+// Chaque action liste ses sources utiles, de la plus juste à la plus proche ;
+// une action sans équivalent chez une source ne l'interroge pas. Une seule
+// source = une seule panne possible : « kill » n'existe que chez waifu.pics,
+// dont l'endpoint a un historique de pannes — d'où le repli sur « shoot ».
+const SOURCES_GIF = {
+  nekos: { nom: 'nekos.best', url: (c) => `https://nekos.best/api/v2/${c}`, parse: (d) => ({ url: d.results?.[0]?.url, anime: d.results?.[0]?.anime_name || null }) },
+  waifu: { nom: 'waifu.pics', url: (c) => `https://api.waifu.pics/sfw/${c}`, parse: (d) => ({ url: d.url, anime: null }) },
+  otaku: { nom: 'otakugifs', url: (c) => `https://api.otakugifs.xyz/gif?reaction=${c}`, parse: (d) => ({ url: d.url, anime: null }) },
+};
 const CATEGORIES_GIF = {
-  kiss: { nekos: 'kiss', waifu: 'kiss', otaku: 'kiss' },
-  peck: { nekos: null, waifu: null, otaku: 'airkiss' },   // le bisou soufflé, le plus proche de la joue
-  hug: { nekos: 'hug', waifu: 'hug', otaku: 'hug' },
-  pat: { nekos: 'pat', waifu: 'pat', otaku: 'pat' },
-  bite: { nekos: 'bite', waifu: 'bite', otaku: 'bite' },
-  lick: { nekos: 'lick', waifu: 'lick', otaku: 'lick' },
-  bang: { nekos: 'shoot', waifu: null, otaku: null },
-  punch: { nekos: 'punch', waifu: null, otaku: 'punch' },
-  kill: { nekos: null, waifu: 'kill', otaku: null },
+  kiss: [['nekos', 'kiss'], ['waifu', 'kiss'], ['otaku', 'kiss']],
+  peck: [['otaku', 'airkiss']],                 // le bisou soufflé, le plus proche de la joue
+  hug: [['nekos', 'hug'], ['waifu', 'hug'], ['otaku', 'hug']],
+  pat: [['nekos', 'pat'], ['waifu', 'pat'], ['otaku', 'pat']],
+  bite: [['nekos', 'bite'], ['waifu', 'bite'], ['otaku', 'bite']],
+  lick: [['nekos', 'lick'], ['waifu', 'lick'], ['otaku', 'lick']],
+  bang: [['nekos', 'shoot']],
+  punch: [['nekos', 'punch'], ['otaku', 'punch']],
+  kill: [['waifu', 'kill'], ['nekos', 'shoot'], ['nekos', 'yeet']],
 };
 
 async function fetchGif(category) {
-  const cat = CATEGORIES_GIF[category] || { nekos: category, waifu: category, otaku: category };
-  const sources = [
-    cat.nekos && {
-      name: 'nekos.best',
-      url: `https://nekos.best/api/v2/${cat.nekos}`,
-      parse: (data) => ({ url: data.results?.[0]?.url, anime: data.results?.[0]?.anime_name || null }),
-    },
-    cat.waifu && {
-      name: 'waifu.pics',
-      url: `https://api.waifu.pics/sfw/${cat.waifu}`,
-      parse: (data) => ({ url: data.url, anime: null }),
-    },
-    cat.otaku && {
-      name: 'otakugifs',
-      url: `https://api.otakugifs.xyz/gif?reaction=${cat.otaku}`,
-      parse: (data) => ({ url: data.url, anime: null }),
-    },
-  ].filter(Boolean);
+  const pistes = CATEGORIES_GIF[category] || [['nekos', category], ['waifu', category], ['otaku', category]];
+  const sources = pistes.map(([cle, cat]) => ({ name: SOURCES_GIF[cle].nom, url: SOURCES_GIF[cle].url(cat), parse: SOURCES_GIF[cle].parse }));
   for (const source of sources) {
     try {
       const res = await fetch(source.url, {
@@ -391,7 +382,7 @@ function moduleBlocked(interaction) {
 }
 
 module.exports = {
-  CATEGORIES_GIF, LOCALES,
+  CATEGORIES_GIF, SOURCES_GIF, LOCALES,
   grade: GRADES.EVERYONE,
   public: true, // réponses visibles par tout le monde (pas d'éphémère)
   allowDm: true, // utilisable en message privé avec le bot

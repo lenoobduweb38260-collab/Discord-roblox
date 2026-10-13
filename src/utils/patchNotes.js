@@ -1744,6 +1744,16 @@ const RELEASES = [
     ],
     retrait: [],
   },
+  {
+    id: 'interact-kill-gif-2026-10ct',
+    title: '/interact kill retrouve son GIF',
+    fix: [
+      '💀 **« GIF momentanement indisponible » sur /interact kill** : une seule source connaissait cette animation, et son service tombe souvent. Chaque action a desormais sa propre liste de sources dans l\'ordre — kill se rabat sur l\'animation de tir si la premiere source manque',
+    ],
+    ajout: [],
+    amelioration: [],
+    retrait: [],
+  },
 ];
 
 // Construit l'embed d'une note à partir d'une entrée { title, ajout, fix,

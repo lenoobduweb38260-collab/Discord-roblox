@@ -107,9 +107,13 @@ global.fetch = async (url) => {
     V('les trois sous-commandes existent', ['bang', 'punch', 'kill'].every((k) => new RegExp(`\\.setName\\('${k}'\\)`).test(srcCmd)));
     const C = itx.CATEGORIES_GIF;
     V('le bisou sur la joue ne demande JAMAIS « kiss » à une source',
-      C.peck && !Object.values(C.peck).includes('kiss'), JSON.stringify(C.peck));
-    V('… mais a bien une source', Object.values(C.peck).some(Boolean));
-    V('chaque nouvelle action a au moins une source', ['bang', 'punch', 'kill'].every((k) => Object.values(C[k] || {}).some(Boolean)));
+      Array.isArray(C.peck) && C.peck.every(([, cat]) => cat !== 'kiss'), JSON.stringify(C.peck));
+    V('… mais a bien une source', C.peck.length > 0);
+    V('chaque nouvelle action a au moins une source', ['bang', 'punch', 'kill'].every((k) => (C[k] || []).length > 0));
+    // waifu.pics est la seule à connaître « kill », et son endpoint tombe :
+    // une seule source serait une seule panne.
+    V('kill a une source de secours', C.kill.length >= 2 && C.kill[0][0] === 'waifu', JSON.stringify(C.kill));
+    V('toutes les sources citées existent', Object.values(C).flat().every(([cle]) => itx.SOURCES_GIF[cle]));
     const src = fs.readFileSync(`${__dirname}/../src/commands/interact.js`, 'utf8');
     V('la réserve est rangée sous la vraie catégorie', /memoriserGif\(category, gif\)/.test(src) && /gifAuHasard\.get\(category\)/.test(src));
   }
