@@ -1,6 +1,6 @@
 const { Events } = require('discord.js');
 const { sendLog, logEmbed, COLORS } = require('../utils/embeds');
-const { diffFil } = require('../utils/journal');
+const { diffFil, etiquetteSalon, fiche } = require('../utils/journal');
 
 module.exports = {
   name: Events.ThreadUpdate,
@@ -10,7 +10,11 @@ module.exports = {
     if (!changes.length) return;
     await sendLog(
       newThread.guild,
-      logEmbed('✏️ Fil modifié', `Fil <#${newThread.id}> modifié :\n${changes.join('\n')}`.slice(0, 4000), COLORS.INFO)
+      logEmbed(
+        '✏️ Fil modifié',
+        fiche({ sujet: etiquetteSalon(newThread.id, newThread), sections: [{ titre: 'Modifications', entrees: changes }] }),
+        COLORS.INFO
+      )
     );
   },
 };

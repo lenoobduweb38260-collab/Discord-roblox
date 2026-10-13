@@ -189,8 +189,8 @@ function fauxMembre(id, { bot = false, roles = [] } = {}) {
     V('… sans sonner personne malgré les étiquettes',
       Array.isArray(envois[0].allowedMentions?.parse) && envois[0].allowedMentions.parse.length === 0);
     V('… la carte nomme le SALON en clair (il sera supprimé)', /#ticket-0016-bay/.test(d), d.slice(0, 160));
-    V('… dit qui a ouvert, nommé et identifié', /Ouvert par \*\*Bayouss\*\* \(<@U1> · `U1`\)/.test(d));
-    V('… et qui a fermé', /Fermé par \*\*Staffeur\*\* \(<@S1> · `S1`\)/.test(d));
+    V('… dit qui a ouvert, nommé et identifié', /Ouvert par \*\*Bayouss\*\* \(`U1`\) <@U1>/.test(d), d);
+    V('… et qui a fermé', /Fermé par \*\*Staffeur\*\* \(`S1`\) <@S1>/.test(d), d);
     V('… avec le compte de messages', /\*\*2\*\* message\(s\)/.test(d), d);
 
     // Le moteur : un fichier libre devient un composant « fichier » DANS la carte.

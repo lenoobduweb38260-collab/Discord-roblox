@@ -1,19 +1,23 @@
 const { Events } = require('discord.js');
 const { sendLog, logEmbed, COLORS } = require('../utils/embeds');
-const { mentionAvecId } = require('../utils/journal');
+const { mentionAvecId, etiquetteSalon, fiche } = require('../utils/journal');
 
 module.exports = {
   name: Events.ThreadCreate,
   async execute(thread, newlyCreated) {
     if (!thread.guild || newlyCreated === false) return;
-    const details = [
-      `➜ Fil : <#${thread.id}> (**${thread.name}**)`,
-      `➜ Dans : <#${thread.parentId}>`,
-    ];
-    if (thread.ownerId) details.push(`➜ Ouvert par : ${mentionAvecId(thread.ownerId)}`);
     await sendLog(
       thread.guild,
-      logEmbed('🧵 Fil créé', details.join('\n'), COLORS.SUCCESS)
+      logEmbed(
+        '🧵 Fil créé',
+        fiche({
+          sujet: etiquetteSalon(thread.id, thread),
+          sections: [{ entrees: [`Dans : <#${thread.parentId}>`] }],
+          par: thread.ownerId ? mentionAvecId(thread.ownerId) : null,
+          verbe: 'Ouvert par',
+        }),
+        COLORS.SUCCESS
+      )
     );
   },
 };

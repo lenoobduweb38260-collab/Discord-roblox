@@ -29,15 +29,56 @@ const nomsPermissions = (bits) => (bits && typeof bits.toArray === 'function' ? 
 // client Discord du lecteur n'a pas ce membre sous la main — fréquent dans
 // les embeds. On écrit donc le nom en clair d'abord, la mention ensuite, et
 // l'identifiant en dernier : quoi qu'affiche le client, on sait de qui on parle.
+//
+// Grammaire unique, pour tout ce qui a un nom et un identifiant :
+//   **Pseudo** (`identifiant`) @mention
+// Le pseudo d'abord (c'est lui qu'on lit), l'identifiant ensuite (c'est lui
+// qu'on copie), la mention en dernier (c'est elle qu'on clique).
+const M = require('./miseEnPage');
+
+const etiquette = (nom, id, mention) => (nom ? `**${nom}** (\`${id}\`) ${mention}` : `(\`${id}\`) ${mention}`);
+
 function etiquetteMembre(membreOuUser) {
   const user = membreOuUser?.user ?? membreOuUser;
   const id = membreOuUser?.id ?? user?.id ?? '?';
   const nom = membreOuUser?.displayName ?? user?.globalName ?? user?.username ?? user?.tag ?? null;
-  return nom ? `**${nom}** (<@${id}> · \`${id}\`)` : `<@${id}> (\`${id}\`)`;
+  return etiquette(nom, id, `<@${id}>`);
 }
 
 // La même chose quand on n'a QUE l'identifiant sous la main.
-const mentionAvecId = (id) => `<@${id}> (\`${id}\`)`;
+const mentionAvecId = (id) => etiquette(null, id, `<@${id}>`);
+
+// Un rôle ou un salon, même grammaire. Le nom en clair compte double ici :
+// un rôle supprimé depuis s'afficherait « @rôle-supprimé », et l'ID permet
+// de le retrouver dans le journal d'audit.
+const etiquetteRole = (id, role = null) => etiquette(role?.name ?? null, id, `<@&${id}>`);
+const etiquetteSalon = (id, salon = null) => etiquette(salon?.name ? `#${salon.name}` : null, id, `<#${id}>`);
+
+// 📋 Une fiche de journal : le sujet, des sections séparées par un filet,
+// et qui a fait le geste.
+//
+//   **Pseudo** (`id`) @mention
+//   ────────────────
+//   ◆ **Rôles ajoutés**
+//   ➜ **Rank F** (`id`) @mention
+//   ────────────────
+//   ✍️ Modifié par : **Pseudo** (`id`) @mention
+//
+// Une section = { titre, entrees } ; sans titre, ses entrées sont posées
+// telles quelles. Les sections vides disparaissent. Le filet est celui de la
+// direction artistique : en mode carte, il devient un vrai séparateur.
+function fiche({ sujet = null, sections = [], par = null, verbe = 'Modifié par', emoji = '✍️' } = {}) {
+  const blocs = [];
+  if (sujet) blocs.push(sujet);
+  for (const section of sections) {
+    if (!section) continue;
+    const entrees = (section.entrees || []).filter((e) => e != null && String(e).trim() !== '');
+    if (!entrees.length) continue;
+    blocs.push(section.titre ? M.bloc(section.titre, entrees, { compte: null }) : entrees.map((e) => M.entree(e)).join('\n'));
+  }
+  if (par) blocs.push(`${emoji} ${verbe} : ${par}`);
+  return M.borner(M.description(blocs), 4000);
+}
 
 // ── Salons ────────────────────────────────────────────────────────
 
@@ -122,37 +163,38 @@ function diffFil(ancien, nouveau) {
 
 // ── Membres ───────────────────────────────────────────────────────
 
-function diffMembre(ancien, nouveau) {
-  const lignes = [];
+// Les changements d'un membre, en SECTIONS prêtes pour `fiche()` :
+// chaque rôle sur sa ligne, chaque sujet sous son titre.
+function sectionsMembre(ancien, nouveau) {
+  const sections = [];
   if ((ancien?.nickname ?? null) !== (nouveau?.nickname ?? null)) {
     const mot = (n) => (n ? `**${n}**` : '*(aucun)*');
-    lignes.push(`➜ Surnom : ${mot(ancien?.nickname)} → ${mot(nouveau?.nickname)}`);
+    sections.push({ titre: 'Surnom', entrees: [`${mot(ancien?.nickname)} → ${mot(nouveau?.nickname)}`] });
   }
   const avant = ancien?.roles?.cache ?? new Map();
   const apres = nouveau?.roles?.cache ?? new Map();
   const ajoutes = [...apres.keys()].filter((id) => !avant.has(id));
   const retires = [...avant.keys()].filter((id) => !apres.has(id));
-  // Le nom du rôle en clair à côté de la mention : un rôle supprimé depuis
-  // s'afficherait « @rôle-supprimé », et l'ID permet de le retrouver.
-  const nomRole = (id, depuis) => {
-    const role = depuis?.get?.(id);
-    return role?.name ? `<@&${id}> (**${role.name}** · \`${id}\`)` : `<@&${id}> (\`${id}\`)`;
-  };
-  if (ajoutes.length) lignes.push(`➜ Rôles ajoutés : ${ajoutes.map((id) => nomRole(id, apres)).join(' · ')}`);
-  if (retires.length) lignes.push(`➜ Rôles retirés : ${retires.map((id) => nomRole(id, avant)).join(' · ')}`);
+  if (ajoutes.length) sections.push({ titre: 'Rôles ajoutés', entrees: ajoutes.map((id) => etiquetteRole(id, apres.get?.(id))) });
+  if (retires.length) sections.push({ titre: 'Rôles retirés', entrees: retires.map((id) => etiquetteRole(id, avant.get?.(id))) });
   const exclAvant = ancien?.communicationDisabledUntilTimestamp ?? null;
   const exclApres = nouveau?.communicationDisabledUntilTimestamp ?? null;
   if (exclAvant !== exclApres) {
-    if (exclApres && exclApres > Date.now()) lignes.push(`➜ Exclusion temporaire jusqu'au <t:${Math.floor(exclApres / 1000)}:f>`);
-    else lignes.push('➜ Exclusion temporaire levée');
+    if (exclApres && exclApres > Date.now()) sections.push({ titre: 'Exclusion temporaire', entrees: [`Jusqu'au <t:${Math.floor(exclApres / 1000)}:f>`] });
+    else sections.push({ titre: 'Exclusion temporaire', entrees: ['Levée'] });
   }
   const boostAvant = ancien?.premiumSinceTimestamp ?? null;
   const boostApres = nouveau?.premiumSinceTimestamp ?? null;
   if (Boolean(boostAvant) !== Boolean(boostApres)) {
-    lignes.push(boostApres ? '➜ 💎 A commencé à booster le serveur' : '➜ 💎 Ne booste plus le serveur');
+    sections.push({ titre: 'Boost', entrees: [boostApres ? '💎 A commencé à booster le serveur' : '💎 Ne booste plus le serveur'] });
   }
-  if ((ancien?.avatar ?? null) !== (nouveau?.avatar ?? null)) lignes.push('➜ Avatar de serveur modifié');
-  return lignes;
+  if ((ancien?.avatar ?? null) !== (nouveau?.avatar ?? null)) sections.push({ titre: 'Avatar de serveur', entrees: ['Modifié'] });
+  return sections;
+}
+
+// La même chose à plat, une ligne `➜` par sujet (pour un résumé court).
+function diffMembre(ancien, nouveau) {
+  return sectionsMembre(ancien, nouveau).map((s) => `➜ ${s.titre} : ${s.entrees.join(' · ')}`);
 }
 
 // ── Le serveur lui-même ───────────────────────────────────────────
@@ -223,6 +265,6 @@ function diffEvenement(ancien, nouveau) {
 }
 
 module.exports = {
-  typeSalon, TYPES_SALON, etiquetteMembre, mentionAvecId,
-  diffSalon, diffPermissionsSalon, diffFil, diffMembre, diffGuilde, diffEvenement,
+  typeSalon, TYPES_SALON, etiquetteMembre, mentionAvecId, etiquetteRole, etiquetteSalon, fiche,
+  diffSalon, diffPermissionsSalon, diffFil, diffMembre, sectionsMembre, diffGuilde, diffEvenement,
 };

@@ -1,7 +1,7 @@
 const { Events, AuditLogEvent } = require('discord.js');
 const { sendLog, logEmbed, COLORS } = require('../utils/embeds');
 const { auditExecutor } = require('../utils/audit');
-const { diffSalon } = require('../utils/journal');
+const { diffSalon, etiquetteSalon, fiche } = require('../utils/journal');
 
 // Le moindre réglage d'un salon : nom, sujet, mode lent, catégorie, NSFW,
 // qualité audio, limite, région — et chaque surcharge de permissions.
@@ -18,7 +18,7 @@ module.exports = {
       newChannel.guild,
       logEmbed(
         '✏️ Salon modifié',
-        `Salon <#${newChannel.id}> modifié${by ? ` par ${by}` : ''} :\n${changes.join('\n')}`.slice(0, 4000),
+        fiche({ sujet: etiquetteSalon(newChannel.id, newChannel), sections: [{ titre: 'Modifications', entrees: changes }], par: by }),
         COLORS.INFO
       )
     );

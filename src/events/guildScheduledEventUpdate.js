@@ -1,6 +1,6 @@
 const { Events } = require('discord.js');
 const { sendLog, logEmbed, COLORS } = require('../utils/embeds');
-const { diffEvenement } = require('../utils/journal');
+const { diffEvenement, fiche } = require('../utils/journal');
 
 module.exports = {
   name: Events.GuildScheduledEventUpdate,
@@ -10,7 +10,11 @@ module.exports = {
     if (!changes.length) return;
     await sendLog(
       newEvent.guild,
-      logEmbed('📆 Événement planifié modifié', `**${newEvent.name}** :\n${changes.join('\n')}`.slice(0, 4000), COLORS.INFO)
+      logEmbed(
+        '📆 Événement planifié modifié',
+        fiche({ sujet: `**${newEvent.name}** (\`${newEvent.id}\`)`, sections: [{ titre: 'Modifications', entrees: changes }] }),
+        COLORS.INFO
+      )
     );
   },
 };

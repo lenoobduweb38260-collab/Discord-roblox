@@ -1743,5 +1743,29 @@
    "🔁 Le bouton « Rendre » garde le type choisi : la reponse est dans le meme style"
   ],
   "retrait": []
+ },
+ {
+  "id": "logs-fiches-2026-10cv",
+  "title": "Des logs qui se lisent",
+  "ajout": [],
+  "fix": [],
+  "amelioration": [
+   "📋 **Chaque log est une fiche** : le membre en tete — pseudo, identifiant, mention — puis une section par sujet separee par un filet (Roles ajoutes, Roles retires, Surnom, Exclusion…), un role par ligne, et « Modifie par » en bas. Fini la phrase de dix lignes ou tout se melange",
+   "🏷️ **Une seule grammaire pour tout ce qui a un nom** : `**Pseudo** (identifiant) @mention`, pour les membres, les roles et les salons. Le pseudo se lit, l'identifiant se copie, la mention se clique",
+   "🔨 Les logs de moderation (ban, kick, mute, ban global, unban general) et tous les evenements du serveur (salons, roles, emojis, stickers, fils, evenements) suivent la meme fiche"
+  ],
+  "retrait": []
+ },
+ {
+  "id": "entreprises-purge-2026-10cw",
+  "title": "Entreprises : remise a zero",
+  "ajout": [
+   "🧹 **`/entreprise purger`** (createur du bot) : supprime la reserve partagee — les anciennes entreprises d'avant la refonte par communaute — ou absolument TOUT, sur tous les serveurs. Patrons, employes, contrats d'assurance et doublons archives partent avec. Un recapitulatif chiffre puis un bouton de confirmation : rien ne part sans un second clic"
+  ],
+  "fix": [],
+  "amelioration": [
+   "📖 Une sous-commande reservee au createur n'apparait plus dans /tuto ni /tutos"
+  ],
+  "retrait": []
  }
 ]

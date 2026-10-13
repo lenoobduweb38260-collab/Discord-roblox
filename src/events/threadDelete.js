@@ -1,5 +1,6 @@
 const { Events } = require('discord.js');
 const { sendLog, logEmbed, COLORS } = require('../utils/embeds');
+const { fiche } = require('../utils/journal');
 
 module.exports = {
   name: Events.ThreadDelete,
@@ -9,7 +10,7 @@ module.exports = {
       thread.guild,
       logEmbed(
         '🗑️ Fil supprimé',
-        `➜ Fil : **${thread.name}** (\`${thread.id}\`)\n➜ Était dans : <#${thread.parentId}>`,
+        fiche({ sujet: `**#${thread.name}** (\`${thread.id}\`)`, sections: [{ entrees: [`Était dans : <#${thread.parentId}>`] }] }),
         COLORS.DANGER
       )
     );

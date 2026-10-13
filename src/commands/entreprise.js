@@ -2,6 +2,8 @@ const {
   SlashCommandBuilder,
   ActionRowBuilder,
   StringSelectMenuBuilder,
+  ButtonBuilder,
+  ButtonStyle,
   EmbedBuilder,
   MessageFlags,
 } = require('discord.js');
@@ -16,6 +18,9 @@ const { porteeEntreprises, estLie } = require('../utils/communaute');
 const PORTEE = (interaction) => porteeEntreprises(interaction.guildId);
 const { buildEnterpriseEmbed, sendLog, logEmbed, COLORS } = require('../utils/embeds');
 const { GRADES, getGrade } = require('../utils/permissions');
+const { isCreator } = require('../utils/botTeam');
+const { etiquetteMembre, fiche } = require('../utils/journal');
+const { mettreAJour } = require('../utils/reponse');
 
 const INSURANCE_TYPES = ['Maladie', 'Véhicule', 'Habitation', 'Entreprise'];
 
@@ -49,6 +54,96 @@ const removeHeadEverywhere = db.prepare(
 const removeEmployeeEverywhere = db.prepare(
   'DELETE FROM enterprise_employees WHERE user_id = ? AND enterprise_id IN (SELECT id FROM enterprises WHERE guild_id = ?)'
 );
+
+// 🧹 Purge (créateur du bot).
+//
+// La migration globale avait versé TOUTES les entreprises dans la réserve
+// partagée ; la refonte par communauté a ensuite rendu chaque serveur maître
+// des siennes. Ce qui reste dans la réserve, c'est l'ancien monde — plus les
+// sociétés des communautés reliées, qui y vivent aussi. Deux portées :
+//   • partagees → la réserve (guild_id GLOBAL) et les doublons archivés ;
+//   • tout      → chaque entreprise, sur chaque serveur, sans exception.
+// Patrons, employés et contrats d'assurance partent avec. Rien n'est
+// récupérable : d'où le bouton de confirmation, réservé au créateur.
+const PORTEES_PURGE = {
+  partagees: { libelle: 'la réserve partagée (anciennes entreprises d\'avant la refonte)', filtre: 'WHERE guild_id = ?', args: () => [RP_SCOPE] },
+  tout: { libelle: 'TOUTES les entreprises, sur tous les serveurs', filtre: '', args: () => [] },
+};
+function bilanPurge(quoi) {
+  const portee = PORTEES_PURGE[quoi];
+  const dans = `IN (SELECT id FROM enterprises ${portee.filtre})`;
+  const args = portee.args();
+  return {
+    entreprises: db.prepare(`SELECT COUNT(*) AS n FROM enterprises ${portee.filtre}`).get(...args).n,
+    patrons: db.prepare(`SELECT COUNT(*) AS n FROM enterprise_heads WHERE enterprise_id ${dans}`).get(...args).n,
+    employes: db.prepare(`SELECT COUNT(*) AS n FROM enterprise_employees WHERE enterprise_id ${dans}`).get(...args).n,
+    contrats: db.prepare(`SELECT COUNT(*) AS n FROM insured_vehicles WHERE enterprise_id ${dans}`).get(...args).n,
+    archives: db.prepare("SELECT COUNT(*) AS n FROM rp_migration_archive WHERE table_name = 'enterprises'").get().n,
+  };
+}
+const executerPurge = db.transaction((quoi) => {
+  const bilan = bilanPurge(quoi);
+  const portee = PORTEES_PURGE[quoi];
+  const dans = `IN (SELECT id FROM enterprises ${portee.filtre})`;
+  const args = portee.args();
+  db.prepare(`DELETE FROM insured_vehicles WHERE enterprise_id ${dans}`).run(...args);
+  db.prepare(`DELETE FROM enterprise_employees WHERE enterprise_id ${dans}`).run(...args);
+  db.prepare(`DELETE FROM enterprise_heads WHERE enterprise_id ${dans}`).run(...args);
+  db.prepare(`DELETE FROM enterprises ${portee.filtre}`).run(...args);
+  db.prepare("DELETE FROM rp_migration_archive WHERE table_name = 'enterprises'").run();
+  return bilan;
+});
+const lignesBilan = (b) => [
+  `**${b.entreprises}** entreprise(s)`,
+  `**${b.patrons}** poste(s) de patron, **${b.employes}** poste(s) d'employé`,
+  `**${b.contrats}** contrat(s) d'assurance`,
+  `**${b.archives}** doublon(s) archivé(s) lors de la migration`,
+];
+
+async function demanderPurge(interaction) {
+  if (!(await isCreator(interaction.client, interaction.user.id))) {
+    return interaction.reply({ content: '⛔ Sécurité : la purge des entreprises est réservée au **créateur du bot**.', flags: MessageFlags.Ephemeral });
+  }
+  const quoi = interaction.options.getString('quoi');
+  const portee = PORTEES_PURGE[quoi];
+  if (!portee) return interaction.reply({ content: '❌ Portée inconnue.', flags: MessageFlags.Ephemeral });
+  const bilan = bilanPurge(quoi);
+  if (!bilan.entreprises && !bilan.archives) {
+    return interaction.reply({ content: `📭 Rien à purger dans ${portee.libelle} : aucune entreprise, aucune archive.`, flags: MessageFlags.Ephemeral });
+  }
+  const embed = new EmbedBuilder()
+    .setColor(COLORS.DANGER)
+    .setTitle('🧹 Purge des entreprises — confirmation')
+    .setDescription(fiche({
+      sujet: `Portée : **${portee.libelle}**`,
+      sections: [{ titre: 'Ce qui sera supprimé, sans retour possible', entrees: lignesBilan(bilan) }],
+    }));
+  const boutons = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId(`entpurge:${quoi}:${interaction.user.id}`).setLabel('Tout supprimer').setEmoji('🧹').setStyle(ButtonStyle.Danger),
+    new ButtonBuilder().setCustomId(`entpurge:non:${interaction.user.id}`).setLabel('Annuler').setStyle(ButtonStyle.Secondary)
+  );
+  return interaction.reply({ embeds: [embed], components: [boutons], flags: MessageFlags.Ephemeral });
+}
+
+async function confirmerPurge(interaction) {
+  const [, quoi, demandeur] = interaction.customId.split(':');
+  if (interaction.user.id !== demandeur || !(await isCreator(interaction.client, interaction.user.id))) {
+    return interaction.reply({ content: '⛔ Seul le créateur qui a lancé la purge peut la confirmer.', flags: MessageFlags.Ephemeral });
+  }
+  if (quoi === 'non' || !PORTEES_PURGE[quoi]) {
+    return mettreAJour(interaction, { content: '↩️ Purge annulée : rien n\'a été supprimé.', embeds: [], components: [] });
+  }
+  const bilan = executerPurge(quoi);
+  const texte = fiche({
+    sujet: `✅ Purge terminée — ${PORTEES_PURGE[quoi].libelle}`,
+    sections: [{ titre: 'Supprimé', entrees: lignesBilan(bilan) }],
+    par: etiquetteMembre(interaction.user),
+    verbe: 'Purgé par',
+    emoji: '🧹',
+  });
+  await mettreAJour(interaction, { content: texte, embeds: [], components: [] });
+  await sendLog(interaction.guild, logEmbed('🧹 Entreprises purgées', texte, COLORS.DANGER));
+}
 
 function insuranceMenu(enterpriseId) {
   return new ActionRowBuilder().addComponents(
@@ -191,6 +286,21 @@ module.exports = {
         .addStringOption((o) =>
           o.setName('nom').setDescription('Entreprise à rapatrier').setRequired(true).setAutocomplete(true)
         )
+    )
+    .addSubcommand((sub) =>
+      sub
+        .setName('purger')
+        .setDescription('[Créateur] Supprimer les entreprises : la réserve partagée (anciennes) ou absolument tout')
+        .addStringOption((o) =>
+          o
+            .setName('quoi')
+            .setDescription('Quelle portée supprimer ?')
+            .setRequired(true)
+            .addChoices(
+              { name: 'La réserve partagée (anciennes entreprises d\'avant la refonte)', value: 'partagees' },
+              { name: 'TOUT : chaque entreprise, sur tous les serveurs', value: 'tout' }
+            )
+        )
     ),
 
   async autocomplete(interaction) {
@@ -212,6 +322,10 @@ module.exports = {
 
   async execute(interaction) {
     const sub = interaction.options.getSubcommand();
+
+    // 🧹 Réservée au créateur du bot : sa propre garde, avant celle du staff.
+    if (sub === 'purger') return demanderPurge(interaction);
+
     const isStaff = getGrade(interaction.member) >= GRADES.STAFF;
 
     if (!['voir', 'liste', 'employe'].includes(sub) && !isStaff) {
@@ -556,4 +670,8 @@ module.exports = {
       }
     }
   },
+
+  // Boutons de confirmation de la purge (`entpurge:<portée>:<créateur>`).
+  handleButton: confirmerPurge,
+  _purge: { bilanPurge, executerPurge, PORTEES_PURGE },
 };

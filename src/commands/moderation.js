@@ -3,6 +3,7 @@ const { db } = require('../database');
 const { sendLog, logEmbed, COLORS } = require('../utils/embeds');
 const { GRADES } = require('../utils/permissions');
 const { isImmune } = require('../utils/botTeam');
+const { etiquetteMembre, fiche } = require('../utils/journal');
 
 const IMMUNE_MSG = '🛡️ Cet utilisateur est **immunisé** (créateur du bot ou liste d\'immunité) : action refusée.';
 
@@ -39,7 +40,7 @@ module.exports = [
       await interaction.reply({ content: `🔨 <@${user.id}> a été **banni**.\n**Raison :** ${raison}` });
       await sendLog(
         interaction.guild,
-        logEmbed('🔨 Ban', `<@${user.id}> (\`${user.id}\`) banni par <@${interaction.user.id}>.\n**Raison :** ${raison}`, COLORS.DANGER)
+        logEmbed('🔨 Ban', fiche({ sujet: etiquetteMembre(user), sections: [{ titre: 'Raison', entrees: [raison] }], par: etiquetteMembre(interaction.user), verbe: 'Banni par', emoji: '🔨' }), COLORS.DANGER)
       );
     },
   },
@@ -65,7 +66,7 @@ module.exports = [
       await interaction.reply({ content: `👢 <@${user.id}> a été **expulsé**.\n**Raison :** ${raison}` });
       await sendLog(
         interaction.guild,
-        logEmbed('👢 Kick', `<@${user.id}> (\`${user.id}\`) expulsé par <@${interaction.user.id}>.\n**Raison :** ${raison}`, COLORS.WARNING)
+        logEmbed('👢 Kick', fiche({ sujet: etiquetteMembre(user), sections: [{ titre: 'Raison', entrees: [raison] }], par: etiquetteMembre(interaction.user), verbe: 'Expulsé par', emoji: '👢' }), COLORS.WARNING)
       );
     },
   },
@@ -98,7 +99,7 @@ module.exports = [
       });
       await sendLog(
         interaction.guild,
-        logEmbed('🔇 Mute', `<@${user.id}> mute ${duree} min par <@${interaction.user.id}>.\n**Raison :** ${raison}`, COLORS.WARNING)
+        logEmbed('🔇 Mute', fiche({ sujet: etiquetteMembre(user), sections: [{ titre: 'Durée', entrees: [`${duree} minute(s)`] }, { titre: 'Raison', entrees: [raison] }], par: etiquetteMembre(interaction.user), verbe: 'Rendu muet par', emoji: '🔇' }), COLORS.WARNING)
       );
     },
   },
@@ -119,7 +120,7 @@ module.exports = [
       await interaction.reply({ content: `🔊 <@${user.id}> n'est plus muet.` });
       await sendLog(
         interaction.guild,
-        logEmbed('🔊 Unmute', `<@${user.id}> démute par <@${interaction.user.id}>.`, COLORS.SUCCESS)
+        logEmbed('🔊 Unmute', fiche({ sujet: etiquetteMembre(user), par: etiquetteMembre(interaction.user), verbe: 'Démuté par', emoji: '🔊' }), COLORS.SUCCESS)
       );
     },
   },
@@ -167,7 +168,7 @@ module.exports = [
         );
         await sendLog(
           interaction.guild,
-          logEmbed('🌍 Ban global', `<@${user.id}> (\`${user.id}\`) banni globalement par <@${interaction.user.id}>.\n**Raison :** ${raison}`, COLORS.DANGER)
+          logEmbed('🌍 Ban global', fiche({ sujet: etiquetteMembre(user), sections: [{ titre: 'Raison', entrees: [raison] }, { titre: 'Serveurs', entrees: [`Banni sur **${count}** serveur(s), et à chaque arrivée future`] }], par: etiquetteMembre(interaction.user), verbe: 'Banni globalement par', emoji: '🌍' }), COLORS.DANGER)
         );
         return;
       }
@@ -188,7 +189,7 @@ module.exports = [
       );
       await sendLog(
         interaction.guild,
-        logEmbed('🌍 Ban global retiré', `Ban global de <@${user.id}> retiré par <@${interaction.user.id}>.`, COLORS.SUCCESS)
+        logEmbed('🌍 Ban global retiré', fiche({ sujet: etiquetteMembre(user), sections: [{ titre: 'Serveurs', entrees: [`Débanni sur **${count}** serveur(s)`] }], par: etiquetteMembre(interaction.user), verbe: 'Retiré par', emoji: '🌍' }), COLORS.SUCCESS)
       );
     },
   },
@@ -229,7 +230,7 @@ module.exports = [
 
         await sendLog(
           interaction.guild,
-          logEmbed('🔓 Unban général', `<@${interaction.user.id}> a levé **${leves}** ban(s) sur **${bannis.size}**.`, COLORS.SUCCESS)
+          logEmbed('🔓 Unban général', fiche({ sujet: `**${leves}** ban(s) levé(s) sur **${bannis.size}**`, par: etiquetteMembre(interaction.user), verbe: 'Levés par', emoji: '🔓' }), COLORS.SUCCESS)
         );
         const lignes = [`🔓 **${leves}** ban(s) levé(s) sur **${bannis.size}** sur ce serveur.`];
         // ⚠️ L'unban local ne lève PAS les automatismes globaux : sans ce mot,

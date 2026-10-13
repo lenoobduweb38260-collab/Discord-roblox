@@ -79,12 +79,12 @@ const bits = (...noms) => ({ toArray: () => noms });
     };
     const d = J.diffMembre(avant, apres).join('\n');
     V('le surnom', /Surnom/.test(d) && /Bayouss/.test(d));
-    V('les rôles ajoutés ET retirés', /ajoutés : <@&R2>/.test(d) && /retirés : <@&R1>/.test(d), d);
-    V('l\'exclusion temporaire, avec sa fin', /Exclusion temporaire jusqu'au <t:\d+:f>/.test(d));
+    V('les rôles ajoutés ET retirés', /ajoutés : \(`R2`\) <@&R2>/.test(d) && /retirés : \(`R1`\) <@&R1>/.test(d), d);
+    V('l\'exclusion temporaire, avec sa fin', /Exclusion temporaire : Jusqu'au <t:\d+:f>/.test(d), d);
     V('le boost', /booster/.test(d));
 
     const leve = J.diffMembre(apres, { ...apres, communicationDisabledUntilTimestamp: null }).join('\n');
-    V('la levée d\'exclusion se dit aussi', /Exclusion temporaire levée/.test(leve));
+    V('la levée d\'exclusion se dit aussi', /Exclusion temporaire : Levée/.test(leve), leve);
   }
 
   console.log('\n3) diffGuilde, diffFil, diffEvenement');
@@ -157,17 +157,41 @@ const bits = (...noms) => ({ toArray: () => noms });
       { guild, id: 'U8', user: { bot: false }, displayName: 'Bayouss', roles: { cache: new Map([['R5', { name: 'Membre' }]]) } }
     );
     const desc = envois[3]?.embeds[0].data.description || '';
-    V('le membre est nommé en clair, avec son ID', /\*\*Bayouss\*\* \(<@U8> · `U8`\)/.test(desc), desc);
-    V('le rôle ajouté est nommé en clair, avec son ID', /\*\*Membre\*\* · `R5`/.test(desc), desc);
+    V('le membre ouvre la fiche : pseudo (ID) mention', desc.startsWith('**Bayouss** (`U8`) <@U8>\n'), desc);
+    V('le rôle ajouté est sous son titre, nommé en clair, avec son ID', /◆ \*\*Rôles ajoutés\*\*\n➜ \*\*Membre\*\* \(`R5`\) <@&R5>/.test(desc), desc);
+    V('un filet sépare le sujet de la section', /<@U8>\n─{8,}\n◆/.test(desc), desc);
   }
 
   console.log('\n4 bis) L\'étiquette : nom en clair, mention, ID');
   {
     V('un membre avec surnom', J.etiquetteMembre({ id: 'U1', displayName: 'Bayouss', user: { username: 'bay' } })
-      === '**Bayouss** (<@U1> · `U1`)', J.etiquetteMembre({ id: 'U1', displayName: 'Bayouss', user: { username: 'bay' } }));
-    V('un utilisateur nu', J.etiquetteMembre({ id: 'U2', username: 'leen' }) === '**leen** (<@U2> · `U2`)');
-    V('sans le moindre nom, la mention et l\'ID restent', J.etiquetteMembre({ id: 'U3' }) === '<@U3> (`U3`)');
-    V('avec juste un ID', J.mentionAvecId('U4') === '<@U4> (`U4`)');
+      === '**Bayouss** (`U1`) <@U1>', J.etiquetteMembre({ id: 'U1', displayName: 'Bayouss', user: { username: 'bay' } }));
+    V('un utilisateur nu', J.etiquetteMembre({ id: 'U2', username: 'leen' }) === '**leen** (`U2`) <@U2>');
+    V('sans le moindre nom, la mention et l\'ID restent', J.etiquetteMembre({ id: 'U3' }) === '(`U3`) <@U3>');
+    V('avec juste un ID', J.mentionAvecId('U4') === '(`U4`) <@U4>');
+    V('un rôle, même grammaire', J.etiquetteRole('R1', { name: 'Rank F' }) === '**Rank F** (`R1`) <@&R1>' && J.etiquetteRole('R2') === '(`R2`) <@&R2>');
+    V('un salon, même grammaire', J.etiquetteSalon('C1', { name: 'général' }) === '**#général** (`C1`) <#C1>');
+  }
+
+  console.log('\n4 quater) La fiche : sujet, sections sous filet, qui a fait le geste');
+  {
+    const f = J.fiche({
+      sujet: '**JujuD** (`U1`) <@U1>',
+      sections: [
+        { titre: 'Rôles ajoutés', entrees: ['**Rank F** (`R1`) <@&R1>', '**Rank E** (`R2`) <@&R2>'] },
+        { titre: 'Rôles retirés', entrees: [] },
+        { entrees: ['Type : texte'] },
+      ],
+      par: '**DraftBot** (`B1`) <@B1>',
+    });
+    const lignes = f.split('\n');
+    V('le sujet ouvre la fiche', lignes[0] === '**JujuD** (`U1`) <@U1>', f);
+    V('un filet, puis la section titrée ◆ et ses entrées ➜', lignes[1].startsWith('────') && lignes[2] === '◆ **Rôles ajoutés**' && lignes[3] === '➜ **Rank F** (`R1`) <@&R1>' && lignes[4] === '➜ **Rank E** (`R2`) <@&R2>', f);
+    V('une section vide disparaît', !f.includes('Rôles retirés'), f);
+    V('une section sans titre pose ses entrées', lignes[6] === '➜ Type : texte', f);
+    V('« Modifié par » ferme la fiche', lignes[lignes.length - 1] === '✍️ Modifié par : **DraftBot** (`B1`) <@B1>' && lignes[lignes.length - 2].startsWith('────'), f);
+    V('le verbe et l\'emoji se choisissent', J.fiche({ sujet: 'X', par: 'Y', verbe: 'Supprimé par', emoji: '🗑️' }).endsWith('🗑️ Supprimé par : Y'));
+    V('sans auteur ni section, la fiche est le sujet seul', J.fiche({ sujet: 'X' }) === 'X');
   }
 
   console.log('\n4 ter) Qui a effacé — le journal d\'audit, sans accuser le mauvais');

@@ -40,13 +40,16 @@ function categorieDe(nom) {
 }
 
 // Les sous-commandes d'une définition, groupes compris, en lignes prêtes.
+// Une sous-commande marquée « [Créateur] » est hors guide, comme les
+// commandes créatrices : elle n'est utile qu'à une seule personne.
+const horsGuide = (o) => /^\[Créateur\]/i.test(String(o?.description || ''));
 function lignesSousCommandes(json) {
   const lignes = [];
   for (const o of json.options || []) {
-    if (o.type === 1) lignes.push(`\`/${json.name} ${o.name}\` — ${o.description}`);
+    if (o.type === 1 && !horsGuide(o)) lignes.push(`\`/${json.name} ${o.name}\` — ${o.description}`);
     else if (o.type === 2) {
       for (const s of o.options || []) {
-        if (s.type === 1) lignes.push(`\`/${json.name} ${o.name} ${s.name}\` — ${s.description}`);
+        if (s.type === 1 && !horsGuide(s)) lignes.push(`\`/${json.name} ${o.name} ${s.name}\` — ${s.description}`);
       }
     }
   }

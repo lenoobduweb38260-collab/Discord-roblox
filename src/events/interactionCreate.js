@@ -301,6 +301,12 @@ module.exports = {
       return require('../utils/communaute').handleDecision(interaction);
     }
 
+    // ----- Purge des entreprises (créateur) : le bouton de confirmation -----
+    if (interaction.isButton() && interaction.customId?.startsWith('entpurge:')) {
+      if (!interaction.inGuild()) return horsServeur(interaction);
+      return require('../commands/entreprise').handleButton(interaction);
+    }
+
     // ----- Boutons de la carte de lecture (/musique) -----
     if (interaction.isButton() && interaction.customId?.startsWith('mus:')) {
       if (!interaction.inGuild()) return horsServeur(interaction);

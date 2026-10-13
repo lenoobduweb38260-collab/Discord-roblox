@@ -1,17 +1,18 @@
 const { Events, AuditLogEvent } = require('discord.js');
 const { sendLog, logEmbed, COLORS } = require('../utils/embeds');
 const { auditExecutor } = require('../utils/audit');
-const { diffMembre, etiquetteMembre } = require('../utils/journal');
+const { sectionsMembre, etiquetteMembre, fiche } = require('../utils/journal');
 
 // Surnom, rôles, exclusion temporaire, boost, avatar de serveur : chaque
-// changement d'un membre laisse une trace.
+// changement d'un membre laisse une trace — en fiche : le membre, puis une
+// section par sujet (un rôle par ligne), puis qui a fait le geste.
 module.exports = {
   name: Events.GuildMemberUpdate,
   async execute(oldMember, newMember) {
     if (newMember.user?.bot) return;
-    const changes = diffMembre(oldMember, newMember);
-    if (!changes.length) return;
-    const rolesOntChange = changes.some((c) => c.includes('Rôles'));
+    const sections = sectionsMembre(oldMember, newMember);
+    if (!sections.length) return;
+    const rolesOntChange = sections.some((s) => s.titre.startsWith('Rôles'));
     const by = await auditExecutor(
       newMember.guild,
       rolesOntChange ? AuditLogEvent.MemberRoleUpdate : AuditLogEvent.MemberUpdate,
@@ -19,11 +20,7 @@ module.exports = {
     );
     await sendLog(
       newMember.guild,
-      logEmbed(
-        '👤 Membre modifié',
-        `${etiquetteMembre(newMember)} a été modifié${by ? ` par ${by}` : ''} :\n${changes.join('\n')}`.slice(0, 4000),
-        COLORS.INFO
-      )
+      logEmbed('👤 Membre modifié', fiche({ sujet: etiquetteMembre(newMember), sections, par: by }), COLORS.INFO)
     );
   },
 };

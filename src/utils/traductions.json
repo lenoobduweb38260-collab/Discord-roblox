@@ -21103,5 +21103,334 @@
     "es": "perfil no encontrado en la lista del bot",
     "pl": "profil nie znaleziony na liście bota",
     "ru": "профиль не найден в списке бота"
+  },
+  "la réserve partagée (anciennes entreprises d'avant la refonte)": {
+    "en": "the shared pool (old companies from before the overhaul)",
+    "de": "die gemeinsame Reserve (alte Unternehmen von vor der Umstellung)",
+    "es": "la reserva compartida (empresas antiguas de antes de la reforma)",
+    "pl": "wspólna pula (stare firmy sprzed przebudowy)",
+    "ru": "общий резерв (старые предприятия до переработки)"
+  },
+  "TOUTES les entreprises, sur tous les serveurs": {
+    "en": "ALL companies, on every server",
+    "de": "ALLE Unternehmen, auf allen Servern",
+    "es": "TODAS las empresas, en todos los servidores",
+    "pl": "WSZYSTKIE firmy, na wszystkich serwerach",
+    "ru": "ВСЕ предприятия, на всех серверах"
+  },
+  "** poste(s) de patron, **": {
+    "en": "** boss position(s), **",
+    "de": "** Chef-Posten, **",
+    "es": "** puesto(s) de jefe, **",
+    "pl": "** stanowisk(a) szefa, **",
+    "ru": "** должност(и/ей) босса, **"
+  },
+  "** poste(s) d'employé": {
+    "en": "** employee position(s)",
+    "de": "** Mitarbeiter-Posten",
+    "es": "** puesto(s) de empleado",
+    "pl": "** stanowisk(a) pracownika",
+    "ru": "** должност(и/ей) сотрудника"
+  },
+  "** doublon(s) archivé(s) lors de la migration": {
+    "en": "** duplicate(s) archived during the migration",
+    "de": "** bei der Migration archivierte(s) Duplikat(e)",
+    "es": "** duplicado(s) archivado(s) durante la migración",
+    "pl": "** duplikat(y) zarchiwizowane podczas migracji",
+    "ru": "** дубликат(ов), архивированных при миграции"
+  },
+  "⛔ Sécurité : la purge des entreprises est réservée au **créateur du bot**.": {
+    "en": "⛔ Security: purging companies is reserved for the **bot creator**.",
+    "de": "⛔ Sicherheit: Das Löschen der Unternehmen ist dem **Bot-Ersteller** vorbehalten.",
+    "es": "⛔ Seguridad: la purga de empresas está reservada al **creador del bot**.",
+    "pl": "⛔ Bezpieczeństwo: czyszczenie firm jest zarezerwowane dla **twórcy bota**.",
+    "ru": "⛔ Безопасность: очистка предприятий доступна только **создателю бота**."
+  },
+  "❌ Portée inconnue.": {
+    "en": "❌ Unknown scope.",
+    "de": "❌ Unbekannter Bereich.",
+    "es": "❌ Alcance desconocido.",
+    "pl": "❌ Nieznany zakres.",
+    "ru": "❌ Неизвестная область."
+  },
+  "📭 Rien à purger dans ": {
+    "en": "📭 Nothing to purge in ",
+    "de": "📭 Nichts zu löschen in ",
+    "es": "📭 Nada que purgar en ",
+    "pl": "📭 Nic do wyczyszczenia w ",
+    "ru": "📭 Нечего очищать в "
+  },
+  " : aucune entreprise, aucune archive.": {
+    "en": ": no company, no archive.",
+    "de": ": kein Unternehmen, kein Archiv.",
+    "es": ": ninguna empresa, ningún archivo.",
+    "pl": ": brak firm, brak archiwum.",
+    "ru": ": ни предприятий, ни архива."
+  },
+  "🧹 Purge des entreprises — confirmation": {
+    "en": "🧹 Company purge — confirmation",
+    "de": "🧹 Unternehmen löschen — Bestätigung",
+    "es": "🧹 Purga de empresas — confirmación",
+    "pl": "🧹 Czyszczenie firm — potwierdzenie",
+    "ru": "🧹 Очистка предприятий — подтверждение"
+  },
+  "Portée : **": {
+    "en": "Scope: **",
+    "de": "Bereich: **",
+    "es": "Alcance: **",
+    "pl": "Zakres: **",
+    "ru": "Область: **"
+  },
+  "Ce qui sera supprimé, sans retour possible": {
+    "en": "What will be deleted, with no way back",
+    "de": "Was unwiderruflich gelöscht wird",
+    "es": "Lo que se eliminará, sin vuelta atrás",
+    "pl": "Co zostanie usunięte, bez możliwości cofnięcia",
+    "ru": "Что будет удалено безвозвратно"
+  },
+  "⛔ Seul le créateur qui a lancé la purge peut la confirmer.": {
+    "en": "⛔ Only the creator who started the purge can confirm it.",
+    "de": "⛔ Nur der Ersteller, der die Löschung gestartet hat, kann sie bestätigen.",
+    "es": "⛔ Solo el creador que inició la purga puede confirmarla.",
+    "pl": "⛔ Tylko twórca, który rozpoczął czyszczenie, może je potwierdzić.",
+    "ru": "⛔ Подтвердить очистку может только создатель, который её запустил."
+  },
+  "↩️ Purge annulée : rien n'a été supprimé.": {
+    "en": "↩️ Purge cancelled: nothing was deleted.",
+    "de": "↩️ Löschung abgebrochen: Nichts wurde gelöscht.",
+    "es": "↩️ Purga cancelada: no se eliminó nada.",
+    "pl": "↩️ Czyszczenie anulowane: nic nie zostało usunięte.",
+    "ru": "↩️ Очистка отменена: ничего не удалено."
+  },
+  "✅ Purge terminée — ": {
+    "en": "✅ Purge complete — ",
+    "de": "✅ Löschung abgeschlossen — ",
+    "es": "✅ Purga terminada — ",
+    "pl": "✅ Czyszczenie zakończone — ",
+    "ru": "✅ Очистка завершена — "
+  },
+  "Supprimé": {
+    "en": "Deleted",
+    "de": "Gelöscht",
+    "es": "Eliminado",
+    "pl": "Usunięto",
+    "ru": "Удалено"
+  },
+  "Purgé par": {
+    "en": "Purged by",
+    "de": "Gelöscht von",
+    "es": "Purgado por",
+    "pl": "Wyczyszczone przez",
+    "ru": "Очистил"
+  },
+  "🧹 Entreprises purgées": {
+    "en": "🧹 Companies purged",
+    "de": "🧹 Unternehmen gelöscht",
+    "es": "🧹 Empresas purgadas",
+    "pl": "🧹 Firmy wyczyszczone",
+    "ru": "🧹 Предприятия очищены"
+  },
+  "[Créateur] Supprimer les entreprises : la réserve partagée (anciennes) ou absolument tout": {
+    "en": "[Creator] Delete companies: the shared pool (old ones) or absolutely everything",
+    "de": "[Ersteller] Unternehmen löschen: die gemeinsame Reserve (alte) oder restlos alles",
+    "es": "[Creador] Eliminar empresas: la reserva compartida (antiguas) o absolutamente todo",
+    "pl": "[Twórca] Usuń firmy: wspólną pulę (stare) lub absolutnie wszystko",
+    "ru": "[Создатель] Удалить предприятия: общий резерв (старые) или абсолютно всё"
+  },
+  "Quelle portée supprimer ?": {
+    "en": "Which scope to delete?",
+    "de": "Welchen Bereich löschen?",
+    "es": "¿Qué alcance eliminar?",
+    "pl": "Jaki zakres usunąć?",
+    "ru": "Какую область удалить?"
+  },
+  "La réserve partagée (anciennes entreprises d'avant la refonte)": {
+    "en": "The shared pool (old companies from before the overhaul)",
+    "de": "Die gemeinsame Reserve (alte Unternehmen von vor der Umstellung)",
+    "es": "La reserva compartida (empresas antiguas de antes de la reforma)",
+    "pl": "Wspólna pula (stare firmy sprzed przebudowy)",
+    "ru": "Общий резерв (старые предприятия до переработки)"
+  },
+  "TOUT : chaque entreprise, sur tous les serveurs": {
+    "en": "EVERYTHING: every company, on every server",
+    "de": "ALLES: jedes Unternehmen, auf allen Servern",
+    "es": "TODO: cada empresa, en todos los servidores",
+    "pl": "WSZYSTKO: każda firma, na wszystkich serwerach",
+    "ru": "ВСЁ: каждое предприятие, на всех серверах"
+  },
+  "Expulsé par": {
+    "en": "Kicked by",
+    "de": "Rausgeworfen von",
+    "es": "Expulsado por",
+    "pl": "Wyrzucony przez",
+    "ru": "Выгнал"
+  },
+  "Durée": {
+    "en": "Duration",
+    "de": "Dauer",
+    "es": "Duración",
+    "pl": "Czas trwania",
+    "ru": "Длительность"
+  },
+  "Rendu muet par": {
+    "en": "Muted by",
+    "de": "Stummgeschaltet von",
+    "es": "Silenciado por",
+    "pl": "Wyciszony przez",
+    "ru": "Заглушил"
+  },
+  "Démuté par": {
+    "en": "Unmuted by",
+    "de": "Stummschaltung aufgehoben von",
+    "es": "Desilenciado por",
+    "pl": "Odciszony przez",
+    "ru": "Снял заглушение"
+  },
+  "** serveur(s), et à chaque arrivée future": {
+    "en": "** server(s), and on every future join",
+    "de": "** Server(n), und bei jedem künftigen Beitritt",
+    "es": "** servidor(es), y en cada llegada futura",
+    "pl": "** serwer(ach), i przy każdym przyszłym dołączeniu",
+    "ru": "** сервер(ах), и при каждом будущем входе"
+  },
+  "Banni globalement par": {
+    "en": "Globally banned by",
+    "de": "Global gebannt von",
+    "es": "Baneado globalmente por",
+    "pl": "Zbanowany globalnie przez",
+    "ru": "Глобально забанил"
+  },
+  "Débanni sur **": {
+    "en": "Unbanned on **",
+    "de": "Entbannt auf **",
+    "es": "Desbaneado en **",
+    "pl": "Odbanowany na **",
+    "ru": "Разбанен на **"
+  },
+  "Retiré par": {
+    "en": "Removed by",
+    "de": "Entfernt von",
+    "es": "Retirado por",
+    "pl": "Usunięte przez",
+    "ru": "Снял"
+  },
+  "Levés par": {
+    "en": "Lifted by",
+    "de": "Aufgehoben von",
+    "es": "Levantados por",
+    "pl": "Zniesione przez",
+    "ru": "Снял"
+  },
+  "Catégorie : <#": {
+    "en": "Category: <#",
+    "de": "Kategorie: <#",
+    "es": "Categoría: <#",
+    "pl": "Kategoria: <#",
+    "ru": "Категория: <#"
+  },
+  "Créé par": {
+    "en": "Created by",
+    "de": "Erstellt von",
+    "es": "Creado por",
+    "pl": "Utworzone przez",
+    "ru": "Создал"
+  },
+  "Ajouté par": {
+    "en": "Added by",
+    "de": "Hinzugefügt von",
+    "es": "Añadido por",
+    "pl": "Dodane przez",
+    "ru": "Добавил"
+  },
+  "Renommé par": {
+    "en": "Renamed by",
+    "de": "Umbenannt von",
+    "es": "Renombrado por",
+    "pl": "Zmienione przez",
+    "ru": "Переименовал"
+  },
+  "Débanni par": {
+    "en": "Unbanned by",
+    "de": "Entbannt von",
+    "es": "Desbaneado por",
+    "pl": "Odbanowany przez",
+    "ru": "Разбанил"
+  },
+  "Affiché séparément : ": {
+    "en": "Displayed separately: ",
+    "de": "Getrennt angezeigt: ",
+    "es": "Mostrado por separado: ",
+    "pl": "Wyświetlany osobno: ",
+    "ru": "Отображается отдельно: "
+  },
+  "Description modifiée": {
+    "en": "Description changed",
+    "de": "Beschreibung geändert",
+    "es": "Descripción modificada",
+    "pl": "Opis zmieniony",
+    "ru": "Описание изменено"
+  },
+  "Était dans : <#": {
+    "en": "Was in: <#",
+    "de": "War in: <#",
+    "es": "Estaba en: <#",
+    "pl": "Był w: <#",
+    "ru": "Был в: <#"
+  },
+  "Modifié par": {
+    "en": "Modified by",
+    "de": "Geändert von",
+    "es": "Modificado por",
+    "pl": "Zmienione przez",
+    "ru": "Изменил"
+  },
+  "Rôles ajoutés": {
+    "en": "Roles added",
+    "de": "Rollen hinzugefügt",
+    "es": "Roles añadidos",
+    "pl": "Role dodane",
+    "ru": "Роли добавлены"
+  },
+  "Rôles retirés": {
+    "en": "Roles removed",
+    "de": "Rollen entfernt",
+    "es": "Roles retirados",
+    "pl": "Role usunięte",
+    "ru": "Роли сняты"
+  },
+  "Levée": {
+    "en": "Lifted",
+    "de": "Aufgehoben",
+    "es": "Levantada",
+    "pl": "Zniesione",
+    "ru": "Снято"
+  },
+  "💎 A commencé à booster le serveur": {
+    "en": "💎 Started boosting the server",
+    "de": "💎 Hat begonnen, den Server zu boosten",
+    "es": "💎 Empezó a impulsar el servidor",
+    "pl": "💎 Zaczął boostować serwer",
+    "ru": "💎 Начал бустить сервер"
+  },
+  "💎 Ne booste plus le serveur": {
+    "en": "💎 No longer boosts the server",
+    "de": "💎 Boostet den Server nicht mehr",
+    "es": "💎 Ya no impulsa el servidor",
+    "pl": "💎 Już nie boostuje serwera",
+    "ru": "💎 Больше не бустит сервер"
+  },
+  "Avatar de serveur": {
+    "en": "Server avatar",
+    "de": "Server-Avatar",
+    "es": "Avatar del servidor",
+    "pl": "Awatar serwera",
+    "ru": "Аватар сервера"
+  },
+  "Modifié": {
+    "en": "Modified",
+    "de": "Geändert",
+    "es": "Modificado",
+    "pl": "Zmieniono",
+    "ru": "Изменён"
   }
 }
