@@ -20866,12 +20866,12 @@
     "pl": "Nazwa i zdjęcie bota na tym serwerze, profile",
     "ru": "Имя и фото бота на этом сервере, профили"
   },
-  "`/interact` (bisou, câlin, caresse, morsure, coup de poing, tir, élimination… façon Nekotina). Désactivé par défaut.": {
-    "en": "`/interact` (kiss, hug, pat, bite, punch, shot, kill… Nekotina-style). Off by default.",
-    "de": "`/interact` (Kuss, Umarmung, Streicheln, Biss, Fausthieb, Schuss, Eliminierung… à la Nekotina). Standardmäßig aus.",
-    "es": "`/interact` (beso, abrazo, caricia, mordisco, puñetazo, disparo, eliminación… al estilo Nekotina). Desactivado por defecto.",
-    "pl": "`/interact` (buziak, przytulenie, głaskanie, ugryzienie, cios, strzał, eliminacja… w stylu Nekotina). Domyślnie wyłączone.",
-    "ru": "`/interact` (поцелуй, объятие, поглаживание, укус, удар, выстрел, устранение… в стиле Nekotina). По умолчанию выключено."
+  "`/interact` (bisou, câlin, caresse, morsure, coup de poing, tir, élimination… façon Nekotina). Option `type` sur chaque action (hétéro, lesbienne, gay, catgirl, catboy, femboy) et `/interact preference` pour le type par défaut de chaque membre. Désactivé par défaut.": {
+    "en": "`/interact` (kiss, hug, pat, bite, punch, shot, kill… Nekotina-style). A `type` option on every action (straight, lesbian, gay, catgirl, catboy, femboy) and `/interact preference` for each member's default type. Off by default.",
+    "de": "`/interact` (Kuss, Umarmung, Streicheln, Biss, Fausthieb, Schuss, Eliminierung… à la Nekotina). Option `type` bei jeder Aktion (hetero, lesbisch, schwul, Catgirl, Catboy, Femboy) und `/interact preference` für den Standardtyp jedes Mitglieds. Standardmäßig aus.",
+    "es": "`/interact` (beso, abrazo, caricia, mordisco, puñetazo, disparo, eliminación… al estilo Nekotina). Opción `type` en cada acción (hetero, lesbiana, gay, catgirl, catboy, femboy) y `/interact preference` para el tipo por defecto de cada miembro. Desactivado por defecto.",
+    "pl": "`/interact` (buziak, przytulenie, głaskanie, ugryzienie, cios, strzał, eliminacja… w stylu Nekotina). Opcja `type` przy każdej akcji (hetero, lesbijka, gej, catgirl, catboy, femboy) i `/interact preference` dla domyślnego typu każdego członka. Domyślnie wyłączone.",
+    "ru": "`/interact` (поцелуй, объятие, поглаживание, укус, удар, выстрел, устранение… в стиле Nekotina). Опция `type` у каждого действия (гетеро, лесби, гей, кошкодевочка, кошкомальчик, фембой) и `/interact preference` для типа по умолчанию каждого участника. По умолчанию выключено."
   },
   "🪪 Configuration — Identité du bot": {
     "en": "🪪 Configuration — Bot identity",

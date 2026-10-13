@@ -49,6 +49,13 @@ const LOCALES = {
     badgesTitle: '🏅 Vos badges d\'interactions',
     badgesEmpty: 'Aucun badge pour le moment — utilisez `/interact` pour en débloquer (paliers : 10, 50, 100, 250, 500) !',
     uses: 'utilisations',
+    types: { hetero: 'Hétéro', lesbienne: 'Lesbienne', gay: 'Gay', catgirl: 'Catgirl', catboy: 'Catboy', femboy: 'Femboy' },
+    typeNote: 'Type : ',
+    typeSansCle: '⚠️ Ce type demande une clé GIPHY, absente sur ce bot — GIF classique',
+    typeIntrouvable: '⚠️ Aucun GIF trouvé pour ce type — GIF classique',
+    prefOk: (t) => `✅ Préférence enregistrée : vos interactions utiliseront des GIF **${t}** par défaut.\n-# Vous pouvez toujours choisir un autre type au cas par cas avec l'option \`type\`.`,
+    prefReset: '↩️ Préférence remise par défaut : GIF hétéro.',
+    prefSansCle: '\n-# ⚠️ Ce type demande une clé GIPHY que ce bot n\'a pas encore : en attendant, ses GIF restent classiques.',
   },
   en: {
     actions: {
@@ -75,6 +82,13 @@ const LOCALES = {
     badgesTitle: '🏅 Your interaction badges',
     badgesEmpty: 'No badges yet — use `/interact` to unlock them (milestones: 10, 50, 100, 250, 500)!',
     uses: 'uses',
+    types: { hetero: 'Straight', lesbienne: 'Lesbian', gay: 'Gay', catgirl: 'Catgirl', catboy: 'Catboy', femboy: 'Femboy' },
+    typeNote: 'Type: ',
+    typeSansCle: '⚠️ This type needs a GIPHY key, missing on this bot — classic GIF',
+    typeIntrouvable: '⚠️ No GIF found for this type — classic GIF',
+    prefOk: (t) => `✅ Preference saved: your interactions will use **${t}** GIFs by default.\n-# You can still pick another type each time with the \`type\` option.`,
+    prefReset: '↩️ Preference reset to default: straight GIFs.',
+    prefSansCle: '\n-# ⚠️ This type needs a GIPHY key this bot does not have yet: until then, its GIFs stay classic.',
   },
   es: {
     actions: {
@@ -101,6 +115,13 @@ const LOCALES = {
     badgesTitle: '🏅 Tus insignias de interacciones',
     badgesEmpty: '¡Aún no tienes insignias — usa `/interact` para desbloquearlas (niveles: 10, 50, 100, 250, 500)!',
     uses: 'usos',
+    types: { hetero: 'Hetero', lesbienne: 'Lesbiana', gay: 'Gay', catgirl: 'Catgirl', catboy: 'Catboy', femboy: 'Femboy' },
+    typeNote: 'Tipo: ',
+    typeSansCle: '⚠️ Este tipo necesita una clave GIPHY, ausente en este bot — GIF clásico',
+    typeIntrouvable: '⚠️ Ningún GIF encontrado para este tipo — GIF clásico',
+    prefOk: (t) => `✅ Preferencia guardada: tus interacciones usarán GIF **${t}** por defecto.\n-# Siempre puedes elegir otro tipo cada vez con la opción \`type\`.`,
+    prefReset: '↩️ Preferencia restablecida: GIF hetero.',
+    prefSansCle: '\n-# ⚠️ Este tipo necesita una clave GIPHY que este bot aún no tiene: mientras tanto, sus GIF siguen siendo clásicos.',
   },
   de: {
     actions: {
@@ -127,6 +148,13 @@ const LOCALES = {
     badgesTitle: '🏅 Deine Interaktions-Abzeichen',
     badgesEmpty: 'Noch keine Abzeichen — nutze `/interact`, um welche freizuschalten (Stufen: 10, 50, 100, 250, 500)!',
     uses: 'Nutzungen',
+    types: { hetero: 'Hetero', lesbienne: 'Lesbisch', gay: 'Schwul', catgirl: 'Catgirl', catboy: 'Catboy', femboy: 'Femboy' },
+    typeNote: 'Typ: ',
+    typeSansCle: '⚠️ Dieser Typ braucht einen GIPHY-Schlüssel, der auf diesem Bot fehlt — klassisches GIF',
+    typeIntrouvable: '⚠️ Kein GIF für diesen Typ gefunden — klassisches GIF',
+    prefOk: (t) => `✅ Einstellung gespeichert: deine Interaktionen nutzen standardmäßig **${t}**-GIFs.\n-# Mit der Option \`type\` kannst du jederzeit einen anderen Typ wählen.`,
+    prefReset: '↩️ Einstellung zurückgesetzt: Hetero-GIFs.',
+    prefSansCle: '\n-# ⚠️ Dieser Typ braucht einen GIPHY-Schlüssel, den dieser Bot noch nicht hat: bis dahin bleiben seine GIFs klassisch.',
   },
   ru: {
     actions: {
@@ -153,6 +181,13 @@ const LOCALES = {
     badgesTitle: '🏅 Ваши значки взаимодействий',
     badgesEmpty: 'Пока значков нет — используйте `/interact`, чтобы их открыть (рубежи: 10, 50, 100, 250, 500)!',
     uses: 'использований',
+    types: { hetero: 'Гетеро', lesbienne: 'Лесби', gay: 'Гей', catgirl: 'Кошкодевочка', catboy: 'Кошкомальчик', femboy: 'Фембой' },
+    typeNote: 'Тип: ',
+    typeSansCle: '⚠️ Для этого типа нужен ключ GIPHY, которого нет у этого бота — обычный GIF',
+    typeIntrouvable: '⚠️ GIF для этого типа не найден — обычный GIF',
+    prefOk: (t) => `✅ Настройка сохранена: ваши взаимодействия по умолчанию будут использовать GIF **${t}**.\n-# Другой тип всегда можно выбрать через опцию \`type\`.`,
+    prefReset: '↩️ Настройка сброшена: обычные (гетеро) GIF.',
+    prefSansCle: '\n-# ⚠️ Для этого типа нужен ключ GIPHY, которого у этого бота пока нет: до тех пор его GIF остаются обычными.',
   },
 };
 
@@ -277,6 +312,172 @@ const CATEGORIES_GIF = {
   kill: [['waifu', 'kill'], ['nekos', 'shoot'], ['nekos', 'yeet']],
 };
 
+// 🏳️‍🌈 Types de GIF : pour que chacun se reconnaisse dans l'image.
+//
+// Les trois sources classiques (nekos.best, waifu.pics, otakugifs) ne
+// classent pas leurs GIF par couple : un « kiss » y est presque toujours un
+// garçon et une fille. Deux renforts, dans l'ordre :
+//
+//  1. Gifukai (api.gifukai.com) — sans clé, tout public par défaut, et qui
+//     SAIT filtrer par couple (`pairing=ff` fille → fille, `mm` garçon →
+//     garçon). Il couvre lesbienne et gay pour les actions qu'il connaît.
+//  2. GIPHY — recherche libre, donc catgirl, catboy, femboy… mais À CLÉ
+//     (`GIPHY_KEY` dans le .env ; gratuite, 100 recherches par heure). Une
+//     recherche rapporte jusqu'à 50 GIF, tous mis en réserve : la plupart des
+//     envois ne coûtent aucun appel. Ses conditions exigent la mention
+//     « Powered by GIPHY » : elle va dans le pied de carte.
+//
+// ⚠️ L'API Tenor de Google a fermé le 30 juin 2026 : ne pas la rebrancher.
+//
+// Sans clé GIPHY, un type qu'aucune source gratuite ne couvre retombe sur le
+// GIF classique, et le pied de carte le DIT — sans quoi on croirait l'option
+// cassée. `hetero` est le défaut : il reste sur les sources classiques.
+const TYPES_GIF = {
+  hetero: null,
+  lesbienne: { pairing: 'ff', requete: 'anime yuri' },
+  gay: { pairing: 'mm', requete: 'anime yaoi' },
+  catgirl: { pairing: null, requete: 'anime catgirl' },
+  catboy: { pairing: null, requete: 'anime catboy' },
+  femboy: { pairing: null, requete: 'anime femboy' },
+};
+// Le mot anglais de chaque action, pour la recherche libre GIPHY.
+const MOTS_ACTION = {
+  kiss: 'kiss', peck: 'cheek kiss', hug: 'hug', pat: 'head pat', bite: 'bite',
+  lick: 'lick', bang: 'shoot gun', punch: 'punch', kill: 'kill',
+};
+// Les actions que Gifukai connaît, et leur chemin (le bisou sur la joue est
+// un filtre `type` du bisou). Les autres passent directement par GIPHY.
+const ACTIONS_GIFUKAI = {
+  kiss: 'kiss', peck: 'kiss?type=cheek', hug: 'hug', pat: 'pat', bite: 'bite',
+};
+const TYPE_DEFAUT = 'hetero';
+const typeValide = (t) => (TYPES_GIF[t] !== undefined ? t : TYPE_DEFAUT);
+const requeteGif = (action, type) => `${TYPES_GIF[type]?.requete || 'anime'} ${MOTS_ACTION[action] || action}`.trim();
+// Un type « à clé » n'a aucune source gratuite : sans GIPHY_KEY, impossible.
+const typeExigeCle = (type) => Boolean(TYPES_GIF[type]) && !TYPES_GIF[type].pairing;
+const cleGiphy = () => (process.env.GIPHY_KEY || '').trim();
+
+// Préférence de chaque membre (`/interact preference`) : le type par défaut
+// de SES interactions, sur tous les serveurs et en MP.
+const getPref = db.prepare('SELECT type FROM interact_prefs WHERE user_id = ?');
+const setPref = db.prepare(
+  'INSERT INTO interact_prefs (user_id, type, at) VALUES (?, ?, ?) ON CONFLICT (user_id) DO UPDATE SET type = excluded.type, at = excluded.at'
+);
+const delPref = db.prepare('DELETE FROM interact_prefs WHERE user_id = ?');
+const prefs = {
+  de(userId) {
+    try { return typeValide(getPref.get(userId)?.type); } catch { return TYPE_DEFAUT; }
+  },
+  poser(userId, type) { setPref.run(userId, typeValide(type), new Date().toISOString()); },
+  effacer(userId) { delPref.run(userId); },
+};
+
+// La réserve des GIF typés est rangée par `action@type@source` : on sait
+// ainsi d'où vient une image ressortie (GIPHY impose sa mention).
+const gifAuHasardTypee = db.prepare(
+  'SELECT url, anime, categorie FROM gif_cache WHERE categorie LIKE ? ORDER BY RANDOM() LIMIT 1'
+);
+const ENTETES_GIF = { 'User-Agent': 'discord-roblox-rp-bot' };
+
+async function chercherGifukai(action, pairing) {
+  const chemin = ACTIONS_GIFUKAI[action];
+  if (!chemin || !pairing) return null;
+  const url = `https://api.gifukai.com/v1/${chemin}${chemin.includes('?') ? '&' : '?'}pairing=${pairing}`;
+  try {
+    const res = await fetch(url, { headers: ENTETES_GIF, signal: AbortSignal.timeout(5000) });
+    if (!res.ok) {
+      console.warn(`⚠️ GIF Gifukai (${action}, ${pairing}) : HTTP ${res.status}`);
+      return null;
+    }
+    const d = await res.json();
+    if (!urlAffichable(d?.url)) {
+      console.warn(`⚠️ GIF Gifukai (${action}, ${pairing}) : réponse sans URL exploitable`);
+      return null;
+    }
+    return { url: d.url, anime: d.anime || null, source: 'gifukai' };
+  } catch (err) {
+    console.warn(`⚠️ GIF Gifukai (${action}, ${pairing}) : ${err.message}`);
+    return null;
+  }
+}
+
+// GIPHY : 100 recherches par heure sur une clé gratuite. Une recherche
+// rapporte 50 GIF, tous mis en réserve ; tant que la réserve d'un couple
+// (action, type) est garnie et que la dernière recherche est récente, on
+// sert la réserve sans appel réseau.
+const GIPHY_LIMITE = 50;
+const GIPHY_REPIT = 20 * 60 * 1000;
+const GIPHY_RESERVE_MIN = 10;
+const derniereRechercheGiphy = new Map();
+
+async function chercherGiphy(action, type, cle) {
+  const q = requeteGif(action, type);
+  const categorie = `${action}@${type}@giphy`;
+  const maintenant = Date.now();
+  const dernier = derniereRechercheGiphy.get(categorie) || 0;
+  if (Number(compterGifs.get(categorie)?.n || 0) >= GIPHY_RESERVE_MIN && maintenant - dernier < GIPHY_REPIT) {
+    const choix = gifAuHasard.get(categorie);
+    if (choix?.url) return { url: choix.url, anime: choix.anime || null, source: 'giphy' };
+  }
+  derniereRechercheGiphy.set(categorie, maintenant);
+  // « pg » laisse passer les bisous sur la bouche ; « pg-13 » n'est tenté
+  // que si « pg » ne rapporte rien (requêtes de niche).
+  for (const rating of ['pg', 'pg-13']) {
+    try {
+      const url = `https://api.giphy.com/v1/gifs/search?api_key=${encodeURIComponent(cle)}&q=${encodeURIComponent(q)}`
+        + `&limit=${GIPHY_LIMITE}&rating=${rating}&lang=en`;
+      const res = await fetch(url, { headers: ENTETES_GIF, signal: AbortSignal.timeout(5000) });
+      if (!res.ok) {
+        console.warn(`⚠️ GIF GIPHY (${q}, ${rating}) : HTTP ${res.status}`);
+        // Clé refusée ou quota épuisé : un second essai ne ferait qu'aggraver.
+        if ([401, 403, 429].includes(res.status)) break;
+        continue;
+      }
+      const d = await res.json();
+      const liste = (Array.isArray(d.data) ? d.data : [])
+        .map((g) => ({ url: g.images?.original?.url || g.images?.downsized?.url, anime: null }))
+        .filter((g) => urlAffichable(g.url));
+      if (!liste.length) {
+        console.warn(`⚠️ GIF GIPHY (${q}, ${rating}) : aucun résultat`);
+        continue;
+      }
+      for (const g of liste) memoriserGif(categorie, g);
+      return { ...liste[Math.floor(Math.random() * liste.length)], source: 'giphy' };
+    } catch (err) {
+      console.warn(`⚠️ GIF GIPHY (${q}, ${rating}) : ${err.message}`);
+    }
+  }
+  return null;
+}
+
+// GIF « typé ». Rend { url, anime, source } ; null pour le type par défaut
+// (→ sources classiques) ; { sansCle: true } quand seule une clé GIPHY
+// absente aurait pu servir ce type ; { introuvable: true } si tout a échoué et
+// que la réserve est vide.
+async function fetchGifTypee(action, type) {
+  const def = TYPES_GIF[type];
+  if (!def) return null;
+  const cle = cleGiphy();
+  if (def.pairing) {
+    const gif = await chercherGifukai(action, def.pairing);
+    if (gif) {
+      memoriserGif(`${action}@${type}@gifukai`, gif);
+      return gif;
+    }
+  }
+  if (cle) {
+    const gif = await chercherGiphy(action, type, cle);
+    if (gif) return gif;
+  }
+  const secours = gifAuHasardTypee.get(`${action}@${type}@%`);
+  if (secours?.url) {
+    console.warn(`⚠️ Sources typées HS pour « ${action} / ${type} » — GIF repris de la réserve.`);
+    return { url: secours.url, anime: secours.anime || null, source: String(secours.categorie).split('@')[2] || null, reserve: true };
+  }
+  if (!cle) return { sansCle: true };
+  return { introuvable: true };
+}
+
 async function fetchGif(category) {
   const pistes = CATEGORIES_GIF[category] || [['nekos', category], ['waifu', category], ['otaku', category]];
   const sources = pistes.map(([cle, cat]) => ({ name: SOURCES_GIF[cle].nom, url: SOURCES_GIF[cle].url(cat), parse: SOURCES_GIF[cle].parse }));
@@ -320,11 +521,22 @@ function displayName(interaction, user) {
   return user.displayName || user.username;
 }
 
-async function buildInteractionMessage(interaction, actionKey, author, target, withButtons, lang) {
+async function buildInteractionMessage(interaction, actionKey, author, target, withButtons, lang, type = TYPE_DEFAUT) {
   const L = LOCALES[lang];
   const action = L.actions[actionKey];
   const counterKey = actionKey === 'peck' ? 'kiss' : actionKey;
-  const gif = await fetchGif(actionKey);
+  type = typeValide(type);
+
+  // GIF typé d'abord ; en cas d'échec on retombe sur le GIF classique, et on
+  // explique pourquoi dans le pied de carte (clé absente ou rien trouvé).
+  let gif = null;
+  let noteType = null;
+  if (type !== TYPE_DEFAUT) {
+    const typee = await fetchGifTypee(actionKey, type);
+    if (typee?.url) gif = typee;
+    else noteType = typee?.sansCle ? L.typeSansCle : L.typeIntrouvable;
+  }
+  if (!gif) gif = await fetchGif(actionKey);
   const count = incrementCounter(author.id, target.id, counterKey);
 
   // Statistiques personnelles de l'auteur → badges par paliers, envoyés en MP.
@@ -341,8 +553,13 @@ async function buildInteractionMessage(interaction, actionKey, author, target, w
     // image.
     try { embed.setImage(gif.url); } catch { /* on continue sans image */ }
   }
-  if (gif?.anime) embed.setFooter({ text: `${L.anime}${gif.anime}` });
-  if (!gif?.url) embed.setFooter({ text: L.noGif });
+  const pied = [];
+  if (type !== TYPE_DEFAUT && !noteType) pied.push(`${L.typeNote}${L.types[type]}`);
+  if (gif?.anime) pied.push(`${L.anime}${gif.anime}`);
+  if (!gif?.url) pied.push(L.noGif);
+  if (gif?.source === 'giphy') pied.push('Powered by GIPHY');
+  if (noteType) pied.push(noteType);
+  if (pied.length) embed.setFooter({ text: pied.join(' • ') });
 
   // Mention de la personne visée uniquement sur un serveur — en MP (et en
   // salon privé d'app utilisateur), pas de mention : elle est inutile et
@@ -353,11 +570,11 @@ async function buildInteractionMessage(interaction, actionKey, author, target, w
     payload.components = [
       new ActionRowBuilder().addComponents(
         new ButtonBuilder()
-          .setCustomId(`itx:${actionKey}:${author.id}:${target.id}`)
+          .setCustomId(`itx:${actionKey}:${author.id}:${target.id}:${type}`)
           .setLabel(action.back)
           .setStyle(ButtonStyle.Secondary),
         new ButtonBuilder()
-          .setCustomId(`itxr:${actionKey}:${author.id}:${target.id}`)
+          .setCustomId(`itxr:${actionKey}:${author.id}:${target.id}:${type}`)
           .setLabel(L.reject)
           .setEmoji('❌')
           .setStyle(ButtonStyle.Secondary)
@@ -381,8 +598,25 @@ function moduleBlocked(interaction) {
   return null;
 }
 
+// Les choix de l'option `type` (les mêmes partout : actions et préférence).
+const CHOIX_TYPE = [
+  { name: 'Hétéro (défaut)', value: 'hetero', name_localizations: { 'en-US': 'Straight (default)', 'en-GB': 'Straight (default)' } },
+  { name: 'Lesbienne', value: 'lesbienne', name_localizations: { 'en-US': 'Lesbian', 'en-GB': 'Lesbian' } },
+  { name: 'Gay', value: 'gay' },
+  { name: 'Catgirl', value: 'catgirl' },
+  { name: 'Catboy', value: 'catboy' },
+  { name: 'Femboy', value: 'femboy' },
+];
+const optionType = (o) =>
+  o
+    .setName('type')
+    .setDescription('Quel type de GIF ? (défaut : votre préférence, sinon hétéro)')
+    .setDescriptionLocalizations({ 'en-US': 'Which kind of GIF? (default: your preference, else straight)', 'en-GB': 'Which kind of GIF? (default: your preference, else straight)' })
+    .setRequired(false)
+    .addChoices(...CHOIX_TYPE);
+
 module.exports = {
-  CATEGORIES_GIF, SOURCES_GIF, LOCALES,
+  CATEGORIES_GIF, SOURCES_GIF, LOCALES, TYPES_GIF, ACTIONS_GIFUKAI, CHOIX_TYPE, requeteGif, typeExigeCle, fetchGifTypee, prefs,
   grade: GRADES.EVERYONE,
   public: true, // réponses visibles par tout le monde (pas d'éphémère)
   allowDm: true, // utilisable en message privé avec le bot
@@ -409,6 +643,7 @@ module.exports = {
             .setRequired(false)
             .addChoices({ name: 'Sur les lèvres 💋', value: 'levres' }, { name: 'Sur la joue 😚', value: 'joue' })
         )
+        .addStringOption(optionType)
     )
     .addSubcommand((sub) =>
       sub
@@ -416,6 +651,7 @@ module.exports = {
         .setDescription('Faire un câlin à quelqu\'un 🤗')
         .setDescriptionLocalizations({ 'en-US': 'A little hug, perhaps? 🤗', 'en-GB': 'A little hug, perhaps? 🤗' })
         .addUserOption((o) => o.setName('membre').setDescription('À qui faire un câlin ?').setRequired(true))
+        .addStringOption(optionType)
     )
     .addSubcommand((sub) =>
       sub
@@ -423,6 +659,7 @@ module.exports = {
         .setDescription('Caresser la tête de quelqu\'un 🖐️')
         .setDescriptionLocalizations({ 'en-US': 'Gently pat someone on the head 🖐️', 'en-GB': 'Gently pat someone on the head 🖐️' })
         .addUserOption((o) => o.setName('membre').setDescription('Qui caresser ?').setRequired(true))
+        .addStringOption(optionType)
     )
     .addSubcommand((sub) =>
       sub
@@ -430,6 +667,7 @@ module.exports = {
         .setDescription('Mordiller quelqu\'un 😬')
         .setDescriptionLocalizations({ 'en-US': 'Playfully bite someone 😬', 'en-GB': 'Playfully bite someone 😬' })
         .addUserOption((o) => o.setName('membre').setDescription('Qui mordre ?').setRequired(true))
+        .addStringOption(optionType)
     )
     .addSubcommand((sub) =>
       sub
@@ -437,6 +675,7 @@ module.exports = {
         .setDescription('Lécher quelqu\'un 👅')
         .setDescriptionLocalizations({ 'en-US': 'Lick someone in a cheeky way 👅', 'en-GB': 'Lick someone in a cheeky way 👅' })
         .addUserOption((o) => o.setName('membre').setDescription('Qui lécher ?').setRequired(true))
+        .addStringOption(optionType)
     )
     .addSubcommand((sub) =>
       sub
@@ -444,6 +683,7 @@ module.exports = {
         .setDescription('Tirer sur quelqu\'un 🔫')
         .setDescriptionLocalizations({ 'en-US': 'Shoot someone 🔫', 'en-GB': 'Shoot someone 🔫' })
         .addUserOption((o) => o.setName('membre').setDescription('Sur qui tirer ?').setRequired(true))
+        .addStringOption(optionType)
     )
     .addSubcommand((sub) =>
       sub
@@ -451,6 +691,7 @@ module.exports = {
         .setDescription('Mettre un coup de poing à quelqu\'un 👊')
         .setDescriptionLocalizations({ 'en-US': 'Punch someone 👊', 'en-GB': 'Punch someone 👊' })
         .addUserOption((o) => o.setName('membre').setDescription('Qui frapper ?').setRequired(true))
+        .addStringOption(optionType)
     )
     .addSubcommand((sub) =>
       sub
@@ -458,6 +699,21 @@ module.exports = {
         .setDescription('Éliminer quelqu\'un 💀')
         .setDescriptionLocalizations({ 'en-US': 'Take someone out 💀', 'en-GB': 'Take someone out 💀' })
         .addUserOption((o) => o.setName('membre').setDescription('Qui éliminer ?').setRequired(true))
+        .addStringOption(optionType)
+    )
+    .addSubcommand((sub) =>
+      sub
+        .setName('preference')
+        .setDescription('Choisir votre type de GIF par défaut (hétéro, lesbienne, gay, catgirl, catboy, femboy)')
+        .setDescriptionLocalizations({ 'en-US': 'Pick your default GIF type (straight, lesbian, gay, catgirl, catboy, femboy)', 'en-GB': 'Pick your default GIF type (straight, lesbian, gay, catgirl, catboy, femboy)' })
+        .addStringOption((o) =>
+          o
+            .setName('type')
+            .setDescription('Le type de GIF de vos interactions')
+            .setDescriptionLocalizations({ 'en-US': 'The GIF type for your interactions', 'en-GB': 'The GIF type for your interactions' })
+            .setRequired(true)
+            .addChoices(...CHOIX_TYPE)
+        )
     )
     .addSubcommand((sub) =>
       sub
@@ -497,8 +753,24 @@ module.exports = {
       return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
     }
 
+    if (sub === 'preference') {
+      const choix = typeValide(interaction.options.getString('type'));
+      let texte;
+      if (choix === TYPE_DEFAUT) {
+        prefs.effacer(interaction.user.id);
+        texte = L.prefReset;
+      } else {
+        prefs.poser(interaction.user.id, choix);
+        texte = L.prefOk(L.types[choix]);
+        if (typeExigeCle(choix) && !cleGiphy()) texte += L.prefSansCle;
+      }
+      return interaction.reply({ content: texte, flags: MessageFlags.Ephemeral });
+    }
+
     const target = interaction.options.getUser('membre');
     const actionKey = sub === 'kiss' && interaction.options.getString('endroit') === 'joue' ? 'peck' : sub;
+    // Type demandé pour cette fois, sinon la préférence du membre, sinon hétéro.
+    const type = typeValide(interaction.options.getString('type') || prefs.de(interaction.user.id));
 
     if (target.id === interaction.user.id) {
       return interaction.reply({ content: L.self, flags: MessageFlags.Ephemeral });
@@ -517,7 +789,7 @@ module.exports = {
     // secondes que Discord accorde. `repondreVite` ne diffère qu'à la
     // dernière seconde, et seulement si la recherche traîne.
     await repondreVite(interaction, async () => {
-      const payload = await buildInteractionMessage(interaction, actionKey, interaction.user, target, withButtons, lang);
+      const payload = await buildInteractionMessage(interaction, actionKey, interaction.user, target, withButtons, lang, type);
       if (!withButtons) payload.content = L.botAccept;
       return payload;
     });
@@ -528,7 +800,8 @@ module.exports = {
     try {
       const lang = resolveLang(interaction.locale);
       const L = LOCALES[lang];
-      const [prefix, actionKey, fromId, toId] = interaction.customId.split(':');
+      const [prefix, actionKey, fromId, toId, typeBouton] = interaction.customId.split(':');
+      const type = typeValide(typeBouton);
       if (!L.actions[actionKey]) return;
       if (interaction.user.id !== toId) {
         return interaction.reply({ content: L.onlyTarget, flags: MessageFlags.Ephemeral });
@@ -542,7 +815,7 @@ module.exports = {
       const author = interaction.user;
       const target = await interaction.client.users.fetch(fromId);
       await mettreAJour(interaction, { components: [] });
-      const payload = await buildInteractionMessage(interaction, actionKey, author, target, false, lang);
+      const payload = await buildInteractionMessage(interaction, actionKey, author, target, false, lang, type);
       await suivre(interaction, payload);
     } catch (err) {
       console.error('Erreur interaction :', err);

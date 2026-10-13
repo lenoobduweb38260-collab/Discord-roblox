@@ -603,7 +603,7 @@ function rpView(guild) {
     name: '🎮 Module Interactions',
     value:
       `État : ${interactOn ? '🟢 **Activé**' : '🔴 **Désactivé**'}\n` +
-      '`/interact` (bisou, câlin, caresse, morsure, coup de poing, tir, élimination… façon Nekotina). Désactivé par défaut.',
+      '`/interact` (bisou, câlin, caresse, morsure, coup de poing, tir, élimination… façon Nekotina). Option `type` sur chaque action (hétéro, lesbienne, gay, catgirl, catboy, femboy) et `/interact preference` pour le type par défaut de chaque membre. Désactivé par défaut.',
   });
   const saoOn = Boolean(cfg.sao_enabled);
   embed.addFields({

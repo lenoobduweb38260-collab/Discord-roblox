@@ -83,6 +83,13 @@ const BOT_ENV_TEMPLATE = [
   '# Profils du bot (nom + photo) proposés aux serveurs — JSON : [{"nom":"Arès","avatar":"https://…/ares.png"}]',
   'BOT_PROFILS=',
   '',
+  '# Clé GIPHY pour les GIF « typés » de /interact (catgirl, catboy, femboy ; secours pour lesbienne et gay) :',
+  '#   https://developers.giphy.com → Create an App → type « API » → la clé apparaît sous le nom de votre app',
+  '#   Gratuite : 100 recherches par heure ; chaque recherche remplit la réserve du bot (50 GIF).',
+  '# Lesbienne et gay marchent SANS clé (Gifukai). Sans clé GIPHY, les autres types',
+  '# retombent sur le GIF classique et le disent.',
+  'GIPHY_KEY=',
+  '',
 ].join('\n');
 
 // ----- État par bot -----

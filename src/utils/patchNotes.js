@@ -1754,6 +1754,20 @@ const RELEASES = [
     amelioration: [],
     retrait: [],
   },
+  {
+    id: 'interact-types-2026-10cu',
+    title: '/interact : des GIF pour tout le monde',
+    ajout: [
+      '🏳️‍🌈 **Option `type` sur chaque action de /interact** (bisou, calin, caresse, morsure, lechouille, tir, coup de poing, elimination) : hetero (defaut), lesbienne, gay, catgirl, catboy ou femboy — le GIF suit le choix',
+      '⭐ **`/interact preference`** : chaque membre enregistre son type par defaut, valable sur tous les serveurs et en MP. L\'option `type` reste disponible au cas par cas',
+    ],
+    amelioration: [
+      '🔑 Lesbienne et gay marchent sans rien configurer (Gifukai : filtre par couple, tout public). Catgirl, catboy et femboy passent par GIPHY : une cle gratuite `GIPHY_KEY` a poser dans le .env du bot (100 recherches par heure, chaque recherche remplit la reserve). Sans cle, le GIF classique part quand meme et le pied de carte le dit',
+      '🔁 Le bouton « Rendre » garde le type choisi : la reponse est dans le meme style',
+    ],
+    fix: [],
+    retrait: [],
+  },
 ];
 
 // Construit l'embed d'une note à partir d'une entrée { title, ajout, fix,
