@@ -115,7 +115,7 @@ global.fetch = async (url) => {
     V('kill a une source de secours', C.kill.length >= 2 && C.kill[0][0] === 'waifu', JSON.stringify(C.kill));
     V('toutes les sources citées existent', Object.values(C).flat().every(([cle]) => itx.SOURCES_GIF[cle]));
     const src = fs.readFileSync(`${__dirname}/../src/commands/interact.js`, 'utf8');
-    V('la réserve est rangée sous la vraie catégorie', /memoriserGif\(category, gif\)/.test(src) && /gifAuHasard\.get\(category\)/.test(src));
+    V('la réserve est rangée sous la vraie catégorie', /memoriserGif\(category, gif\)/.test(src) && /gifsAuHasard\.all\(category\)/.test(src));
   }
 
   global.fetch = vraiFetch;

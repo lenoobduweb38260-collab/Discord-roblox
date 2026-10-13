@@ -263,6 +263,42 @@ const garderGif = db.prepare(
 const gifAuHasard = db.prepare(
   'SELECT url, anime FROM gif_cache WHERE categorie = ? ORDER BY RANDOM() LIMIT 1'
 );
+// Plusieurs candidats au hasard : on en écarte ceux déjà vus (voir `exclure`).
+const gifsAuHasard = db.prepare(
+  'SELECT url, anime, categorie FROM gif_cache WHERE categorie = ? ORDER BY RANDOM() LIMIT 8'
+);
+const gifsAuHasardTypee = db.prepare(
+  'SELECT url, anime, categorie FROM gif_cache WHERE categorie LIKE ? ORDER BY RANDOM() LIMIT 8'
+);
+
+// 🔁 « Rendre » ne doit JAMAIS ressortir le GIF du message d'origine : la
+// même image deux fois de suite, c'est une réponse qui a l'air copiée. Chaque
+// source reçoit donc un ensemble d'URL à écarter, et retire au hasard (ou
+// passe à la source suivante) tant qu'elle tombe dessus.
+const ESSAIS_SAUF = 3;
+const estExclu = (url, exclure) => Boolean(exclure && exclure.size && url && exclure.has(url));
+const premierLibre = (liste, exclure) => liste.find((g) => g?.url && !estExclu(g.url, exclure)) || null;
+
+// Toutes les URL d'un message du bot — embed (image, vignette) ou carte
+// (galerie) — pour les écarter de la réponse.
+function urlsDuMessage(message) {
+  const urls = new Set();
+  const brut = (x) => (x && typeof x.toJSON === 'function' ? x.toJSON() : x);
+  const visiter = (x, profondeur = 0) => {
+    if (!x || typeof x !== 'object' || profondeur > 12) return;
+    for (const [cle, valeur] of Object.entries(x)) {
+      if ((cle === 'url' || cle === 'proxy_url' || cle === 'proxyURL') && typeof valeur === 'string' && /^https?:\/\//i.test(valeur)) urls.add(valeur);
+      else if (valeur && typeof valeur === 'object') visiter(brut(valeur), profondeur + 1);
+    }
+  };
+  try {
+    visiter((message?.embeds || []).map(brut));
+    visiter((message?.components || []).map(brut));
+  } catch {
+    // Un message illisible ne doit pas empêcher la réponse : on n'exclut rien.
+  }
+  return urls;
+}
 const compterGifs = db.prepare('SELECT COUNT(*) AS n FROM gif_cache WHERE categorie = ?');
 const purgerGifs = db.prepare(
   'DELETE FROM gif_cache WHERE categorie = ? AND rowid NOT IN'
@@ -379,26 +415,31 @@ const gifAuHasardTypee = db.prepare(
 );
 const ENTETES_GIF = { 'User-Agent': 'discord-roblox-rp-bot' };
 
-async function chercherGifukai(action, pairing) {
+async function chercherGifukai(action, pairing, exclure = null) {
   const chemin = ACTIONS_GIFUKAI[action];
   if (!chemin || !pairing) return null;
   const url = `https://api.gifukai.com/v1/${chemin}${chemin.includes('?') ? '&' : '?'}pairing=${pairing}`;
-  try {
-    const res = await fetch(url, { headers: ENTETES_GIF, signal: AbortSignal.timeout(5000) });
-    if (!res.ok) {
-      console.warn(`⚠️ GIF Gifukai (${action}, ${pairing}) : HTTP ${res.status}`);
+  const essais = exclure?.size ? ESSAIS_SAUF : 1;
+  for (let essai = 0; essai < essais; essai++) {
+    try {
+      const res = await fetch(url, { headers: ENTETES_GIF, signal: AbortSignal.timeout(5000) });
+      if (!res.ok) {
+        console.warn(`⚠️ GIF Gifukai (${action}, ${pairing}) : HTTP ${res.status}`);
+        return null;
+      }
+      const d = await res.json();
+      if (!urlAffichable(d?.url)) {
+        console.warn(`⚠️ GIF Gifukai (${action}, ${pairing}) : réponse sans URL exploitable`);
+        return null;
+      }
+      if (estExclu(d.url, exclure)) continue; // le même GIF que l'original : on retire
+      return { url: d.url, anime: d.anime || null, source: 'gifukai' };
+    } catch (err) {
+      console.warn(`⚠️ GIF Gifukai (${action}, ${pairing}) : ${err.message}`);
       return null;
     }
-    const d = await res.json();
-    if (!urlAffichable(d?.url)) {
-      console.warn(`⚠️ GIF Gifukai (${action}, ${pairing}) : réponse sans URL exploitable`);
-      return null;
-    }
-    return { url: d.url, anime: d.anime || null, source: 'gifukai' };
-  } catch (err) {
-    console.warn(`⚠️ GIF Gifukai (${action}, ${pairing}) : ${err.message}`);
-    return null;
   }
+  return null;
 }
 
 // GIPHY : 100 recherches par heure sur une clé gratuite. Une recherche
@@ -410,13 +451,13 @@ const GIPHY_REPIT = 20 * 60 * 1000;
 const GIPHY_RESERVE_MIN = 10;
 const derniereRechercheGiphy = new Map();
 
-async function chercherGiphy(action, type, cle) {
+async function chercherGiphy(action, type, cle, exclure = null) {
   const q = requeteGif(action, type);
   const categorie = `${action}@${type}@giphy`;
   const maintenant = Date.now();
   const dernier = derniereRechercheGiphy.get(categorie) || 0;
   if (Number(compterGifs.get(categorie)?.n || 0) >= GIPHY_RESERVE_MIN && maintenant - dernier < GIPHY_REPIT) {
-    const choix = gifAuHasard.get(categorie);
+    const choix = premierLibre(gifsAuHasard.all(categorie), exclure);
     if (choix?.url) return { url: choix.url, anime: choix.anime || null, source: 'giphy' };
   }
   derniereRechercheGiphy.set(categorie, maintenant);
@@ -442,7 +483,9 @@ async function chercherGiphy(action, type, cle) {
         continue;
       }
       for (const g of liste) memoriserGif(categorie, g);
-      return { ...liste[Math.floor(Math.random() * liste.length)], source: 'giphy' };
+      const libres = liste.filter((g) => !estExclu(g.url, exclure));
+      if (!libres.length) continue;
+      return { ...libres[Math.floor(Math.random() * libres.length)], source: 'giphy' };
     } catch (err) {
       console.warn(`⚠️ GIF GIPHY (${q}, ${rating}) : ${err.message}`);
     }
@@ -454,22 +497,22 @@ async function chercherGiphy(action, type, cle) {
 // (→ sources classiques) ; { sansCle: true } quand seule une clé GIPHY
 // absente aurait pu servir ce type ; { introuvable: true } si tout a échoué et
 // que la réserve est vide.
-async function fetchGifTypee(action, type) {
+async function fetchGifTypee(action, type, exclure = null) {
   const def = TYPES_GIF[type];
   if (!def) return null;
   const cle = cleGiphy();
   if (def.pairing) {
-    const gif = await chercherGifukai(action, def.pairing);
+    const gif = await chercherGifukai(action, def.pairing, exclure);
     if (gif) {
       memoriserGif(`${action}@${type}@gifukai`, gif);
       return gif;
     }
   }
   if (cle) {
-    const gif = await chercherGiphy(action, type, cle);
+    const gif = await chercherGiphy(action, type, cle, exclure);
     if (gif) return gif;
   }
-  const secours = gifAuHasardTypee.get(`${action}@${type}@%`);
+  const secours = premierLibre(gifsAuHasardTypee.all(`${action}@${type}@%`), exclure);
   if (secours?.url) {
     console.warn(`⚠️ Sources typées HS pour « ${action} / ${type} » — GIF repris de la réserve.`);
     return { url: secours.url, anime: secours.anime || null, source: String(secours.categorie).split('@')[2] || null, reserve: true };
@@ -478,33 +521,40 @@ async function fetchGifTypee(action, type) {
   return { introuvable: true };
 }
 
-async function fetchGif(category) {
+async function fetchGif(category, exclure = null) {
   const pistes = CATEGORIES_GIF[category] || [['nekos', category], ['waifu', category], ['otaku', category]];
   const sources = pistes.map(([cle, cat]) => ({ name: SOURCES_GIF[cle].nom, url: SOURCES_GIF[cle].url(cat), parse: SOURCES_GIF[cle].parse }));
+  const essais = exclure?.size ? ESSAIS_SAUF : 1;
   for (const source of sources) {
-    try {
-      const res = await fetch(source.url, {
-        headers: { 'User-Agent': 'discord-roblox-rp-bot' },
-        signal: AbortSignal.timeout(5000),
-      });
-      if (!res.ok) {
-        console.warn(`⚠️ GIF ${source.name} (${category}) : HTTP ${res.status}`);
-        continue;
-      }
-      const gif = source.parse(await res.json());
-      if (urlAffichable(gif.url)) {
+    for (let essai = 0; essai < essais; essai++) {
+      try {
+        const res = await fetch(source.url, {
+          headers: { 'User-Agent': 'discord-roblox-rp-bot' },
+          signal: AbortSignal.timeout(5000),
+        });
+        if (!res.ok) {
+          console.warn(`⚠️ GIF ${source.name} (${category}) : HTTP ${res.status}`);
+          break;
+        }
+        const gif = source.parse(await res.json());
+        if (!urlAffichable(gif.url)) {
+          console.warn(`⚠️ GIF ${source.name} (${category}) : réponse sans URL exploitable`);
+          break;
+        }
         memoriserGif(category, gif);
+        if (estExclu(gif.url, exclure)) continue; // le même GIF que l'original : on retire
         return gif;
+      } catch (err) {
+        console.warn(`⚠️ GIF ${source.name} (${category}) : ${err.message}`);
+        break;
       }
-      console.warn(`⚠️ GIF ${source.name} (${category}) : réponse sans URL exploitable`);
-    } catch (err) {
-      console.warn(`⚠️ GIF ${source.name} (${category}) : ${err.message}`);
     }
   }
 
-  // Les trois sources sont tombées : on ressert une image déjà vue plutôt que
-  // de rendre une animation sans animation.
-  const secours = gifAuHasard.get(category);
+  // Les trois sources sont tombées (ou ne donnent que l'image à écarter) : on
+  // ressert une image déjà vue plutôt que de rendre une animation sans
+  // animation.
+  const secours = premierLibre(gifsAuHasard.all(category), exclure);
   if (secours?.url) {
     console.warn(`⚠️ Sources HS pour « ${category} » — GIF repris de la réserve.`);
     return { url: secours.url, anime: secours.anime || null, reserve: true };
@@ -521,7 +571,7 @@ function displayName(interaction, user) {
   return user.displayName || user.username;
 }
 
-async function buildInteractionMessage(interaction, actionKey, author, target, withButtons, lang, type = TYPE_DEFAUT) {
+async function buildInteractionMessage(interaction, actionKey, author, target, withButtons, lang, type = TYPE_DEFAUT, { exclure = null } = {}) {
   const L = LOCALES[lang];
   const action = L.actions[actionKey];
   const counterKey = actionKey === 'peck' ? 'kiss' : actionKey;
@@ -529,14 +579,15 @@ async function buildInteractionMessage(interaction, actionKey, author, target, w
 
   // GIF typé d'abord ; en cas d'échec on retombe sur le GIF classique, et on
   // explique pourquoi dans le pied de carte (clé absente ou rien trouvé).
+  // `exclure` : les URL du message d'origine, qu'une réponse ne ressort jamais.
   let gif = null;
   let noteType = null;
   if (type !== TYPE_DEFAUT) {
-    const typee = await fetchGifTypee(actionKey, type);
+    const typee = await fetchGifTypee(actionKey, type, exclure);
     if (typee?.url) gif = typee;
     else noteType = typee?.sansCle ? L.typeSansCle : L.typeIntrouvable;
   }
-  if (!gif) gif = await fetchGif(actionKey);
+  if (!gif) gif = await fetchGif(actionKey, exclure);
   const count = incrementCounter(author.id, target.id, counterKey);
 
   // Statistiques personnelles de l'auteur → badges par paliers, envoyés en MP.
@@ -616,7 +667,7 @@ const optionType = (o) =>
     .addChoices(...CHOIX_TYPE);
 
 module.exports = {
-  CATEGORIES_GIF, SOURCES_GIF, LOCALES, TYPES_GIF, ACTIONS_GIFUKAI, CHOIX_TYPE, requeteGif, typeExigeCle, fetchGifTypee, prefs,
+  CATEGORIES_GIF, SOURCES_GIF, LOCALES, TYPES_GIF, ACTIONS_GIFUKAI, CHOIX_TYPE, requeteGif, typeExigeCle, fetchGifTypee, fetchGif, prefs, urlsDuMessage,
   grade: GRADES.EVERYONE,
   public: true, // réponses visibles par tout le monde (pas d'éphémère)
   allowDm: true, // utilisable en message privé avec le bot
@@ -811,11 +862,13 @@ module.exports = {
         await suivre(interaction, { content: L.rejected(`<@${toId}>`, `<@${fromId}>`) });
         return;
       }
-      // « Rendre » : nouvelle interaction dans l'autre sens, boutons retirés de l'original.
+      // « Rendre » : nouvelle interaction dans l'autre sens, boutons retirés de
+      // l'original — et JAMAIS le même GIF que lui.
       const author = interaction.user;
       const target = await interaction.client.users.fetch(fromId);
+      const exclure = urlsDuMessage(interaction.message);
       await mettreAJour(interaction, { components: [] });
-      const payload = await buildInteractionMessage(interaction, actionKey, author, target, false, lang, type);
+      const payload = await buildInteractionMessage(interaction, actionKey, author, target, false, lang, type, { exclure });
       await suivre(interaction, payload);
     } catch (err) {
       console.error('Erreur interaction :', err);

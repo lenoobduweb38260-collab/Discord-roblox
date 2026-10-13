@@ -1767,5 +1767,15 @@
    "📖 Une sous-commande reservee au createur n'apparait plus dans /tuto ni /tutos"
   ],
   "retrait": []
+ },
+ {
+  "id": "interact-rendre-gif-2026-10cx",
+  "title": "/interact : rendre, mais pas avec la meme image",
+  "ajout": [],
+  "fix": [],
+  "amelioration": [
+   "🔁 **« Rendre » ne ressort jamais le GIF du message d'origine.** La reponse retire tant qu'elle tombe sur la meme image, passe a la source suivante, puis a la reserve — et prefere ne pas mettre d'image plutot que la meme. Valable pour les GIF classiques, Gifukai et GIPHY, que l'original soit une carte ou un ancien embed"
+  ],
+  "retrait": []
  }
 ]

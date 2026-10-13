@@ -1792,6 +1792,16 @@ const RELEASES = [
     fix: [],
     retrait: [],
   },
+  {
+    id: 'interact-rendre-gif-2026-10cx',
+    title: '/interact : rendre, mais pas avec la meme image',
+    amelioration: [
+      '🔁 **« Rendre » ne ressort jamais le GIF du message d\'origine.** La reponse retire tant qu\'elle tombe sur la meme image, passe a la source suivante, puis a la reserve — et prefere ne pas mettre d\'image plutot que la meme. Valable pour les GIF classiques, Gifukai et GIPHY, que l\'original soit une carte ou un ancien embed',
+    ],
+    ajout: [],
+    fix: [],
+    retrait: [],
+  },
 ];
 
 // Construit l'embed d'une note à partir d'une entrée { title, ajout, fix,
