@@ -1801,5 +1801,17 @@
   "retrait": [
    "🗑️ **`/interact preference` est retiree.** Le type de GIF se choisit a chaque interaction avec l'option `type`, facultative : sans elle, c'est hetero. Rien n'est memorise"
   ]
+ },
+ {
+  "id": "interact-prefs-purge-2026-10da",
+  "title": "/interact : la table des preferences est supprimee",
+  "ajout": [],
+  "fix": [
+   "🗑️ La table qui gardait le type de GIF choisi par chaque membre est **supprimee des bases existantes** au demarrage : rien ne reste de la sous-commande retiree",
+   "🎞️ La reecriture de la reserve GIPHY laisse intacte une adresse qu'elle ne sait pas normaliser, au lieu de la supprimer",
+   "⚠️ Quand la source typee n'avait que l'image d'origine mais que les sources classiques sont en panne, le pied dit « indisponible » : une panne reste une panne"
+  ],
+  "amelioration": [],
+  "retrait": []
  }
 ]

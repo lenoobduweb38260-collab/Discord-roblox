@@ -17,7 +17,7 @@ const RACINE = path.join(__dirname, '..', 'src');
 // Ce qui n'est JAMAIS du texte affiché.
 const TECHNIQUE = [
   /^[a-z0-9_:.\-]+$/i,                    // identifiants, clés, routes
-  /^(SELECT|INSERT|UPDATE|DELETE|CREATE|ALTER|PRAGMA)\b/i,
+  /^(SELECT|INSERT|UPDATE|DELETE|CREATE|ALTER|DROP|PRAGMA)\b/i,
   // Un MORCEAU de requête : `\` = ? WHERE guild_id = ?\`` ne commence par aucun
   // mot-clé, mais un `= ?` ne s'écrit jamais dans une phrase.
   /=\s*\?/,

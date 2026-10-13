@@ -449,8 +449,6 @@ CREATE TABLE IF NOT EXISTS gif_cache (
   PRIMARY KEY (categorie, url)
 );
 
--- 🏳️‍🌈 /interact : le type d'animation prefere de chaque membre (hetero par
--- defaut) — pour que les GIF correspondent a tout le monde sans le redire.
 -- 🔢 Matricules RP : le numero qui suit une personne dans le RP.
 -- Relie les trois facons de la designer — matricule, pseudo du jeu, compte
 -- Discord — pour qu'aucune ne soit un cul-de-sac. Le retrait garde la ligne
@@ -611,7 +609,7 @@ for (const column of [
   'embed_author INTEGER',               // 1 = ligne d'auteur avec l'icône du serveur
   'embed_ligne INTEGER',                // 1 = filet sous le titre
   'embed_filet_taille INTEGER',         // longueur du filet (6 à 30, défaut 16)
-  'embed_fusion INTEGER',               // 1 = champs refondus en sections (défaut)
+  'embed_fusion INTEGER',               // 1 = champs refondus en sections, par défaut
   'embed_cartes INTEGER',               // 1 = cartes sans bordure au lieu d'embeds (défaut)
   'embed_bordure TEXT',                 // 'aucune' (défaut) | 'accent' : la barre colorée de gauche
   'embed_titre TEXT',                   // 'grand' (défaut, # ) | 'moyen' (##) : taille du titre de carte
@@ -671,6 +669,16 @@ for (const colonne of ['claimed_by TEXT', 'claimed_at TEXT']) {
   try {
     db.exec(`ALTER TABLE tickets ADD COLUMN ${colonne}`);
   } catch {}
+}
+
+// 🗑️ /interact preference n'existe plus (v2.0.219) : la table qui gardait le
+// type de GIF choisi par chaque membre est supprimée des bases existantes —
+// c'était une donnée déclarée par membre, elle ne doit pas traîner sans
+// qu'aucune commande ne permette de l'effacer.
+try {
+  db.exec('DROP TABLE IF EXISTS interact_prefs');
+} catch (err) {
+  console.warn(`⚠️ Table interact_prefs non supprimée : ${err.message}`);
 }
 
 // 🎧 Clôture d'une attente vocale : la carte finale reste affichée un court

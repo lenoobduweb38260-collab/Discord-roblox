@@ -304,13 +304,17 @@ try {
   if (signees.length) {
     const poser = db.prepare('INSERT OR IGNORE INTO gif_cache (categorie, url, anime, at) VALUES (?, ?, ?, ?)');
     const oter = db.prepare('DELETE FROM gif_cache WHERE categorie = ? AND url = ?');
+    let reecrites = 0;
     db.transaction(() => {
       for (const l of signees) {
-        poser.run(l.categorie, urlStable(l.url), l.anime, l.at);
+        const stable = urlStable(l.url);
+        if (stable === l.url) continue; // adresse inconnue : on la laisse telle quelle
+        poser.run(l.categorie, stable, l.anime, l.at);
         oter.run(l.categorie, l.url);
+        reecrites++;
       }
     })();
-    console.log(`🎞️ Réserve GIPHY : ${signees.length} adresse(s) signée(s) réécrite(s) en adresse stable.`);
+    if (reecrites) console.log(`🎞️ Réserve GIPHY : ${reecrites} adresse(s) signée(s) réécrite(s) en adresse stable.`);
   }
 } catch (err) {
   console.warn(`⚠️ Réserve GIPHY non normalisée : ${err.message}`);
@@ -661,7 +665,10 @@ async function buildInteractionMessage(interaction, actionKey, author, target, w
   if (!gif?.url) {
     // Sans image du tout, une note qui promet « GIF classique » mentirait :
     // une seule ligne, qui dit pourquoi il n'y en a pas.
-    pied.push(gif?.memeSeulement || noteType === L.typeMeme ? L.memeGif : L.noGif);
+    // Et « une seule animation » ne se dit que si les sources classiques ont
+    // bien répondu : si elles sont en panne, c'est une panne, même quand la
+    // source typée, elle, n'avait que l'original.
+    pied.push(gif?.memeSeulement ? L.memeGif : L.noGif);
   } else if (noteType) {
     pied.push(noteType);
   }

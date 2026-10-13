@@ -21432,5 +21432,12 @@
     "es": "Modificado",
     "pl": "Zmieniono",
     "ru": "Изменён"
+  },
+  "⚠️ Table interact_prefs non supprimée : ": {
+    "en": "⚠️ Table interact_prefs not dropped: ",
+    "de": "⚠️ Tabelle interact_prefs nicht gelöscht: ",
+    "es": "⚠️ Tabla interact_prefs no eliminada: ",
+    "pl": "⚠️ Tabela interact_prefs nie została usunięta: ",
+    "ru": "⚠️ Таблица interact_prefs не удалена: "
   }
 }
