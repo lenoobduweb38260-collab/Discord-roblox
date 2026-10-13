@@ -27,7 +27,13 @@ const silence = () => {}; // les avertissements de repli sont attendus ici
 const warnOrig = console.warn;
 
 // ----- Faux réseau : Gifukai, GIPHY, nekos.best -----
-const etat = { gifukai: 'ok', giphy: 'ok', giphyNombre: 2, nekos: ['https://nekos.best/kiss.gif'], nekosIndex: 0, waifu: null };
+const etat = {
+  gifukai: 'ok', gifukaiUrls: ['https://cdn.gifukai.com/ff-kiss.gif'], gifukaiIndex: 0,
+  giphy: 'ok', giphyNombre: 2, giphyIds: null, giphyReponse: 0,
+  nekos: ['https://nekos.best/kiss.gif'], nekosIndex: 0, waifu: null, otaku: null,
+};
+// Une URL GIPHY telle que l'API la rend : jeton de chemin + cid PAR RÉPONSE.
+const urlGiphy = (id, reponse) => `https://media2.giphy.com/media/v1.Y2lkPTc5MGI3NjEx${reponse}/${id}/giphy.gif?cid=790b7611${reponse}&ep=v1_gifs_search&rid=giphy.gif&ct=g`;
 const appels = [];
 const vraiFetch = global.fetch;
 global.fetch = async (url) => {
@@ -36,16 +42,18 @@ global.fetch = async (url) => {
   if (u.includes('api.gifukai.com')) {
     if (etat.gifukai === 'panne') return { ok: false, status: 503 };
     if (etat.gifukai === 'vide') return { ok: false, status: 404 };
-    return { ok: true, json: async () => ({ url: 'https://cdn.gifukai.com/ff-kiss.gif', anime: 'Bloom Into You' }) };
+    const url = etat.gifukaiUrls[etat.gifukaiIndex++ % etat.gifukaiUrls.length];
+    return { ok: true, json: async () => ({ url, anime: 'Bloom Into You' }) };
   }
   if (u.includes('api.giphy.com')) {
     if (etat.giphy === 'panne') return { ok: false, status: 500 };
     if (etat.giphy === 'quota') return { ok: false, status: 429 };
     if (etat.giphy === 'vide' || (etat.giphy === 'vide-pg' && u.includes('rating=pg&'))) return { ok: true, json: async () => ({ data: [] }) };
-    const data = [];
-    for (let k = 0; k < etat.giphyNombre; k++) {
-      data.push(k % 2 ? { images: { downsized: { url: `https://media.giphy.com/d${k}.gif` } } } : { images: { original: { url: `https://media.giphy.com/o${k}.gif` } } });
-    }
+    const reponse = ++etat.giphyReponse;
+    const ids = etat.giphyIds || Array.from({ length: etat.giphyNombre }, (_, k) => `gif${k}`);
+    const data = ids.map((id, k) => (k % 2
+      ? { images: { downsized: { url: urlGiphy(id, reponse) } } }
+      : { images: { original: { url: urlGiphy(id, reponse) } } }));
     return { ok: true, json: async () => ({ data }) };
   }
   if (u.includes('nekos.best')) {
@@ -54,6 +62,9 @@ global.fetch = async (url) => {
   }
   if (u.includes('api.waifu.pics') && etat.waifu) {
     return { ok: true, json: async () => ({ url: etat.waifu }) };
+  }
+  if (u.includes('api.otakugifs.xyz') && etat.otaku) {
+    return { ok: true, json: async () => ({ url: etat.otaku }) };
   }
   return { ok: false, status: 404 };
 };
@@ -138,7 +149,7 @@ const texte = (o) => JSON.stringify(o);
     process.env.GIPHY_KEY = 'cle-test';
     vider();
     const g = await I.fetchGifTypee('hug', 'catgirl');
-    V('GIF GIPHY reçu', g?.url?.startsWith('https://media.giphy.com/') && g.source === 'giphy', texte(g));
+    V('GIF GIPHY reçu, URL stabilisée (sans jeton de réponse)', /^https:\/\/media2\.giphy\.com\/media\/gif\d+\/giphy\.gif$/.test(g?.url || '') && g.source === 'giphy', texte(g));
     const u = derniersAppels('giphy')[0] || '';
     V('recherche anime catgirl hug, 50 résultats, filtre pg', u.includes('q=anime%20catgirl%20hug') && u.includes('limit=50') && u.includes('rating=pg&') && u.includes('api_key=cle-test'), u);
     V('tous les résultats mis en réserve', enReserve('hug@catgirl@giphy') === 2, String(enReserve('hug@catgirl@giphy')));
@@ -222,7 +233,7 @@ const texte = (o) => JSON.stringify(o);
     it = fausse({ sub: 'hug', strings: { type: 'catgirl' } });
     await I.execute(it);
     t = texte(it.reponses[0]);
-    V('sans clé mais réserve garnie : on ressert la réserve, mention GIPHY comprise', t.includes('media.giphy.com') && t.includes('Powered by GIPHY'), t);
+    V('sans clé mais réserve garnie : on ressert la réserve, mention GIPHY comprise', t.includes('giphy.com/media/') && t.includes('Powered by GIPHY'), t);
 
     // Avec clé : mention GIPHY.
     process.env.GIPHY_KEY = 'cle-test';
@@ -267,30 +278,52 @@ const texte = (o) => JSON.stringify(o);
     const original = (url, carte = false) => (carte
       ? { embeds: [], components: [{ type: 17, components: [{ type: 12, items: [{ media: { url, proxy_url: 'https://media.discordapp.net/x' } }] }] }], flags: 32768 }
       : { embeds: [{ toJSON: () => ({ image: { url }, footer: { text: 'x' } }) }], components: [], flags: 0 });
+    const viderReserve = (motif) => db.prepare('DELETE FROM gif_cache WHERE categorie LIKE ?').run(motif);
+    const garnir = (categorie, url) => db.prepare('INSERT OR IGNORE INTO gif_cache (categorie, url, anime, at) VALUES (?, ?, NULL, ?)').run(categorie, url, '2026-10-13');
+
     V('urlsDuMessage lit l\'image d\'un embed', I.urlsDuMessage(original(A)).has(A));
     V('… et la galerie d\'une carte, URL d\'origine et proxy', I.urlsDuMessage(original(A, true)).has(A) && I.urlsDuMessage(original(A, true)).has('https://media.discordapp.net/x'));
+    const vignette = { embeds: [{ toJSON: () => ({ thumbnail: { url: 'https://x/t.gif' } }) }], components: [{ type: 17, components: [{ type: 9, accessory: { type: 11, media: { url: 'https://x/acc.gif' } }, components: [] }] }] };
+    V('… la vignette d\'un embed et l\'accessoire d\'une section', I.urlsDuMessage(vignette).has('https://x/t.gif') && I.urlsDuMessage(vignette).has('https://x/acc.gif'));
     V('… sans planter sur un message vide', I.urlsDuMessage(null).size === 0 && I.urlsDuMessage({}).size === 0);
+    V('deux URL GIPHY du même GIF ont la même clé, pas deux GIF différents',
+      I.cleGif(urlGiphy('abc', 1)) === I.cleGif(urlGiphy('abc', 2)) && I.cleGif(urlGiphy('abc', 1)) !== I.cleGif(urlGiphy('abd', 1)) && I.cleGif('https://nekos.best/a.gif?x=1') === 'https://nekos.best/a.gif');
+    V('urlStable retire le jeton de réponse GIPHY et laisse les autres URL', I.urlStable(urlGiphy('abc', 7)) === 'https://media2.giphy.com/media/abc/giphy.gif' && I.urlStable(A) === A);
 
-    // La source alterne A, B : si elle tombe d'abord sur A, on retire.
+    // La source alterne A, A, B : on retire jusqu'à un GIF différent.
     etat.nekos = [A, A, B]; etat.nekosIndex = 0; vider();
     const g1 = await I.fetchGif('hug', new Set([A]));
-    V('la source est retirée jusqu\'à un GIF différent', g1?.url === B && derniersAppels('nekos').length === 3, texte(g1) + ' ' + appels.length);
+    V('la source est retirée jusqu\'à un GIF différent (3 appels)', g1?.url === B && derniersAppels('nekos').length === 3, texte(g1) + ' ' + appels.length);
+
+    // Premier tirage déjà libre : un seul appel, comme sans exclusion.
+    etat.nekos = [B]; etat.nekosIndex = 0; vider();
+    const g1b = await I.fetchGif('hug', new Set([A]));
+    V('premier tirage libre → un seul appel', g1b?.url === B && derniersAppels('nekos').length === 1);
+    vider();
+    await I.fetchGif('hug', new Set());
+    V('ensemble d\'exclusion vide → un seul appel', derniersAppels('nekos').length === 1);
 
     // La source ne sait donner que A : on passe à la suivante (waifu.pics).
     etat.nekos = [A]; etat.nekosIndex = 0; etat.waifu = 'https://i.waifu.pics/c.gif'; vider();
     const g2 = await I.fetchGif('hug', new Set([A]));
-    V('après trois A, la source suivante prend le relais', g2?.url === 'https://i.waifu.pics/c.gif' && derniersAppels('nekos').length === 3, texte(g2));
+    V('après trois A, la source suivante prend le relais', g2?.url === 'https://i.waifu.pics/c.gif' && derniersAppels('nekos').length === 3 && derniersAppels('waifu').length === 1, texte(g2));
 
-    // Toutes les sources ne donnent que A : la réserve (qui a vu B et C) sert.
-    etat.waifu = A; vider();
-    const g3 = await I.fetchGif('hug', new Set([A]));
-    V('sources bloquées sur A → un autre GIF de la réserve', g3?.reserve === true && g3.url !== A, texte(g3));
+    // Toutes les sources ne donnent que A ; la réserve contient A et B : B, toujours.
+    viderReserve('hug'); garnir('hug', A); garnir('hug', B);
+    etat.nekos = [A]; etat.nekosIndex = 0; etat.waifu = A; vider();
+    let jamaisA = true;
+    for (let k = 0; k < 20; k++) {
+      const g3 = await I.fetchGif('hug', new Set([A]));
+      if (!(g3?.reserve === true && g3.url === B)) jamaisA = false;
+    }
+    V('sources bloquées sur A → B depuis la réserve, 20 fois sur 20', jamaisA);
+    V('… avec 3 appels nekos, 3 waifu, 1 otakugifs par tentative', derniersAppels('nekos').length === 60 && derniersAppels('waifu').length === 60 && derniersAppels('otakugifs').length === 20, [derniersAppels('nekos').length, derniersAppels('waifu').length, derniersAppels('otakugifs').length].join('/'));
 
-    // Rien d'autre que A nulle part : plutôt pas de GIF que le même.
-    db.prepare("DELETE FROM gif_cache WHERE categorie = 'bite' ").run();
+    // Rien d'autre que A nulle part : pas de GIF, et ce n'est PAS une panne.
+    viderReserve('bite'); garnir('bite', A);
     etat.nekos = [A]; etat.nekosIndex = 0; etat.waifu = A; vider();
     const g4 = await I.fetchGif('bite', new Set([A]));
-    V('aucune alternative → aucun GIF, jamais le même', g4 === null, texte(g4));
+    V('aucune alternative → { memeSeulement }, jamais le même', g4?.memeSeulement === true && !g4.url, texte(g4));
     etat.waifu = null;
 
     // Le chemin complet : bouton « Rendre » sur un message dont l'image est A.
@@ -307,20 +340,82 @@ const texte = (o) => JSON.stringify(o);
     t = texte(it.suivis[0] || {});
     V('réponse « Rendre » (carte d\'origine) : GIF B, pas A', t.includes(B) && !t.includes(A), t);
 
-    // Typé : Gifukai ne sait rendre que ff-kiss.gif, déjà dans l'original →
-    // on retire trois fois, puis GIF classique avec la note « introuvable ».
-    etat.nekos = [B]; etat.nekosIndex = 0; vider();
-    it = fausse({ user: 'u2', customId: 'itx:kiss:u1:u2:lesbienne' });
-    it.message = original('https://cdn.gifukai.com/ff-kiss.gif');
-    db.prepare("DELETE FROM gif_cache WHERE categorie LIKE 'kiss@lesbienne@%'").run();
+    // Bisou sur la joue : une seule source (otakugifs) qui n'a que A, réserve = A.
+    viderReserve('peck'); garnir('peck', A);
+    etat.otaku = A; vider();
+    it = fausse({ user: 'u2', customId: 'itx:peck:u1:u2' });
+    it.message = original(A);
     await I.handleButton(it);
     t = texte(it.suivis[0] || {});
-    V('typé : Gifukai retiré 3 fois, puis repli classique différent', derniersAppels('gifukai').length === 3 && t.includes(B) && !t.includes('ff-kiss.gif'), t + ' ' + appels.join(' '));
+    V('seule image = l\'original → réponse sans image, note « une seule animation », pas « indisponible »',
+      !t.includes(A) && t.includes(I.LOCALES.fr.memeGif) && !t.includes(I.LOCALES.fr.noGif), t);
+    etat.otaku = null;
 
-    // Sans exclusion (première interaction), une seule requête, comme avant.
-    etat.nekos = [A]; etat.nekosIndex = 0; vider();
-    await I.fetchGif('hug');
-    V('sans message d\'origine, un seul appel réseau', derniersAppels('nekos').length === 1);
+    // Typé Gifukai : 1er tirage = l'original, 2e différent → renvoyé, rangé, « Type : Lesbienne ».
+    const FF1 = 'https://cdn.gifukai.com/ff-kiss.gif', FF2 = 'https://cdn.gifukai.com/ff-kiss-2.gif';
+    viderReserve('kiss@lesbienne@%');
+    etat.gifukaiUrls = [FF1, FF2]; etat.gifukaiIndex = 0; vider();
+    it = fausse({ user: 'u2', customId: 'itx:kiss:u1:u2:lesbienne' });
+    it.message = original(FF1);
+    await I.handleButton(it);
+    t = texte(it.suivis[0] || {});
+    V('typé : retiré une fois, le 2e GIF Gifukai est renvoyé avec « Type : Lesbienne »', derniersAppels('gifukai').length === 2 && t.includes(FF2) && !t.includes(FF1) && t.includes('Type : Lesbienne • Anime : Bloom Into You'), t);
+    V('… et rangé en réserve typée', enReserve('kiss@lesbienne@gifukai') === 1 && db.prepare('SELECT url FROM gif_cache WHERE categorie = ?').get('kiss@lesbienne@gifukai').url === FF2);
+
+    // Typé Gifukai qui ne connaît que l'original, réserve = l'original : repli classique différent,
+    // note « le seul GIF de ce type était déjà dans le message » — pas « clé GIPHY ».
+    viderReserve('kiss@lesbienne@%'); garnir('kiss@lesbienne@gifukai', FF1);
+    etat.gifukaiUrls = [FF1]; etat.gifukaiIndex = 0; etat.nekos = [B]; etat.nekosIndex = 0; vider();
+    it = fausse({ user: 'u2', customId: 'itx:kiss:u1:u2:lesbienne' });
+    it.message = original(FF1);
+    await I.handleButton(it);
+    t = texte(it.suivis[0] || {});
+    V('typé : Gifukai retiré 3 fois, réserve = l\'original → GIF classique différent', derniersAppels('gifukai').length === 3 && t.includes(B) && !t.includes(FF1), t + ' ' + appels.join(' '));
+    V('… avec la note « déjà dans le message », jamais « clé GIPHY » ni « introuvable »', t.includes(I.LOCALES.fr.typeMeme) && !t.includes('clé GIPHY') && !t.includes(I.LOCALES.fr.typeIntrouvable), t);
+    etat.gifukaiUrls = [FF1]; etat.gifukaiIndex = 0;
+
+    // GIPHY, avec clé : le même GIF revient sous un autre cid → reconnu et écarté.
+    process.env.GIPHY_KEY = 'cle-test';
+    viderReserve('hug@catgirl@%');
+    etat.giphyIds = ['same', 'autre']; vider();
+    it = fausse({ sub: 'hug', strings: { type: 'catgirl' } });
+    await I.execute(it);
+    const premier = texte(it.reponses[0]).match(/https:\/\/media2\.giphy\.com\/media\/[A-Za-z0-9]+\/giphy\.gif/)?.[0];
+    V('première interaction GIPHY : URL stable envoyée', Boolean(premier), texte(it.reponses[0]).slice(0, 300));
+    let jamaisLeMeme = true;
+    for (let k = 0; k < 20; k++) {
+      const g = await I.fetchGifTypee('hug', 'catgirl', new Set([urlGiphy('same', 999)]));
+      if (!g?.url || I.cleGif(g.url) === 'giphy:same') jamaisLeMeme = false;
+    }
+    V('recherche fraîche : le GIF « same » (nouveau cid) est écarté 20 fois sur 20', jamaisLeMeme);
+    V('la réserve ne stocke qu\'une entrée par GIF malgré les cid différents', enReserve('hug@catgirl@giphy') === 2, String(enReserve('hug@catgirl@giphy')));
+
+    // Réserve garnie (≥ 10) et recherche récente : servie SANS appel, jamais l'original.
+    viderReserve('pat@catboy@%');
+    etat.giphyIds = Array.from({ length: 12 }, (_, k) => `c${k}`); vider();
+    await I.fetchGifTypee('pat', 'catboy');
+    const exclureC0 = new Set([urlGiphy('c0', 123)]);
+    jamaisLeMeme = true; vider();
+    for (let k = 0; k < 30; k++) {
+      const g = await I.fetchGifTypee('pat', 'catboy', exclureC0);
+      if (!g?.url || I.cleGif(g.url) === 'giphy:c0' || g.source !== 'giphy') jamaisLeMeme = false;
+    }
+    V('réserve GIPHY garnie : 30 « Rendre » sans appel réseau, jamais c0', jamaisLeMeme && derniersAppels('giphy').length === 0, String(derniersAppels('giphy').length));
+
+    // Recherche à résultat unique = l'original : pg puis pg-13, puis { introuvable, memeSeulement }.
+    viderReserve('kill@femboy@%');
+    etat.giphyIds = ['unique']; vider();
+    const g5 = await I.fetchGifTypee('kill', 'femboy', new Set([urlGiphy('unique', 5)]));
+    V('résultat unique = l\'original → essai pg-13 puis « seulement le même »', g5?.memeSeulement === true && derniersAppels('giphy').length === 2, texte(g5) + ' ' + derniersAppels('giphy').length);
+    etat.giphyIds = null;
+    delete process.env.GIPHY_KEY;
+
+    // Un ancien bouton sans type marche toujours.
+    etat.nekos = [A, B]; etat.nekosIndex = 0; vider();
+    it = fausse({ user: 'u2', customId: 'itx:hug:u1:u2' });
+    it.message = original(A);
+    await I.handleButton(it);
+    V('ancien bouton sans type → réponse hétéro différente, sans erreur', it.suivis.length === 1 && texte(it.suivis[0]).includes(B) && !texte(it.suivis[0]).includes('Type :'), texte(it.suivis[0]));
   }
 
   console.warn = warnOrig;

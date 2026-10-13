@@ -1802,6 +1802,17 @@ const RELEASES = [
     fix: [],
     retrait: [],
   },
+  {
+    id: 'interact-rendre-gif-2026-10cy',
+    title: '/interact : le meme GIF GIPHY reconnu sous toutes ses adresses',
+    fix: [
+      '🔁 **« Rendre » pouvait ressortir un GIF GIPHY identique** : GIPHY signe chaque reponse d\'un jeton, si bien que la meme image revenait sous une adresse differente et passait le filtre. Les GIF sont desormais reconnus par leur identifiant, et ranges en reserve sous une adresse stable (plus de doublons)',
+      '📝 Quand la seule animation disponible est celle du message d\'origine, le pied de carte le dit — au lieu de « GIF momentanement indisponible » ou « ce type demande une cle GIPHY », qui accusaient une panne ou une cle manquante inexistantes',
+    ],
+    ajout: [],
+    amelioration: [],
+    retrait: [],
+  },
 ];
 
 // Construit l'embed d'une note à partir d'une entrée { title, ajout, fix,

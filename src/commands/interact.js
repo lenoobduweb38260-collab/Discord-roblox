@@ -56,6 +56,8 @@ const LOCALES = {
     prefOk: (t) => `✅ Préférence enregistrée : vos interactions utiliseront des GIF **${t}** par défaut.\n-# Vous pouvez toujours choisir un autre type au cas par cas avec l'option \`type\`.`,
     prefReset: '↩️ Préférence remise par défaut : GIF hétéro.',
     prefSansCle: '\n-# ⚠️ Ce type demande une clé GIPHY que ce bot n\'a pas encore : en attendant, ses GIF restent classiques.',
+    memeGif: '🔁 Une seule animation existe ici — on ne la remet pas deux fois',
+    typeMeme: '🔁 Le seul GIF de ce type était déjà dans le message : GIF classique',
   },
   en: {
     actions: {
@@ -89,6 +91,8 @@ const LOCALES = {
     prefOk: (t) => `✅ Preference saved: your interactions will use **${t}** GIFs by default.\n-# You can still pick another type each time with the \`type\` option.`,
     prefReset: '↩️ Preference reset to default: straight GIFs.',
     prefSansCle: '\n-# ⚠️ This type needs a GIPHY key this bot does not have yet: until then, its GIFs stay classic.',
+    memeGif: '🔁 Only one GIF exists here — not showing it twice',
+    typeMeme: '🔁 The only GIF of this type was already in the message: classic GIF',
   },
   es: {
     actions: {
@@ -122,6 +126,8 @@ const LOCALES = {
     prefOk: (t) => `✅ Preferencia guardada: tus interacciones usarán GIF **${t}** por defecto.\n-# Siempre puedes elegir otro tipo cada vez con la opción \`type\`.`,
     prefReset: '↩️ Preferencia restablecida: GIF hetero.',
     prefSansCle: '\n-# ⚠️ Este tipo necesita una clave GIPHY que este bot aún no tiene: mientras tanto, sus GIF siguen siendo clásicos.',
+    memeGif: '🔁 Solo existe un GIF aquí — no se repite',
+    typeMeme: '🔁 El único GIF de este tipo ya estaba en el mensaje: GIF clásico',
   },
   de: {
     actions: {
@@ -155,6 +161,8 @@ const LOCALES = {
     prefOk: (t) => `✅ Einstellung gespeichert: deine Interaktionen nutzen standardmäßig **${t}**-GIFs.\n-# Mit der Option \`type\` kannst du jederzeit einen anderen Typ wählen.`,
     prefReset: '↩️ Einstellung zurückgesetzt: Hetero-GIFs.',
     prefSansCle: '\n-# ⚠️ Dieser Typ braucht einen GIPHY-Schlüssel, den dieser Bot noch nicht hat: bis dahin bleiben seine GIFs klassisch.',
+    memeGif: '🔁 Hier gibt es nur ein GIF — es wird nicht zweimal gezeigt',
+    typeMeme: '🔁 Das einzige GIF dieses Typs war schon in der Nachricht: klassisches GIF',
   },
   ru: {
     actions: {
@@ -188,6 +196,8 @@ const LOCALES = {
     prefOk: (t) => `✅ Настройка сохранена: ваши взаимодействия по умолчанию будут использовать GIF **${t}**.\n-# Другой тип всегда можно выбрать через опцию \`type\`.`,
     prefReset: '↩️ Настройка сброшена: обычные (гетеро) GIF.',
     prefSansCle: '\n-# ⚠️ Для этого типа нужен ключ GIPHY, которого у этого бота пока нет: до тех пор его GIF остаются обычными.',
+    memeGif: '🔁 Здесь только один GIF — дважды не показываем',
+    typeMeme: '🔁 Единственный GIF этого типа уже был в сообщении: обычный GIF',
   },
 };
 
@@ -276,7 +286,31 @@ const gifsAuHasardTypee = db.prepare(
 // source reçoit donc un ensemble d'URL à écarter, et retire au hasard (ou
 // passe à la source suivante) tant qu'elle tombe dessus.
 const ESSAIS_SAUF = 3;
-const estExclu = (url, exclure) => Boolean(exclure && exclure.size && url && exclure.has(url));
+
+// 🔑 La clé sous laquelle deux URL désignent LE MÊME GIF.
+//
+// GIPHY signe chaque réponse : `…/media/v1.<jeton>/<id>/giphy.gif?cid=<réponse>…`.
+// Deux recherches qui rapportent le même GIF donnent deux chaînes
+// différentes — comparer les URL telles quelles ne reconnaîtrait jamais
+// l'image d'origine, et la réserve se remplirait de doublons. La clé est donc
+// l'identifiant du chemin pour giphy.com, l'URL sans paramètres ailleurs.
+const ID_GIPHY = /^https?:\/\/(?:[a-z0-9-]+\.)*giphy\.com\/media\/(?:v\d+\.[^/]+\/)?([A-Za-z0-9]+)\//i;
+function cleGif(url) {
+  const u = String(url || '');
+  const giphy = u.match(ID_GIPHY);
+  if (giphy) return `giphy:${giphy[1]}`;
+  return u.split(/[?#]/)[0];
+}
+// L'URL sous laquelle on AFFICHE et on RANGE un GIF GIPHY : stable, sans
+// jeton de réponse — Discord la lit aussi bien, et la réserve ne la stocke
+// qu'une fois.
+function urlStable(url) {
+  const u = String(url || '');
+  const m = u.match(/^(https?:\/\/(?:[a-z0-9-]+\.)*giphy\.com)\/media\/(?:v\d+\.[^/]+\/)?([A-Za-z0-9]+)\/([^/?#]+)/i);
+  return m ? `${m[1]}/media/${m[2]}/${m[3]}` : u;
+}
+const clesExclues = (urls) => new Set([...(urls || [])].map(cleGif));
+const estExclu = (url, exclure) => Boolean(exclure && exclure.size && url && exclure.has(cleGif(url)));
 const premierLibre = (liste, exclure) => liste.find((g) => g?.url && !estExclu(g.url, exclure)) || null;
 
 // Toutes les URL d'un message du bot — embed (image, vignette) ou carte
@@ -439,7 +473,8 @@ async function chercherGifukai(action, pairing, exclure = null) {
       return null;
     }
   }
-  return null;
+  // La source a répondu, mais toujours avec l'image à écarter.
+  return { exclu: true };
 }
 
 // GIPHY : 100 recherches par heure sur une clé gratuite. Une recherche
@@ -476,7 +511,7 @@ async function chercherGiphy(action, type, cle, exclure = null) {
       }
       const d = await res.json();
       const liste = (Array.isArray(d.data) ? d.data : [])
-        .map((g) => ({ url: g.images?.original?.url || g.images?.downsized?.url, anime: null }))
+        .map((g) => ({ url: urlStable(g.images?.original?.url || g.images?.downsized?.url), anime: null }))
         .filter((g) => urlAffichable(g.url));
       if (!liste.length) {
         console.warn(`⚠️ GIF GIPHY (${q}, ${rating}) : aucun résultat`);
@@ -497,34 +532,47 @@ async function chercherGiphy(action, type, cle, exclure = null) {
 // (→ sources classiques) ; { sansCle: true } quand seule une clé GIPHY
 // absente aurait pu servir ce type ; { introuvable: true } si tout a échoué et
 // que la réserve est vide.
+// Rend aussi { introuvable: true, memeSeulement: true } quand le SEUL GIF
+// connu de ce type est celui qu'on devait écarter : ce n'est ni une panne ni
+// une clé manquante, et le pied de carte doit le dire tel quel.
 async function fetchGifTypee(action, type, exclure = null) {
   const def = TYPES_GIF[type];
   if (!def) return null;
+  exclure = exclure?.size ? clesExclues(exclure) : null; // clés normalisées (idempotent)
   const cle = cleGiphy();
-  if (def.pairing) {
+  // Une source gratuite existe pour ce couple (action, type) ?
+  const gratuite = Boolean(def.pairing && ACTIONS_GIFUKAI[action]);
+  let memeSeulement = false;
+  if (gratuite) {
     const gif = await chercherGifukai(action, def.pairing, exclure);
-    if (gif) {
+    if (gif?.url) {
       memoriserGif(`${action}@${type}@gifukai`, gif);
       return gif;
     }
+    if (gif?.exclu) memeSeulement = true;
   }
   if (cle) {
     const gif = await chercherGiphy(action, type, cle, exclure);
     if (gif) return gif;
   }
-  const secours = premierLibre(gifsAuHasardTypee.all(`${action}@${type}@%`), exclure);
+  const candidats = gifsAuHasardTypee.all(`${action}@${type}@%`);
+  const secours = premierLibre(candidats, exclure);
   if (secours?.url) {
     console.warn(`⚠️ Sources typées HS pour « ${action} / ${type} » — GIF repris de la réserve.`);
     return { url: secours.url, anime: secours.anime || null, source: String(secours.categorie).split('@')[2] || null, reserve: true };
   }
-  if (!cle) return { sansCle: true };
+  if (candidats.length) memeSeulement = true;
+  if (memeSeulement) return { introuvable: true, memeSeulement: true };
+  if (!cle && !gratuite) return { sansCle: true };
   return { introuvable: true };
 }
 
 async function fetchGif(category, exclure = null) {
+  exclure = exclure?.size ? clesExclues(exclure) : null; // clés normalisées (idempotent)
   const pistes = CATEGORIES_GIF[category] || [['nekos', category], ['waifu', category], ['otaku', category]];
   const sources = pistes.map(([cle, cat]) => ({ name: SOURCES_GIF[cle].nom, url: SOURCES_GIF[cle].url(cat), parse: SOURCES_GIF[cle].parse }));
   const essais = exclure?.size ? ESSAIS_SAUF : 1;
+  let memeSeulement = false; // une source a répondu, mais rien d'autre que l'image à écarter
   for (const source of sources) {
     for (let essai = 0; essai < essais; essai++) {
       try {
@@ -542,7 +590,7 @@ async function fetchGif(category, exclure = null) {
           break;
         }
         memoriserGif(category, gif);
-        if (estExclu(gif.url, exclure)) continue; // le même GIF que l'original : on retire
+        if (estExclu(gif.url, exclure)) { memeSeulement = true; continue; } // le même GIF : on retire
         return gif;
       } catch (err) {
         console.warn(`⚠️ GIF ${source.name} (${category}) : ${err.message}`);
@@ -554,10 +602,17 @@ async function fetchGif(category, exclure = null) {
   // Les trois sources sont tombées (ou ne donnent que l'image à écarter) : on
   // ressert une image déjà vue plutôt que de rendre une animation sans
   // animation.
-  const secours = premierLibre(gifsAuHasard.all(category), exclure);
+  const candidats = gifsAuHasard.all(category);
+  const secours = premierLibre(candidats, exclure);
   if (secours?.url) {
     console.warn(`⚠️ Sources HS pour « ${category} » — GIF repris de la réserve.`);
     return { url: secours.url, anime: secours.anime || null, reserve: true };
+  }
+  if (memeSeulement || candidats.length) {
+    // Tout ce qui existe, c'est l'image à écarter : plutôt pas d'image que
+    // la même — et le pied de carte dira que ce n'est pas une panne.
+    console.warn(`ℹ️ « ${category} » : seul le GIF à écarter est disponible — réponse sans image.`);
+    return { memeSeulement: true };
   }
   console.warn(`⚠️ Aucun GIF trouvé pour « ${category} » — les 3 sources ont échoué et la réserve est vide.`);
   return null;
@@ -580,14 +635,16 @@ async function buildInteractionMessage(interaction, actionKey, author, target, w
   // GIF typé d'abord ; en cas d'échec on retombe sur le GIF classique, et on
   // explique pourquoi dans le pied de carte (clé absente ou rien trouvé).
   // `exclure` : les URL du message d'origine, qu'une réponse ne ressort jamais.
+  exclure = exclure?.size ? clesExclues(exclure) : null;
   let gif = null;
   let noteType = null;
   if (type !== TYPE_DEFAUT) {
     const typee = await fetchGifTypee(actionKey, type, exclure);
     if (typee?.url) gif = typee;
+    else if (typee?.memeSeulement) noteType = L.typeMeme;
     else noteType = typee?.sansCle ? L.typeSansCle : L.typeIntrouvable;
   }
-  if (!gif) gif = await fetchGif(actionKey, exclure);
+  if (!gif?.url) gif = await fetchGif(actionKey, exclure);
   const count = incrementCounter(author.id, target.id, counterKey);
 
   // Statistiques personnelles de l'auteur → badges par paliers, envoyés en MP.
@@ -607,7 +664,7 @@ async function buildInteractionMessage(interaction, actionKey, author, target, w
   const pied = [];
   if (type !== TYPE_DEFAUT && !noteType) pied.push(`${L.typeNote}${L.types[type]}`);
   if (gif?.anime) pied.push(`${L.anime}${gif.anime}`);
-  if (!gif?.url) pied.push(L.noGif);
+  if (!gif?.url) pied.push(gif?.memeSeulement ? L.memeGif : L.noGif);
   if (gif?.source === 'giphy') pied.push('Powered by GIPHY');
   if (noteType) pied.push(noteType);
   if (pied.length) embed.setFooter({ text: pied.join(' • ') });
@@ -667,7 +724,7 @@ const optionType = (o) =>
     .addChoices(...CHOIX_TYPE);
 
 module.exports = {
-  CATEGORIES_GIF, SOURCES_GIF, LOCALES, TYPES_GIF, ACTIONS_GIFUKAI, CHOIX_TYPE, requeteGif, typeExigeCle, fetchGifTypee, fetchGif, prefs, urlsDuMessage,
+  CATEGORIES_GIF, SOURCES_GIF, LOCALES, TYPES_GIF, ACTIONS_GIFUKAI, CHOIX_TYPE, requeteGif, typeExigeCle, fetchGifTypee, fetchGif, prefs, urlsDuMessage, cleGif, urlStable,
   grade: GRADES.EVERYONE,
   public: true, // réponses visibles par tout le monde (pas d'éphémère)
   allowDm: true, // utilisable en message privé avec le bot
