@@ -57,6 +57,7 @@ global.fetch = async (url) => {
     return { ok: true, json: async () => ({ data }) };
   }
   if (u.includes('nekos.best')) {
+    if (etat.nekosPanne) return { ok: false, status: 503 };
     const url = etat.nekos[etat.nekosIndex++ % etat.nekos.length];
     return { ok: true, json: async () => ({ results: [{ url, anime_name: 'Toradora' }] }) };
   }
@@ -183,24 +184,11 @@ const texte = (o) => JSON.stringify(o);
     delete process.env.GIPHY_KEY;
   }
 
-  console.log('\n5) Préférence par membre');
-  {
-    V('inconnu → hétéro', I.prefs.de('inconnu') === 'hetero');
-    I.prefs.poser('u1', 'catboy');
-    V('posée puis relue', I.prefs.de('u1') === 'catboy');
-    I.prefs.poser('u1', 'lesbienne');
-    V('remplacée (upsert)', I.prefs.de('u1') === 'lesbienne');
-    I.prefs.poser('u9', 'n-importe-quoi');
-    V('type inconnu → hétéro', I.prefs.de('u9') === 'hetero');
-    I.prefs.effacer('u1');
-    V('effacée → hétéro', I.prefs.de('u1') === 'hetero');
-  }
-
-  console.log('\n6) La commande : option type partout, sous-commande preference, boutons');
+  console.log('\n5) La commande : option type partout, boutons');
   {
     const src = fs.readFileSync(path.join(__dirname, '..', 'src', 'commands', 'interact.js'), 'utf8');
     V('option type sur les 8 actions', (src.match(/\.addStringOption\(optionType\)/g) || []).length === 8);
-    V('sous-commande preference', src.includes(".setName('preference')"));
+    V('plus de sous-commande preference : le type est une option facultative', !src.includes(".setName('preference')") && !src.includes('interact_prefs'));
     V('plus aucune trace de l\'API Tenor (fermée)', !src.includes('tenor.googleapis.com'));
     for (const f of ['src/index.js', 'src/manager/index.js', 'hebergeur/index.js']) {
       const t = fs.readFileSync(path.join(__dirname, '..', f), 'utf8');
@@ -210,7 +198,8 @@ const texte = (o) => JSON.stringify(o);
       const L = I.LOCALES[lang];
       V(`${lang} : six noms de type + textes du type`,
         Object.keys(L.types || {}).length === 6 && typeof L.typeNote === 'string' && typeof L.typeSansCle === 'string'
-        && typeof L.typeIntrouvable === 'string' && typeof L.prefOk === 'function' && typeof L.prefReset === 'string' && typeof L.prefSansCle === 'string');
+        && typeof L.typeIntrouvable === 'string' && typeof L.memeGif === 'string' && typeof L.typeMeme === 'string'
+        && L.prefOk === undefined && L.prefReset === undefined && L.prefSansCle === undefined);
     }
 
     // Bisou lesbienne : le type voyage dans les boutons et le pied de carte.
@@ -243,23 +232,16 @@ const texte = (o) => JSON.stringify(o);
     V('avec clé : Type : Catgirl • Powered by GIPHY', t.includes('Type : Catgirl') && t.includes('Powered by GIPHY'), t);
     delete process.env.GIPHY_KEY;
 
-    // Préférence : enregistrée en éphémère, puis appliquée sans option.
-    it = fausse({ sub: 'preference', strings: { type: 'gay' } });
-    await I.execute(it);
-    V('preference gay → confirmation éphémère', it.reponses[0]?.flags === 64 && it.reponses[0].content.includes('**Gay**'), texte(it.reponses[0]));
-    V('…et aucun avertissement de clé pour un type gratuit', !it.reponses[0].content.includes('GIPHY'));
+    // Sans option : hétéro, toujours — aucune préférence mémorisée.
     it = fausse({ sub: 'hug' });
     await I.execute(it);
-    V('hug sans option → la préférence (gay) s\'applique', texte(it.reponses[0]).includes('itx:hug:u1:u2:gay'), texte(it.reponses[0]).slice(0, 300));
-    it = fausse({ sub: 'preference', strings: { type: 'femboy' } });
-    await I.execute(it);
-    V('preference femboy sans clé → avertissement', it.reponses[0].content.includes('GIPHY'), it.reponses[0].content);
-    it = fausse({ sub: 'preference', strings: { type: 'hetero' } });
-    await I.execute(it);
-    V('preference hetero → remise à zéro', it.reponses[0].content.includes('↩️') && I.prefs.de('u1') === 'hetero');
+    V('hug sans option → hétéro', texte(it.reponses[0]).includes('itx:hug:u1:u2:hetero') && !texte(it.reponses[0]).includes('Type :'), texte(it.reponses[0]).slice(0, 300));
     it = fausse({ sub: 'kiss', strings: { type: 'catgirl' } });
     await I.execute(it);
-    V('l\'option explicite prime sur la préférence', texte(it.reponses[0]).includes('itx:kiss:u1:u2:catgirl'));
+    V('l\'option type s\'applique à cette interaction seulement', texte(it.reponses[0]).includes('itx:kiss:u1:u2:catgirl'));
+    it = fausse({ sub: 'kiss' });
+    await I.execute(it);
+    V('… et la suivante, sans option, est à nouveau hétéro', texte(it.reponses[0]).includes('itx:kiss:u1:u2:hetero'));
 
     // Bouton « Rendre » : la réponse garde le type du message d'origine.
     vider();
@@ -272,7 +254,7 @@ const texte = (o) => JSON.stringify(o);
     V('ancien bouton sans type → hétéro, sans erreur', it.suivis.length === 1 && !texte(it.suivis[0]).includes('Type :'), texte(it.suivis[0]));
   }
 
-  console.log('\n7) « Rendre » ne ressort jamais le GIF du message d\'origine');
+  console.log('\n6) « Rendre » ne ressort jamais le GIF du message d\'origine');
   {
     const A = 'https://nekos.best/a.gif', B = 'https://nekos.best/b.gif';
     const original = (url, carte = false) => (carte
@@ -409,6 +391,42 @@ const texte = (o) => JSON.stringify(o);
     V('résultat unique = l\'original → essai pg-13 puis « seulement le même »', g5?.memeSeulement === true && derniersAppels('giphy').length === 2, texte(g5) + ' ' + derniersAppels('giphy').length);
     etat.giphyIds = null;
     delete process.env.GIPHY_KEY;
+
+    // Panne des sources + réserve réduite à l'original : c'est une PANNE, pas « une seule animation ».
+    viderReserve('hug'); garnir('hug', A);
+    etat.nekosPanne = true; etat.waifu = null; etat.otaku = null; vider();
+    const g6 = await I.fetchGif('hug', new Set([A]));
+    V('sources en panne, réserve = l\'original → null (indisponible), pas « seulement le même »', g6 === null, texte(g6));
+    it = fausse({ user: 'u2', customId: 'itx:hug:u1:u2' });
+    it.message = original(A);
+    await I.handleButton(it);
+    t = texte(it.suivis[0] || {});
+    V('… et le pied dit « indisponible »', t.includes(I.LOCALES.fr.noGif) && !t.includes(I.LOCALES.fr.memeGif), t);
+    etat.nekosPanne = false;
+
+    // Gifukai en panne + réserve typée = l'original + pas de clé : « introuvable », pas « déjà dans le message ».
+    viderReserve('kiss@lesbienne@%'); garnir('kiss@lesbienne@gifukai', FF1);
+    etat.gifukai = 'panne'; etat.nekos = [B]; etat.nekosIndex = 0; vider();
+    const g7 = await I.fetchGifTypee('kiss', 'lesbienne', new Set([FF1]));
+    V('Gifukai en panne → { introuvable } sans memeSeulement ni sansCle', g7?.introuvable === true && !g7.memeSeulement && !g7.sansCle, texte(g7));
+    it = fausse({ user: 'u2', customId: 'itx:kiss:u1:u2:lesbienne' });
+    it.message = original(FF1);
+    await I.handleButton(it);
+    t = texte(it.suivis[0] || {});
+    V('… pied « Aucun GIF trouvé pour ce type », GIF classique différent', t.includes(I.LOCALES.fr.typeIntrouvable) && t.includes(B) && !t.includes(I.LOCALES.fr.typeMeme), t);
+    etat.gifukai = 'ok';
+
+    // Typé ET classique réduits à l'original : une seule ligne de pied, pas de promesse de « GIF classique ».
+    viderReserve('kiss@lesbienne@%'); garnir('kiss@lesbienne@gifukai', FF1);
+    viderReserve('kiss'); garnir('kiss', FF1);
+    etat.gifukaiUrls = [FF1]; etat.gifukaiIndex = 0; etat.nekos = [FF1]; etat.nekosIndex = 0; etat.waifu = FF1; etat.otaku = FF1; vider();
+    it = fausse({ user: 'u2', customId: 'itx:kiss:u1:u2:lesbienne' });
+    it.message = original(FF1);
+    await I.handleButton(it);
+    t = texte(it.suivis[0] || {});
+    const piedT = (it.suivis[0]?.embeds?.[0]?.data?.footer?.text) || '';
+    V('rien d\'autre nulle part → sans image, une seule ligne « une seule animation »', !t.includes('"image"') && piedT === I.LOCALES.fr.memeGif, piedT);
+    etat.waifu = null; etat.otaku = null;
 
     // Un ancien bouton sans type marche toujours.
     etat.nekos = [A, B]; etat.nekosIndex = 0; vider();

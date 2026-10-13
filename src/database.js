@@ -451,12 +451,6 @@ CREATE TABLE IF NOT EXISTS gif_cache (
 
 -- 🏳️‍🌈 /interact : le type d'animation prefere de chaque membre (hetero par
 -- defaut) — pour que les GIF correspondent a tout le monde sans le redire.
-CREATE TABLE IF NOT EXISTS interact_prefs (
-  user_id TEXT PRIMARY KEY,
-  type    TEXT NOT NULL,
-  at      TEXT
-);
-
 -- 🔢 Matricules RP : le numero qui suit une personne dans le RP.
 -- Relie les trois facons de la designer — matricule, pseudo du jeu, compte
 -- Discord — pour qu'aucune ne soit un cul-de-sac. Le retrait garde la ligne

@@ -1813,6 +1813,19 @@ const RELEASES = [
     amelioration: [],
     retrait: [],
   },
+  {
+    id: 'interact-sans-preference-2026-10cz',
+    title: '/interact : le type, une option et rien de plus',
+    retrait: [
+      '🗑️ **`/interact preference` est retiree.** Le type de GIF se choisit a chaque interaction avec l\'option `type`, facultative : sans elle, c\'est hetero. Rien n\'est memorise',
+    ],
+    fix: [
+      '⚠️ Une panne des sources de GIF etait annoncee comme « une seule animation existe ici » des que la reserve ne contenait que l\'image d\'origine : la panne est de nouveau dite comme telle (« GIF momentanement indisponible »), et le message typé ne promet plus un « GIF classique » quand aucune image ne part',
+      '🎞️ La reserve GIPHY des bots deja en place est reecrite sous des adresses stables : plus de doublons de la meme image',
+    ],
+    ajout: [],
+    amelioration: [],
+  },
 ];
 
 // Construit l'embed d'une note à partir d'une entrée { title, ajout, fix,
