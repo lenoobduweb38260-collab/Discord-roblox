@@ -68,7 +68,8 @@ global.fetch = async (url) => {
     const liste = etat.gifukaiCouples ? (etat.gifukaiCouples[couple] || []) : (['ff', 'mm'].includes(couple) ? etat.gifukaiUrls : []);
     if (!liste.length) return { ok: false, status: 404 };
     const url = liste[etat.gifukaiIndex++ % liste.length];
-    return { ok: true, status: 200, json: async () => ({ url, anime: 'Bloom Into You', pairing: couple }) };
+    const type = etat.gifukaiTypeForce || new URL(u).searchParams.get('type') || undefined;
+    return { ok: true, status: 200, json: async () => ({ url, anime: 'Bloom Into You', pairing: couple, type }) };
   }
   if (u.includes('api.giphy.com')) {
     if (etat.giphy === 'panne') return { ok: false, status: 500 };
@@ -440,7 +441,7 @@ const pied = (r) => r?.embeds?.[0]?.data?.footer?.text || '';
     it.message = original(FF1);
     await I.handleButton(it);
     t = texte(it.suivis[0] || {});
-    V('typé : Gifukai retiré 3 fois par nom (baiser, puis tout bisou), réserve = l\'original → pas d\'image', appelsGifukai().length === 6 && !t.includes('"image"') && !t.includes(B), t + ' ' + appels.join(' '));
+    V('typé : Gifukai retiré 3 fois (vrai baiser seulement), réserve = l\'original → pas d\'image', appelsGifukai().length === 3 && appelsGifukai().every((u) => u.includes('type=mouth')) && !t.includes('"image"') && !t.includes(B), t + ' ' + appels.join(' '));
     V('… avec la seule note « déjà dans le message »', (it.suivis[0]?.embeds?.[0]?.data?.footer?.text) === I.LOCALES.fr.typeMeme, t);
     etat.gifukaiUrls = [FF1]; etat.gifukaiIndex = 0;
 
@@ -556,7 +557,7 @@ const pied = (r) => r?.embeds?.[0]?.data?.footer?.text || '';
     it = fausse({ sub: 'kiss', strings: { type: 'lesbienne' } });
     await I.execute(it);
     V('Gifukai en panne : pied = « injoignable » seul, pas d\'image', pied(it.reponses[0]) === I.LOCALES.fr.typeInjoignable && !texte(it.reponses[0]).includes('"image"'), pied(it.reponses[0]));
-    etat.gifukai = 'ok';
+    etat.gifukai = 'ok'; I._oublierGifukai();
     // Typé « seulement le même » mais classique en PANNE : c'est une panne.
     viderReserve('kiss@lesbienne@%'); garnir('kiss@lesbienne@gifukai', FF1); viderReserve('kiss'); garnir('kiss', FF1);
     etat.gifukaiUrls = [FF1]; etat.gifukaiIndex = 0;
@@ -565,6 +566,48 @@ const pied = (r) => r?.embeds?.[0]?.data?.footer?.text || '';
     await I.handleButton(it);
     V('typé = l\'original : « déjà dans le message », quelles que soient les sources classiques', pied(it.suivis[0]) === I.LOCALES.fr.typeMeme, pied(it.suivis[0]));
     etat.nekosPanne = false;
+
+    // Bisou sur la bouche : jamais « kiss » tout court quand kiss est typé.
+    vider();
+    V('chemins du baiser : type=mouth seulement (kiss typé)', I.cheminsGifukai('kiss', { noms: new Set(['kiss']), typees: new Set(['kiss']) }).join() === 'kiss?type=mouth');
+    V('… « kiss » tout court seulement si Gifukai ne type pas les bisous', I.cheminsGifukai('kiss', { noms: new Set(['kiss']), typees: new Set() }).join() === 'kiss');
+    V('chemins de la joue : cheek, alias peck, forehead — jamais mouth ni kiss nu', I.cheminsGifukai('peck', { noms: new Set(['kiss', 'peck']), typees: new Set(['kiss']) }).join() === 'kiss?type=cheek,peck,kiss?type=forehead');
+    V('sans liste : actions documentées, baiser typé', I.cheminsGifukai('kiss', null).join() === 'kiss?type=mouth' && I.cheminsGifukai('lick', null).length === 0);
+    V('liste réelle : lick, shoot (tir), punch, kill sont interrogés', I.cheminsGifukai('lick', { noms: new Set(['lick']), typees: new Set() }).join() === 'lick'
+      && I.cheminsGifukai('bang', { noms: new Set(['shoot']), typees: new Set() }).join() === 'shoot'
+      && I.cheminsGifukai('kill', { noms: new Set(['kill']), typees: new Set() }).join() === 'kill');
+
+    // Gifukai renvoie un baiser sur la bouche pour une joue : refusé.
+    db.prepare("DELETE FROM gif_cache WHERE categorie LIKE 'peck@gay@%'").run();
+    etat.gifukaiTypeForce = 'mouth'; etat.gifukaiUrls = ['https://cdn.gifukai.com/mm-mouth.gif']; vider();
+    const gb = await I.fetchGifTypee('peck', 'gay');
+    V('joue demandée, baiser renvoyé → refusé, pas d\'image (sans clé : « clé GIPHY » pour élargir)', !gb?.url && gb?.sansCle === true && enReserve('peck@gay@') === 0, texte(gb));
+    etat.gifukaiTypeForce = null; etat.gifukaiUrls = [FF1];
+
+    // Gifukai injoignable par délai : une seule tentative, puis 2 min sans le réinterroger.
+    db.prepare("DELETE FROM gif_cache WHERE categorie LIKE 'hug@gay@%'").run();
+    etat.nekos = [B]; etat.nekosIndex = 0;
+    etat.gifukai = 'jette'; vider();
+    const hp1 = await I.fetchGifHetero('hug');
+    const apres1 = derniersAppels('api.gifukai.com').length;
+    etat.gifukai = 'ok';
+    const hp2 = await I.fetchGifHetero('hug');
+    const gp = await I.fetchGifTypee('hug', 'gay');
+    V('hétéro pendant une panne : un seul essai Gifukai (la liste), puis les sources classiques', apres1 === 1 && hp1?.url === B, apres1 + ' ' + texte(hp1));
+    V('… et pendant 2 min, plus aucun appel Gifukai, réponse immédiate', derniersAppels('api.gifukai.com').length === 1 && hp2?.url === B, appels.join(' '));
+    V('… un type choisi le dit : « injoignable », sans appel', gp?.injoignable === true && derniersAppels('api.gifukai.com').length === 1, texte(gp));
+    I._catalogue.panne = Date.now() - 3 * 60 * 1000; I._catalogue.echec = Date.now() - 4 * 60 * 1000;
+    const gp2 = await I.fetchGifTypee('hug', 'gay');
+    V('… passé le délai, Gifukai est réinterrogé', gp2?.url && derniersAppels('api.gifukai.com').length > 1, texte(gp2));
+    // Une panne au milieu (5xx sur un GIF, la liste déjà lue) coupe aussi la suite.
+    vider();
+    await I.fetchGifTypee('pat', 'lesbienne'); // lit la liste, Gifukai joignable
+    etat.gifukai = 'panne'; appels.length = 0;
+    await I.fetchGifHetero('kiss');
+    const pendant = appelsGifukai().length;
+    await I.fetchGifHetero('kiss');
+    V('5xx en cours de route : un seul appel, puis plus rien pendant 2 min', pendant === 1 && appelsGifukai().length === 1, appels.join(' '));
+    etat.gifukai = 'ok'; I._oublierGifukai();
 
     // Un ancien bouton sans type marche toujours.
     etat.nekos = [A, B]; etat.nekosIndex = 0; vider();

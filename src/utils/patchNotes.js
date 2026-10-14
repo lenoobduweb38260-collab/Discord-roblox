@@ -1854,6 +1854,18 @@ const RELEASES = [
     ajout: [],
     retrait: [],
   },
+  {
+    id: 'interact-gifukai-panne-2026-10dc',
+    title: '/interact : plus d\'attente quand la source est bloquee',
+    fix: [
+      '⏱️ **Plus d\'attente de 15 secondes** quand l\'hebergeur bloque la source des GIF filtres par couple : apres un echec, elle n\'est plus interrogee pendant 2 minutes, et l\'hetero passe tout de suite aux GIF classiques',
+      '💋 Le bisou sur la bouche ne se rabat plus sur « n\'importe quel bisou » (qui ne pouvait etre qu\'une joue ou un front) : un vrai baiser ou rien',
+      '😚 Un bisou sur la joue renvoye en baiser sur la bouche par la source est refuse',
+    ],
+    ajout: [],
+    amelioration: [],
+    retrait: [],
+  },
 ];
 
 // Construit l'embed d'une note à partir d'une entrée { title, ajout, fix,

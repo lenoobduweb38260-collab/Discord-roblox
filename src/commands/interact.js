@@ -449,6 +449,10 @@ const NOMS_GIFUKAI = {
 // Faute de liste (Gifukai injoignable au moment de la lire), on ne tente que
 // les actions dont l'existence est documentée.
 const GIFUKAI_DOCUMENTEES = new Set(['kiss', 'hug', 'pat', 'cry', 'sleep']);
+const GIFUKAI_TYPEES_DOCUMENTEES = new Set(['kiss']);
+// Le type de bisou que chaque action accepte dans la réponse de Gifukai.
+// Un « peck » qui reviendrait en baiser sur la bouche est refusé.
+const TYPES_ACCEPTES = { kiss: ['mouth'], peck: ['cheek', 'forehead'] };
 const TYPE_DEFAUT = 'hetero';
 const typeValide = (t) => (TYPES_GIF[t] !== undefined ? t : TYPE_DEFAUT);
 const requeteGif = (action, type) => `${TYPES_GIF[type]?.requete || 'anime'} ${MOTS_ACTION[action] || action}`.trim();
@@ -468,8 +472,14 @@ const ENTETES_GIF = { 'User-Agent': 'discord-roblox-rp-bot' };
 // réussite et le premier échec sont écrits dans la console, une fois chacun,
 // pour qu'un hébergeur qui bloque l'API se voie tout de suite.
 const CATALOGUE_DUREE = 6 * 60 * 60 * 1000;
-const CATALOGUE_REESSAI = 10 * 60 * 1000;
-const catalogue = { noms: null, typees: null, lu: 0, echec: 0, annonce: null };
+const CATALOGUE_REESSAI = 3 * 60 * 1000;
+// Gifukai injoignable (délai dépassé, réseau, 5xx) : on ne le réinterroge pas
+// pendant 2 min. Sans cela, un hébergeur qui laisse les requêtes pendre
+// faisait attendre CHAQUE interaction hétéro 5 s par essai avant les GIF
+// classiques.
+const PANNE_DUREE = 2 * 60 * 1000;
+const catalogue = { noms: null, typees: null, lu: 0, echec: 0, annonce: null, panne: 0 };
+const enPanne = () => Boolean(catalogue.panne) && Date.now() - catalogue.panne < PANNE_DUREE;
 async function catalogueGifukai() {
   const maintenant = Date.now();
   if (catalogue.noms && maintenant - catalogue.lu < CATALOGUE_DUREE) return catalogue;
@@ -495,6 +505,7 @@ async function catalogueGifukai() {
     return catalogue;
   } catch (err) {
     catalogue.echec = maintenant;
+    catalogue.panne = maintenant;
     if (catalogue.annonce !== 'ko') {
       console.warn(`⚠️ Gifukai injoignable depuis ce bot (${err.message}) : les GIF lesbienne et gay ne peuvent pas être servis sans lui. Vérifiez que l'hébergeur autorise api.gifukai.com.`);
       catalogue.annonce = 'ko';
@@ -516,18 +527,21 @@ const estVide = (url) => {
 };
 function oublierGifukai() {
   videsGifukai.clear();
-  Object.assign(catalogue, { noms: null, typees: null, lu: 0, echec: 0 });
+  Object.assign(catalogue, { noms: null, typees: null, lu: 0, echec: 0, panne: 0 });
 }
 
 // Les chemins Gifukai à essayer pour une action du bot, d'après le catalogue.
 function cheminsGifukai(action, cat) {
   const candidats = NOMS_GIFUKAI[action] || [];
+  const typee = (base) => (cat ? cat.typees.has(base) : GIFUKAI_TYPEES_DOCUMENTEES.has(base));
   return candidats.filter((chemin) => {
     const base = chemin.split('?')[0];
-    if (!cat) return GIFUKAI_DOCUMENTEES.has(base);
-    if (!cat.noms.has(base)) return false;
+    if (cat ? !cat.noms.has(base) : !GIFUKAI_DOCUMENTEES.has(base)) return false;
     // `?type=` sur une action non typée : Gifukai répond 400.
-    return !chemin.includes('?type=') || cat.typees.has(base);
+    if (chemin.includes('?type=')) return typee(base);
+    // Sans `?type=`, une action typée renvoie TOUS ses types : « kiss » tout
+    // court servirait une joue ou un front à qui a demandé un vrai baiser.
+    return !typee(base);
   });
 }
 
@@ -538,7 +552,9 @@ function cheminsGifukai(action, cat) {
 // l'action (rien à demander).
 async function chercherGifukai(action, couples, exclure = null) {
   if (!Array.isArray(couples) || !couples.length) return null;
+  if (enPanne()) return { injoignable: true };
   const cat = await catalogueGifukai();
+  if (!cat && enPanne()) return { injoignable: true };
   const chemins = cheminsGifukai(action, cat);
   if (!chemins.length) return cat ? null : { injoignable: true };
   const essais = exclure?.size ? ESSAIS_SAUF : 1;
@@ -554,13 +570,18 @@ async function chercherGifukai(action, couples, exclure = null) {
           res = await fetch(url, { headers: ENTETES_GIF, signal: AbortSignal.timeout(5000) });
         } catch (err) {
           console.warn(`⚠️ GIF Gifukai (${chemin}, ${couple}) : ${err.message}`);
-          break;
+          catalogue.panne = Date.now();
+          return exclu ? { exclu: true } : (repondu ? { introuvable: true } : { injoignable: true });
         }
         // 404 « aucun GIF pour ce couple », 400 « filtre refusé » : Gifukai a
         // répondu, il n'a rien — on passe au couple ou au nom suivant.
         if (res.status === 404 || res.status === 400) { repondu = true; videsGifukai.set(url, Date.now()); break; }
         if (!res.ok) {
           console.warn(`⚠️ GIF Gifukai (${chemin}, ${couple}) : HTTP ${res.status}`);
+          if (res.status >= 500) {
+            catalogue.panne = Date.now();
+            return exclu ? { exclu: true } : (repondu ? { introuvable: true } : { injoignable: true });
+          }
           break;
         }
         let d = null;
@@ -572,6 +593,7 @@ async function chercherGifukai(action, couples, exclure = null) {
         repondu = true;
         // Ceinture et bretelles : un GIF d'un autre couple n'est jamais pris.
         if (d.pairing && !couples.includes(String(d.pairing))) break;
+        if (d.type && TYPES_ACCEPTES[action] && !TYPES_ACCEPTES[action].includes(String(d.type))) break;
         if (estExclu(d.url, exclure)) { exclu = true; continue; } // le même GIF que l'original : on retire
         return { url: d.url, anime: d.anime || null, source: 'gifukai' };
       }
@@ -879,7 +901,7 @@ const optionType = (o) =>
 
 module.exports = {
   CATEGORIES_GIF, SOURCES_GIF, LOCALES, TYPES_GIF, NOMS_GIFUKAI, CHOIX_TYPE, requeteGif, typeExigeCle, porteLeType, fetchGifTypee, fetchGifHetero, fetchGif, urlsDuMessage, cleGif, urlStable,
-  _catalogue: catalogue, _oublierGifukai: oublierGifukai,
+  _catalogue: catalogue, _oublierGifukai: oublierGifukai, cheminsGifukai,
   grade: GRADES.EVERYONE,
   public: true, // réponses visibles par tout le monde (pas d'éphémère)
   allowDm: true, // utilisable en message privé avec le bot
