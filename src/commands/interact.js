@@ -51,10 +51,11 @@ const LOCALES = {
     uses: 'utilisations',
     types: { hetero: 'Hétéro', lesbienne: 'Lesbienne', gay: 'Gay', catgirl: 'Catgirl', catboy: 'Catboy', femboy: 'Femboy' },
     typeNote: 'Type : ',
-    typeSansCle: '⚠️ Ce type demande une clé GIPHY, absente sur ce bot — GIF classique',
-    typeIntrouvable: '⚠️ Aucun GIF trouvé pour ce type — GIF classique',
+    typeSansCle: '⚠️ Pour cette action, ce type demande une clé GIPHY (absente sur ce bot) — pas d\'image plutôt qu\'un GIF qui ne correspond pas',
+    typeIntrouvable: '⚠️ Aucun GIF de ce type pour cette action — pas d\'image plutôt qu\'un GIF qui ne correspond pas',
+    typeInjoignable: '⚠️ La source des GIF de ce type est injoignable depuis ce bot — réessayez plus tard',
     memeGif: '🔁 Une seule animation existe ici — on ne la remet pas deux fois',
-    typeMeme: '🔁 Le seul GIF de ce type était déjà dans le message : GIF classique',
+    typeMeme: '🔁 Le seul GIF de ce type était déjà dans le message',
   },
   en: {
     actions: {
@@ -83,10 +84,11 @@ const LOCALES = {
     uses: 'uses',
     types: { hetero: 'Straight', lesbienne: 'Lesbian', gay: 'Gay', catgirl: 'Catgirl', catboy: 'Catboy', femboy: 'Femboy' },
     typeNote: 'Type: ',
-    typeSansCle: '⚠️ This type needs a GIPHY key, missing on this bot — classic GIF',
-    typeIntrouvable: '⚠️ No GIF found for this type — classic GIF',
+    typeSansCle: '⚠️ For this action, this type needs a GIPHY key (missing on this bot) — no image rather than a GIF that doesn\'t match',
+    typeIntrouvable: '⚠️ No GIF of this type for this action — no image rather than a GIF that doesn\'t match',
+    typeInjoignable: '⚠️ The source of GIFs of this type can\'t be reached from this bot — try again later',
     memeGif: '🔁 Only one GIF exists here — not showing it twice',
-    typeMeme: '🔁 The only GIF of this type was already in the message: classic GIF',
+    typeMeme: '🔁 The only GIF of this type was already in the message',
   },
   es: {
     actions: {
@@ -115,10 +117,11 @@ const LOCALES = {
     uses: 'usos',
     types: { hetero: 'Hetero', lesbienne: 'Lesbiana', gay: 'Gay', catgirl: 'Catgirl', catboy: 'Catboy', femboy: 'Femboy' },
     typeNote: 'Tipo: ',
-    typeSansCle: '⚠️ Este tipo necesita una clave GIPHY, ausente en este bot — GIF clásico',
-    typeIntrouvable: '⚠️ Ningún GIF encontrado para este tipo — GIF clásico',
+    typeSansCle: '⚠️ Para esta acción, este tipo necesita una clave GIPHY (ausente en este bot) — sin imagen antes que un GIF que no corresponde',
+    typeIntrouvable: '⚠️ Ningún GIF de este tipo para esta acción — sin imagen antes que un GIF que no corresponde',
+    typeInjoignable: '⚠️ La fuente de GIF de este tipo no responde desde este bot — inténtalo más tarde',
     memeGif: '🔁 Solo existe un GIF aquí — no se repite',
-    typeMeme: '🔁 El único GIF de este tipo ya estaba en el mensaje: GIF clásico',
+    typeMeme: '🔁 El único GIF de este tipo ya estaba en el mensaje',
   },
   de: {
     actions: {
@@ -147,10 +150,11 @@ const LOCALES = {
     uses: 'Nutzungen',
     types: { hetero: 'Hetero', lesbienne: 'Lesbisch', gay: 'Schwul', catgirl: 'Catgirl', catboy: 'Catboy', femboy: 'Femboy' },
     typeNote: 'Typ: ',
-    typeSansCle: '⚠️ Dieser Typ braucht einen GIPHY-Schlüssel, der auf diesem Bot fehlt — klassisches GIF',
-    typeIntrouvable: '⚠️ Kein GIF für diesen Typ gefunden — klassisches GIF',
+    typeSansCle: '⚠️ Für diese Aktion braucht dieser Typ einen GIPHY-Schlüssel (fehlt auf diesem Bot) — lieber kein Bild als ein unpassendes GIF',
+    typeIntrouvable: '⚠️ Kein GIF dieses Typs für diese Aktion — lieber kein Bild als ein unpassendes GIF',
+    typeInjoignable: '⚠️ Die Quelle für GIFs dieses Typs ist von diesem Bot aus nicht erreichbar — später erneut versuchen',
     memeGif: '🔁 Hier gibt es nur ein GIF — es wird nicht zweimal gezeigt',
-    typeMeme: '🔁 Das einzige GIF dieses Typs war schon in der Nachricht: klassisches GIF',
+    typeMeme: '🔁 Das einzige GIF dieses Typs war schon in der Nachricht',
   },
   ru: {
     actions: {
@@ -179,10 +183,11 @@ const LOCALES = {
     uses: 'использований',
     types: { hetero: 'Гетеро', lesbienne: 'Лесби', gay: 'Гей', catgirl: 'Кошкодевочка', catboy: 'Кошкомальчик', femboy: 'Фембой' },
     typeNote: 'Тип: ',
-    typeSansCle: '⚠️ Для этого типа нужен ключ GIPHY, которого нет у этого бота — обычный GIF',
-    typeIntrouvable: '⚠️ GIF для этого типа не найден — обычный GIF',
+    typeSansCle: '⚠️ Для этого действия нужен ключ GIPHY (его нет у этого бота) — лучше без картинки, чем с неподходящим GIF',
+    typeIntrouvable: '⚠️ Нет GIF этого типа для этого действия — лучше без картинки, чем с неподходящим GIF',
+    typeInjoignable: '⚠️ Источник GIF этого типа недоступен для этого бота — попробуйте позже',
     memeGif: '🔁 Здесь только один GIF — дважды не показываем',
-    typeMeme: '🔁 Единственный GIF этого типа уже был в сообщении: обычный GIF',
+    typeMeme: '🔁 Единственный GIF этого типа уже был в сообщении',
   },
 };
 
@@ -296,29 +301,20 @@ function urlStable(url) {
 }
 const clesExclues = (urls) => new Set([...(urls || [])].map(cleGif));
 
-// Les lignes de réserve GIPHY rangées avant cette clé portaient le jeton de
-// réponse : on les réécrit une fois sous leur adresse stable (les doublons
-// se fondent, `INSERT OR IGNORE` puis suppression de l'ancienne ligne).
+// 🧹 La réserve GIPHY typée rangée avant le tri par mots-clés peut contenir
+// des GIF qui ne portent pas le type (un baiser quelconque pour « gay ») :
+// elle est vidée une fois. Gifukai, filtré par couple, n'est pas concerné.
 try {
-  const signees = db.prepare("SELECT categorie, url, anime, at FROM gif_cache WHERE categorie LIKE '%@giphy' AND url LIKE '%?%'").all();
-  if (signees.length) {
-    const poser = db.prepare('INSERT OR IGNORE INTO gif_cache (categorie, url, anime, at) VALUES (?, ?, ?, ?)');
-    const oter = db.prepare('DELETE FROM gif_cache WHERE categorie = ? AND url = ?');
-    let reecrites = 0;
-    db.transaction(() => {
-      for (const l of signees) {
-        const stable = urlStable(l.url);
-        if (stable === l.url) continue; // adresse inconnue : on la laisse telle quelle
-        poser.run(l.categorie, stable, l.anime, l.at);
-        oter.run(l.categorie, l.url);
-        reecrites++;
-      }
-    })();
-    if (reecrites) console.log(`🎞️ Réserve GIPHY : ${reecrites} adresse(s) signée(s) réécrite(s) en adresse stable.`);
+  const fait = db.prepare("SELECT value FROM app_state WHERE key = 'interact_giphy_tri'").get();
+  if (!fait) {
+    const n = db.prepare("DELETE FROM gif_cache WHERE categorie LIKE '%@giphy'").run().changes;
+    db.prepare("INSERT OR REPLACE INTO app_state (key, value) VALUES ('interact_giphy_tri', '1')").run();
+    if (n) console.log(`🎞️ Réserve GIPHY : ${n} GIF non triés retirés — seuls ceux qui portent le type seront gardés.`);
   }
 } catch (err) {
-  console.warn(`⚠️ Réserve GIPHY non normalisée : ${err.message}`);
+  console.warn(`⚠️ Réserve GIPHY non triée : ${err.message}`);
 }
+
 const estExclu = (url, exclure) => Boolean(exclure && exclure.size && url && exclure.has(cleGif(url)));
 const premierLibre = (liste, exclure) => liste.find((g) => g?.url && !estExclu(g.url, exclure)) || null;
 
@@ -412,28 +408,52 @@ const CATEGORIES_GIF = {
 // GIF classique, et le pied de carte le DIT — sans quoi on croirait l'option
 // cassée. `hetero` est le défaut : il reste sur les sources classiques.
 const TYPES_GIF = {
-  hetero: null,
-  lesbienne: { pairing: 'ff', requete: 'anime yuri' },
-  gay: { pairing: 'mm', requete: 'anime yaoi' },
-  catgirl: { pairing: null, requete: 'anime catgirl' },
-  catboy: { pairing: null, requete: 'anime catboy' },
-  femboy: { pairing: null, requete: 'anime femboy' },
+  // Hétéro : couples garçon→fille et fille→garçon chez Gifukai, puis les
+  // sources classiques (c'est le défaut historique, sans filtre de couple).
+  hetero: { couples: ['mf', 'fm'], requete: null, mots: null, contraires: null },
+  lesbienne: {
+    couples: ['ff'], requete: 'anime yuri',
+    mots: /yuri|lesbi|sapphic|\bwlw\b|\bgl\b|girls?'? ?love/i,
+    contraires: /yaoi|\bbl\b|boys?'? ?love|\bgay\b|shounen.?ai/i,
+  },
+  gay: {
+    couples: ['mm'], requete: 'anime yaoi',
+    mots: /yaoi|\bbl\b|boys?'? ?love|\bgay\b|shounen.?ai|\bmlm\b/i,
+    contraires: /yuri|lesbi|sapphic|\bgl\b/i,
+  },
+  catgirl: { couples: null, requete: 'anime catgirl', mots: /cat.?girl|nekomimi|\bneko\b(?!.?boy)/i, contraires: /cat.?boy|neko.?boy/i },
+  catboy: { couples: null, requete: 'anime catboy', mots: /cat.?boy|neko.?boy/i, contraires: /cat.?girl/i },
+  femboy: { couples: null, requete: 'anime femboy', mots: /fem.?boy|femboi|otokonoko|crossdress|astolfo/i, contraires: null },
 };
 // Le mot anglais de chaque action, pour la recherche libre GIPHY.
 const MOTS_ACTION = {
   kiss: 'kiss', peck: 'cheek kiss', hug: 'hug', pat: 'head pat', bite: 'bite',
   lick: 'lick', bang: 'shoot gun', punch: 'punch', kill: 'kill',
 };
-// Les actions que Gifukai connaît, et leur chemin (le bisou sur la joue est
-// un filtre `type` du bisou). Les autres passent directement par GIPHY.
-const ACTIONS_GIFUKAI = {
-  kiss: 'kiss', peck: 'kiss?type=cheek', hug: 'hug', pat: 'pat', bite: 'bite',
+// Les noms à essayer chez Gifukai, dans l'ordre, pour chaque action du bot.
+// Filtrés à l'exécution par la liste publique des actions (`/v1/actions`,
+// alias compris) : on n'interroge que ce qui existe. Le bisou sur la bouche
+// cherche d'abord un vrai baiser ; le bisou sur la joue n'accepte que la
+// joue ou le front — jamais un baiser sur la bouche.
+const NOMS_GIFUKAI = {
+  kiss: ['kiss?type=mouth', 'kiss'],
+  peck: ['kiss?type=cheek', 'peck', 'kiss?type=forehead'],
+  hug: ['hug', 'cuddle'],
+  pat: ['pat', 'headpat'],
+  bite: ['bite', 'nom'],
+  lick: ['lick'],
+  bang: ['shoot', 'gun', 'bang'],
+  punch: ['punch', 'hit'],
+  kill: ['kill', 'stab'],
 };
+// Faute de liste (Gifukai injoignable au moment de la lire), on ne tente que
+// les actions dont l'existence est documentée.
+const GIFUKAI_DOCUMENTEES = new Set(['kiss', 'hug', 'pat', 'cry', 'sleep']);
 const TYPE_DEFAUT = 'hetero';
 const typeValide = (t) => (TYPES_GIF[t] !== undefined ? t : TYPE_DEFAUT);
 const requeteGif = (action, type) => `${TYPES_GIF[type]?.requete || 'anime'} ${MOTS_ACTION[action] || action}`.trim();
 // Un type « à clé » n'a aucune source gratuite : sans GIPHY_KEY, impossible.
-const typeExigeCle = (type) => Boolean(TYPES_GIF[type]) && !TYPES_GIF[type].pairing;
+const typeExigeCle = (type) => type !== TYPE_DEFAUT && Boolean(TYPES_GIF[type]) && !TYPES_GIF[type].couples;
 const cleGiphy = () => (process.env.GIPHY_KEY || '').trim();
 
 // La réserve des GIF typés est rangée par `action@type@source` : on sait
@@ -443,32 +463,122 @@ const gifAuHasardTypee = db.prepare(
 );
 const ENTETES_GIF = { 'User-Agent': 'discord-roblox-rp-bot' };
 
-async function chercherGifukai(action, pairing, exclure = null) {
-  const chemin = ACTIONS_GIFUKAI[action];
-  if (!chemin || !pairing) return null;
-  const url = `https://api.gifukai.com/v1/${chemin}${chemin.includes('?') ? '&' : '?'}pairing=${pairing}`;
+// 📚 La liste des actions Gifukai (et de leurs alias), relue toutes les 6 h.
+// Elle dit aussi si Gifukai est joignable depuis CE bot : la première
+// réussite et le premier échec sont écrits dans la console, une fois chacun,
+// pour qu'un hébergeur qui bloque l'API se voie tout de suite.
+const CATALOGUE_DUREE = 6 * 60 * 60 * 1000;
+const CATALOGUE_REESSAI = 10 * 60 * 1000;
+const catalogue = { noms: null, typees: null, lu: 0, echec: 0, annonce: null };
+async function catalogueGifukai() {
+  const maintenant = Date.now();
+  if (catalogue.noms && maintenant - catalogue.lu < CATALOGUE_DUREE) return catalogue;
+  if (catalogue.echec && maintenant - catalogue.echec < CATALOGUE_REESSAI) return catalogue.noms ? catalogue : null;
+  try {
+    const res = await fetch('https://api.gifukai.com/v1/actions', { headers: ENTETES_GIF, signal: AbortSignal.timeout(5000) });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const d = await res.json();
+    const actions = d?.actions && typeof d.actions === 'object' ? d.actions : null;
+    if (!actions || !Object.keys(actions).length) throw new Error('liste des actions vide');
+    const noms = new Set();
+    const typees = new Set();
+    for (const [nom, info] of Object.entries(actions)) {
+      noms.add(String(nom).toLowerCase());
+      if (info?.has_types) typees.add(String(nom).toLowerCase());
+      for (const a of Array.isArray(info?.aliases) ? info.aliases : []) if (a?.alias) noms.add(String(a.alias).toLowerCase());
+    }
+    Object.assign(catalogue, { noms, typees, lu: maintenant, echec: 0 });
+    if (catalogue.annonce !== 'ok') {
+      console.log(`🎞️ Gifukai joignable : ${noms.size} action(s) et alias — GIF hétéro, lesbienne et gay filtrés par couple.`);
+      catalogue.annonce = 'ok';
+    }
+    return catalogue;
+  } catch (err) {
+    catalogue.echec = maintenant;
+    if (catalogue.annonce !== 'ko') {
+      console.warn(`⚠️ Gifukai injoignable depuis ce bot (${err.message}) : les GIF lesbienne et gay ne peuvent pas être servis sans lui. Vérifiez que l'hébergeur autorise api.gifukai.com.`);
+      catalogue.annonce = 'ko';
+    }
+    return catalogue.noms ? catalogue : null;
+  }
+}
+
+// « Rien pour ce couple » (404/400) est retenu 30 min : sans cela, un bisou
+// sur la joue hétéro redemanderait six fois de suite ce que Gifukai n'a pas,
+// à chaque interaction, avant de passer aux sources classiques.
+const VIDE_DUREE = 30 * 60 * 1000;
+const videsGifukai = new Map();
+const estVide = (url) => {
+  const t = videsGifukai.get(url);
+  if (!t) return false;
+  if (Date.now() - t > VIDE_DUREE) { videsGifukai.delete(url); return false; }
+  return true;
+};
+function oublierGifukai() {
+  videsGifukai.clear();
+  Object.assign(catalogue, { noms: null, typees: null, lu: 0, echec: 0 });
+}
+
+// Les chemins Gifukai à essayer pour une action du bot, d'après le catalogue.
+function cheminsGifukai(action, cat) {
+  const candidats = NOMS_GIFUKAI[action] || [];
+  return candidats.filter((chemin) => {
+    const base = chemin.split('?')[0];
+    if (!cat) return GIFUKAI_DOCUMENTEES.has(base);
+    if (!cat.noms.has(base)) return false;
+    // `?type=` sur une action non typée : Gifukai répond 400.
+    return !chemin.includes('?type=') || cat.typees.has(base);
+  });
+}
+
+// Un GIF Gifukai pour cette action et l'un de ces couples.
+// Rend { url, anime, source } ; { exclu } si Gifukai n'a répondu QUE l'image
+// à écarter ; { introuvable } s'il a répondu sans rien pour ces couples ;
+// { injoignable } si aucun appel n'a abouti ; null s'il ne connaît pas
+// l'action (rien à demander).
+async function chercherGifukai(action, couples, exclure = null) {
+  if (!Array.isArray(couples) || !couples.length) return null;
+  const cat = await catalogueGifukai();
+  const chemins = cheminsGifukai(action, cat);
+  if (!chemins.length) return cat ? null : { injoignable: true };
   const essais = exclure?.size ? ESSAIS_SAUF : 1;
-  for (let essai = 0; essai < essais; essai++) {
-    try {
-      const res = await fetch(url, { headers: ENTETES_GIF, signal: AbortSignal.timeout(5000) });
-      if (!res.ok) {
-        console.warn(`⚠️ GIF Gifukai (${action}, ${pairing}) : HTTP ${res.status}`);
-        return null;
+  let repondu = false;
+  let exclu = false;
+  for (const chemin of chemins) {
+    for (const couple of couples) {
+      const url = `https://api.gifukai.com/v1/${chemin}${chemin.includes('?') ? '&' : '?'}pairing=${couple}`;
+      if (estVide(url)) { repondu = true; continue; }
+      for (let essai = 0; essai < essais; essai++) {
+        let res;
+        try {
+          res = await fetch(url, { headers: ENTETES_GIF, signal: AbortSignal.timeout(5000) });
+        } catch (err) {
+          console.warn(`⚠️ GIF Gifukai (${chemin}, ${couple}) : ${err.message}`);
+          break;
+        }
+        // 404 « aucun GIF pour ce couple », 400 « filtre refusé » : Gifukai a
+        // répondu, il n'a rien — on passe au couple ou au nom suivant.
+        if (res.status === 404 || res.status === 400) { repondu = true; videsGifukai.set(url, Date.now()); break; }
+        if (!res.ok) {
+          console.warn(`⚠️ GIF Gifukai (${chemin}, ${couple}) : HTTP ${res.status}`);
+          break;
+        }
+        let d = null;
+        try { d = await res.json(); } catch { d = null; }
+        if (!urlAffichable(d?.url)) {
+          console.warn(`⚠️ GIF Gifukai (${chemin}, ${couple}) : réponse sans URL exploitable`);
+          break;
+        }
+        repondu = true;
+        // Ceinture et bretelles : un GIF d'un autre couple n'est jamais pris.
+        if (d.pairing && !couples.includes(String(d.pairing))) break;
+        if (estExclu(d.url, exclure)) { exclu = true; continue; } // le même GIF que l'original : on retire
+        return { url: d.url, anime: d.anime || null, source: 'gifukai' };
       }
-      const d = await res.json();
-      if (!urlAffichable(d?.url)) {
-        console.warn(`⚠️ GIF Gifukai (${action}, ${pairing}) : réponse sans URL exploitable`);
-        return null;
-      }
-      if (estExclu(d.url, exclure)) continue; // le même GIF que l'original : on retire
-      return { url: d.url, anime: d.anime || null, source: 'gifukai' };
-    } catch (err) {
-      console.warn(`⚠️ GIF Gifukai (${action}, ${pairing}) : ${err.message}`);
-      return null;
     }
   }
-  // La source a répondu, mais toujours avec l'image à écarter.
-  return { exclu: true };
+  if (exclu) return { exclu: true };
+  return repondu ? { introuvable: true } : { injoignable: true };
 }
 
 // GIPHY : 100 recherches par heure sur une clé gratuite. Une recherche
@@ -479,6 +589,17 @@ const GIPHY_LIMITE = 50;
 const GIPHY_REPIT = 20 * 60 * 1000;
 const GIPHY_RESERVE_MIN = 10;
 const derniereRechercheGiphy = new Map();
+
+// Un résultat GIPHY ne porte le type que si son titre, son adresse ou son
+// texte alternatif le DIT (« yaoi », « yuri », « catgirl »…) et ne dit pas
+// le contraire. Une recherche « anime yaoi kiss » rapporte aussi des baisers
+// quelconques : sans ce tri, on servirait un GIF hétéro à qui a choisi gay.
+function porteLeType(g, type) {
+  const def = TYPES_GIF[type];
+  if (!def?.mots) return true;
+  const texte = `${g?.title || ''} ${g?.slug || ''} ${g?.alt_text || ''}`.replace(/[-_]+/g, ' ');
+  return def.mots.test(texte) && !(def.contraires && def.contraires.test(texte));
+}
 
 async function chercherGiphy(action, type, cle, exclure = null) {
   const q = requeteGif(action, type);
@@ -491,6 +612,7 @@ async function chercherGiphy(action, type, cle, exclure = null) {
   }
   derniereRechercheGiphy.set(categorie, maintenant);
   let toutExclu = false; // GIPHY a répondu, mais rien d'autre que l'image à écarter
+  let repondu = false;
   // « pg » laisse passer les bisous sur la bouche ; « pg-13 » n'est tenté
   // que si « pg » ne rapporte rien (requêtes de niche).
   for (const rating of ['pg', 'pg-13']) {
@@ -505,11 +627,14 @@ async function chercherGiphy(action, type, cle, exclure = null) {
         continue;
       }
       const d = await res.json();
-      const liste = (Array.isArray(d.data) ? d.data : [])
+      repondu = true;
+      const brut = Array.isArray(d.data) ? d.data : [];
+      const liste = brut
+        .filter((g) => porteLeType(g, type))
         .map((g) => ({ url: urlStable(g.images?.original?.url || g.images?.downsized?.url), anime: null }))
         .filter((g) => urlAffichable(g.url));
       if (!liste.length) {
-        console.warn(`⚠️ GIF GIPHY (${q}, ${rating}) : aucun résultat`);
+        console.warn(`⚠️ GIF GIPHY (${q}, ${rating}) : ${brut.length ? `${brut.length} résultat(s), aucun ne porte le type` : 'aucun résultat'}`);
         continue;
       }
       for (const g of liste) memoriserGif(categorie, g);
@@ -520,36 +645,42 @@ async function chercherGiphy(action, type, cle, exclure = null) {
       console.warn(`⚠️ GIF GIPHY (${q}, ${rating}) : ${err.message}`);
     }
   }
-  return toutExclu ? { exclu: true } : null;
+  if (toutExclu) return { exclu: true };
+  return repondu ? { introuvable: true } : { injoignable: true };
 }
 
-// GIF « typé ». Rend { url, anime, source } ; null pour le type par défaut
-// (→ sources classiques) ; { sansCle: true } quand seule une clé GIPHY
-// absente aurait pu servir ce type ; { introuvable: true } si tout a échoué et
-// que la réserve est vide.
-// Rend aussi { introuvable: true, memeSeulement: true } quand le SEUL GIF
-// connu de ce type est celui qu'on devait écarter : ce n'est ni une panne ni
-// une clé manquante, et le pied de carte doit le dire tel quel.
+// GIF « typé » (tout sauf hétéro). Rend { url, anime, source } ; null pour
+// l'hétéro (→ fetchGifHetero) ; sinon un état qui dit pourquoi il n'y a pas
+// d'image — et JAMAIS un GIF d'un autre type à la place :
+//   { introuvable, memeSeulement } : le seul GIF de ce type était l'original ;
+//   { injoignable }                : aucune source n'a pu être jointe ;
+//   { sansCle }                    : aucune source gratuite pour cette action,
+//                                    et pas de clé GIPHY ;
+//   { introuvable }                : les sources ont répondu, sans rien.
 async function fetchGifTypee(action, type, exclure = null) {
   const def = TYPES_GIF[type];
-  if (!def) return null;
+  if (!def || type === TYPE_DEFAUT) return null;
   exclure = exclure?.size ? clesExclues(exclure) : null; // clés normalisées (idempotent)
   const cle = cleGiphy();
-  // Une source gratuite existe pour ce couple (action, type) ?
-  const gratuite = Boolean(def.pairing && ACTIONS_GIFUKAI[action]);
   let memeSeulement = false;
-  if (gratuite) {
-    const gif = await chercherGifukai(action, def.pairing, exclure);
-    if (gif?.url) {
-      memoriserGif(`${action}@${type}@gifukai`, gif);
-      return gif;
+  let joint = false; // au moins une source a répondu
+  let tente = false; // au moins une source a été tentée
+  if (def.couples) {
+    const r = await chercherGifukai(action, def.couples, exclure);
+    if (r?.url) {
+      memoriserGif(`${action}@${type}@gifukai`, r);
+      return r;
     }
-    if (gif?.exclu) memeSeulement = true;
+    if (r) tente = true;
+    if (r?.exclu) memeSeulement = true;
+    if (r && !r.injoignable) joint = true;
   }
   if (cle) {
-    const gif = await chercherGiphy(action, type, cle, exclure);
-    if (gif?.url) return gif;
-    if (gif?.exclu) memeSeulement = true;
+    tente = true;
+    const r = await chercherGiphy(action, type, cle, exclure);
+    if (r?.url) return r;
+    if (r?.exclu) memeSeulement = true;
+    if (r && !r.injoignable) joint = true;
   }
   const secours = premierLibre(gifsAuHasardTypee.all(`${action}@${type}@%`), exclure);
   if (secours?.url) {
@@ -560,8 +691,22 @@ async function fetchGifTypee(action, type, exclure = null) {
   // l'image à écarter : une réserve réduite à l'original ne dit rien d'une
   // source en panne, et ce serait annoncer un faux diagnostic.
   if (memeSeulement) return { introuvable: true, memeSeulement: true };
-  if (!cle && !gratuite) return { sansCle: true };
+  if (tente && !joint) return { injoignable: true };
+  if (!cle) return { sansCle: true };
   return { introuvable: true };
+}
+
+// GIF hétéro : Gifukai filtré sur garçon→fille / fille→garçon (dans un ordre
+// tiré au hasard), puis les sources classiques — le défaut historique.
+async function fetchGifHetero(action, exclure = null) {
+  exclure = exclure?.size ? clesExclues(exclure) : null;
+  const couples = Math.random() < 0.5 ? ['mf', 'fm'] : ['fm', 'mf'];
+  const r = await chercherGifukai(action, couples, exclure);
+  if (r?.url) {
+    memoriserGif(`${action}@hetero@gifukai`, r);
+    return r;
+  }
+  return fetchGif(action, exclure);
 }
 
 async function fetchGif(category, exclure = null) {
@@ -630,8 +775,10 @@ async function buildInteractionMessage(interaction, actionKey, author, target, w
   const counterKey = actionKey === 'peck' ? 'kiss' : actionKey;
   type = typeValide(type);
 
-  // GIF typé d'abord ; en cas d'échec on retombe sur le GIF classique, et on
-  // explique pourquoi dans le pied de carte (clé absente ou rien trouvé).
+  // 🏳️‍🌈 Un type choisi n'est JAMAIS remplacé par un GIF d'un autre type :
+  // les sources classiques montrent presque toujours un couple hétéro, et
+  // c'est ce qui donnait un GIF hétéro à qui avait choisi gay. Sans GIF du
+  // bon type, la carte part sans image et le pied dit pourquoi.
   // `exclure` : les URL du message d'origine, qu'une réponse ne ressort jamais.
   exclure = exclure?.size ? clesExclues(exclure) : null;
   let gif = null;
@@ -640,9 +787,12 @@ async function buildInteractionMessage(interaction, actionKey, author, target, w
     const typee = await fetchGifTypee(actionKey, type, exclure);
     if (typee?.url) gif = typee;
     else if (typee?.memeSeulement) noteType = L.typeMeme;
-    else noteType = typee?.sansCle ? L.typeSansCle : L.typeIntrouvable;
+    else if (typee?.injoignable) noteType = L.typeInjoignable;
+    else if (typee?.sansCle) noteType = L.typeSansCle;
+    else noteType = L.typeIntrouvable;
+  } else {
+    gif = await fetchGifHetero(actionKey, exclure);
   }
-  if (!gif?.url) gif = await fetchGif(actionKey, exclure);
   const count = incrementCounter(author.id, target.id, counterKey);
 
   // Statistiques personnelles de l'auteur → badges par paliers, envoyés en MP.
@@ -660,19 +810,17 @@ async function buildInteractionMessage(interaction, actionKey, author, target, w
     try { embed.setImage(gif.url); } catch { /* on continue sans image */ }
   }
   const pied = [];
-  if (type !== TYPE_DEFAUT && !noteType) pied.push(`${L.typeNote}${L.types[type]}`);
-  if (gif?.anime) pied.push(`${L.anime}${gif.anime}`);
-  if (!gif?.url) {
-    // Sans image du tout, une note qui promet « GIF classique » mentirait :
-    // une seule ligne, qui dit pourquoi il n'y en a pas.
-    // Et « une seule animation » ne se dit que si les sources classiques ont
-    // bien répondu : si elles sont en panne, c'est une panne, même quand la
-    // source typée, elle, n'avait que l'original.
-    pied.push(gif?.memeSeulement ? L.memeGif : L.noGif);
-  } else if (noteType) {
+  if (noteType) {
+    // Type choisi, aucun GIF de ce type : une seule ligne, qui dit pourquoi.
     pied.push(noteType);
+  } else {
+    if (type !== TYPE_DEFAUT) pied.push(`${L.typeNote}${L.types[type]}`);
+    if (gif?.anime) pied.push(`${L.anime}${gif.anime}`);
+    // « Une seule animation » ne se dit que si les sources ont bien répondu :
+    // si elles sont en panne, c'est une panne.
+    if (!gif?.url) pied.push(gif?.memeSeulement ? L.memeGif : L.noGif);
+    if (gif?.source === 'giphy') pied.push('Powered by GIPHY');
   }
-  if (gif?.source === 'giphy') pied.push('Powered by GIPHY');
   if (pied.length) embed.setFooter({ text: pied.join(' • ') });
 
   // Mention de la personne visée uniquement sur un serveur — en MP (et en
@@ -730,7 +878,8 @@ const optionType = (o) =>
     .addChoices(...CHOIX_TYPE);
 
 module.exports = {
-  CATEGORIES_GIF, SOURCES_GIF, LOCALES, TYPES_GIF, ACTIONS_GIFUKAI, CHOIX_TYPE, requeteGif, typeExigeCle, fetchGifTypee, fetchGif, urlsDuMessage, cleGif, urlStable,
+  CATEGORIES_GIF, SOURCES_GIF, LOCALES, TYPES_GIF, NOMS_GIFUKAI, CHOIX_TYPE, requeteGif, typeExigeCle, porteLeType, fetchGifTypee, fetchGifHetero, fetchGif, urlsDuMessage, cleGif, urlStable,
+  _catalogue: catalogue, _oublierGifukai: oublierGifukai,
   grade: GRADES.EVERYONE,
   public: true, // réponses visibles par tout le monde (pas d'éphémère)
   allowDm: true, // utilisable en message privé avec le bot

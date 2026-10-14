@@ -1813,5 +1813,21 @@
   ],
   "amelioration": [],
   "retrait": []
+ },
+ {
+  "id": "interact-bons-gif-2026-10db",
+  "title": "/interact : le bon GIF pour le bon type",
+  "ajout": [],
+  "fix": [
+   "🏳️‍🌈 **Un type choisi ne donne plus jamais un GIF d'un autre type.** Quand aucun GIF gay (ou lesbienne, catgirl…) n'existait pour une action, le bot prenait un GIF « classique » — presque toujours un couple hetero. La carte part desormais sans image, et le pied dit pourquoi : aucun GIF de ce type, cle GIPHY absente, ou source injoignable",
+   "😚 Le bisou sur la bouche cherche un vrai baiser, le bisou sur la joue n'accepte que la joue ou le front — dans tous les types"
+  ],
+  "amelioration": [
+   "📚 Le bot lit la liste reelle des actions Gifukai (alias compris) : chaque action qu'il connait est servie filtree par couple, au lieu d'une liste figee",
+   "💑 **Hetero filtre aussi** : garcon→fille ou fille→garcon chez Gifukai d'abord, puis les sources classiques",
+   "🔎 GIPHY : seuls les GIF dont le titre porte le type (« yaoi », « yuri », « catgirl »…) sont gardes. La reserve GIPHY d'avant ce tri est videe une fois",
+   "🖥️ La console dit au demarrage si Gifukai est joignable depuis l'hebergeur — sans lui, pas de GIF lesbienne ni gay"
+  ],
+  "retrait": []
  }
 ]
