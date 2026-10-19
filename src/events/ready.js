@@ -56,6 +56,14 @@ module.exports = {
       console.warn(`⚠️ Rappels de bump non réarmés : ${err.message}`);
     }
 
+    // 🎲 Mini-jeux : les parties en cours reprennent (minuteurs du quiz et
+    // du réflexe), celles qui ont expiré pendant le sommeil se concluent.
+    try {
+      require('../utils/jeux/moteur').demarrerJeux(client);
+    } catch (err) {
+      console.warn(`⚠️ Mini-jeux non démarrés : ${err.message}`);
+    }
+
     // XP vocal : chaque minute, chaque membre connecté en vocal (non muet
     // serveur, hors salon AFK, hors bots) gagne l'XP vocal configuré.
     setInterval(() => {

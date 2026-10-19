@@ -23,6 +23,7 @@ const { themeParCle, listeThemes, CLES } = require('./rpThemes');
 const LG = require('./langues');
 const { lien: lienCommunaute, demanderLiaison, delier } = require('./communaute');
 const M = require('./miseEnPage');
+const { vueConfigJeux, gererConfigJeux } = require('./jeux/reglagesJeux');
 
 // Panneau central de configuration : /config ouvre une vue d'ensemble avec un
 // menu de catégories ; chaque catégorie se règle via des sélecteurs de rôles,
@@ -230,7 +231,8 @@ function mainView(guild) {
         { label: 'Musique', value: 'musique', emoji: '🎵', description: 'Salons des commandes, carte de lecture' },
         { label: 'Identité du bot', value: 'identitebot', emoji: '🪪', description: 'Nom et photo du bot sur ce serveur, profils' },
         { label: 'Absences', value: 'absences', emoji: '📅', description: 'Les salons où partent les annonces d\'absence' },
-        { label: 'Réseaux sociaux', value: 'reseaux', emoji: '📡', description: 'Annonces des lives et nouvelles vidéos' }
+        { label: 'Réseaux sociaux', value: 'reseaux', emoji: '📡', description: 'Annonces des lives et nouvelles vidéos' },
+        { label: 'Mini-jeux', value: 'jeux', emoji: '🎲', description: 'Les jeux de /jeu, un par un, et leurs récompenses' }
       )
   );
   return { embeds: [embed], components: [categoryRow] };
@@ -1131,7 +1133,10 @@ function absencesView(guild) {
   };
 }
 
-const CATEGORY_VIEWS = { communaute: communauteView, rp: rpView, roles: rolesView, arrivees: arriveesView, salons: salonsView, xp: xpView, securite: securiteView, whitelist: whitelistView, tickets: ticketsView, vocal: vocalView, musique: musiqueView, identitebot: identiteBotView, absences: absencesView, reseaux: reseauxView };
+// 🎲 Mini-jeux : la vue vit avec les jeux (src/utils/jeux/reglagesJeux.js).
+const jeuxView = (guild) => vueConfigJeux(guild);
+
+const CATEGORY_VIEWS = { communaute: communauteView, rp: rpView, roles: rolesView, arrivees: arriveesView, salons: salonsView, xp: xpView, securite: securiteView, whitelist: whitelistView, tickets: ticketsView, vocal: vocalView, musique: musiqueView, identitebot: identiteBotView, absences: absencesView, reseaux: reseauxView, jeux: jeuxView };
 const SECURITY_TOGGLES = new Set(['antispam_enabled', 'antinuke_enabled', 'captcha_enabled']);
 
 function xpModal(cfg) {
@@ -1206,6 +1211,11 @@ async function handleConfigInteraction(interaction) {
       const view = CATEGORY_VIEWS[interaction.values[0]];
       if (!view) return;
       return await mettreAJour(interaction, view(interaction.guild));
+    }
+
+    // 🎲 Mini-jeux : module, jeux un par un, récompenses (modal).
+    if (id.startsWith('cfgjeux:')) {
+      return await gererConfigJeux(interaction, grade);
     }
 
     // Sécurité : bascule anti-spam / anti-nuke / captcha.
