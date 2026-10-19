@@ -1,0 +1,1071 @@
+<!DOCTYPE html>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Zetku — Dashboard (DÉMO locale)</title>
+<style>  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root { --bg:#0a1122; --bg2:#070d1a; --panel:#101a30; --panel2:#16233f; --border:#24395e; --text:#e7f1ff;
+          --muted:#8aa2c8; --accent:#4dc3ff; --accent2:#2ea8e8; --green:#43d68b; --red:#ff5f6b; --blue:#62b8ff; --gold:#ff9b3d; }
+  body { font-family:'Segoe UI',system-ui,sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
+  a { color:inherit; text-decoration:none; }
+  button { background:var(--panel2); color:var(--text); border:1px solid var(--border); border-radius:8px;
+           padding:9px 16px; font-size:13.5px; cursor:pointer; font-family:inherit; }
+  button:hover { filter:brightness(1.12); }
+  button.accent { background:linear-gradient(135deg, #39b6f5, #1f8fe0); border-color:#57c8ff; color:#04121f; font-weight:700; box-shadow:0 0 14px rgba(77,195,255,.35); }
+  input, select, textarea { background:#0b1526; border:1px solid var(--border); color:var(--text);
+           border-radius:9px; padding:11px 13px; font-size:13.5px; width:100%; font-family:inherit; }
+  input:focus, select:focus, textarea:focus { outline:none; border-color:var(--accent); }
+  /* ---- barre du haut ---- */
+  .nav { display:flex; align-items:center; gap:26px; padding:0 26px; height:64px; background:var(--bg2);
+         border-bottom:1px solid var(--border); position:sticky; top:0; z-index:20; }
+  .nav .brand { display:flex; align-items:center; gap:10px; font-weight:800; font-size:19px; letter-spacing:.02em; color:var(--accent); }
+  .nav .brand .lg { font-size:24px; }
+  .nav .links { display:flex; gap:22px; font-size:13px; font-weight:700; letter-spacing:.06em; }
+  .nav .links a { color:var(--text); opacity:.85; } .nav .links a:hover { color:var(--accent); opacity:1; }
+  .nav .spacer { margin-left:auto; }
+  .nav .supportbtn { border:1.5px solid var(--accent); color:var(--accent); background:transparent; border-radius:22px;
+                     padding:9px 22px; font-weight:700; letter-spacing:.05em; font-size:12.5px; }
+  .nav .me { display:flex; align-items:center; gap:9px; font-weight:600; font-size:14px; }
+  .nav .me img { width:36px; height:36px; border-radius:50%; border:2px solid var(--border); }
+  /* ---- interrupteurs façon DraftBot ---- */
+  .switch { position:relative; width:46px; height:25px; flex-shrink:0; display:inline-block; }
+  .switch input { opacity:0; width:0; height:0; }
+  .switch .sl { position:absolute; inset:0; background:#253a5c; border-radius:25px; transition:.18s; cursor:pointer; }
+  .switch .sl:before { content:''; position:absolute; width:19px; height:19px; border-radius:50%; background:#fff; top:3px; left:3px; transition:.18s; }
+  .switch input:checked + .sl { background:var(--accent); }
+  .switch input:checked + .sl:before { transform:translateX(21px); }
+  /* ---- disposition application ---- */
+  .layout { display:flex; min-height:calc(100vh - 64px); }
+  .rail { width:68px; background:var(--bg2); border-right:1px solid var(--border); padding:12px 0; display:flex;
+          flex-direction:column; align-items:center; gap:10px; flex-shrink:0; }
+  .rail .ric { width:46px; height:46px; border-radius:50%; cursor:pointer; border:2px solid transparent; transition:.15s;
+               background:var(--panel2); display:flex; align-items:center; justify-content:center; font-size:19px; overflow:hidden; }
+  .rail .ric img { width:100%; height:100%; object-fit:cover; }
+  .rail .ric:hover { border-color:var(--muted); border-radius:16px; }
+  .rail .ric.on { border-color:var(--accent); }
+  .side { width:250px; background:var(--panel); border-right:1px solid var(--border); flex-shrink:0; }
+  .side .head { padding:20px 16px; text-align:center; border-bottom:1px solid var(--border); }
+  .side .head img, .side .head .noicon { width:76px; height:76px; border-radius:50%; margin-bottom:9px; }
+  .side .head .noicon { background:var(--panel2); display:inline-flex; align-items:center; justify-content:center; font-size:30px; }
+  .side .head .nm { font-family:'Georgia',serif; font-weight:700; font-size:16px; }
+  .side .item { display:flex; align-items:center; gap:10px; padding:11px 16px; font-size:13.5px; color:var(--muted);
+                cursor:pointer; border-left:3px solid transparent; }
+  .side .item:hover { background:var(--panel2); color:var(--text); }
+  .side .item.on { background:var(--panel2); color:var(--text); border-left-color:var(--accent); font-weight:600; }
+  .main { flex:1; padding:34px 42px; min-width:0; max-width:1150px; }
+  h1.pagetitle { font-size:26px; font-weight:700; margin-bottom:26px; }
+  .sec { margin-bottom:34px; }
+  .sechead { display:flex; align-items:flex-start; gap:14px; margin-bottom:8px; }
+  .sechead .t { font-size:17px; font-weight:700; }
+  .sechead .d { color:var(--muted); font-size:13px; margin-top:3px; }
+  .sechead .sw { margin-left:auto; }
+  .flabel { font-size:11px; letter-spacing:.08em; font-weight:800; color:#a9c2e8; text-transform:uppercase; margin:16px 0 7px; }
+  .fields { max-width:640px; }
+  .cols { display:flex; gap:34px; flex-wrap:wrap; }
+  .cols > div { flex:1; min-width:320px; }
+  .togline { display:flex; align-items:center; gap:12px; font-size:13.5px; color:var(--muted); margin:14px 0; }
+  .count { text-align:right; font-size:11.5px; color:var(--muted); margin-top:3px; }
+  .count b { color:var(--accent); font-weight:600; }
+  /* ---- prévisualisation Discord ---- */
+  .dprev { background:#313338; border-radius:10px; padding:14px 16px; font-size:14px; }
+  .dprev .dtop { display:flex; align-items:center; gap:8px; margin-bottom:6px; }
+  .dprev .dtop img { width:38px; height:38px; border-radius:50%; }
+  .dprev .dtop .bn { font-weight:600; }
+  .dprev .dtop .badge { background:#5865f2; color:#fff; font-size:10px; font-weight:700; border-radius:4px; padding:1px 5px; }
+  .dprev .dtop .ts { color:#949ba4; font-size:11.5px; }
+  .dprev .dcard { border-left:4px solid var(--accent); background:#2b2d31; border-radius:5px; padding:11px 13px; margin-top:4px; }
+  .dprev .dcard .dt { font-weight:700; margin-bottom:5px; }
+  .dprev .dcard .dd { color:#dbdee1; font-size:13.5px; line-height:1.55; white-space:pre-wrap; }
+  .dprev .dcard .df { color:#949ba4; font-size:11.5px; margin-top:9px; }
+  .dprev .mention { background:rgba(88,101,242,.3); color:#c9cdfb; border-radius:3px; padding:0 3px; }
+  /* ---- tuiles / lignes ---- */
+  .tiles { display:grid; grid-template-columns:repeat(auto-fill,minmax(170px,1fr)); gap:13px; margin:18px 0; }
+  .tile { background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:16px; }
+  .tile .tv { font-size:23px; font-weight:800; color:var(--accent); }
+  .tile .tl { color:var(--muted); font-size:12px; margin-top:4px; }
+  .row { background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:11px 15px;
+         margin-bottom:8px; display:flex; align-items:center; gap:10px; flex-wrap:wrap; font-size:13.5px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:15px; }
+  .scard { background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:19px;
+           display:flex; align-items:center; gap:14px; cursor:pointer; transition:.15s; }
+  .scard:hover { border-color:var(--accent); transform:translateY(-2px); }
+  .scard img, .scard .noicon { width:54px; height:54px; border-radius:50%; }
+  .scard .noicon { background:var(--panel2); display:flex; align-items:center; justify-content:center; font-size:22px; }
+  .toast { position:fixed; bottom:24px; right:24px; background:var(--panel2); border:1px solid var(--accent);
+           border-radius:10px; padding:13px 18px; font-size:13.5px; opacity:0; transform:translateY(10px);
+           transition:opacity .22s, transform .22s; z-index:60; box-shadow:0 10px 30px rgba(0,0,0,.35); pointer-events:none; }
+  .toast.on { opacity:1; transform:translateY(0); }
+  .toast.ok { border-color:var(--green); }
+  .toast.err { border-color:var(--red); }
+  .empty { color:var(--muted); padding:48px; text-align:center; }
+  .wrap { max-width:1100px; margin:0 auto; padding:30px 20px; }
+  /* ---- onglets (espace staff) ---- */
+  .tabbar { display:flex; gap:4px; border-bottom:1px solid var(--border); margin:16px 0 22px; flex-wrap:wrap; }
+  .tab { padding:10px 18px; font-size:13.5px; color:var(--muted); cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-1px; }
+  .tab:hover { color:var(--text); }
+  .tab.on { color:var(--accent); border-bottom-color:var(--accent); font-weight:600; }
+  .chip { background:#0b1526; border:1px solid var(--border); border-radius:14px; padding:4px 11px; font-size:12.5px;
+          display:inline-flex; gap:6px; align-items:center; }
+  .chip button { padding:0 5px; font-size:11px; background:transparent; border:0; color:var(--muted); }
+  /* ---- bouton flottant Créateur (en bas à gauche) ---- */
+  .cfab { position:fixed; bottom:22px; left:22px; width:52px; height:52px; border-radius:50%; background:var(--accent);
+          color:#fff; font-size:24px; display:flex; align-items:center; justify-content:center; cursor:pointer;
+          box-shadow:0 8px 26px rgba(0,0,0,.4); z-index:40; transition:transform .15s; }
+  .cfab:hover { transform:scale(1.08); }
+  /* ---- barre de défilement raffinée ---- */
+  ::-webkit-scrollbar { width:10px; height:10px; }
+  ::-webkit-scrollbar-track { background:transparent; }
+  ::-webkit-scrollbar-thumb { background:#28405f; border-radius:6px; border:2px solid var(--bg); }
+  ::-webkit-scrollbar-thumb:hover { background:#33507a; }
+  * { scrollbar-width:thin; scrollbar-color:#28405f transparent; }
+  :focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
+  /* ---- chargement (spinner) ---- */
+  .spin { width:34px; height:34px; border:3px solid var(--border); border-top-color:var(--accent);
+          border-radius:50%; animation:spin .7s linear infinite; margin:44px auto; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .loadbox { display:flex; flex-direction:column; align-items:center; gap:12px; padding:40px; color:var(--muted); font-size:13.5px; }
+  /* ---- pastille de statut (bot en ligne) ---- */
+  .dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; display:inline-block; }
+  .dot.up { background:var(--green); box-shadow:0 0 7px rgba(67,214,139,.8); }
+  .dot.down { background:var(--red); }
+  .rail .ric { position:relative; }
+  .rail .ric .st { position:absolute; bottom:-1px; right:-1px; width:13px; height:13px; border-radius:50%; border:2.5px solid var(--bg2); }
+  .rail .ric .st.up { background:var(--green); } .rail .ric .st.down { background:var(--red); }
+  .side .head .stline { display:flex; align-items:center; justify-content:center; gap:6px; color:var(--muted); font-size:12px; margin-top:5px; }
+  /* ---- transition d'apparition des pages ---- */
+  .fade { animation:fade .25s ease; }
+  @keyframes fade { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }
+  /* ---- écran d'erreur avec réessai ---- */
+  .errbox { text-align:center; padding:52px 20px; color:var(--muted); }
+  .errbox .ei { font-size:44px; margin-bottom:12px; }
+  .errbox .em { font-size:15px; margin-bottom:18px; max-width:440px; margin-left:auto; margin-right:auto; line-height:1.55; }
+  /* ---- menu mobile (masqué en bureau) ---- */
+  .burger { display:none; background:transparent; border:0; font-size:22px; padding:4px 8px; cursor:pointer; color:var(--text); }
+  @media (max-width:860px) {
+    html, body { overflow-x:hidden; }
+    .nav { gap:10px; padding:0 12px; }
+    .nav .links, .nav .me span, .nav .supportbtn { display:none; }
+    .nav .brand { font-size:16px; }
+    .nav button { padding:8px 12px; font-size:12.5px; }
+    .burger { display:block; }
+    .wrap { padding:22px 14px; }
+    .grid { grid-template-columns:1fr; }
+    .layout { flex-direction:column; }
+    .rail { width:100%; flex-direction:row; overflow-x:auto; padding:10px; border-right:0; border-bottom:1px solid var(--border); }
+    .side { width:100%; border-right:0; border-bottom:1px solid var(--border); display:none; }
+    .side.open { display:block; }
+    .side .head { padding:14px; }
+    .side .head img, .side .head .noicon { width:54px; height:54px; }
+    .main { padding:20px 16px; max-width:100%; }
+    .cols { gap:20px; }
+    .cols > div { min-width:100%; }
+    h1.pagetitle { font-size:22px; margin-bottom:18px; }
+  }</style>
+</head>
+<body>
+<div style="background:#4dc3ff;color:#04121f;text-align:center;padding:7px 14px;font-size:13px;font-weight:600">🧪 DÉMO LOCALE — données fictives, aucune connexion. Toutes les sections (Staff, Créateur, Tickets, Base de données) sont explorables.</div>
+<div class="nav">
+  <span class="brand" style="cursor:pointer" onclick="renderHome()"><span class="lg">🎛️</span>Zetku</span>
+  <span class="links"><a href="#" onclick="return false">DOCUMENTATION</a></span>
+  <span class="spacer"></span>
+  <button class="supportbtn">SUPPORT</button>
+  <span class="me"><img id="h_avatar" style="display:none"><span id="h_name"></span></span>
+  <button onclick="renderHome()">Accueil</button>
+</div>
+<div id="content"><div class="loadbox"><div class="spin"></div>Chargement…</div></div>
+<div id="toast" class="toast"></div>
+<script>
+var moi = null, gid = null, page = 'apercu';
+function $(id){ return document.getElementById(id); }
+function esc(s){ var d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; }
+var toastTimer;
+function toast(msg, kind){ var t = $('toast'); t.textContent = msg; t.className = 'toast on ' + (kind || ''); clearTimeout(toastTimer); toastTimer = setTimeout(function(){ t.className = 'toast ' + (kind || ''); }, 3200); }
+function su(a){ return 'index.php?p=api-serveur&gid=' + gid + '&a=' + a; }
+function spinner(){ return '<div class="loadbox"><div class="spin"></div>Chargement…</div>'; }
+function errScreen(msg, retry){
+  var h = '<div class="errbox fade"><div class="ei">😕</div><div class="em">' + esc(msg) + '</div>';
+  if (retry) h += '<button class="accent" id="retrybtn">↻ Réessayer</button>';
+  h += '</div>';
+  return h;
+}
+// ===== DÉMO LOCALE : routeur simulant l'API (aucun réseau) =====
+var DB = {
+  moi: { user:{ id:'0', username:'Vous (démo)', avatar:null },
+    role:{ creator:true, staff:true, rank:'Créateur', perms:['blacklist','tickets','staff'] },
+    dash:{ nom:'Zetku', accent:'#4dc3ff', accroche:'Le Roleplay',
+      modules:{ apercu:true, module:true, membres:true, roles:true, salons:true, niveaux:true, whitelist:false, tickets:true } },
+    servers:[
+      { id:'900000000000000001', name:'Colmar RP', icon:null, membres:842, bot:'Colmar_rp', enligne:true },
+      { id:'900000000000000002', name:'Shadow Community', icon:null, membres:1287, bot:'Shadow_community', enligne:true },
+      { id:'900000000000000003', name:'Lyon RP', icon:null, membres:356, bot:'Colmar_rp', enligne:false } ] },
+  apercu: { serveur:{ name:'Colmar RP', membres:842, icon:null },
+    stats:{ cartes:128, permis:74, entreprises:12, ticketsOuverts:3, whitelist:41, vehicules:26 },
+    top:[ {user:'shadow',level:42,xp:18400}, {user:'Alex',level:37,xp:14200}, {user:'Marie',level:31,xp:9800} ] },
+  params: { config:{ rp_enabled:1, rp_locked:0, staff_role_id:'10', admin_role_id:'11',
+      staff_role_ids:'["10","12"]', admin_role_ids:'["11"]', service_role_id:'13',
+      log_channel_id:'20', level_channel_id:'21', service_channel_id:'22', staff_channel_id:'23',
+      member_channel_id:'24', update_channel_id:null, proof_channel_id:'26',
+      welcome_message:'Bienvenue à {user} sur **{server}** ! 🎉\nPense à lire le règlement.',
+      goodbye_message:null, welcome_mention:1, xp_text:20, xp_voice:10, xp_cooldown:60 },
+    roles:[ {id:'10',name:'Staff'}, {id:'11',name:'Administration'}, {id:'12',name:'Modérateur'},
+      {id:'13',name:'En service'}, {id:'14',name:'Police'}, {id:'15',name:'Gérant Police'} ],
+    channels:[ {id:'20',name:'logs'}, {id:'21',name:'niveaux'}, {id:'22',name:'services'}, {id:'23',name:'staff'},
+      {id:'24',name:'bienvenue'}, {id:'25',name:'général'}, {id:'26',name:'preuves'} ],
+    categories:[ {id:'30',name:'TICKETS'}, {id:'31',name:'AIDE'} ],
+    whitelist:[ {roleId:'14',managerId:'15',role:'Police',manager:'Gérant Police'} ],
+    tickets:[ {id:1,label:'Support',emoji:'🛠️',description:'Une question, un souci ?',categorie:'TICKETS',support:'Staff',supports:[{id:'10',name:'Staff'},{id:'12',name:'Modérateur'}]},
+      {id:2,label:'Plainte',emoji:'⚖️',description:'Signaler un membre',categorie:'AIDE',support:'Modérateur',supports:[{id:'12',name:'Modérateur'}]} ],
+    profils:[ {id:1,name:'Support Colmar RP',avatar:'https://cdn.discordapp.com/embed/avatars/2.png'} ], bans:[] },
+  blacklist:[ {userId:'700000000000000010',tag:'ScammeurX',reason:'Arnaque MrBeast',by:'0',at:'2026-07-20T14:00:00Z'},
+    {userId:'700000000000000011',tag:null,reason:'Spam massif',by:'0',at:'2026-07-19T09:30:00Z'} ],
+  botstaff:{ staff:[ {userId:'800000000000000001',tag:'Alex',rank:'Responsable',perms:['blacklist','tickets','staff']},
+      {userId:'800000000000000002',tag:'Marie',rank:'Modérateur',perms:['tickets']} ],
+    grades:['Responsable','Modérateur','Support'],
+    perms:{ blacklist:'🚫 Blacklist', tickets:'🎫 Tickets du QG', staff:'🛡️ Gestion du staff' } },
+  qg:[ {id:42,kind:'ban',guildName:'Colmar RP',guildId:'900000000000000001',targetId:'700000000000000030',targetTag:'Fraudeur',reporterId:null,reason:'Ban : publicité + insultes',status:'ouvert',claimedBy:null,resolution:null,at:'2026-07-22T08:10:00Z'},
+    {id:41,kind:'ban',guildName:'Shadow Community',guildId:'900000000000000002',targetId:'700000000000000031',targetTag:'Troll',reporterId:null,reason:'Ban : spam',status:'claim',claimedBy:'800000000000000001',resolution:null,at:'2026-07-21T19:44:00Z'},
+    {id:40,kind:'ban',guildName:'Colmar RP',guildId:'900000000000000001',targetId:'700000000000000010',targetTag:'ScammeurX',reporterId:null,reason:'Ban : arnaque',status:'traite',claimedBy:'800000000000000001',resolution:'blacklist',at:'2026-07-20T13:55:00Z'} ],
+  historique:[ {id:3,userId:'700000000000000010',tag:'ScammeurX',action:'blacklist',reason:'Arnaque MrBeast',proof:'https://cdn.discordapp.com/preuve1.png',by:'800000000000000001',at:'2026-07-20T14:00:00Z'},
+    {id:2,userId:'700000000000000011',tag:null,action:'blacklist',reason:'Spam massif',proof:null,by:'0',at:'2026-07-19T09:30:00Z'},
+    {id:1,userId:'700000000000000009',tag:'Repenti',action:'deblacklist',reason:null,proof:null,by:'0',at:'2026-07-18T16:20:00Z'} ],
+  preuves:[ {id:5,authorId:'800000000000000001',authorTag:'Alex',content:'Preuve arnaque ScammeurX — capture ci-jointe',attachments:['https://cdn.discordapp.com/preuve1.png'],at:'2026-07-20T13:58:00Z'},
+    {id:4,authorId:'800000000000000002',authorTag:'Marie',content:'Logs du spam de Troll',attachments:['https://cdn.discordapp.com/logs.txt'],at:'2026-07-21T19:40:00Z'} ],
+  status:{ type:'watching', text:'les serveurs RP', presence:'online' },
+  auto:true,
+  dashconfig:null
+};
+DB.dashconfig = { config: DB.moi.dash, modules: {
+    apercu:['📊','Vue d\'ensemble'], module:['🎭','Module RP'], membres:['👋','Arrivées et départs'],
+    roles:['👮','Rôles & sécurité'], salons:['📢','Salons & logs'], niveaux:['📈','Niveaux'],
+    whitelist:['📋','Whitelist métiers'], tickets:['🎫','Tickets'] },
+  bots:[ {name:'Colmar_rp',serveurs:2}, {name:'Shadow_community',serveurs:1} ] };
+function demoQ(list, q, fields){
+  q = String(q||'').trim().toLowerCase(); if (!q) return list;
+  return list.filter(function(r){ return fields.map(function(f){ return r[f]; }).filter(Boolean).some(function(v){ return String(v).toLowerCase().indexOf(q) >= 0; }); });
+}
+function qparam(path, key){ var m = path.match(new RegExp('[?&]' + key + '=([^&]*)')); return m ? decodeURIComponent(m[1]) : ''; }
+function api(method, path, body){
+  return new Promise(function(resolve){
+    setTimeout(function(){ resolve(demoRoute(method, path, body || {})); }, 90);
+  });
+}
+function demoRoute(method, path, body){
+  try {
+    if (path.indexOf('p=api-moi') >= 0) return DB.moi;
+    // ---- api-serveur ----
+    if (path.indexOf('p=api-serveur') >= 0){
+      var a = qparam(path, 'a');
+      if (a === 'apercu') return DB.apercu;
+      if (a === 'parametres') return DB.params;
+      if (a === 'config'){ if (body.key !== undefined) DB.params.config[body.key] = body.value; return { ok:true }; }
+      if (a === 'tickets-type'){ var id = DB.params.tickets.length ? Math.max.apply(null, DB.params.tickets.map(function(t){return t.id;}))+1 : 1;
+        var rids = Array.isArray(body.supportRoleIds) ? body.supportRoleIds : (body.supportRoleId ? [body.supportRoleId] : []);
+        var supports = rids.map(function(rid){ var r = DB.params.roles.filter(function(x){ return x.id === rid; })[0]; return { id: rid, name: r ? r.name : rid }; });
+        var cat = DB.params.categories.filter(function(c){ return c.id === body.categoryId; })[0];
+        DB.params.tickets.push({ id:id, label:body.label||'Ticket', emoji:body.emoji||'🎫', description:body.description||'', categorie: cat ? cat.name : (body.categoryId||''), support: supports[0] ? supports[0].name : '', supports: supports }); return { ok:true }; }
+      if (a === 'tickets-type-suppr'){ DB.params.tickets = DB.params.tickets.filter(function(t){ return String(t.id) !== String(body.id); }); return { ok:true }; }
+      if (a === 'whitelist-ajouter'){ DB.params.whitelist.push({ roleId:body.roleId, managerId:body.managerId, role:'Rôle', manager:'Gérant' }); return { ok:true }; }
+      if (a === 'whitelist-retirer'){ DB.params.whitelist = DB.params.whitelist.filter(function(w){ return w.roleId !== body.roleId; }); return { ok:true }; }
+      if (a === 'ticket-panneau') return { ok:true, note:'Démo — panneau simulé' };
+      if (a === 'profil-ajouter'){ var pid = DB.params.profils.length ? Math.max.apply(null, DB.params.profils.map(function(p){return p.id;}))+1 : 1;
+        DB.params.profils.push({ id:pid, name:body.name||'Profil', avatar:body.avatar||'' }); return { ok:true }; }
+      if (a === 'profil-suppr'){ DB.params.profils = DB.params.profils.filter(function(p){ return String(p.id) !== String(body.id); }); return { ok:true }; }
+      return { ok:true, note:'Démo' };
+    }
+    // ---- api-global ----
+    if (path.indexOf('p=api-global') >= 0){
+      var g = qparam(path, 'a');
+      if (g === 'blacklist' && method === 'GET') return { blacklist: DB.blacklist };
+      if (g === 'botstaff' && method === 'GET') return DB.botstaff;
+      if (g === 'dashconfig' && method === 'GET') return DB.dashconfig;
+      if (g === 'bot-status' && method === 'GET') return { status: DB.status, tag:'Colmar_rp#0001' };
+      if (g === 'dash-version' && method === 'GET') return { current:'v1.0.46', latest:'v1.0.47', updateAvailable:true, auto:(DB.auto !== false), writable:true, error:null };
+      if (g === 'dash-maj') return { ok:true, version:'v1.0.47' };
+      if (g === 'dash-auto'){ DB.auto = !!body.on; return { ok:true, auto: DB.auto }; }
+      if (g === 'qg-tickets' && method === 'GET') return { tickets: DB.qg };
+      if (g === 'blacklist-historique' && method === 'GET') return { historique: demoQ(DB.historique, qparam(path,'q'), ['userId','tag','reason']) };
+      if (g === 'preuves' && method === 'GET') return { preuves: demoQ(DB.preuves, qparam(path,'q'), ['authorId','authorTag','content']) };
+      // écritures
+      if (g === 'blacklist-ajouter'){ var t = { userId:body.userId, tag:'Utilisateur '+body.userId, reason:body.reason||null, by:'0', at:new Date().toISOString() };
+        DB.blacklist.unshift(t); DB.historique.unshift({ id:DB.historique.length+1, userId:body.userId, tag:t.tag, action:'blacklist', reason:body.reason||null, proof:body.proof||null, by:'0', at:t.at });
+        return { ok:true, tag:t.tag, banned:3, dmOk:true }; }
+      if (g === 'blacklist-retirer'){ DB.blacklist = DB.blacklist.filter(function(b){ return b.userId !== body.userId; });
+        DB.historique.unshift({ id:DB.historique.length+1, userId:body.userId, tag:null, action:'deblacklist', reason:null, proof:null, by:'0', at:new Date().toISOString() });
+        return { ok:true, unbanned:3 }; }
+      if (g === 'botstaff-ajouter'){ DB.botstaff.staff.push({ userId:body.userId, tag:'Staff '+body.userId, rank:body.rank||'Support', perms:[] }); return { ok:true }; }
+      if (g === 'botstaff-retirer'){ DB.botstaff.staff = DB.botstaff.staff.filter(function(s){ return s.userId !== body.userId; }); return { ok:true }; }
+      if (g === 'botstaff-perm'){ var s = DB.botstaff.staff.find(function(x){ return x.userId === body.userId; });
+        if (s){ var i = s.perms.indexOf(body.perm); if (body.on && i<0) s.perms.push(body.perm); if (!body.on && i>=0) s.perms.splice(i,1); } return { ok:true }; }
+      if (g === 'botstaff-grade'){ if (body.grade && DB.botstaff.grades.indexOf(body.grade)<0) DB.botstaff.grades.push(body.grade);
+        var m2 = DB.botstaff.staff.find(function(x){ return x.userId === body.userId; }); if (m2 && body.rank) m2.rank = body.rank; return { ok:true }; }
+      if (g === 'botstaff-grade-suppr'){ DB.botstaff.grades = DB.botstaff.grades.filter(function(x){ return x !== body.grade; }); return { ok:true }; }
+      if (g === 'dashconfig-save'){ if (body.config) { DB.moi.dash = body.config; DB.dashconfig.config = body.config; } return { ok:true, config: body.config }; }
+      if (g === 'bot-status-save'){ if (body.status) DB.status = body.status; return { ok:true }; }
+      if (g === 'qg-claim'){ var q1 = DB.qg.find(function(x){ return String(x.id) === String(body.ticketId); }); if (q1){ q1.status='claim'; q1.claimedBy='0'; } return { ok:true }; }
+      if (g === 'qg-invite') return { ok:true, url:'https://discord.gg/demo-invite-1h' };
+      if (g === 'qg-traiter'){ var q2 = DB.qg.find(function(x){ return String(x.id) === String(body.ticketId); });
+        if (q2){ q2.status='traite'; q2.resolution = body.resolution === 'blacklist' ? 'blacklist' : 'aucune';
+          if (body.resolution === 'blacklist'){ DB.blacklist.unshift({ userId:q2.targetId, tag:q2.targetTag, reason:'Ticket QG n°'+q2.id, by:'0', at:new Date().toISOString() });
+            DB.historique.unshift({ id:DB.historique.length+1, userId:q2.targetId, tag:q2.targetTag, action:'blacklist', reason:'Ticket QG n°'+q2.id, proof:body.proof||null, by:'0', at:new Date().toISOString() }); } }
+        return { ok:true, tag:q2 && q2.targetTag, banned:3 }; }
+      return { ok:true, note:'Démo' };
+    }
+    return { error:'Route de démo inconnue : ' + path };
+  } catch (e) { return { error:'Démo : ' + e.message }; }
+}
+function save(key, value){
+  api('POST', su('config'), { key: key, value: value }).then(function(j){ if (j && !j.error) toast('✅ Enregistré', 'ok'); });
+}
+// Interrupteur façon DraftBot.
+function tog(id, checked){
+  return '<label class="switch"><input type="checkbox" id="' + id + '"' + (checked ? ' checked' : '') + '><span class="sl"></span></label>';
+}
+
+var ROLE = { creator: false, staff: false, perms: [] };
+var DASH = { nom: 'Mon Bot', accent: '#4dc3ff', modules: {} };
+var TK = null; // paramètres tickets (raisons, profils) pour la prévisualisation
+function canPerm(p){ return ROLE.creator || (ROLE.perms || []).indexOf(p) >= 0; }
+
+// ----- Accueil : grille des serveurs -----
+function renderHome(){
+  gid = null;
+  var h = '<div class="wrap"><h1 class="pagetitle">Mes serveurs</h1>';
+  if (!moi.servers.length) h += '<div class="empty">Aucun serveur — invitez le bot sur votre serveur (bouton « Ajouter à Discord » de la page d\'accueil), puis rechargez.</div>';
+  h += '<div class="grid">';
+  moi.servers.forEach(function(s){
+    h += '<div class="scard" data-g="' + s.id + '">' +
+      (s.icon ? '<img src="' + s.icon + '">' : '<div class="noicon">🌐</div>') +
+      '<div><div style="font-weight:700">' + esc(s.name) + '</div>' +
+      '<div style="color:var(--muted);font-size:12px">' + (s.membres ? s.membres + ' membres · ' : '') + '🤖 ' + esc(s.bot) + '</div></div></div>';
+  });
+  h += '</div>';
+  // Accès Staff / Créateur (réservés à l'équipe du bot)
+  if (ROLE.staff || ROLE.creator){
+    h += '<h1 class="pagetitle" style="margin-top:34px">Espace équipe du bot</h1><div class="grid">';
+    if (ROLE.staff) h += '<div class="scard" id="go-staff"><div class="noicon">🛡️</div><div><div style="font-weight:700">Staff du bot</div><div style="color:var(--muted);font-size:12px">Blacklist · Équipe du bot</div></div></div>';
+    if (ROLE.creator) h += '<div class="scard" id="go-createur"><div class="noicon">⚙️</div><div><div style="font-weight:700">Créateur</div><div style="color:var(--muted);font-size:12px">Configurer le dashboard</div></div></div>';
+    h += '</div>';
+  }
+  h += '</div>';
+  $('content').innerHTML = h;
+  Array.prototype.forEach.call(document.querySelectorAll('.scard[data-g]'), function(el){
+    el.onclick = function(){ gid = el.getAttribute('data-g'); page = 'apercu'; renderServer(); };
+  });
+  if ($('go-staff')) $('go-staff').onclick = function(){ renderStaff('blacklist'); };
+  if ($('go-createur')) $('go-createur').onclick = renderCreateur;
+  // Bouton flottant « Créateur » en bas à gauche (créateur uniquement).
+  var old = $('cfab'); if (old) old.remove();
+  if (ROLE.creator){
+    var fab = document.createElement('div');
+    fab.id = 'cfab'; fab.className = 'cfab'; fab.title = 'Espace Créateur';
+    fab.innerHTML = '⚙️'; fab.onclick = renderCreateur;
+    document.body.appendChild(fab);
+  }
+}
+
+// ----- Vue serveur : rail d'icônes + sidebar + page -----
+var ALL_PAGES = [
+  ['apercu', '📊', 'Vue d\'ensemble'],
+  ['module', '🎭', 'Module RP'],
+  ['membres', '👋', 'Arrivées et départs'],
+  ['roles', '👮', 'Rôles & sécurité'],
+  ['salons', '📢', 'Salons & logs'],
+  ['niveaux', '📈', 'Niveaux'],
+  ['whitelist', '📋', 'Whitelist métiers'],
+  ['tickets', '🎫', 'Tickets']
+];
+// Seules les pages dont le module est activé par le créateur s'affichent.
+function pagesActives(){
+  return ALL_PAGES.filter(function(p){ return p[0] === 'apercu' || DASH.modules[p[0]] !== false; });
+}
+var PAGES = ALL_PAGES;
+function renderServer(){
+  var srv = null;
+  moi.servers.forEach(function(s){ if (s.id === gid) srv = s; });
+  var h = '<div class="layout">';
+  // rail : tous mes serveurs en icônes rondes (pastille verte = bot en ligne)
+  h += '<button class="burger" id="burger" style="margin:8px">☰ ' + esc(srv ? srv.name : '') + '</button>';
+  h += '<div class="rail">';
+  moi.servers.forEach(function(s){
+    h += '<div class="ric' + (s.id === gid ? ' on' : '') + '" data-g="' + s.id + '" title="' + esc(s.name) + '">' +
+      (s.icon ? '<img src="' + s.icon + '">' : '🌐') +
+      '<span class="st ' + (s.enligne === false ? 'down' : 'up') + '"></span></div>';
+  });
+  h += '</div>';
+  // sidebar : serveur + statut + catégories
+  h += '<div class="side" id="side"><div class="head">' +
+    (srv && srv.icon ? '<img src="' + srv.icon + '">' : '<div class="noicon">🌐</div>') +
+    '<div class="nm">' + esc(srv ? srv.name : '') + '</div>' +
+    '<div class="stline"><span class="dot ' + (srv && srv.enligne === false ? 'down' : 'up') + '"></span>' +
+    (srv && srv.enligne === false ? 'Bot hors ligne' : 'Bot en ligne') + '</div></div>';
+  var pages = pagesActives();
+  if (!pages.some(function(p){ return p[0] === page; })) page = 'apercu';
+  pages.forEach(function(pg){
+    h += '<div class="item' + (pg[0] === page ? ' on' : '') + '" data-p="' + pg[0] + '"><span>' + pg[1] + '</span> ' + pg[2] + '</div>';
+  });
+  h += '<div class="item" id="side-home">⬅ Mes serveurs</div>';
+  h += '</div><div class="main" id="main">' + spinner() + '</div></div>';
+  $('content').innerHTML = h;
+  if ($('burger')) $('burger').onclick = function(){ $('side').classList.toggle('open'); };
+  Array.prototype.forEach.call(document.querySelectorAll('.rail .ric'), function(el){
+    el.onclick = function(){ gid = el.getAttribute('data-g'); page = 'apercu'; renderServer(); };
+  });
+  Array.prototype.forEach.call(document.querySelectorAll('.side .item[data-p]'), function(el){
+    el.onclick = function(){ page = el.getAttribute('data-p'); if ($('side')) $('side').classList.remove('open'); renderServer(); };
+  });
+  if ($('side-home')) $('side-home').onclick = renderHome;
+  loadPage(srv);
+}
+
+// ----- Aides de mise en page façon DraftBot -----
+function sec(title, desc, inner, togHtml){
+  return '<div class="sec"><div class="sechead"><div><div class="t">' + title + '</div>' +
+    (desc ? '<div class="d">' + desc + '</div>' : '') + '</div>' +
+    (togHtml ? '<div class="sw">' + togHtml + '</div>' : '') + '</div>' + inner + '</div>';
+}
+function fsel(key, label, list, current, prefix){
+  var h = '<div class="flabel">' + label + '</div>';
+  h += '<select class="wsave" data-k="' + key + '"><option value="">— Désactivé —</option>';
+  list.forEach(function(x){ h += '<option value="' + x.id + '"' + (x.id === current ? ' selected' : '') + '>' + (prefix || '') + esc(x.name) + '</option>'; });
+  h += '</select>';
+  return h;
+}
+function fmulti(key, label, list, currentJson){
+  var current = [];
+  try { current = JSON.parse(currentJson || '[]'); } catch (e) {}
+  var h = '<div class="flabel">' + label + '</div>';
+  h += '<select multiple size="6" class="wmulti" data-k="' + key + '" style="height:auto">';
+  list.forEach(function(x){ h += '<option value="' + x.id + '"' + (current.indexOf(x.id) >= 0 ? ' selected' : '') + '>@' + esc(x.name) + '</option>'; });
+  h += '</select><br><button class="wmultisave accent" data-k="' + key + '" style="margin-top:9px">💾 Enregistrer la sélection</button>';
+  return h;
+}
+function fnum(key, label, value, min, max){
+  return '<div class="flabel">' + label + '</div>' +
+    '<div style="display:flex;gap:8px"><input type="number" class="wnum" data-k="' + key + '" value="' + value + '" min="' + min + '" max="' + max + '" style="width:140px">' +
+    '<button class="wnumsave" data-k="' + key + '">💾</button></div>';
+}
+
+// Prévisualisation Discord du message de bienvenue (variables + gras).
+function prevBienvenue(srv){
+  var raw = $('w_wel') ? ($('w_wel').value || '') : '';
+  if (!raw.trim()) raw = 'Bienvenue à {user} sur **{server}** ! 🎉';
+  var txt = esc(raw)
+    .replace(/\{user\.username\}/g, moi.user.username)
+    .replace(/\{user\.mention\}|\{user\}/g, '<span class="mention">@' + esc(moi.user.username) + '</span>')
+    .replace(/\{server\}/g, esc(srv ? srv.name : 'Mon Serveur'))
+    .replace(/\{membercount\}/g, srv && srv.membres ? srv.membres : '128')
+    .replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>')
+    .replace(/\*([^*]+)\*/g, '<i>$1</i>');
+  var mention = $('w_mention') && $('w_mention').checked ? '<div style="margin-bottom:5px"><span class="mention">@' + esc(moi.user.username) + '</span></div>' : '';
+  $('w_pv').innerHTML =
+    '<div class="dprev"><div class="dtop"><img src="' + (srv && srv.icon ? srv.icon : 'https://cdn.discordapp.com/embed/avatars/1.png') + '">' +
+    '<span class="bn">' + esc(srv ? srv.bot : 'Bot') + '</span><span class="badge">✔ APP</span><span class="ts">Aujourd\'hui</span></div>' +
+    mention +
+    '<div class="dcard"><div class="dt">📥 Arrivée d\'un membre</div><div class="dd">' + txt + '</div>' +
+    '<div class="df">💬 ' + esc(moi.user.username) + ' · 👥 Membre n°' + (srv && srv.membres ? srv.membres : '128') + ' · 📅 Compte créé le 12/01/2023</div></div></div>';
+}
+
+function loadPage(srv){
+  var m = $('main');
+  m.innerHTML = spinner();
+  if (page === 'apercu'){
+    api('GET', su('apercu')).then(function(d){
+      if (d.error) { m.innerHTML = errScreen('Impossible de charger ce serveur : ' + d.error, true); if ($('retrybtn')) $('retrybtn').onclick = function(){ loadPage(srv); }; return; }
+      var h = '<div class="fade"><h1 class="pagetitle">' + esc(d.serveur.name) + '</h1>' +
+        '<p style="color:var(--muted);margin:-18px 0 8px">' + d.serveur.membres + ' membres · géré par 🤖 ' + esc(srv ? srv.bot : '') + '</p>';
+      var labels = { cartes: "🪪 Cartes d'identité", permis: '🚗 Permis', entreprises: '🏢 Entreprises', ticketsOuverts: '🎫 Tickets ouverts', whitelist: '📋 Whitelist métiers', vehicules: '🛡️ Véhicules assurés' };
+      h += '<div class="tiles">';
+      Object.keys(labels).forEach(function(k){ h += '<div class="tile"><div class="tv">' + (d.stats[k] || 0) + '</div><div class="tl">' + labels[k] + '</div></div>'; });
+      h += '</div>';
+      if (d.top && d.top.length){
+        h += '<div class="flabel">🏆 Top niveaux (écrit)</div>';
+        d.top.forEach(function(t, i){ h += '<div class="row">' + (i + 1) + '. <b>' + esc(t.user) + '</b> — niveau ' + t.level + ' (' + t.xp + ' XP)</div>'; });
+      }
+      m.innerHTML = h + '</div>';
+    });
+    return;
+  }
+  api('GET', su('parametres')).then(function(p){
+    if (p.error) { m.innerHTML = errScreen('Impossible de charger la configuration : ' + p.error, true); if ($('retrybtn')) $('retrybtn').onclick = function(){ loadPage(srv); }; return; }
+    var cfg = p.config, h = '<div class="fade">';
+    if (page === 'module'){
+      h += '<h1 class="pagetitle">Module RP</h1>';
+      if (cfg.rp_locked){
+        h += sec('Module RP 🔒', 'Réglage verrouillé par l\'administrateur du bot — modifiable uniquement depuis son gestionnaire.',
+          '<div class="row">État actuel : ' + (cfg.rp_enabled ? '🟢 <b>Activé</b>' : '🔴 <b>Désactivé</b>') + '</div>', '');
+      } else {
+        h += sec('Module RP', 'Cartes d\'identité, permis, entreprises, assurances, service et temps. Désactivé, ces commandes sont retirées de la liste du serveur.',
+          '<div class="togline">Activer le Module RP sur ce serveur</div>', tog('w_rp', cfg.rp_enabled));
+      }
+    } else if (page === 'membres'){
+      h += '<h1 class="pagetitle">Arrivées et Départs</h1>';
+      var inner = '<div class="cols"><div class="fields">';
+      inner += fsel('member_channel_id', 'Salon des messages de bienvenue', p.channels, cfg.member_channel_id, '# ');
+      inner += '<div class="flabel">Message personnalisé</div>';
+      inner += '<textarea id="w_wel" rows="6">' + esc(cfg.welcome_message || '') + '</textarea>';
+      inner += '<div class="count"><b id="w_count">' + (cfg.welcome_message || '').length + '</b> /1500 — variables : {user} {user.username} {server} {membercount}</div>';
+      inner += '<button id="w_savew" class="accent" style="margin-top:8px">💾 Enregistrer le message</button>';
+      inner += '<div class="togline">' + tog('w_mention', cfg.welcome_mention) + ' Mentionner le membre dans le message de bienvenue.</div>';
+      inner += '</div><div><div class="flabel">Prévisualisation</div><div id="w_pv"></div></div></div>';
+      h += sec('Message de Bienvenue', 'Configurez des messages de bienvenue pour les nouveaux membres.', inner, '');
+      var bye = '<div class="fields"><div class="flabel">Message personnalisé</div>' +
+        '<textarea id="w_bye" rows="4">' + esc(cfg.goodbye_message || '') + '</textarea>' +
+        '<div class="count">variables : {user.username} {server} {membercount}</div>' +
+        '<button id="w_saveb" class="accent" style="margin-top:8px">💾 Enregistrer le message</button></div>';
+      h += sec('Message d\'Au Revoir', 'Configurez des messages d\'au revoir pour les anciens membres (même salon).', bye, '');
+    } else if (page === 'roles'){
+      h += '<h1 class="pagetitle">Rôles & sécurité</h1>';
+      h += sec('Rôles Staff', 'Grade 2 — accès aux commandes staff : cartes, permis, modération, tickets… Plusieurs rôles possibles (Ctrl+clic).',
+        '<div class="fields">' + fmulti('staff_role_ids', 'Rôles staff', p.roles, cfg.staff_role_ids || (cfg.staff_role_id ? JSON.stringify([cfg.staff_role_id]) : null)) + '</div>', '');
+      h += sec('Rôles Administration', 'Grade 3 — accès aux réglages sensibles et /banglobal.',
+        '<div class="fields">' + fmulti('admin_role_ids', 'Rôles administration', p.roles, cfg.admin_role_ids || (cfg.admin_role_id ? JSON.stringify([cfg.admin_role_id]) : null)) + '</div>', '');
+      h += sec('Rôle « En service »', 'Ajouté et retiré automatiquement par /service.',
+        '<div class="fields">' + fsel('service_role_id', 'Rôle en service', p.roles, cfg.service_role_id, '@ ') + '</div>', '');
+    } else if (page === 'salons'){
+      h += '<h1 class="pagetitle">Salons & logs</h1>';
+      h += sec('Journal de sécurité', 'Actions staff, messages supprimés/modifiés, vocal, transcripts de tickets.',
+        '<div class="fields">' + fsel('log_channel_id', 'Salon des logs', p.channels, cfg.log_channel_id, '# ') + '</div>', '');
+      h += sec('Annonces du staff', 'Arrivées et départs de poste (/arrivee, /depart) et services RP.',
+        '<div class="fields">' + fsel('staff_channel_id', 'Salon staff', p.channels, cfg.staff_channel_id, '# ') +
+        fsel('service_channel_id', 'Salon des services RP', p.channels, cfg.service_channel_id, '# ') + '</div>', '');
+      h += sec('Mises à jour du bot', 'Annonces « mise à jour prête / installée » avec mention du staff. Sans salon : #shadow-logs est créé automatiquement (visible du staff uniquement).',
+        '<div class="fields">' + fsel('update_channel_id', 'Salon des annonces de mise à jour', p.channels, cfg.update_channel_id, '# ') + '</div>', '');
+      h += sec('🖼️ Salon des preuves', 'Salon du Discord principal où le staff poste les preuves. Le bot y récupère automatiquement chaque message (auteur, texte, pièces jointes) pour la base de données du staff.',
+        '<div class="fields">' + fsel('proof_channel_id', 'Salon des preuves', p.channels, cfg.proof_channel_id, '# ') + '</div>', '');
+    } else if (page === 'niveaux'){
+      h += '<h1 class="pagetitle">Niveaux</h1>';
+      h += sec('Annonces de niveau', 'Salon où le bot annonce les montées de niveau (écrit et vocal).',
+        '<div class="fields">' + fsel('level_channel_id', 'Salon des annonces', p.channels, cfg.level_channel_id, '# ') + '</div>', '');
+      h += sec('Gains d\'XP', 'Réglez la vitesse de progression de vos membres.',
+        '<div class="fields">' + fnum('xp_text', 'XP par message', cfg.xp_text, 1, 1000) +
+        fnum('xp_voice', 'XP par minute en vocal', cfg.xp_voice, 1, 1000) +
+        fnum('xp_cooldown', 'Cooldown XP texte (secondes)', cfg.xp_cooldown, 5, 3600) + '</div>', '');
+    } else if (page === 'whitelist'){
+      h += '<h1 class="pagetitle">Whitelist métiers</h1>';
+      var wl = '';
+      p.whitelist.forEach(function(w){
+        wl += '<div class="row">👮 <b>@' + esc(w.role) + '</b> — géré par @' + esc(w.manager) +
+          '<button class="wl-del" data-r="' + w.roleId + '" data-m="' + w.managerId + '" style="margin-left:auto;padding:4px 11px;font-size:12px">🗑</button></div>';
+      });
+      if (!p.whitelist.length) wl += '<div class="row" style="color:var(--muted)"><i>Aucune autorisation configurée.</i></div>';
+      h += sec('Autorisations des gérants', 'Un gérant peut whitelister des recrues sur son rôle métier — le bot attribue le rôle automatiquement.', wl, '');
+      var add = '<div class="fields" style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end">' +
+        '<div style="flex:1;min-width:190px">' + fsel2('ww_role', 'Rôle métier', p.roles) + '</div>' +
+        '<div style="flex:1;min-width:190px">' + fsel2('ww_mgr', 'Rôle gérant', p.roles) + '</div>' +
+        '<button id="ww_add" class="accent">➕ Ajouter</button></div>';
+      h += sec('Nouvelle autorisation', '', add, '');
+    } else if (page === 'tickets'){
+      TK = p; // mémorise pour la prévisualisation en direct
+      h += '<h1 class="pagetitle">Tickets</h1>';
+      // ---- Éditeur du panneau : message + embed + profil + salon + preview ----
+      var profOpts = (p.profils || []).map(function(pr){ return '<option value="' + pr.id + '">' + esc(pr.name) + '</option>'; }).join('');
+      var editor = '<div class="cols"><div class="fields">' +
+        '<div class="flabel">Mode d\'ouverture</div><select id="tp_ouv"><option value="menu">📋 Menu déroulant (sélecteur de raison)</option><option value="boutons">🔘 Boutons</option></select>' +
+        '<div class="flabel" style="margin-top:12px">Profil d\'envoi (nom + avatar du bot pour ce message)</div>' +
+        '<select id="tp_prof"><option value="">— Le bot lui-même —</option>' + profOpts + '</select>' +
+        '<div class="flabel" style="margin-top:12px">Message (au-dessus de l\'embed)</div><input id="tp_msg" placeholder="🎫 Besoin d\'aide ?">' +
+        '<div class="flabel" style="margin-top:12px">— Embed (laissez vide pour un simple message) —</div>' +
+        '<label style="display:flex;gap:8px;align-items:center;font-size:13px;margin:6px 0">' + tog('tp_embed', true) + ' Utiliser un embed</label>' +
+        '<div class="flabel">Titre</div><input id="tp_titre" value="Ouvrir un ticket">' +
+        '<div class="flabel" style="margin-top:10px">Description</div><textarea id="tp_desc" rows="3">Choisissez une raison pour contacter le staff.</textarea>' +
+        '<div style="display:flex;gap:9px;flex-wrap:wrap;margin-top:10px">' +
+        '<div><div class="flabel">Couleur</div><input id="tp_col" type="color" value="#4dc3ff" style="width:64px;height:36px;padding:2px"></div>' +
+        '<div style="flex:1;min-width:180px"><div class="flabel">Auteur (haut de l\'embed)</div><input id="tp_auteur"></div></div>' +
+        '<div class="flabel" style="margin-top:10px">Grande image (URL)</div><input id="tp_img">' +
+        '<div class="flabel" style="margin-top:10px">Miniature (URL)</div><input id="tp_thumb">' +
+        '<div class="flabel" style="margin-top:10px">Pied de page</div><input id="tp_footer">' +
+        '<div class="flabel" style="margin-top:14px">Publier dans le salon</div>' + fsel3b('tp_salon', p.channels) +
+        '<button id="tp_pub" class="accent" style="margin-top:12px">📤 Publier le panneau</button>' +
+        '</div><div style="flex:1;min-width:320px"><div class="flabel">Prévisualisation en direct</div><div id="tp_pv"></div></div></div>';
+      h += sec('🎨 Éditeur du panneau', 'Écrivez le message, créez l\'embed, choisissez un profil d\'envoi et publiez — comme sur Ticket Tool.', editor, '');
+      // ---- Profils d'envoi ----
+      var pf = '';
+      (p.profils || []).forEach(function(pr){
+        pf += '<div class="row">' + (pr.avatar ? '<img src="' + esc(pr.avatar) + '" style="width:26px;height:26px;border-radius:50%">' : '👤') + ' <b>' + esc(pr.name) + '</b>' +
+          '<button class="pf-del" data-id="' + pr.id + '" style="margin-left:auto;padding:4px 11px;font-size:12px">🗑</button></div>';
+      });
+      if (!(p.profils || []).length) pf += '<div class="row" style="color:var(--muted)"><i>Aucun profil — le bot envoie sous son propre nom.</i></div>';
+      pf += '<div class="fields" style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end;margin-top:8px">' +
+        '<div style="min-width:170px"><div class="flabel">Nom du profil</div><input id="pf_nom" placeholder="Support Colmar RP"></div>' +
+        '<div style="flex:1;min-width:220px"><div class="flabel">URL de l\'avatar</div><input id="pf_ava" placeholder="https://…/avatar.png"></div>' +
+        '<button id="pf_add" class="accent">➕ Créer le profil</button></div>';
+      h += sec('👤 Profils d\'envoi', 'Nom + avatar personnalisés : le bot enverra le panneau sous cette identité (via un webhook).', pf, '');
+      // ---- Raisons ----
+      var tk = '';
+      p.tickets.forEach(function(t){
+        var sup = (t.supports && t.supports.length) ? t.supports.map(function(s){ return '@' + esc(s.name); }).join(' ') : (t.support ? '@' + esc(t.support) : '');
+        tk += '<div class="row">' + (t.emoji ? esc(t.emoji) + ' ' : '') + '<b>' + esc(t.label) + '</b>' + (t.description ? ' <span style="color:var(--muted)">— ' + esc(t.description) + '</span>' : '') +
+          '<span style="color:var(--muted);font-size:12px">📁 ' + esc(t.categorie) + (sup ? ' · 🛎️ ' + sup : '') + '</span>' +
+          '<button class="tk-del" data-id="' + t.id + '" style="margin-left:auto;padding:4px 11px;font-size:12px">🗑</button></div>';
+      });
+      if (!p.tickets.length) tk += '<div class="row" style="color:var(--muted)"><i>Aucune raison de ticket.</i></div>';
+      h += sec('Raisons de tickets', 'Chaque raison a sa <b>propre catégorie</b> Discord : un ticket ouvert avec cette raison sera créé dedans.', tk, '');
+      var addt = '<div class="fields">' +
+        '<div style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end">' +
+        '<div style="min-width:150px"><div class="flabel">Nom de la raison</div><input id="wt_nom" placeholder="Support"></div>' +
+        '<div style="min-width:80px;max-width:100px"><div class="flabel">Emoji</div><input id="wt_emoji" placeholder="🎫"></div>' +
+        '<div style="flex:1;min-width:200px">' + fsel3('wt_cat', 'Catégorie dédiée à cette raison', p.categories) + '</div>' +
+        '<div style="flex:1;min-width:200px"><div class="flabel">Rôles support (plusieurs possibles)</div>' +
+        '<select id="wt_roles" multiple size="4" style="height:auto">' + (p.roles || []).map(function(r){ return '<option value="' + r.id + '">@' + esc(r.name) + '</option>'; }).join('') + '</select>' +
+        '<div style="color:var(--muted);font-size:11px;margin-top:3px">Ctrl (Windows) ou ⌘ (Mac) pour en sélectionner plusieurs.</div></div></div>' +
+        '<div class="flabel" style="margin-top:10px">Description (affichée sous la raison dans le menu déroulant)</div><input id="wt_desc" placeholder="Ex : Une question, un souci ? Ouvrez ici.">' +
+        '<button id="wt_add" class="accent" style="margin-top:10px">➕ Ajouter la raison</button></div>';
+      h += sec('Nouvelle raison (avec sa catégorie)', 'La config avancée du sélecteur : chaque raison peut pointer vers une catégorie différente.', addt, '');
+    }
+    m.innerHTML = h + '</div>';
+    var reload = function(j){ if (j && !j.error) { toast('✅ ' + (j.note || 'Enregistré'), 'ok'); loadPage(srv); } };
+    if ($('w_rp')) $('w_rp').onchange = function(){ save('rp_enabled', $('w_rp').checked ? 1 : 0); };
+    if ($('w_mention')) $('w_mention').onchange = function(){ save('welcome_mention', $('w_mention').checked ? 1 : 0); prevBienvenue(srv); };
+    if ($('w_wel')) {
+      $('w_wel').addEventListener('input', function(){ $('w_count').textContent = $('w_wel').value.length; prevBienvenue(srv); });
+      prevBienvenue(srv);
+    }
+    if ($('w_savew')) $('w_savew').onclick = function(){ save('welcome_message', $('w_wel').value.trim() || null); };
+    if ($('w_saveb')) $('w_saveb').onclick = function(){ save('goodbye_message', $('w_bye').value.trim() || null); };
+    if ($('ww_add')) $('ww_add').onclick = function(){
+      if (!$('ww_role').value || !$('ww_mgr').value) { toast('⚠️ Choisissez les deux rôles.'); return; }
+      api('POST', su('whitelist-ajouter'), { roleId: $('ww_role').value, managerRoleId: $('ww_mgr').value }).then(reload);
+    };
+    Array.prototype.forEach.call(m.querySelectorAll('.wl-del'), function(el){
+      el.onclick = function(){ api('POST', su('whitelist-retirer'), { roleId: el.getAttribute('data-r'), managerRoleId: el.getAttribute('data-m') }).then(reload); };
+    });
+    if ($('wt_add')) $('wt_add').onclick = function(){
+      if (!$('wt_nom').value.trim() || !$('wt_cat').value) { toast('⚠️ Nom et catégorie requis.'); return; }
+      var wtRoles = $('wt_roles') ? Array.prototype.slice.call($('wt_roles').selectedOptions).map(function(o){ return o.value; }) : [];
+      api('POST', su('tickets-type'), { label: $('wt_nom').value, emoji: $('wt_emoji').value, categoryId: $('wt_cat').value, supportRoleIds: wtRoles, description: $('wt_desc') ? $('wt_desc').value : '' }).then(reload);
+    };
+    // Éditeur de panneau : prévisualisation en direct + publication.
+    if ($('tp_pv')){
+      ['tp_ouv','tp_prof','tp_msg','tp_embed','tp_titre','tp_desc','tp_col','tp_auteur','tp_img','tp_thumb','tp_footer'].forEach(function(id){
+        var el = $(id); if (el) el.addEventListener(el.type === 'checkbox' ? 'change' : 'input', function(){ prevTicket(srv); });
+      });
+      prevTicket(srv);
+      $('tp_pub').onclick = function(){
+        if (!$('tp_salon').value){ toast('⚠️ Choisissez le salon de publication.', 'err'); return; }
+        if (!(TK.tickets || []).length){ toast('⚠️ Ajoutez au moins une raison.', 'err'); return; }
+        var options = { ouverture: $('tp_ouv').value, texte: $('tp_msg').value };
+        if ($('tp_embed').checked){
+          options.mode = 'embed';
+          options.titre = $('tp_titre').value; options.description = $('tp_desc').value;
+          options.couleur = $('tp_col').value; options.auteur = $('tp_auteur').value;
+          options.image = $('tp_img').value; options.miniature = $('tp_thumb').value; options.footer = $('tp_footer').value;
+        }
+        api('POST', su('ticket-panneau'), { channelId: $('tp_salon').value, options: options, profileId: $('tp_prof').value || null })
+          .then(function(j){ if (j && !j.error) toast('📤 ' + (j.note || 'Panneau publié !'), 'ok'); });
+      };
+    }
+    if ($('pf_add')) $('pf_add').onclick = function(){
+      if (!$('pf_nom').value.trim()){ toast('⚠️ Nom du profil requis.', 'err'); return; }
+      api('POST', su('profil-ajouter'), { name: $('pf_nom').value, avatarUrl: $('pf_ava').value }).then(reload);
+    };
+    Array.prototype.forEach.call(m.querySelectorAll('.pf-del'), function(el){
+      el.onclick = function(){ if (confirm('Supprimer ce profil ?')) api('POST', su('profil-suppr'), { id: el.getAttribute('data-id') }).then(reload); };
+    });
+    Array.prototype.forEach.call(m.querySelectorAll('.tk-del'), function(el){
+      el.onclick = function(){ if (confirm('Supprimer ce type de ticket ?')) api('POST', su('tickets-type-suppr'), { id: el.getAttribute('data-id') }).then(reload); };
+    });
+    Array.prototype.forEach.call(m.querySelectorAll('.wsave'), function(el){
+      el.onchange = function(){ save(el.getAttribute('data-k'), el.value || null); };
+    });
+    Array.prototype.forEach.call(m.querySelectorAll('.wnumsave'), function(el){
+      el.onclick = function(){ save(el.getAttribute('data-k'), m.querySelector('.wnum[data-k="' + el.getAttribute('data-k') + '"]').value); };
+    });
+    Array.prototype.forEach.call(m.querySelectorAll('.wmultisave'), function(el){
+      el.onclick = function(){
+        var s = m.querySelectorAll('.wmulti[data-k="' + el.getAttribute('data-k') + '"]')[0];
+        var vals = Array.prototype.filter.call(s.options, function(o){ return o.selected; }).map(function(o){ return o.value; });
+        save(el.getAttribute('data-k'), vals.length ? vals : null);
+      };
+    });
+  });
+}
+
+// Sélecteurs simples (formulaires whitelist/tickets, sans data-k).
+function fsel2(id, label, list){
+  var h = '<div class="flabel">' + label + '</div><select id="' + id + '"><option value="">—</option>';
+  list.forEach(function(x){ h += '<option value="' + x.id + '">@' + esc(x.name) + '</option>'; });
+  return h + '</select>';
+}
+function fsel3(id, label, list){
+  var h = '<div class="flabel">' + label + '</div><select id="' + id + '"><option value="">—</option>';
+  list.forEach(function(x){ h += '<option value="' + x.id + '">' + esc(x.name) + '</option>'; });
+  return h + '</select>';
+}
+function fsel3b(id, list){
+  var h = '<select id="' + id + '"><option value="">— Choisir un salon —</option>';
+  list.forEach(function(x){ h += '<option value="' + x.id + '">#' + esc(x.name) + '</option>'; });
+  return h + '</select>';
+}
+function gu(a){ return 'index.php?p=api-global&a=' + a; }
+
+// Prévisualisation en direct du panneau de tickets (message + embed + sélecteur/boutons).
+function prevTicket(srv){
+  if (!$('tp_pv') || !TK) return;
+  var prof = null;
+  (TK.profils || []).forEach(function(pr){ if (String(pr.id) === $('tp_prof').value) prof = pr; });
+  var nom = prof ? prof.name : (srv ? srv.bot : 'Bot');
+  var ava = prof && prof.avatar ? prof.avatar : 'https://cdn.discordapp.com/embed/avatars/1.png';
+  var h = '<div class="dprev"><div class="dtop"><img src="' + esc(ava) + '"><span class="bn">' + esc(nom) + '</span><span class="badge">✔ APP</span></div>';
+  if ($('tp_msg').value) h += '<div style="margin:4px 0 6px;white-space:pre-wrap">' + esc($('tp_msg').value) + '</div>';
+  if ($('tp_embed').checked){
+    h += '<div class="dcard" style="border-left-color:' + $('tp_col').value + '">';
+    if ($('tp_auteur').value) h += '<div style="font-size:12.5px;font-weight:600;margin-bottom:4px">' + esc($('tp_auteur').value) + '</div>';
+    if ($('tp_titre').value) h += '<div class="dt">' + esc($('tp_titre').value) + '</div>';
+    if ($('tp_desc').value) h += '<div class="dd">' + esc($('tp_desc').value) + '</div>';
+    if ($('tp_thumb').value) h += '<img src="' + esc($('tp_thumb').value) + '" style="width:60px;height:60px;border-radius:6px;float:right;margin:-30px 0 0">';
+    if ($('tp_img').value) h += '<img src="' + esc($('tp_img').value) + '" style="max-width:100%;border-radius:6px;margin-top:8px">';
+    if ($('tp_footer').value) h += '<div class="df">' + esc($('tp_footer').value) + '</div>';
+    h += '</div>';
+  }
+  // Sélecteur ou boutons selon le mode.
+  if ($('tp_ouv').value === 'menu'){
+    var opts = '';
+    (TK.tickets || []).forEach(function(t){ opts += '<option>' + (t.emoji ? esc(t.emoji) + ' ' : '') + esc(t.label) + (t.description ? ' — ' + esc(t.description) : '') + '</option>'; });
+    h += '<div style="margin-top:10px"><select style="pointer-events:none"><option>🎫 Choisissez une raison…</option>' + opts + '</select></div>';
+  } else {
+    var btns = '';
+    (TK.tickets || []).forEach(function(t){ btns += '<button style="background:#5865f2;border:0;color:#fff;pointer-events:none;margin:2px">' + (t.emoji ? esc(t.emoji) + ' ' : '') + esc(t.label) + '</button>'; });
+    h += '<div style="margin-top:10px;display:flex;gap:4px;flex-wrap:wrap">' + (btns || '<i style="color:var(--muted)">Ajoutez des raisons</i>') + '</div>';
+  }
+  h += '</div>';
+  $('tp_pv').innerHTML = h;
+}
+
+// ================= 🛡️ ESPACE STAFF DU BOT =================
+function staffShell(active, inner){
+  var tabs = [['blacklist', '🚫 Blacklist'], ['tickets', '🎫 Tickets de ban'], ['bdd', '🗂️ Base de données'], ['equipe', '🛡️ Équipe du bot']];
+  var h = '<div class="wrap"><div style="display:flex;align-items:center;gap:14px;margin-bottom:8px">' +
+    '<h1 class="pagetitle" style="margin:0">🛡️ Staff du bot</h1>' +
+    '<button id="staff-home" style="margin-left:auto">⬅ Mes serveurs</button></div>' +
+    '<p class="sub">Espace réservé à l\'équipe du bot (valable sur tous les serveurs).</p>';
+  h += '<div class="tabbar">';
+  tabs.forEach(function(t){ h += '<div class="tab' + (t[0] === active ? ' on' : '') + '" data-t="' + t[0] + '">' + t[1] + '</div>'; });
+  h += '</div><div id="staffmain">' + inner + '</div></div>';
+  $('content').innerHTML = h;
+  if ($('staff-home')) $('staff-home').onclick = renderHome;
+  Array.prototype.forEach.call(document.querySelectorAll('.tab[data-t]'), function(el){
+    el.onclick = function(){ renderStaff(el.getAttribute('data-t')); };
+  });
+}
+function renderStaff(tab){
+  staffShell(tab, spinner());
+  var m = function(){ return $('staffmain'); };
+  if (tab === 'blacklist'){
+    api('GET', gu('blacklist')).then(function(d){
+      if (!d || d.error) { m().innerHTML = errScreen((d && d.error) || 'Erreur', false); return; }
+      var h = '<div class="fade">';
+      if (canPerm('blacklist')){
+        h += sec('Blacklister un utilisateur', 'Il reçoit un MP (raison + serveur de déban), est banni de tous les serveurs du bot et re-banni à chaque arrivée.',
+          '<div class="fields" style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end">' +
+          '<div style="min-width:210px"><div class="flabel">ID Discord</div><input id="bl_id" placeholder="123456789012345678"></div>' +
+          '<div style="flex:1;min-width:220px"><div class="flabel">Raison</div><input id="bl_reason" placeholder="Motif de la blacklist"></div>' +
+          '<div style="flex:1;min-width:220px"><div class="flabel">Preuve (lien, facultatif)</div><input id="bl_proof" placeholder="https://…"></div>' +
+          '<button id="bl_add" class="accent">🚫 Blacklister</button></div>', '');
+      }
+      var list = (d.blacklist || []);
+      var rows = '';
+      list.forEach(function(b){
+        rows += '<div class="row">🚫 <b>' + esc(b.tag || ('ID ' + b.userId)) + '</b> <span style="color:var(--muted)">' + esc(b.userId) + '</span>' +
+          (b.reason ? ' — ' + esc(b.reason) : '') +
+          (canPerm('blacklist') ? '<button class="bl-del" data-u="' + b.userId + '" style="margin-left:auto;padding:4px 11px;font-size:12px">Débannir</button>' : '') + '</div>';
+      });
+      if (!list.length) rows = '<div class="row" style="color:var(--muted)"><i>Personne n\'est blacklisté.</i></div>';
+      h += sec('Blacklist (' + list.length + ')', '', rows, '');
+      m().innerHTML = h + '</div>';
+      if ($('bl_add')) $('bl_add').onclick = function(){
+        if (!/^\d{5,25}$/.test($('bl_id').value.trim())) { toast('⚠️ ID Discord invalide.', 'err'); return; }
+        api('POST', gu('blacklist-ajouter'), { userId: $('bl_id').value.trim(), reason: $('bl_reason').value, proof: ($('bl_proof') ? $('bl_proof').value : '') }).then(function(j){ if (j && !j.error){ toast('🚫 ' + (j.tag || 'Utilisateur') + ' blacklisté' + (j.banned != null ? ' (' + j.banned + ' serveur(s))' : ''), 'ok'); renderStaff('blacklist'); } });
+      };
+      Array.prototype.forEach.call(m().querySelectorAll('.bl-del'), function(el){
+        el.onclick = function(){ if (confirm('Débannir cet utilisateur partout ?')) api('POST', gu('blacklist-retirer'), { userId: el.getAttribute('data-u') }).then(function(j){ if (j && !j.error){ toast('🔓 Blacklist levée', 'ok'); renderStaff('blacklist'); } }); };
+      });
+    });
+    return;
+  }
+  // 🎫 Tickets de bannissement remontés au QG
+  if (tab === 'tickets'){
+    api('GET', gu('qg-tickets')).then(function(d){
+      if (!d || d.error) { m().innerHTML = errScreen((d && d.error) || 'Erreur', false); return; }
+      var list = (d.tickets || []);
+      var badge = { 'ouvert': ['🟢 Ouvert', '#3ba55d'], 'claim': ['🖐 Claim', '#faa61a'], 'traite': ['✅ Traité', 'var(--muted)'] };
+      var res = { 'blacklist': '🚫 Blacklist appliquée', 'aucune': '— Aucune action' };
+      var rows = '';
+      list.forEach(function(t){
+        var b = badge[t.status] || ['?', 'var(--muted)'];
+        rows += '<div class="row" style="flex-wrap:wrap;gap:8px" data-id="' + t.id + '">' +
+          '<span style="min-width:44px;font-weight:700">#' + t.id + '</span>' +
+          '<div style="min-width:170px"><b>' + esc(t.targetTag || ('ID ' + t.targetId)) + '</b><div style="color:var(--muted);font-size:11.5px">' + esc(t.targetId) + '</div></div>' +
+          '<div style="min-width:150px;font-size:12.5px">🌐 ' + esc(t.guildName || t.guildId) + '</div>' +
+          '<div style="flex:1;min-width:150px;color:var(--muted);font-size:12.5px">' + (t.reason ? esc(t.reason) : '<i>Sans motif</i>') + '</div>' +
+          '<span class="chip" style="background:' + b[1] + '22;color:' + b[1] + '">' + b[0] + '</span>';
+        if (t.status === 'traite'){
+          rows += '<span style="color:var(--muted);font-size:12px;width:100%">' + (res[t.resolution] || '') + '</span>';
+        } else if (canPerm('tickets')){
+          rows += '<div style="display:flex;gap:5px;flex-wrap:wrap;width:100%;margin-top:4px">' +
+            (t.status !== 'claim' ? '<button class="qg-claim" data-id="' + t.id + '" style="padding:4px 11px;font-size:12px">🖐 Claim</button>' : '<span style="font-size:12px;color:var(--muted);align-self:center">Claim par ' + esc(t.claimedBy || '?') + '</span>') +
+            '<button class="qg-inv" data-id="' + t.id + '" style="padding:4px 11px;font-size:12px">✉️ M\'inviter</button>' +
+            '<button class="qg-none" data-id="' + t.id + '" style="padding:4px 11px;font-size:12px">Ne rien faire</button>' +
+            (canPerm('blacklist') ? '<button class="qg-bl accent" data-id="' + t.id + '" data-tag="' + esc(t.targetTag || t.targetId) + '" style="padding:4px 11px;font-size:12px">🚫 Blacklist + preuves</button>' : '') +
+            '</div>';
+        }
+        rows += '</div>';
+      });
+      if (!list.length) rows = '<div class="row" style="color:var(--muted)"><i>Aucun ticket de bannissement.</i></div>';
+      m().innerHTML = '<div class="fade">' + sec('Tickets de bannissement (' + list.length + ')',
+        'À chaque bannissement sur un serveur du bot, un ticket arrive ici. Claim, faites-vous inviter, puis traitez : « ne rien faire » ou blacklist (preuves obligatoires).', rows, '') + '</div>';
+      Array.prototype.forEach.call(m().querySelectorAll('.qg-claim'), function(el){
+        el.onclick = function(){ api('POST', gu('qg-claim'), { ticketId: el.getAttribute('data-id') }).then(function(j){ if (j && !j.error){ toast('🖐 Ticket claim', 'ok'); renderStaff('tickets'); } }); };
+      });
+      Array.prototype.forEach.call(m().querySelectorAll('.qg-inv'), function(el){
+        el.onclick = function(){ api('POST', gu('qg-invite'), { ticketId: el.getAttribute('data-id') }).then(function(j){ if (j && !j.error){ prompt('Invitation (valable 1h, 1 usage) :', j.url || ''); } }); };
+      });
+      Array.prototype.forEach.call(m().querySelectorAll('.qg-none'), function(el){
+        el.onclick = function(){ if (confirm('Clôturer ce ticket sans action ?')) api('POST', gu('qg-traiter'), { ticketId: el.getAttribute('data-id'), resolution: 'aucune' }).then(function(j){ if (j && !j.error){ toast('✅ Ticket traité', 'ok'); renderStaff('tickets'); } }); };
+      });
+      Array.prototype.forEach.call(m().querySelectorAll('.qg-bl'), function(el){
+        el.onclick = function(){
+          var proof = prompt('Blacklist de ' + el.getAttribute('data-tag') + '.\nPreuves OBLIGATOIRES (lien capture / logs) :', '');
+          if (proof === null) return;
+          if (!proof.trim()) { toast('⚠️ Les preuves sont obligatoires.', 'err'); return; }
+          api('POST', gu('qg-traiter'), { ticketId: el.getAttribute('data-id'), resolution: 'blacklist', proof: proof.trim() }).then(function(j){ if (j && !j.error){ toast('🚫 Blacklist appliquée' + (j.banned != null ? ' (' + j.banned + ' serveur(s))' : ''), 'ok'); renderStaff('tickets'); } });
+        };
+      });
+    });
+    return;
+  }
+  // 🗂️ Base de données : historique des blacklists + preuves du salon principal
+  if (tab === 'bdd'){
+    var draw = function(hist, preuves){
+      var act = { 'blacklist': ['🚫 Blacklist', '#e74c3c'], 'deblacklist': ['🔓 Déban', '#3ba55d'] };
+      var hrows = '';
+      (hist || []).forEach(function(r){
+        var a = act[r.action] || [r.action, 'var(--muted)'];
+        hrows += '<div class="row" style="flex-wrap:wrap;gap:7px">' +
+          '<span class="chip" style="background:' + a[1] + '22;color:' + a[1] + '">' + a[0] + '</span>' +
+          '<div style="min-width:160px"><b>' + esc(r.tag || ('ID ' + r.userId)) + '</b><div style="color:var(--muted);font-size:11.5px">' + esc(r.userId) + '</div></div>' +
+          '<div style="flex:1;min-width:150px;font-size:12.5px">' + (r.reason ? esc(r.reason) : '<i style="color:var(--muted)">—</i>') + '</div>' +
+          (r.proof ? '<a href="' + esc(r.proof) + '" target="_blank" class="chip" style="text-decoration:none">📎 Preuve</a>' : '') +
+          '<span style="color:var(--muted);font-size:11.5px;width:100%">' + esc((r.at || '').replace('T', ' ').replace(/\..*/, '')) + ' · par ' + esc(r.by || '?') + '</span>' +
+          '</div>';
+      });
+      if (!(hist || []).length) hrows = '<div class="row" style="color:var(--muted)"><i>Aucune blacklist enregistrée.</i></div>';
+      var prows = '';
+      (preuves || []).forEach(function(pv){
+        prows += '<div class="row" style="flex-wrap:wrap;gap:6px">' +
+          '<div style="min-width:150px"><b>' + esc(pv.authorTag || pv.authorId) + '</b></div>' +
+          '<div style="flex:1;min-width:170px;font-size:12.5px;white-space:pre-wrap">' + (pv.content ? esc(pv.content) : '') + '</div>' +
+          ((pv.attachments || []).map(function(u){ return '<a href="' + esc(u) + '" target="_blank" class="chip" style="text-decoration:none">📎 Fichier</a>'; }).join('')) +
+          '<span style="color:var(--muted);font-size:11.5px;width:100%">' + esc((pv.at || '').replace('T', ' ').replace(/\..*/, '')) + '</span>' +
+          '</div>';
+      });
+      if (!(preuves || []).length) prows = '<div class="row" style="color:var(--muted)"><i>Aucun message récupéré (configurez le salon des preuves dans Salons & logs).</i></div>';
+      m().innerHTML = '<div class="fade">' +
+        '<div class="fields" style="display:flex;gap:8px;margin-bottom:12px"><input id="bdd_q" placeholder="🔎 Rechercher (ID, pseudo, raison…)" style="flex:1"><button id="bdd_go" class="accent">Rechercher</button></div>' +
+        sec('Historique des blacklists', 'Chaque blacklist / déban depuis le début, avec la preuve fournie.', hrows, '') +
+        sec('🖼️ Salon des preuves', 'Messages récupérés automatiquement dans le salon des preuves du Discord principal.', prows, '') +
+        '</div>';
+      var run = function(){
+        var q = $('bdd_q') ? encodeURIComponent($('bdd_q').value.trim()) : '';
+        m().innerHTML = spinner();
+        Promise.all([api('GET', gu('blacklist-historique') + (q ? '&q=' + q : '')), api('GET', gu('preuves') + (q ? '&q=' + q : ''))]).then(function(r){
+          draw((r[0] && r[0].historique) || [], (r[1] && r[1].preuves) || []);
+        });
+      };
+      if ($('bdd_go')) $('bdd_go').onclick = run;
+      if ($('bdd_q')) $('bdd_q').onkeydown = function(e){ if (e.key === 'Enter') run(); };
+    };
+    Promise.all([api('GET', gu('blacklist-historique')), api('GET', gu('preuves'))]).then(function(r){
+      if (r[0] && r[0].error) { m().innerHTML = errScreen(r[0].error, false); return; }
+      draw((r[0] && r[0].historique) || [], (r[1] && r[1].preuves) || []);
+    });
+    return;
+  }
+  // Équipe du bot (grades + permissions par personne)
+  api('GET', gu('botstaff')).then(function(d){
+    if (!d || d.error) { m().innerHTML = errScreen((d && d.error) || 'Erreur', false); return; }
+    var permKeys = Object.keys(d.perms || {});
+    var manage = canPerm('staff');
+    var h = '<div class="fade">';
+    if (manage){
+      var gr = '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">';
+      (d.grades || []).forEach(function(g){ gr += '<span class="chip">' + esc(g) + (manage ? '<button class="bsg-del" data-g="' + esc(g) + '">✕</button>' : '') + '</span>'; });
+      gr += '<input id="bsg_new" placeholder="Nouveau grade" style="max-width:190px"><button id="bsg_add" class="accent" style="padding:5px 12px">➕</button></div>';
+      h += sec('📛 Grades', 'Créez vos grades librement (Responsable, Modérateur, Support…).', gr, '');
+    }
+    var rows = '';
+    (d.staff || []).forEach(function(s){
+      rows += '<div class="row"><div style="min-width:150px"><b>' + esc(s.tag || ('ID ' + s.userId)) + '</b><div style="color:var(--muted);font-size:11.5px">' + esc(s.userId) + '</div></div>';
+      if (manage){
+        rows += '<select class="bs-rank" data-u="' + s.userId + '" style="max-width:150px">';
+        var seen = false;
+        (d.grades || []).forEach(function(g){ if (g === s.rank) seen = true; rows += '<option' + (g === s.rank ? ' selected' : '') + '>' + esc(g) + '</option>'; });
+        if (!seen) rows += '<option selected>' + esc(s.rank) + '</option>';
+        rows += '</select>';
+        permKeys.forEach(function(pk){ rows += '<label style="display:flex;gap:4px;align-items:center;font-size:12px"><input type="checkbox" class="bs-perm" data-u="' + s.userId + '" data-p="' + pk + '"' + (s.perms.indexOf(pk) >= 0 ? ' checked' : '') + ' style="width:auto"> ' + d.perms[pk] + '</label>'; });
+        rows += '<button class="bs-del" data-u="' + s.userId + '" style="margin-left:auto;padding:4px 10px;font-size:12px">🗑</button>';
+      } else {
+        rows += '<span style="color:var(--muted)">' + esc(s.rank) + ' — ' + (s.perms.map(function(pk){ return d.perms[pk] || pk; }).join(' · ') || 'aucune') + '</span>';
+      }
+      rows += '</div>';
+    });
+    if (!(d.staff || []).length) rows = '<div class="row" style="color:var(--muted)"><i>Aucun membre dans le staff du bot.</i></div>';
+    h += sec('Membres du staff', manage ? 'Grade et permissions par personne.' : 'Vous n\'avez pas la gestion du staff.', rows, '');
+    if (manage){
+      h += sec('➕ Ajouter un staff', '', '<div class="fields" style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end">' +
+        '<div style="min-width:210px"><div class="flabel">ID Discord</div><input id="bs_id" placeholder="123456789012345678"></div>' +
+        '<div style="min-width:150px"><div class="flabel">Grade</div><select id="bs_rank">' + (d.grades || []).map(function(g){ return '<option>' + esc(g) + '</option>'; }).join('') + '</select></div>' +
+        '<button id="bs_add" class="accent">Ajouter</button></div>', '');
+    }
+    m().innerHTML = h + '</div>';
+    var rr = function(){ renderStaff('equipe'); };
+    if ($('bsg_add')) $('bsg_add').onclick = function(){ if ($('bsg_new').value.trim()) api('POST', gu('botstaff-grade'), { name: $('bsg_new').value }).then(function(j){ if (j && !j.error) rr(); }); };
+    Array.prototype.forEach.call(m().querySelectorAll('.bsg-del'), function(el){ el.onclick = function(){ api('POST', gu('botstaff-grade-suppr'), { name: el.getAttribute('data-g') }).then(function(j){ if (j && !j.error) rr(); }); }; });
+    if ($('bs_add')) $('bs_add').onclick = function(){ if (!/^\d{5,25}$/.test($('bs_id').value.trim())){ toast('⚠️ ID invalide.', 'err'); return; } api('POST', gu('botstaff-ajouter'), { userId: $('bs_id').value.trim(), rank: $('bs_rank').value }).then(function(j){ if (j && !j.error){ toast('✅ Ajouté', 'ok'); rr(); } }); };
+    Array.prototype.forEach.call(m().querySelectorAll('.bs-rank'), function(el){ el.onchange = function(){ api('POST', gu('botstaff-ajouter'), { userId: el.getAttribute('data-u'), rank: el.value }).then(function(j){ if (j && !j.error) toast('✅ Grade mis à jour', 'ok'); }); }; });
+    Array.prototype.forEach.call(m().querySelectorAll('.bs-perm'), function(el){ el.onchange = function(){ api('POST', gu('botstaff-perm'), { userId: el.getAttribute('data-u'), perm: el.getAttribute('data-p'), on: el.checked }).then(function(j){ if (j && !j.error) toast('✅ Permission mise à jour', 'ok'); }); }; });
+    Array.prototype.forEach.call(m().querySelectorAll('.bs-del'), function(el){ el.onclick = function(){ if (confirm('Retirer ce membre du staff ?')) api('POST', gu('botstaff-retirer'), { userId: el.getAttribute('data-u') }).then(function(j){ if (j && !j.error) rr(); }); }; });
+  });
+}
+
+// ================= ⚙️ ESPACE CRÉATEUR (config du dashboard) =================
+function renderCreateur(){
+  gid = null;
+  $('content').innerHTML = '<div class="wrap">' + spinner() + '</div>';
+  api('GET', gu('dashconfig')).then(function(d){
+    if (!d || d.error) { $('content').innerHTML = '<div class="wrap">' + errScreen((d && d.error) || 'Erreur', false) + '</div>'; return; }
+    var cfg = d.config, mods = d.modules;
+    var h = '<div class="wrap fade"><div style="display:flex;align-items:center;gap:14px;margin-bottom:8px">' +
+      '<h1 class="pagetitle" style="margin:0">⚙️ Créateur — configurer le dashboard</h1>' +
+      '<button id="cr-home" style="margin-left:auto">⬅ Mes serveurs</button></div>' +
+      '<p class="sub">Personnalisez le dashboard de A à Z : marque et modules affichés à vos staffs. Appliqué à tout le monde.</p>';
+    // Marque
+    h += sec('🎨 Marque du dashboard', 'Nom, couleur d\'accent et accroche de la page d\'accueil.',
+      '<div class="fields">' +
+      '<div class="flabel">Nom affiché</div><input id="cr_nom" value="' + esc(cfg.nom || '') + '">' +
+      '<div class="flabel" style="margin-top:12px">Accroche (page d\'accueil : « Un bot pour … »)</div><input id="cr_accroche" value="' + esc(cfg.accroche || '') + '">' +
+      '<div class="flabel" style="margin-top:12px">Couleur d\'accent</div><input id="cr_accent" type="color" value="' + esc(cfg.accent || '#4dc3ff') + '" style="width:70px;height:38px;padding:3px">' +
+      '</div>', '');
+    // Modules
+    var mi = '';
+    Object.keys(mods).forEach(function(k){
+      if (k === 'apercu') return; // la vue d'ensemble reste toujours active
+      var on = cfg.modules[k] !== false;
+      mi += '<div class="row"><span style="font-size:18px">' + mods[k][0] + '</span> <b>' + mods[k][1] + '</b>' +
+        '<span class="sw" style="margin-left:auto">' + tog('crm_' + k, on) + '</span></div>';
+    });
+    h += sec('🧩 Modules affichés', 'Activez ou désactivez les pages visibles par vos staffs dans la configuration des serveurs.', mi, '');
+    h += '<button id="cr_save" class="accent" style="font-size:14px;padding:11px 22px">💾 Enregistrer la configuration</button>';
+
+    // Statut personnalisé par bot
+    var bots = d.bots || [];
+    var bopts = bots.map(function(b){ return '<option value="' + esc(b.name) + '">' + esc(b.name) + ' (' + b.serveurs + ' serveur' + (b.serveurs > 1 ? 's' : '') + ')</option>'; }).join('');
+    var typeOpts = [['custom','Personnalisé'],['playing','Joue à'],['watching','Regarde'],['listening','Écoute'],['competing','Participe à'],['streaming','En live (Twitch)']]
+      .map(function(t){ return '<option value="' + t[0] + '">' + t[1] + '</option>'; }).join('');
+    var presOpts = [['online','🟢 En ligne'],['idle','🌙 Inactif'],['dnd','⛔ Ne pas déranger'],['invisible','⚪ Invisible']]
+      .map(function(p){ return '<option value="' + p[0] + '">' + p[1] + '</option>'; }).join('');
+    var stat = '<div class="fields">' +
+      '<div class="flabel">Bot concerné</div><select id="st_bot">' + (bopts || '<option value="">— Aucun bot en ligne —</option>') + '</select>' +
+      '<div style="display:flex;gap:9px;flex-wrap:wrap;margin-top:12px">' +
+      '<div style="min-width:150px"><div class="flabel">Type</div><select id="st_type">' + typeOpts + '</select></div>' +
+      '<div style="flex:1;min-width:220px"><div class="flabel">Texte du statut</div><input id="st_text" placeholder="ex : les serveurs RP"></div>' +
+      '<div style="min-width:170px"><div class="flabel">Présence</div><select id="st_pres">' + presOpts + '</select></div></div>' +
+      '<div class="flabel" id="st_urlL" style="margin-top:12px;display:none">URL Twitch (pour « En live »)</div><input id="st_url" placeholder="https://twitch.tv/…" style="display:none">' +
+      '<div style="margin-top:12px;display:flex;gap:9px"><button id="st_save" class="accent">💾 Appliquer le statut</button><button id="st_clear">🧹 Retirer le statut</button></div></div>';
+    h += sec('🟢 Statut personnalisé par bot', 'Définissez l\'activité et la présence Discord affichées par un bot précis.', stat, '');
+    // Mises à jour du dashboard (auto-update depuis GitHub, comme le bot)
+    h += sec('🔄 Mises à jour du dashboard', 'Le dashboard se met à jour tout seul depuis GitHub, comme le bot. Le fichier config.php et vos réglages sont conservés (une sauvegarde index.php.bak est créée).',
+      '<div id="maj_box" style="color:var(--muted)">Vérification…</div>', '');
+    h += '</div>';
+
+    $('content').innerHTML = h;
+    if ($('cr-home')) $('cr-home').onclick = renderHome;
+    // ----- Mises à jour -----
+    var loadMaj = function(){
+      var box = $('maj_box'); if (!box) return;
+      api('GET', gu('dash-version')).then(function(j){
+        box = $('maj_box'); if (!box) return;
+        if (!j || j.error){ box.innerHTML = '<span style="color:#ffb066">Vérification impossible : ' + esc((j && j.error) || 'réseau') + '</span>'; return; }
+        var cur = j.current || 'inconnue (dev)', lat = j.latest || '?';
+        var html = '<div>Version installée : <b>' + esc(cur) + '</b> · Dernière version publiée : <b>' + esc(lat) + '</b></div>';
+        // Interrupteur mise à jour automatique
+        html += '<div class="row" style="border:0;padding:10px 0 4px"><b>🔁 Mise à jour automatique</b>' +
+          '<span style="color:var(--muted);font-size:12px;margin-left:8px">le dashboard s\'actualise seul (vérif. toutes les 6 h)</span>' +
+          '<span class="sw" style="margin-left:auto">' + tog('maj_auto', j.auto !== false) + '</span></div>';
+        if (!j.writable){
+          html += '<div style="color:#ffb066;font-size:12.5px;margin-top:6px">⚠️ Ici, PHP ne peut pas réécrire index.php : la mise à jour automatique est en pause. Donnez les droits d\'écriture au fichier (chmod 644) ou ré-uploadez-le à la main.</div>';
+        } else if (j.updateAvailable){
+          html += '<div style="margin-top:10px;color:#4bd07f;font-size:12.5px">⬇️ Nouvelle version disponible — elle s\'installera automatiquement. Vous pouvez aussi l\'appliquer tout de suite :</div>' +
+            '<div style="margin-top:8px"><button id="maj_go" class="accent">Mettre à jour vers ' + esc(lat) + ' maintenant</button></div>';
+        } else if (j.current === null){
+          html += '<div style="margin-top:8px;color:var(--muted);font-size:12.5px">Version « dev » (non tamponnée) : l\'auto-update s\'activera dès que vous installerez une version publiée. Vous pouvez la récupérer maintenant :</div>' +
+            '<div style="margin-top:8px"><button id="maj_go" class="accent">⬇️ Installer la dernière version (' + esc(lat) + ')</button></div>';
+        } else {
+          html += '<div style="color:#4bd07f;font-size:13px;margin-top:6px">✅ Dashboard à jour.</div>';
+        }
+        box.innerHTML = html;
+        if ($('maj_auto')) $('maj_auto').onchange = function(){
+          api('POST', gu('dash-auto'), { on: $('maj_auto').checked }).then(function(r){ if (r && !r.error) toast(r.auto ? '🔁 Mise à jour automatique activée' : '⏸️ Mise à jour automatique désactivée', 'ok'); });
+        };
+        if ($('maj_go')) $('maj_go').onclick = function(){
+          if (!confirm('Mettre à jour le dashboard maintenant ?\nindex.php sera remplacé par la dernière version (sauvegarde automatique, config.php conservé).')) return;
+          $('maj_go').disabled = true; $('maj_go').textContent = '⏳ Mise à jour…';
+          api('POST', gu('dash-maj')).then(function(r){
+            if (r && !r.error){ toast('✅ Dashboard mis à jour' + (r.version ? ' — ' + r.version : ''), 'ok'); setTimeout(function(){ location.reload(); }, 1300); }
+            else { loadMaj(); }
+          });
+        };
+      });
+    };
+    loadMaj();
+    $('cr_save').onclick = function(){
+      var modules = {};
+      Object.keys(mods).forEach(function(k){ if (k === 'apercu') { modules[k] = true; return; } modules[k] = $('crm_' + k) ? $('crm_' + k).checked : true; });
+      var newCfg = { nom: $('cr_nom').value.trim() || 'Mon Bot', accroche: $('cr_accroche').value.trim() || 'Le Roleplay', accent: $('cr_accent').value, modules: modules };
+      api('POST', gu('dashconfig-save'), { config: newCfg }).then(function(j){
+        if (j && !j.error){ toast('✅ Configuration enregistrée', 'ok'); DASH = newCfg; applyBrand(); }
+      });
+    };
+    // Statut : affiche le champ URL uniquement pour « streaming », charge l'existant.
+    var toggleUrl = function(){ var on = $('st_type').value === 'streaming'; $('st_url').style.display = on ? '' : 'none'; $('st_urlL').style.display = on ? '' : 'none'; };
+    if ($('st_type')) $('st_type').onchange = toggleUrl;
+    var loadStatus = function(){
+      if (!$('st_bot') || !$('st_bot').value) return;
+      api('GET', gu('bot-status') + '&bot=' + encodeURIComponent($('st_bot').value)).then(function(j){
+        var s = (j && j.status) || {};
+        if ($('st_type')) $('st_type').value = s.type || 'custom';
+        if ($('st_text')) $('st_text').value = s.text || '';
+        if ($('st_pres')) $('st_pres').value = s.presence || 'online';
+        if ($('st_url')) $('st_url').value = s.url || '';
+        toggleUrl();
+      });
+    };
+    if ($('st_bot')) { $('st_bot').onchange = loadStatus; loadStatus(); }
+    if ($('st_save')) $('st_save').onclick = function(){
+      if (!$('st_bot').value) { toast('⚠️ Aucun bot.', 'err'); return; }
+      var status = { type: $('st_type').value, text: $('st_text').value.trim(), presence: $('st_pres').value, url: $('st_url').value.trim() };
+      api('POST', gu('bot-status-save'), { bot: $('st_bot').value, status: status }).then(function(j){ if (j && !j.error) toast('✅ Statut appliqué', 'ok'); });
+    };
+    if ($('st_clear')) $('st_clear').onclick = function(){
+      if (!$('st_bot').value) return;
+      api('POST', gu('bot-status-save'), { bot: $('st_bot').value, status: null }).then(function(j){ if (j && !j.error){ toast('🧹 Statut retiré', 'ok'); $('st_text').value = ''; } });
+    };
+  });
+}
+
+// Applique la marque (nom + couleur d'accent) définie par le créateur.
+function applyBrand(){
+  if (DASH.accent) document.documentElement.style.setProperty('--accent', DASH.accent);
+  if (DASH.nom){ var b = document.querySelector('.nav .brand'); if (b) b.innerHTML = '<span class="lg">🎛️</span>' + esc(DASH.nom); document.title = DASH.nom + ' — Dashboard'; }
+}
+
+api('GET', 'index.php?p=api-moi').then(function(j){
+  if (!j || j.error) { location.href = 'index.php'; return; }
+  moi = j;
+  ROLE = j.role || ROLE;
+  DASH = j.dash || DASH;
+  applyBrand();
+  if (moi.user.avatar) { $('h_avatar').src = moi.user.avatar; $('h_avatar').style.display = ''; }
+  $('h_name').textContent = moi.user.username;
+  renderHome();
+});
+</script>
+</body>
+</html>
