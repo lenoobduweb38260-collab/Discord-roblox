@@ -1,6 +1,6 @@
 const { Events } = require('discord.js');
 const { getGuildConfig } = require('../database');
-const { addXp, announceLevelUp } = require('../utils/levels');
+const { gagnerXpServeur, gainTexteXp, estExcluXp, levelsEnabled } = require('../utils/levels');
 const { scanMessage } = require('../utils/scamImages');
 
 // Anti-spam XP : un gain par utilisateur et par période de cooldown.
@@ -50,15 +50,23 @@ module.exports = {
       require('../utils/aiResponder').onMention(message).catch(() => null);
     }
 
+    // 📈 XP : système actif, message assez long, salon et rôles non exclus —
+    // vérifiés AVANT le délai, pour qu'un message qui ne rapporte rien ne
+    // consomme pas le droit au prochain gain.
+    if (!levelsEnabled(message.guild.id)) return;
+    const longueurMin = Number(cfg.xp_longueur_min ?? 0) || 0;
+    if (longueurMin > 0 && String(message.content || '').trim().length < longueurMin) return;
+    const contexte = { membre: message.member, salon: message.channel };
+    if (estExcluXp(message.guild.id, 'text', contexte)) return;
+
     const key = `${message.guild.id}:${message.author.id}`;
     const now = Date.now();
     const last = cooldowns.get(key) || 0;
-    if (now - last < cfg.xp_cooldown * 1000) return;
+    if (now - last < (cfg.xp_cooldown ?? 60) * 1000) return;
     cooldowns.set(key, now);
 
-    const { leveledUp, newLevel } = addXp(message.guild.id, message.author.id, 'text', cfg.xp_text);
-    if (leveledUp) {
-      await announceLevelUp(message.guild, message.author.id, 'text', newLevel, message.channel);
-    }
+    // Gain fixe, ou tiré entre le minimum et le maximum ; annonce et
+    // récompenses dans le salon du message quand le serveur le veut.
+    await gagnerXpServeur(message.guild, message.author.id, 'text', gainTexteXp(cfg), contexte);
   },
 };

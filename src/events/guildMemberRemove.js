@@ -11,6 +11,14 @@ module.exports = {
   name: Events.GuildMemberRemove,
   async execute(member) {
     const cfg = getGuildConfig(member.guild.id);
+    // 📈 Niveaux : le membre quitte le classement — ou son XP est effacée si
+    // le serveur l'a demandé (/config → 📈 XP & niveaux). AVANT la garde du
+    // salon : un serveur sans message de départ doit quand même le faire.
+    try {
+      require('../utils/levels').marquerDepartNiveau(member.guild.id, member.id);
+    } catch (err) {
+      console.warn(`⚠️ Niveaux : départ non noté (${err.message}).`);
+    }
     // Salon de départ dédié si configuré, sinon le salon des arrivées.
     const channelId = cfg.goodbye_channel_id || cfg.member_channel_id;
     if (!channelId) return;

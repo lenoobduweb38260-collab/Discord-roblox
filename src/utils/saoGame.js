@@ -10,7 +10,7 @@
 // attribution des badges). Les embeds et boutons vivent dans commands/sao.js.
 
 const { db } = require('../database');
-const { addXp, announceLevelUp } = require('./levels');
+const { gagnerXpServeur } = require('./levels');
 
 // ----- Données de jeu -----
 
@@ -201,14 +201,11 @@ function gainXp(p, amount) {
 
 // XP serveur automatique (récompense « auto XP ») : les hauts faits SAO
 // donnent de l'XP dans le système de niveaux du serveur, avec annonce.
+// Source 'sao' : la part versée suit `xp_sao_pourcent` (/config → 📈), et
+// l'annonce dit « dans l'Aventure SAO » au lieu de « en écrivant ».
+// `gagne` dans le résultat = l'XP réellement ajoutée.
 async function grantServerXp(guild, userId, amount, fallbackChannel = null) {
-  try {
-    const res = addXp(guild.id, userId, 'text', Math.max(0, Math.round(amount)));
-    if (res.leveledUp) await announceLevelUp(guild, userId, 'text', res.newLevel, fallbackChannel);
-    return res;
-  } catch {
-    return { leveledUp: false };
-  }
+  return gagnerXpServeur(guild, userId, 'sao', Math.max(0, Math.round(amount)), { salon: fallbackChannel });
 }
 
 module.exports = {
