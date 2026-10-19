@@ -4,8 +4,9 @@
 //   1. coffre de couple : un refus ne laisse rien à moitié fait
 //   2. remise à zéro d'un marié : le conjoint récupère TOUT le coffre
 //   3. pas de soin hors du menu pendant un combat de boss
-//   4. un combat abandonné ne bloque plus l'auberge, le voyage, Argo, la pêche
-//   5. pas de quête « boss » pour qui a conquis Aincrad
+//   4. un combat abandonné ne bloque plus l'auberge, le voyage, Argo, la pêche,
+//      et /sao cd qui le clôt dit la pénalité
+//   5. pas de quête « boss » ni « Sword Skills » pour qui a conquis Aincrad
 //   6. un clic tardif ne remplace jamais une carte de fin par l'ancien état
 //   7. la quête « Sword Skills » bouclée par le dernier coup compte
 //   8. consulter la fiche d'un autre ne gèle plus sa régénération
@@ -288,22 +289,42 @@ const ABANDON = 2 * 3600 * 1000;
     vieillir(cv.id, ABANDON);
     const voy = await commande('voyager', { options: { etage: 1 } });
     V('/sao voyager : la ligne d\'abandon est dans la réponse', /a été abandonné/.test(txt(sortie(voy))), txt(sortie(voy)).slice(0, 200));
+
+    // /sao cd clôt lui aussi le combat : la pénalité y est dite, pas encaissée en silence.
+    const cd = nouveauCombat('u1', { hp: 300, col: 10000 });
+    vieillir(cd.id, ABANDON);
+    const delais = await commande('cd');
+    const tcd = txt(sortie(delais));
+    V('/sao cd, combat quitté il y a 2 h : clos en fuite (−5 %)', G.combatParId(cd.id).statut === 'abandon' && joueur('u1').col === 9500, String(joueur('u1').col));
+    V('… et la carte « Délais » le dit : abandon et Col perdus, en tête', /Délais/.test(tcd) && /a été abandonné/.test(tcd) && /−500 Col/.test(tcd) && tcd.indexOf('abandonné') < tcd.indexOf('Chasse') && eph(sortie(delais)), tcd.slice(0, 300));
+    const encore = await commande('cd');
+    V('… une seule fois : le /sao cd suivant n\'en reparle pas', !/abandonné/.test(txt(sortie(encore))) && joueur('u1').col === 9500);
   }
 
-  console.log('\n5) Aincrad conquis : jamais de quête « Vaincre un boss »');
+  console.log('\n5) Aincrad conquis : jamais de quête « Vaincre un boss » ni « Sword Skills »');
   {
     let conquis = 0;
     let front = 0;
+    let skillsConquis = 0;
+    let skillsFront = 0;
     for (let i = 0; i < 60; i++) {
       G.ensurePlayer('G1', `conq${i}`);
       majJoueur(`conq${i}`, { floor: 101, position: 100 });
-      if (G.quetesDuJour('G1', `conq${i}`).some((q) => q.cle === 'boss')) conquis++;
+      const qc = G.quetesDuJour('G1', `conq${i}`);
+      if (qc.some((q) => q.cle === 'boss')) conquis++;
+      if (qc.some((q) => q.cle === 'skills')) skillsConquis++;
       G.ensurePlayer('G1', `front${i}`);
       majJoueur(`front${i}`, { floor: 100, position: 100 });
-      if (G.quetesDuJour('G1', `front${i}`).some((q) => q.cle === 'boss')) front++;
+      const qf = G.quetesDuJour('G1', `front${i}`);
+      if (qf.some((q) => q.cle === 'boss')) front++;
+      if (qf.some((q) => q.cle === 'skills')) skillsFront++;
     }
     V('60 joueurs à l\'étage 101 : aucune quête boss (24 avant)', conquis === 0, String(conquis));
     V('… elle reste tirée à l\'étage 100, où un boss attend', front > 0, String(front));
+    // Les Sword Skills ne se lancent qu'en combat de boss : sans boss, la
+    // quête est tout aussi impossible et coûtait le coffre des trois quêtes.
+    V('60 joueurs à l\'étage 101 : aucune quête « Sword Skills » non plus', skillsConquis === 0, String(skillsConquis));
+    V('… elle reste tirée à l\'étage 100', skillsFront > 0, String(skillsFront));
   }
 
   console.log('\n6) Clics tardifs (mode carte) : la carte de fin n\'est jamais écrasée');

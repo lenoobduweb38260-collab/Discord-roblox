@@ -428,11 +428,8 @@ function startManagedApi(client, baseDir) {
       await journal(`🔢 Salon de comptage → ${value ? `<#${value}>` : '*aucun (comptage coupé)*'}`);
       return value ? 'Compte remis à 0 dans le nouveau salon (record et classement conservés).' : null;
     }
-    if (key === 'comptage_role_erreur') {
-      // Rôle changé ou vidé : le dernier fautif rend l'ancien, comme dans /config.
-      await require('./utils/comptage').retirerRoleFautifComptage(guild, { garder: value });
-      return null;
-    }
+    // comptage_role_erreur : le retrait de l'ancien rôle est lancé dans
+    // POST /config AVANT d'écrire le réglage (il doit lire l'ancien).
     if (key === 'xp_courbe' || key === 'xp_niveau_max') {
       const L = require('./utils/levels');
       const n = L.recalculerNiveaux(guild.id);
@@ -1361,6 +1358,13 @@ function startManagedApi(client, baseDir) {
           if (key === 'bot_avatar_url') return send(200, { ok: true, value: getGuildConfig(body.guildId).bot_avatar_url ?? null });
           return send(200, { ok: true, value });
         }
+        // 🎭 Rôle d'erreur du comptage changé ou vidé : le dernier fautif rend
+        // l'ancien, comme dans /config. Lancé AVANT d'écrire : sa partie
+        // synchrone lit l'ANCIEN réglage — le seul repère quand la base ne
+        // dit pas quel rôle il a reçu (ligne d'avant la colonne role_fautif).
+        const retraitComptage = key === 'comptage_role_erreur' && String(avant ?? '') !== String(value ?? '')
+          ? require('./utils/comptage').retirerRoleFautifComptage(client.guilds.cache.get(body.guildId), { garder: value })
+          : null;
         setGuildConfig(body.guildId, key, value);
         // Colonnes historiques mono-rôle synchronisées avec les listes (le
         // grade fusionne les deux : sans ça, un rôle retiré de la liste
@@ -1379,6 +1383,7 @@ function startManagedApi(client, baseDir) {
             .then((result) => console.log(`🔄 Module RP ${result.rp ? 'activé' : 'désactivé'} — ${result.total} commande(s) synchronisées.`))
             .catch((err) => console.warn(`⚠️ Sync commandes : ${err.message}`));
         }
+        await retraitComptage;
         // Les effets de /config, à l'identique (voir effetReglageDashboard).
         const note = String(avant ?? '') === String(value ?? '')
           ? null

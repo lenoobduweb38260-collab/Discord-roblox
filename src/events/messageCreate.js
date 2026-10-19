@@ -41,8 +41,11 @@ module.exports = {
     const abandonnerComptage = () => placeComptage?.liberer(false);
 
     // Anti-scam : vérifie les images jointes contre les échantillons enregistrés.
+    // Une image reconnue rend sa place au comptage AUSSITÔT : la sanction qui
+    // suit (preuves, effacement, ban partout) peut dépasser le délai d'attente
+    // de la file, et le nombre aurait alors été jugé quand même.
     if (message.attachments.size) {
-      const handled = await scanMessage(message).catch((err) => {
+      const handled = await scanMessage(message, { surCorrespondance: abandonnerComptage }).catch((err) => {
         console.error('Erreur scan anti-scam :', err);
         return false;
       });

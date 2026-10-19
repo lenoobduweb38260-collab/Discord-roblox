@@ -281,13 +281,15 @@ module.exports = {
       // PNG est lu par le moteur d'images du bot, et dans des bornes (poids,
       // dimensions) qui protègent le bot d'une image piégée. Le fond lu est
       // gardé prêt : les fiches suivantes ne le retéléchargent pas.
+      // En cas d'échec, les bornes de CARTE (MAX_OCTETS_IMAGE,
+      // MAX_PIXELS_IMAGE, MAX_COTE_IMAGE) sont dites en clair.
       return repondreVite(interaction, async () => {
         const image = await CARTE.fondNiveau(url, { rafraichir: true });
         return {
           content: image
             ? '✅ Image enregistrée : elle sert de fond aux cartes de niveau.'
             : '✅ Image enregistrée, mais je n\'ai pas pu la lire comme **PNG**.\n'
-              + `➜ Il faut une image PNG de ${CARTE.MAX_COTE_IMAGE} × ${CARTE.MAX_COTE_IMAGE} pixels et 8 Mo au plus, `
+              + '➜ Il faut une image PNG de 8 Mo au plus et d\'environ 4 millions de pixels (4096 px par côté au maximum : un fond 2560 × 1440 passe), '
               + 'qui se télécharge en moins d\'une seconde et demie. D\'ici là, les cartes gardent leur fond par défaut.',
           flags: MessageFlags.Ephemeral,
         };

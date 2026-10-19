@@ -224,6 +224,13 @@ async function gererConfigComptage(interaction) {
       return refuser(`❌ **${role.name}** porte des permissions sensibles : ${sensibles.join(', ')}.\n`
         + '➜ Le bot le donnerait à n\'importe qui casse la série : choisissez un rôle sans aucun pouvoir de modération.');
     }
+    // Ni un rôle staff ou admin du bot : sans la moindre permission Discord,
+    // il donne déjà accès à /ban, /kick, /mute.
+    const duBot = role ? C.roleDuBotComptage(guildId, role.id) : null;
+    if (duBot) {
+      return refuser(`❌ **${role.name}** : ${duBot}.\n`
+        + '➜ Le bot le donnerait, avec son grade, à n\'importe qui casse la série : choisissez un rôle sans aucun pouvoir.');
+    }
     // Ni au-dessus de celui qui règle : le bot ne distribue pas, à sa
     // place, un rôle qu'il ne pourrait pas donner lui-même.
     const haut = interaction.member?.roles?.highest?.position;

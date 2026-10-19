@@ -74,7 +74,12 @@ async function downloadImage(url) {
 // preuves téléchargées, message supprimé, auteur BLACKLISTÉ (ban partout +
 // re-ban automatique à l'arrivée + MP avec le serveur de déban), images
 // republiées en preuve. Renvoie true si le message a été traité comme scam.
-async function scanMessage(message) {
+//
+// `surCorrespondance(echantillon)` : appelé DÈS qu'une image correspond,
+// avant les preuves, l'effacement et la blacklist — qui peuvent durer de
+// longues secondes (téléchargements, un ban par serveur). Le salon de
+// comptage s'en sert pour ne pas juger un nombre qui va disparaître.
+async function scanMessage(message, { surCorrespondance = null } = {}) {
   // Échantillons de CE serveur + échantillons globaux (ajoutés par le créateur,
   // valables partout).
   const samples = [...listSamples.all(message.guildId), ...listGlobalSamples.all(GLOBAL_SCOPE)];
@@ -89,6 +94,11 @@ async function scanMessage(message) {
       (s) => s.sha256 === sha256 || (dhash && s.dhash && hamming(dhash, s.dhash) <= THRESHOLD)
     );
     if (!match) continue;
+
+    // Le verdict tout de suite — immunisé ou non, le message sera effacé.
+    try {
+      surCorrespondance?.(match);
+    } catch { /* un rappel qui échoue n'arrête pas la sanction */ }
 
     const { isImmune, applyBlacklist } = require('./botTeam');
 

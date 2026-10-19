@@ -391,10 +391,11 @@ function quetesDuJour(guildId, userId, now) {
   if (existantes.length) return existantes;
   const p = getPlayer(g, u);
   const R = reglagesSao(g);
-  const eligibles = Object.entries(D.QUETES).filter(([cle, q]) => {
-    // Aincrad conquis : plus aucun boss d'étage, donc une quête impossible
-    // qui priverait le joueur du coffre des trois quêtes.
-    if (cle === 'boss') return (p?.floor || 1) <= MAX_FLOOR;
+  const eligibles = Object.entries(D.QUETES).filter(([, q]) => {
+    // Aincrad conquis : plus aucun boss d'étage. Les quêtes qui n'avancent
+    // qu'en combat de boss (le boss lui-même, les Sword Skills) deviennent
+    // impossibles et priveraient le joueur du coffre des trois quêtes.
+    if (q.cond === 'boss') return (p?.floor || 1) <= MAX_FLOOR;
     if (q.cond === 'peche') return (p?.floor || 1) >= D.ETAGE_PECHE;
     if (q.cond === 'raid') return Boolean(R.salonRaid && R.raidHeures > 0);
     if (q.cond === 'pvp') return R.pvp;
@@ -1425,14 +1426,17 @@ function leaderboard(guildId, limit = 10) {
   return classementSao(guildId, 'etage').slice(0, limit);
 }
 
+// Le combat abandonné que /sao cd clôt au passage est RENDU (`abandon`) :
+// la pénalité ne doit pas plus passer sous silence ici qu'à l'auberge.
 function delaisSao(guildId, userId, { now } = {}) {
   const t = maintenant(now);
-  expirerCombatAbandonne(guildId, userId, t);
+  const abandon = expirerCombatAbandonne(guildId, userId, t);
   const p = chargerJoueur(guildId, userId, t);
   if (!p) return null;
   const R = reglagesSao(guildId);
   const afkMin = Math.min(R.afkHeures * 60, Math.max(0, (t - (tempsDe(p.last_afk) || t)) / 60000));
   return {
+    abandon,
     joueur: p,
     chasse: Math.max(0, R.chasseDelai * 1000 - (t - tempsDe(p.last_hunt))),
     quotidien: p.quotidien_jour === jourSao(t) ? msAvantMinuit(t) : 0,

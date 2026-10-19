@@ -763,11 +763,17 @@ function prochaineRecompenseNiveau(guildId, niveau) {
 // seuls les rôles du plus haut palier atteint sont voulus. À la baisse, les
 // rôles des paliers non atteints ne sont plus voulus.
 //
+// `ancien` : le niveau d'avant la baisse, quand on le connaît. Seuls les
+// paliers PERDUS (au-dessus du niveau, mais atteints autrefois) sont alors
+// repris : un rôle de palier jamais atteint — donné à la main, pour un
+// événement — n'a pas à disparaître parce que la courbe a changé. Sans
+// ancien niveau (/xp synchroniser), tout ce qui est au-dessus est repris.
+//
 // `attribuable(roleId)` : en mode remplacement, le « plus haut palier » est
 // le plus haut dont le rôle peut VRAIMENT être donné. Un rôle supprimé, ou
 // passé au-dessus du mien, ne doit pas faire retirer celui d'en dessous :
 // le membre se retrouverait sans aucun rôle de palier.
-function planRolesNiveau(recompenses, niveau, { cumul = true, baisse = false, attribuable = null } = {}) {
+function planRolesNiveau(recompenses, niveau, { cumul = true, baisse = false, attribuable = null, ancien = null } = {}) {
   const atteintes = recompenses.filter((r) => r.niveau <= niveau);
   // (Le plus haut palier ne compte qu'en mode remplacement : en cumul, on
   // ne demande rien à `attribuable`.)
@@ -779,8 +785,9 @@ function planRolesNiveau(recompenses, niveau, { cumul = true, baisse = false, at
     else if (r.type === 'role_retrait') voulu.set(r.valeur, { veut: false, r });
   }
   if (baisse) {
+    const borne = Number.isInteger(ancien) ? ancien : Infinity;
     for (const r of recompenses) {
-      if (r.type === 'role' && r.niveau > niveau && !voulu.has(r.valeur)) voulu.set(r.valeur, { veut: false, r, perdu: true });
+      if (r.type === 'role' && r.niveau > niveau && r.niveau <= borne && !voulu.has(r.valeur)) voulu.set(r.valeur, { veut: false, r, perdu: true });
     }
   }
   return voulu;
@@ -857,6 +864,12 @@ function roleAttribuable(guild, role) {
 // ⛔ Un rôle que Discord vient de refuser n'est pas redemandé à chaque gain
 // (chaque minute de vocal, chaque message) : 10 minutes de répit. La
 // synchronisation et un vrai passage de niveau, eux, réessaient.
+//
+// Pendant le répit, un rattrapage tient le rôle pour NON attribuable, dans
+// le plan lui-même : en mode remplacement, le « plus haut palier » retombe
+// sur celui d'en dessous, que le membre porte déjà — plus rien à faire.
+// Sans cela, l'ancien palier passait pour « à retirer », relançait le
+// rattrapage, et le rôle refusé était redemandé à chaque gain.
 const REPIT_REFUS = 10 * 60 * 1000;
 const refusRecents = new Map();
 const cleRefus = (gid, roleId) => `${gid}:${roleId}`;
@@ -893,10 +906,10 @@ function recompensesEnAttente(guild, membre, niveau) {
   const roles = membre?.roles?.cache;
   if (roles) {
     const cumul = Number(getGuildConfig(guild.id).level_rewards_stack ?? 1) !== 0;
-    const attribuable = (id) => roleAttribuable(guild, guild.roles?.cache?.get(id));
+    const attribuable = (id) => roleAttribuable(guild, guild.roles?.cache?.get(id)) && !refusRecent(String(guild.id), id);
     for (const [roleId, v] of planRolesNiveau(recompenses, niveau, { cumul, attribuable })) {
       if (v.veut === Boolean(roles.has(roleId))) continue;
-      if (attribuable(roleId) && !refusRecent(String(guild.id), roleId)) return true;
+      if (attribuable(roleId)) return true;
     }
   }
   const unique = recompenses.filter((r) => r.niveau <= niveau && (r.type === 'col' || r.type === 'objet'));
@@ -934,12 +947,19 @@ async function appliquerRecompenses(guild, userId, niveau, { ancien = null, memb
     // 🎭 Rôles — d'abord ce qu'on donne, ensuite ce qu'on retire : en mode
     // remplacement, l'ancien palier ne part que si le nouveau est bien posé.
     const roleDe = async (id) => guild.roles.cache.get(id) || (await guild.roles.fetch(id).catch(() => null));
-    const attribuable = (id) => roleAttribuable(guild, guild.roles.cache.get(id));
-    const plan = [...planRolesNiveau(recompenses, niveau, { cumul, baisse, attribuable })];
+    // Un simple rattrapage (ni passage de niveau, ni baisse, ni /xp
+    // synchroniser) laisse en paix un rôle encore en répit.
+    const rattrapage = synchro && !baisse;
+    const enRepit = (id) => rattrapage && refusRecent(gid, id);
+    const attribuable = (id) => roleAttribuable(guild, guild.roles.cache.get(id)) && !enRepit(id);
+    // Les paliers perdus seulement — bornés par l'ancien niveau. /xp
+    // synchroniser (realigner), sans ancien niveau, reprend tout le dessus.
+    const plan = [...planRolesNiveau(recompenses, niveau, { cumul, baisse, attribuable, ancien: realigner ? null : ancien })];
     let nouveauManque = false;
     for (const [roleId, v] of [...plan.filter(([, x]) => x.veut), ...plan.filter(([, x]) => !x.veut)]) {
       const aDeja = m.roles.cache.has(roleId);
       if (v.veut === aDeja) continue;
+      if (enRepit(roleId)) continue;
       const role = await roleDe(roleId);
       // Un rôle disparu, géré, sensible, ou plus haut que le mien ne bouge
       // pas : le diagnostic de /config le dit, on passe au suivant sans bruit.

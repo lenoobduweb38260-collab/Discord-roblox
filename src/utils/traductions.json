@@ -2339,12 +2339,26 @@
     "pl": " nie jest kategorią tego serwera (usunięta lub z innego serwera): wybierz jedną z listy.",
     "ru": " не является категорией этого сервера (удалена или с другого сервера): выберите категорию из списка."
   },
+  " n'est plus donné (": {
+    "en": " is no longer given (",
+    "de": " wird nicht mehr vergeben (",
+    "es": " ya no se da (",
+    "pl": " nie jest już nadawana (",
+    "ru": " больше не выдаётся ("
+  },
   " n'était pas autorisé pour ": {
     "en": " was not allowed for ",
     "de": " war nicht autorisiert für ",
     "es": " no estaba autorizado para ",
     "pl": " nie był upoważniony do ",
     "ru": " не был уполномочен для "
+  },
+  " ne convient pas : ": {
+    "en": " is not suitable: ",
+    "de": " ist nicht geeignet: ",
+    "es": " no es adecuado: ",
+    "pl": " nie nadaje się: ",
+    "ru": " не подходит: "
   },
   " ne permet à personne de diffuser son audio : je joue le même titre depuis YouTube.": {
     "en": " lets nobody stream its audio: I play the same track from YouTube.",
@@ -13681,6 +13695,13 @@
     "pl": "➜ Potrzebny jest obraz PNG o wymiarach do ",
     "ru": "➜ Нужно изображение PNG размером не более "
   },
+  "➜ Il faut une image PNG de 8 Mo au plus et d'environ 4 millions de pixels (4096 px par côté au maximum : un fond 2560 × 1440 passe), ": {
+    "en": "➜ It must be a PNG image of at most 8 MB and about 4 million pixels (4096 px per side at most: a 2560 × 1440 background fits), ",
+    "de": "➜ Nötig ist ein PNG-Bild von höchstens 8 MB und etwa 4 Millionen Pixeln (höchstens 4096 px pro Seite: ein Hintergrund mit 2560 × 1440 passt), ",
+    "es": "➜ Se necesita una imagen PNG de 8 MB como máximo y de unos 4 millones de píxeles (4096 px por lado como máximo: un fondo de 2560 × 1440 sirve), ",
+    "pl": "➜ Potrzebny jest obraz PNG o rozmiarze do 8 MB i około 4 milionach pikseli (najwyżej 4096 px na bok: tło 2560 × 1440 się mieści), ",
+    "ru": "➜ Нужно изображение PNG не больше 8 МБ и примерно до 4 миллионов пикселей (не более 4096 px по стороне: фон 2560 × 1440 подходит), "
+  },
   "➜ Il reste deux causes possibles, toutes deux hors du bot :": {
     "en": "➜ Two possible causes remain, both outside the bot:",
     "de": "➜ Es bleiben zwei mögliche Ursachen, beide außerhalb des Bots:",
@@ -13792,6 +13813,13 @@
     "es": "➜ El bot se lo daría a cualquiera que rompa la racha: elija un rol sin ningún poder de moderación.",
     "pl": "➜ Bot dałby ją każdemu, kto przerwie serię: wybierz rolę bez żadnych uprawnień moderacyjnych.",
     "ru": "➜ Бот выдал бы её любому, кто прервёт серию: выберите роль без каких-либо прав модерации."
+  },
+  "➜ Le bot le donnerait, avec son grade, à n'importe qui casse la série : choisissez un rôle sans aucun pouvoir.": {
+    "en": "➜ The bot would give it, along with its rank, to anyone who breaks the streak: choose a role without any power.",
+    "de": "➜ Der Bot würde sie samt ihrem Rang jedem geben, der die Serie bricht: Wählen Sie eine Rolle ganz ohne Rechte.",
+    "es": "➜ El bot se lo daría, con su rango, a cualquiera que rompa la racha: elija un rol sin ningún poder.",
+    "pl": "➜ Bot dałby ją, razem z jej rangą, każdemu, kto przerwie serię: wybierz rolę bez żadnych uprawnień.",
+    "ru": "➜ Бот выдал бы её вместе с её рангом любому, кто прервёт серию: выберите роль без каких-либо прав."
   },
   "➜ Le classement des compteurs est **conservé**.": {
     "en": "➜ The counters leaderboard is **kept**.",
@@ -27462,6 +27490,13 @@
     "es": "El rol ",
     "pl": "Rola ",
     "ru": "Роль "
+  },
+  "Le rôle d'erreur du comptage est donné automatiquement : choisissez un rôle sans aucun pouvoir.": {
+    "en": "The counting mistake role is given automatically: choose a role without any power.",
+    "de": "Die Fehlerrolle des Zählens wird automatisch vergeben: Wählen Sie eine Rolle ganz ohne Rechte.",
+    "es": "El rol de error del conteo se da automáticamente: elija un rol sin ningún poder.",
+    "pl": "Rola za błąd w liczeniu jest nadawana automatycznie: wybierz rolę bez żadnych uprawnień.",
+    "ru": "Роль за ошибку в счёте выдаётся автоматически: выберите роль без каких-либо прав."
   },
   "le rôle d'erreur du comptage est donné automatiquement, il ne doit en porter aucune.": {
     "en": "the counting mistake role is given automatically, so it must not have any.",

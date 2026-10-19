@@ -30,6 +30,7 @@ const CMD = require('../src/commands/comptage');
 const CC = require('../src/utils/comptageConfig');
 const { getLevels } = require('../src/utils/levels');
 const TUTO = require('../src/utils/tutoriel');
+const { GRADES, getGrade } = require('../src/utils/permissions');
 
 let ok = 0, ko = 0;
 const V = (t, c, d = '') => { if (c) { ok++; console.log('  ✅ ' + t); } else { ko++; console.log('  ❌ ' + t + (d ? ' — ' + d : '')); } };
@@ -57,6 +58,9 @@ const ROLES = new Map([
   ['BANROLE', { id: 'BANROLE', name: 'Videurs', position: 9, managed: false, permissions: '4' }],
   ['R2', { id: 'R2', name: 'Maladroit', position: 2, managed: false, permissions: { bitfield: 0n } }],
   ['ENTRE', { id: 'ENTRE', name: 'Entre deux', position: 35, managed: false }],
+  // Rôles staff / admin DU BOT : aucune permission Discord, mais un grade.
+  ['EQUIPE', { id: 'EQUIPE', name: 'Équipe', position: 3, managed: false, permissions: { bitfield: 0n } }],
+  ['DIRECTION', { id: 'DIRECTION', name: 'Direction', position: 4, managed: false, permissions: { bitfield: 0n } }],
 ]);
 
 let seq = 0;
@@ -649,6 +653,31 @@ const titreLog = () => embedDe(SALONS.LOGS.envois[SALONS.LOGS.envois.length - 1]
     const deux = await poster('modo', '2');
     V('le modo casse la série exprès : il ne reçoit PAS le rôle « Administrateur »', deux.reactions[0] === '❌' && !membre('modo').roles.cache.has('ADMINROLE'));
     setGuildConfig('G1', 'comptage_role_erreur', null);
+
+    // Un rôle staff ou admin DU BOT ne porte souvent aucune permission
+    // Discord, mais donne le grade (/ban, /kick, /mute) : jamais un rôle
+    // d'erreur, ni par /config, ni par le site, ni au moment de le donner.
+    setGuildConfig('G1', 'staff_role_ids', JSON.stringify(['EQUIPE']));
+    setGuildConfig('G1', 'admin_role_id', 'DIRECTION');
+    it = role(['EQUIPE'], 'staff');
+    await IC.execute(it);
+    V('/config : un rôle staff du bot, sans permission Discord → refusé, expliqué', !getGuildConfig('G1').comptage_role_erreur
+      && /\*\*Équipe\*\* : c'est un rôle staff du bot/.test(texte(it.suivis)) && /avec son grade/.test(texte(it.suivis)), texte(it.suivis).slice(0, 300));
+    it = role(['DIRECTION'], 'staff');
+    await IC.execute(it);
+    V('… un rôle d\'administration du bot aussi', !getGuildConfig('G1').comptage_role_erreur && /rôle d'administration du bot/.test(texte(it.suivis)));
+    V('le contrôle du site refuse les deux', /rôle staff du bot/.test(C.refusRoleErreurComptage(guild, 'EQUIPE') || '')
+      && /rôle d'administration du bot/.test(C.refusRoleErreurComptage(guild, 'DIRECTION') || '') && C.refusRoleErreurComptage(guild, 'R2') === null);
+    // Réglé avant ce verrou, ou ajouté au staff du bot APRÈS le réglage.
+    setGuildConfig('G1', 'comptage_role_erreur', 'EQUIPE');
+    C.definirNombreComptage('G1', 3, 'CPT');
+    const fautif = await poster('u2', '9');
+    V('… et déjà réglé : qui casse la série ne le reçoit PAS (grade du membre inchangé)', fautif.reactions[0] === '❌'
+      && !membre('u2').roles.cache.has('EQUIPE') && etat().role_fautif === '' && getGrade(membre('u2')) === GRADES.EVERYONE,
+      texte([fautif.reactions, etat().role_fautif]));
+    setGuildConfig('G1', 'comptage_role_erreur', null);
+    setGuildConfig('G1', 'staff_role_ids', null);
+    setGuildConfig('G1', 'admin_role_id', null);
   }
 
   console.log('\n18) Rôle d\'erreur retiré quand le staff le change, le vide ou coupe le comptage');
@@ -737,9 +766,89 @@ const titreLog = () => embedDe(SALONS.LOGS.envois[SALONS.LOGS.envois.length - 1]
     await Promise.all([MC3.execute(huitArnaque), (async () => { await attendre(10); return MC3.execute(huit); })()]);
     V('un nombre effacé par l\'anti-scam ne compte pas ; le suivant est jugé normalement', !huitArnaque.reactions.length && huit.reactions[0] === '✅' && etat().courant === 8,
       texte([huitArnaque.reactions, huit.reactions, etat().courant]));
+
+    // ⏱️ La sanction de l'anti-scam (preuves, effacement, ban sur CHAQUE
+    // serveur, envois des preuves) peut durer plus que l'attente de la file.
+    // Le nombre était alors jugé quand même : une arnaque « 18+ free nitro »
+    // cassait la série. Ici le VRAI scanMessage, une blacklist qui traîne, et
+    // l'attente de la file réduite de 10 s à 150 ms.
     SI.scanMessage = scanOrig;
-    delete require.cache[require.resolve('../src/events/messageCreate')];
-    MC = require('../src/events/messageCreate');
+    const BT = require('../src/utils/botTeam');
+    const btOrig = { isImmune: BT.isImmune, applyBlacklist: BT.applyBlacklist };
+    const fetchOrig = global.fetch;
+    const minuteurOrig = global.setTimeout;
+    const AFFICHE = Buffer.from('affiche-de-scam-du-comptage');
+    const empreinte = require('crypto').createHash('sha256').update(AFFICHE).digest('hex');
+    SI.insertSample.run('G1', 'faux nitro', empreinte, null, 'staff', '2026-01-01');
+    const echantillon = SI.listSamples.all('G1').find((s) => s.sha256 === empreinte);
+    const traces = [];
+    try {
+      global.fetch = async () => ({ ok: true, arrayBuffer: async () => AFFICHE });
+      global.setTimeout = (f, ms, ...a) => minuteurOrig(f, ms === 10_000 ? 150 : ms, ...a);
+      BT.isImmune = async () => false;
+      BT.applyBlacklist = async () => { traces.push('blacklist'); await attendre(400); return { banned: 1, dmOk: false }; };
+      const affiche = (user, contenu) => {
+        const m = fauxMessage({ user, contenu });
+        m.attachments = { size: 1, values: () => [{ id: 'A1', name: 'nitro.png', url: 'https://cdn.test/nitro.png', contentType: 'image/png', size: AFFICHE.length }][Symbol.iterator]() };
+        const effacer = m.delete;
+        m.delete = async () => { traces.push('effacement'); return effacer(); };
+        return m;
+      };
+      const rechargerMC = () => {
+        delete require.cache[require.resolve('../src/events/messageCreate')];
+        return require('../src/events/messageCreate');
+      };
+
+      let MC4 = rechargerMC();
+      C.definirNombreComptage('G1', 57, 'CPT');
+      let envoisAvant = SALONS.CPT.envois.length;
+      const arnaque = affiche('u3', '18+ free nitro');
+      const cinquanteHuit = fauxMessage({ user: 'u1', contenu: '58' });
+      await Promise.all([MC4.execute(arnaque), (async () => { await attendre(100); return MC4.execute(cinquanteHuit); })()]);
+      V('arnaque « 18+ … », sanction plus longue que l\'attente : effacée, blacklistée, jamais jugée',
+        arnaque.supprime && traces.includes('blacklist') && !arnaque.reactions.length, texte([arnaque.reactions, traces]));
+      V('… le « 58 » qui suit est juste, et personne n\'a « cassé la série »', cinquanteHuit.reactions[0] === '✅' && etat().courant === 58
+        && !SALONS.CPT.envois.slice(envoisAvant).some((e) => /a cassé la série/.test(e.content || '')),
+        texte([cinquanteHuit.reactions, etat().courant, SALONS.CPT.envois.slice(envoisAvant).map((e) => e.content)]));
+
+      // Le verdict part AVANT l'effacement et la blacklist — et aussi pour
+      // un membre immunisé, dont l'affiche est effacée tout de même.
+      traces.length = 0;
+      const verdict = (e) => traces.push(`verdict:${e?.id}`);
+      await SI.scanMessage(affiche('u3', '59'), { surCorrespondance: verdict });
+      V('anti-scam : le verdict précède l\'effacement et la blacklist', texte(traces) === texte([`verdict:${echantillon?.id}`, 'effacement', 'blacklist']), texte(traces));
+      traces.length = 0;
+      BT.isImmune = async () => true;
+      const immunise = await SI.scanMessage(affiche('u3', '59'), { surCorrespondance: verdict });
+      V('… chemin « immunisé » compris (effacé sans sanction)', immunise === true && texte(traces) === texte([`verdict:${echantillon?.id}`, 'effacement']), texte(traces));
+
+      // Filet : l'image n'est pas encore reconnue (téléchargement plus long
+      // que l'attente), mais le message a déjà disparu — Discord l'a annoncé.
+      // À l'expiration de l'attente, il n'est pas jugé.
+      SI.scanMessage = async () => { await attendre(400); return false; };
+      MC4 = rechargerMC();
+      C.definirNombreComptage('G1', 57, 'CPT');
+      envoisAvant = SALONS.CPT.envois.length;
+      const lente = affiche('u3', '18+ free nitro');
+      const encore58 = fauxMessage({ user: 'u1', contenu: '58' });
+      await Promise.all([
+        MC4.execute(lente),
+        (async () => { await attendre(40); await lente.delete(); return C.surSuppressionComptage(lente); })(),
+        (async () => { await attendre(100); return MC4.execute(encore58); })(),
+      ]);
+      V('filet : un nombre effacé avant la fin de l\'attente n\'est pas jugé, le « 58 » suivant est juste',
+        !lente.reactions.length && encore58.reactions[0] === '✅' && etat().courant === 58
+        && !SALONS.CPT.envois.slice(envoisAvant).some((e) => /a cassé la série/.test(e.content || '')),
+        texte([lente.reactions, encore58.reactions, etat().courant]));
+    } finally {
+      global.fetch = fetchOrig;
+      global.setTimeout = minuteurOrig;
+      Object.assign(BT, btOrig);
+      if (echantillon) SI.deleteSample.run(echantillon.id, 'G1');
+      SI.scanMessage = scanOrig;
+      delete require.cache[require.resolve('../src/events/messageCreate')];
+      MC = require('../src/events/messageCreate');
+    }
   }
 
   console.log('\n21) Purge (suppression en masse) du dernier nombre');

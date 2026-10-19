@@ -448,19 +448,28 @@ function enFileComptage(cle, travail) {
   return tour;
 }
 
-// Les hors-jeu que le bot efface lui-même : leur suppression n'a pas à
-// remplir le journal (un salon de comptage animé en produirait des
-// centaines). Mémoire courte et bornée.
-const effacesParLeBot = new Map();
-function noterEffacement(id) {
+// Une mémoire courte et bornée d'identifiants de messages : une minute, 500
+// au plus (les plus anciens partent d'abord).
+function noterDans(memoire, id) {
   const t = Date.now();
-  effacesParLeBot.set(String(id), t);
-  if (effacesParLeBot.size > 500) {
-    for (const [k, quand] of effacesParLeBot) {
-      if (t - quand > 60_000 || effacesParLeBot.size > 500) effacesParLeBot.delete(k);
+  memoire.set(String(id), t);
+  if (memoire.size > 500) {
+    for (const [k, quand] of memoire) {
+      if (t - quand > 60_000 || memoire.size > 500) memoire.delete(k);
     }
   }
 }
+
+// Les hors-jeu que le bot efface lui-même : leur suppression n'a pas à
+// remplir le journal (un salon de comptage animé en produirait des
+// centaines).
+const effacesParLeBot = new Map();
+const noterEffacement = (id) => noterDans(effacesParLeBot, id);
+
+// Les messages du salon de comptage dont Discord a annoncé la suppression.
+// Un nombre dont les filtres tardent à rendre leur verdict n'est pas jugé
+// s'il a disparu entretemps (voir placerEnFile).
+const effacesRecus = new Map();
 
 // ══════════════════════════════════════════════════════════════════════════
 // 🎯 LE JEU
@@ -505,8 +514,9 @@ async function sansEchec(appel) {
 // placé sous celui du bot, comptait « 1 » puis « 2 »… et le recevait.
 //
 // D'où trois verrous : le rôle se règle par l'ADMINISTRATION, il ne porte
-// aucune permission sensible, et ces permissions sont revérifiées à chaque
-// fois qu'on le donne (elles ont pu changer depuis le réglage).
+// aucune permission sensible ni aucun grade du bot (rôle staff ou admin
+// réglé dans le bot), et tout cela est revérifié à chaque fois qu'on le
+// donne (permissions et listes ont pu changer depuis le réglage).
 
 // Les permissions qu'un rôle d'erreur ne doit JAMAIS porter. Les valeurs
 // sont celles de l'API de Discord, écrites ici plutôt que lues dans
@@ -551,15 +561,35 @@ function permissionsSensiblesRole(role) {
   return PERMISSIONS_SENSIBLES_COMPTAGE.filter(([bit]) => (bits & bit) === bit).map(([, nom]) => nom);
 }
 
+// Un rôle staff ou admin DU BOT (réglé dans le bot) donne un grade à qui le
+// porte — /ban, /kick, /mute… — même sans aucune permission Discord. Le
+// motif du refus, ou null. Même verrou que les récompenses de niveau.
+function roleDuBotComptage(guildId, roleId) {
+  if (!guildId || !roleId) return null;
+  // Chargé ici : permissions.js ne dépend que de la base, pas de cycle.
+  const P = require('./permissions');
+  const cfg = getGuildConfig(String(guildId));
+  if (P.adminRoleIds(cfg).includes(String(roleId))) return 'c\'est un rôle d\'administration du bot';
+  if (P.staffRoleIds(cfg).includes(String(roleId))) return 'c\'est un rôle staff du bot';
+  return null;
+}
+
 // Le refus du site (API) pour un rôle d'erreur porteur de pouvoirs, ou null.
 // Les autres contrôles (rôle du serveur, géré, sous le bot) sont faits avant.
 function refusRoleErreurComptage(guild, roleId) {
   const role = guild?.roles?.cache?.get?.(String(roleId));
   if (!role) return null;
   const sensibles = permissionsSensiblesRole(role);
-  if (!sensibles.length) return null;
-  return `Le rôle ${role.name || role.id} porte des permissions sensibles (${sensibles.join(', ')}) : `
-    + 'le rôle d\'erreur du comptage est donné automatiquement, il ne doit en porter aucune.';
+  if (sensibles.length) {
+    return `Le rôle ${role.name || role.id} porte des permissions sensibles (${sensibles.join(', ')}) : `
+      + 'le rôle d\'erreur du comptage est donné automatiquement, il ne doit en porter aucune.';
+  }
+  const duBot = roleDuBotComptage(guild.id, role.id);
+  if (duBot) {
+    return `Le rôle ${role.name || role.id} ne convient pas : ${duBot}. `
+      + 'Le rôle d\'erreur du comptage est donné automatiquement : choisissez un rôle sans aucun pouvoir.';
+  }
+  return null;
 }
 
 // Retire un rôle à un membre, sans jamais lever.
@@ -585,13 +615,19 @@ async function passerRoleErreur(message, roleId, { ancienFautif = null, ancienRo
 }
 
 // Le rôle qu'on peut donner maintenant : celui du réglage, s'il existe
-// encore et ne porte aucune permission sensible. Sinon null.
+// encore, ne porte aucune permission sensible et n'est pas un rôle staff ou
+// admin du bot (ajouté peut-être à la liste après le réglage). Sinon null.
 function roleErreurDonnable(guild, roleId) {
   if (!roleId) return null;
   const role = guild?.roles?.cache?.get?.(String(roleId));
   if (!role) return null;
   if (permissionsSensiblesRole(role).length) {
     console.warn(`⚠️ Comptage : le rôle d'erreur ${role.name || role.id} porte des permissions sensibles — il n'est plus donné.`);
+    return null;
+  }
+  const duBot = roleDuBotComptage(guild.id, roleId);
+  if (duBot) {
+    console.warn(`⚠️ Comptage : le rôle d'erreur ${role.name || role.id} n'est plus donné (${duBot}).`);
     return null;
   }
   return String(roleId);
@@ -708,8 +744,11 @@ function examinerComptage(message, cfg) {
 }
 
 // L'anti-scam qui télécharge une image ne doit pas figer le salon : passé
-// ce délai, le nombre est jugé quand même.
+// ce délai, le nombre est jugé quand même — sauf s'il a été effacé.
+// L'anti-scam rend son verdict dès qu'une image correspond, AVANT les
+// preuves, l'effacement et la blacklist (qui peuvent durer bien plus).
 const ATTENTE_FILTRES_MS = 10_000;
+const DELAI_DEPASSE = 'delai';
 
 function placerEnFile(message, { R, lu }) {
   let feu;
@@ -718,11 +757,14 @@ function placerEnFile(message, { R, lu }) {
     let minuteur;
     const garder = await Promise.race([
       filtres,
-      new Promise((r) => { minuteur = setTimeout(() => r(true), ATTENTE_FILTRES_MS); minuteur.unref?.(); }),
+      new Promise((r) => { minuteur = setTimeout(() => r(DELAI_DEPASSE), ATTENTE_FILTRES_MS); minuteur.unref?.(); }),
     ]);
     clearTimeout(minuteur);
     // Effacé par l'anti-scam ou l'anti-spam : ce message ne compte pas.
     if (!garder) return { traite: true, filtre: true };
+    // Les filtres n'ont rien dit à temps, mais le message a disparu (un
+    // filtre plus lent que prévu, un modérateur) : il ne compte pas non plus.
+    if (garder === DELAI_DEPASSE && effacesRecus.has(String(message.id))) return { traite: true, filtre: true };
     return jugerMessageComptage(message, lu, R);
   });
   return { tour, liberer: (garder = true) => feu(Boolean(garder)) };
@@ -800,6 +842,7 @@ async function surSuppressionComptage(message, { enMasse = false } = {}) {
   if (!guildId) return {};
   const R = reglagesComptage(getGuildConfig(guildId));
   if (!R.salon || String(message.channelId) !== R.salon) return {};
+  noterDans(effacesRecus, id);
   return enFileComptage(R.salon, async () => {
     const e = etatComptage(guildId);
     if (String(e.channel_id) !== R.salon || String(e.dernier_message_id || '') !== id) return {};
@@ -825,6 +868,7 @@ async function surSuppressionEnMasseComptage(messages, salon) {
   if (!guildId || !messages || typeof messages.get !== 'function') return {};
   const R = reglagesComptage(getGuildConfig(guildId));
   if (!R.salon || String(salon.id) !== R.salon) return {};
+  for (const efface of messages.keys?.() || []) noterDans(effacesRecus, efface);
   const id = String(etatComptage(guildId).dernier_message_id || '');
   const m = id ? messages.get(id) : null;
   if (!m) return {};
@@ -864,4 +908,5 @@ module.exports = {
   enFileComptage, traiterMessageComptage, surSuppressionComptage, surModificationComptage, annoncerComptage,
   reserverPlaceComptage, surSuppressionEnMasseComptage,
   PERMISSIONS_SENSIBLES_COMPTAGE, permissionsSensiblesRole, refusRoleErreurComptage, retirerRoleFautifComptage,
+  roleDuBotComptage,
 };

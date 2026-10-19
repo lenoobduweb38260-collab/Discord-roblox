@@ -172,21 +172,28 @@ function dessinerCarteNiveau(plan, avatar = null, fondImage = null) {
 
 const DELAI_CARTE = 1500; // ms, réseau compris : sous la marge de repondreVite
 const MAX_OCTETS_IMAGE = 8 * 1024 * 1024;
-const MAX_COTE_IMAGE = 2048;
+// Borne en PIXELS, pas par côté : la mémoire (largeur × hauteur × 4) et le
+// temps de décodage suivent le nombre de pixels. Une borne de 2048 par côté
+// refusait un fond QHD (2560 × 1440, 3,7 Mpx) ou une bannière 2700 × 900 —
+// le format naturel d'une carte en 3:1 — tout en acceptant 2048 × 2048
+// (4,2 Mpx). Le côté reste borné, plus largement, contre les images en fil.
+const MAX_PIXELS_IMAGE = 2048 * 2048;
+const MAX_COTE_IMAGE = 4096;
 const SIGNATURE_PNG = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
 const CANAUX_PNG = { 0: 1, 2: 3, 3: 1, 4: 2, 6: 4 };
 
 // Le PNG peut-il être décodé sans danger ? Lit l'en-tête et la taille des
 // données, puis décompresse avec un plafond : la sortie d'une image honnête
 // fait EXACTEMENT (largeur × canaux + 1) × hauteur octets.
-function pngSansDanger(buf, { maxCote = MAX_COTE_IMAGE } = {}) {
+function pngSansDanger(buf, { maxCote = MAX_COTE_IMAGE, maxPixels = MAX_PIXELS_IMAGE } = {}) {
   try {
     if (!Buffer.isBuffer(buf) || buf.length < 33 || !buf.subarray(0, 8).equals(SIGNATURE_PNG)) return false;
     if (buf.toString('ascii', 12, 16) !== 'IHDR') return false; // l'en-tête vient TOUJOURS en premier
     const largeur = buf.readUInt32BE(16);
     const hauteur = buf.readUInt32BE(20);
     const canaux = CANAUX_PNG[buf[25]];
-    if (!largeur || !hauteur || largeur > maxCote || hauteur > maxCote || buf[24] !== 8 || !canaux || buf[28]) return false;
+    if (!largeur || !hauteur || largeur > maxCote || hauteur > maxCote || largeur * hauteur > maxPixels) return false;
+    if (buf[24] !== 8 || !canaux || buf[28]) return false;
     const idat = [];
     let pos = 8;
     while (pos + 8 <= buf.length) {
@@ -251,7 +258,7 @@ const telechargeur = () => require('./identiteBot').telechargerPublic;
 // Une image PNG en ligne : null si quoi que ce soit échoue (adresse refusée,
 // réseau, format, poids, dimensions). Jamais plus de `delai` ms, résolution
 // du nom comprise : passé ce délai, on rend null et on coupe.
-async function telechargerPngNiveau(url, delai = DELAI_CARTE, { maxOctets = MAX_OCTETS_IMAGE, maxCote = MAX_COTE_IMAGE } = {}) {
+async function telechargerPngNiveau(url, delai = DELAI_CARTE, { maxOctets = MAX_OCTETS_IMAGE, maxCote = MAX_COTE_IMAGE, maxPixels = MAX_PIXELS_IMAGE } = {}) {
   if (!/^https:\/\//i.test(String(url || ''))) return null;
   const arret = new AbortController();
   let minuteur = null;
@@ -274,7 +281,7 @@ async function telechargerPngNiveau(url, delai = DELAI_CARTE, { maxOctets = MAX_
         return null;
       }
       const corps = await lireBorne(res, maxOctets);
-      if (!corps || arret.signal.aborted || !pngSansDanger(corps, { maxCote })) return null;
+      if (!corps || arret.signal.aborted || !pngSansDanger(corps, { maxCote, maxPixels })) return null;
       return IMG.decoderPng(corps);
     } catch {
       couper(res);
@@ -357,5 +364,5 @@ async function fabriquerCarteNiveau(plan, user = null, fondUrl = null) {
 module.exports = {
   planCarteNiveau, dessinerCarteNiveau, fabriquerCarteNiveau, telechargerPngNiveau, texteCarteNiveau,
   fondNiveau, pngSansDanger, recadrerFond,
-  LARGEUR_CARTE, HAUTEUR_CARTE, DELAI_CARTE, MAX_OCTETS_IMAGE, MAX_COTE_IMAGE,
+  LARGEUR_CARTE, HAUTEUR_CARTE, DELAI_CARTE, MAX_OCTETS_IMAGE, MAX_COTE_IMAGE, MAX_PIXELS_IMAGE,
 };

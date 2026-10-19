@@ -16,6 +16,8 @@
 // 10. une quantité illisible est refusée, jamais changée en 1 ;
 // 11. /niveau voir n'attend jamais assez pour partir à l'ancienne ;
 // 12. la rubrique 🏅 Récompenses tient dans une carte (1, 13, 50, 100).
+// (6 : seuls les paliers PERDUS ; 9 : le répit vaut aussi en remplacement ;
+//  4 : le fond est borné en pixels, pas par côté.)
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -483,6 +485,31 @@ function reponseHttp(corps, { taille = null, morceau = 64 * 1024, status = 200, 
     const honnete = toile.png();
     V('une image honnête passe', CARTE.pngSansDanger(honnete) === true);
 
+    // Borne en PIXELS (≈ 2048 × 2048), 4096 px par côté au plus : un fond
+    // QHD ou une bannière 3:1 en haute définition passent, comme 2048².
+    const pleine = (l, h) => pngBrut(l, h, zlib.deflateSync(Buffer.alloc((l * 4 + 1) * h), { level: 1 }));
+    for (const [l, h] of [[2560, 1440], [2700, 900], [3000, 1000], [4096, 1024], [2048, 2048]]) {
+      V(`${l} × ${h} (${(l * h / 1e6).toFixed(1)} Mpx) : accepté`, CARTE.pngSansDanger(pleine(l, h)) === true);
+    }
+    appelsInflate = 0;
+    zlib.inflateSync = (...a) => { appelsInflate++; return vraiInflate(...a); };
+    for (const [l, h, pourquoi] of [[2049, 2049, 'trop de pixels'], [4097, 100, 'côté au-delà de 4096'], [100, 4097, 'côté au-delà de 4096'], [3000, 1500, 'trop de pixels']]) {
+      V(`${l} × ${h} : refusé sur l'en-tête (${pourquoi})`, CARTE.pngSansDanger(pngBrut(l, h, zlib.deflateSync(Buffer.alloc(16)))) === false && appelsInflate === 0, `inflate ×${appelsInflate}`);
+    }
+    zlib.inflateSync = vraiInflate;
+    V('les bornes exportées : 2048 × 2048 pixels, 4096 par côté', CARTE.MAX_PIXELS_IMAGE === 2048 * 2048 && CARTE.MAX_COTE_IMAGE === 4096);
+    {
+      // /niveau image dit la VRAIE limite (et plus « 2048 × 2048 »).
+      const gi = fabriquerServeur('R4i');
+      ajouterMembre(gi, 'staff', [], { staff: true });
+      WEB.set('https://x.test/illisible.png', () => reponseHttp(Buffer.from('pas un png')));
+      const it = fausse(gi, { user: 'staff', nom: 'niveau', sub: 'image', options: { url: 'https://x.test/illisible.png' } });
+      await IC.execute(it);
+      const dit = contenu(it);
+      V('/niveau image en échec : la limite dite est celle du code (4 millions de pixels, 4096 px par côté, 8 Mo)',
+        /pas pu la lire/.test(dit) && /4 millions de pixels/.test(dit) && /4096 px par côté/.test(dit) && /8 Mo/.test(dit) && !/2048/.test(dit), dit);
+    }
+
     // Par le réseau : poids annoncé, poids compté, contenu piégé.
     const servir = (url, rep) => { WEB.set(url, () => rep); return rep; };
     let rep = servir('https://x.test/lourd.png', reponseHttp(Buffer.alloc(9 * 1024 * 1024), { taille: 9 * 1024 * 1024 }));
@@ -671,6 +698,26 @@ function reponseHttp(corps, { taille = null, morceau = 64 * 1024, status = 200, 
     const bilan = await L.synchroniserNiveaux(g3);
     V('synchroniser : un membre retombé au niveau 0 est visité, ses rôles repris', bilan.membres === 1 && bilan.retires === 2
       && !zero.roles.cache.has(R.N2) && !zero.roles.cache.has(R.N5), texte(bilan));
+
+    // Les paliers PERDUS seulement : un rôle de palier jamais atteint (VIP
+    // au niveau 50, offert à la main à un membre de niveau 12) reste.
+    const g4 = fabriquerServeur('R6d');
+    setGuildConfig(g4.id, 'levels_enabled', 1);
+    L.ajouterRecompenseNiveau(g4.id, { niveau: 5, type: 'role', valeur: R.N5 });
+    L.ajouterRecompenseNiveau(g4.id, { niveau: 10, type: 'role', valeur: R.N10 });
+    L.ajouterRecompenseNiveau(g4.id, { niveau: 50, type: 'role', valeur: R.VIP });
+    const gagnant = ajouterMembre(g4, 'u5', [R.N5, R.N10, R.VIP]);
+    L.addXp(g4.id, 'u5', 'admin', L.totalXpForLevel(12));
+    setGuildConfig(g4.id, 'xp_courbe', 'raide');
+    L.recalculerNiveaux(g4.id);
+    const b4 = await L.realignerBaisses(g4);
+    const n4 = L.getLevels(g4.id, 'u5').level;
+    V('courbe raide, niveau 12 → sous 10 : le palier 10, perdu, est repris', n4 < 10 && n4 >= 5 && !gagnant.roles.cache.has(R.N10) && gagnant.roles.cache.has(R.N5), `${n4} · ${g4.journal.join(' ')}`);
+    V('… mais VIP (palier 50, jamais atteint, donné à la main) reste', gagnant.roles.cache.has(R.VIP) && !g4.journal.includes('-u5:VIP') && b4.retires === 1, `${g4.journal.join(' ')} · ${texte(b4)}`);
+    // Même borne pour une baisse ordinaire (/xp retirer, niveau 0).
+    const vip = ajouterMembre(g4, 'u6', [R.N5, R.VIP]);
+    await L.appliquerRecompenses(g4, 'u6', 0, { ancien: 7, membre: vip });
+    V('baisse ordinaire du niveau 7 au niveau 0 : N5 repris, VIP gardé', !vip.roles.cache.has(R.N5) && vip.roles.cache.has(R.VIP), g4.journal.join(' '));
   }
 
   console.log('\n7) Sans « Gérer les rôles » : un diagnostic qui le dit, plus d\'appel refusé à chaque gain');
@@ -748,6 +795,27 @@ function reponseHttp(corps, { taille = null, morceau = 64 * 1024, status = 200, 
     V('Discord refuse le rôle du palier 5 : N3 reste', m.roles.cache.has(R.N3) && !m.roles.cache.has(R.N5), g.journal.join(' '));
     ({ g, m } = await cas('e', R.N5));
     V('cas normal : N5 remplace N3', m.roles.cache.has(R.N5) && !m.roles.cache.has(R.N3), g.journal.join(' '));
+
+    // Le répit de 10 minutes vaut aussi en mode remplacement : N10 refusé,
+    // N5 encore porté ne doit pas faire relancer N10 à chaque gain.
+    for (const cumul of [1, 0]) {
+      const gr = fabriquerServeur(`R9r${cumul}`);
+      setGuildConfig(gr.id, 'levels_enabled', 1);
+      setGuildConfig(gr.id, 'level_rewards_stack', cumul);
+      L.ajouterRecompenseNiveau(gr.id, { niveau: 5, type: 'role', valeur: R.N5 });
+      L.ajouterRecompenseNiveau(gr.id, { niveau: 10, type: 'role', valeur: R.N10 });
+      const mr = ajouterMembre(gr, 'u1', [R.N5]);
+      L.addXp(gr.id, 'u1', 'admin', L.totalXpForLevel(10) + 5); // niveau 10, porte N5, pas N10
+      gr.refuses.add(R.N10);
+      for (let k = 0; k < 6; k++) await L.gagnerXpServeur(gr, 'u1', 'text', 1, { membre: mr, salon: SALONS[S.GEN] });
+      const essais = gr.journal.filter((x) => x === '+u1:Niveau 10').length;
+      V(`${cumul ? 'cumul' : 'remplacement'} : N10 refusé, un seul essai sur 6 gains, N5 gardé`, essais === 1 && mr.roles.cache.has(R.N5), gr.journal.join(' '));
+      if (!cumul) {
+        gr.refuses.delete(R.N10);
+        await L.synchroniserNiveaux(gr);
+        V('… /xp synchroniser, lui, réessaie : N10 posé, N5 remplacé', mr.roles.cache.has(R.N10) && !mr.roles.cache.has(R.N5), gr.journal.join(' '));
+      }
+    }
   }
 
   console.log('\n10) Formulaire de récompense : une quantité illisible est refusée');

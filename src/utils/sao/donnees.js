@@ -339,14 +339,17 @@ const ETAGE_PECHE = 22;
 
 // ── Quêtes du jour ──────────────────────────────────────────────────────
 // `cond` : condition d'accès (étage débloqué, réglage du serveur).
+// `cond: 'boss'` : la quête ne progresse que dans un combat de boss d'étage
+// (les Sword Skills ne se lancent que là). Aincrad conquis, plus aucun boss :
+// elle ne doit plus être tirée, sans quoi le coffre des trois quêtes est perdu.
 const QUETES = {
   tuer: { texte: 'Vaincre {n} monstres', emoji: '⚔️', objectifs: [10, 15, 20] },
-  boss: { texte: 'Vaincre un boss d\'étage', emoji: '🐉', objectifs: [1] },
+  boss: { texte: 'Vaincre un boss d\'étage', emoji: '🐉', objectifs: [1], cond: 'boss' },
   forger: { texte: 'Forger ou améliorer chez Lisbeth', emoji: '🔨', objectifs: [1] },
   vendre: { texte: 'Vendre {n} objets à Agil', emoji: '💰', objectifs: [5, 8] },
   pecher: { texte: 'Pêcher {n} poissons à l\'étage 22', emoji: '🎣', objectifs: [2, 3], cond: 'peche' },
   cuisiner: { texte: 'Cuisiner un repas', emoji: '🍳', objectifs: [1] },
-  skills: { texte: 'Lancer {n} Sword Skills', emoji: '🌀', objectifs: [4, 6] },
+  skills: { texte: 'Lancer {n} Sword Skills', emoji: '🌀', objectifs: [4, 6], cond: 'boss' },
   raid: { texte: 'Frapper {n} fois le boss de raid', emoji: '🐲', objectifs: [2, 3], cond: 'raid' },
   duel: { texte: 'Gagner un duel', emoji: '🤺', objectifs: [1], cond: 'pvp' },
 };

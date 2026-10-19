@@ -680,7 +680,62 @@ async function erreurDe(promesse) {
     const bloc = api.slice(iPhoto, api.indexOf('\n}\n', iPhoto));
     V('… exige le droit sur CE serveur, envoie au bot dans la même requête (30 s)',
       /exiger_serveur\(/.test(bloc) && /\/proxy\/config'/.test(bloc) && /'key' => 'bot_avatar_url'/.test(bloc) && /\], 30\)/.test(bloc));
-    V('… data URI seulement sous 700 Ko, si l\'adresse du site est privée', /hote_prive\(req_host\(\)\)/.test(bloc) && /700 \* 1024/.test(bloc));
+    V('… data URI sous 700 Ko QUEL QUE SOIT l\'hôte (plus de hote_prive ici)', !/hote_prive\(/.test(bloc) && /700 \* 1024/.test(bloc));
+    {
+      // Exécuté pour de vrai : le bloc seul, avec des doublures pour ce qu'il
+      // appelle. Un site sur Tailscale (100.64/10), derrière un DNS local ou
+      // sur le port 8080 paraît « public » à PHP, mais le bot refuse d'y
+      // télécharger : sous 700 Ko, la photo doit voyager dans la demande.
+      const { spawnSync } = require('child_process');
+      const dossier = fs.mkdtempSync(path.join(os.tmpdir(), 'photo-bot-'));
+      const photoDe = (ko) => {
+        const f = path.join(dossier, `p${ko}.png`);
+        fs.writeFileSync(f, Buffer.concat([PNG, Buffer.alloc(ko * 1024 - PNG.length, 7)]));
+        return f;
+      };
+      const jouer = (hote, fichier, botAccepte) => {
+        const code = `
+          function exiger_serveur($g) { return [[], 'bot1']; }
+          function req_host() { return ${JSON.stringify(hote)}; }
+          function photo_bot_recue($champ) { $f = ${JSON.stringify(fichier)};
+            return ['fichier' => $f, 'chemin' => 'uploads/avatars/x.png', 'url' => 'https://' . req_host() . '/uploads/avatars/x.png', 'mime' => 'image/png', 'taille' => filesize($f)]; }
+          $GLOBALS['envoye'] = null;
+          function agent_post_json($route, $corps, $delai) { $GLOBALS['envoye'] = $corps['value'];
+            return ${botAccepte ? "[200, ['value' => 'https://cdn.discordapp.com/x.png']]" : "[400, ['error' => 'Identité du bot : ce lien ne mène pas à une adresse publique']]"}; }
+          function respond($d, $c = 200) { echo json_encode(['code' => $c, 'reponse' => $d, 'envoye' => $GLOBALS['envoye']], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); exit; }
+          $_POST = ['serveur' => '123']; $_GET = [];
+          $action = 'serveur.bot.photo';
+          ${bloc}
+          }`;
+        const r = spawnSync('php', ['-r', code], { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 });
+        if (r.status !== 0 && !r.stdout) return { absent: r.error?.code === 'ENOENT', erreur: r.stderr };
+        try { return JSON.parse(r.stdout); } catch { return { erreur: r.stdout.slice(0, 300) + r.stderr }; }
+      };
+      const petite = photoDe(300);
+      const essai = jouer('100.101.102.103', petite, true);
+      if (essai.absent) {
+        console.log('  ⚠️ php absent : serveur.bot.photo vérifié par son texte seulement');
+      } else {
+        for (const hote of ['100.101.102.103', 'monpc.tail1234.ts.net', 'bot.maison.fr', 'monsite.fr:8080', 'monsite.fr', 'localhost']) {
+          const r = hote === '100.101.102.103' ? essai : jouer(hote, petite, true);
+          V(`photo de 300 Ko, site sur ${hote} : envoyée en data URI`, /^data:image\/png;base64,/.test(r.envoye || '') && r.reponse?.ok === true && r.reponse?.note === null,
+            texte(r).slice(0, 200));
+        }
+        // Et le bot l'accepte telle quelle, sans rien télécharger.
+        const avant = connexions.length;
+        const uri = await I.dataUriDepuis(essai.envoye).catch((e) => `refus : ${e.message}`);
+        V('… que le bot accepte directement, sans aucun téléchargement', /^data:image\/png;base64,/.test(uri) && connexions.length === avant, String(uri).slice(0, 120));
+        const lourde = photoDe(900);
+        const refus = jouer('monsite.fr:8080', lourde, false);
+        V('photo de 900 Ko : l\'URL du site est envoyée (trop lourde pour la demande)', refus.envoye === 'https://monsite.fr:8080/uploads/avatars/x.png', texte(refus).slice(0, 200));
+        V('… et si le bot refuse, l\'erreur dit pourquoi et quoi faire (adresse publique sur 80/443, ou réduire sous 700 Ko)',
+          refus.code === 502 && /adresse publique/.test(refus.reponse?.error || '') && /port 80 ou 443/.test(refus.reponse?.error || '')
+          && /réduisez la photo sous 700 Ko/i.test(refus.reponse?.error || '') && /monsite\.fr:8080/.test(refus.reponse?.error || ''), refus.reponse?.error);
+        const posee = jouer('monsite.fr', lourde, true);
+        V('… si le bot l\'a téléchargée, aucune note inutile', posee.reponse?.ok === true && posee.reponse?.note === null, texte(posee).slice(0, 200));
+      }
+      fs.rmSync(dossier, { recursive: true, force: true });
+    }
     V('api.php : contrôles des fonds repris (post_max_size, erreurs, extension ET contenu, 8 Mo)',
       /function photo_bot_recue/.test(api) && /UPLOAD_ERR_PARTIAL/.test(api) && /\$imagesOk\[\$extension\] !== \$mime/.test(api) && /8 \* 1024 \* 1024/.test(api));
     V('… WEBP converti seulement si GD sait le lire', /function_exists\('imagecreatefromwebp'\)/.test(api));

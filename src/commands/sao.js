@@ -432,7 +432,7 @@ module.exports = {
       const d = G.delaisSao(g, u);
       const dr = RAID.delaiRaid(g, u);
       const raid = dr ? `🐲 Raid : ${dr.ms ? `⏳ ${V.dureeSao(dr.ms)}` : '✅ coup prêt'} (${D.RAIDS[dr.raid.boss]?.nom || 'boss'} dans <#${dr.raid.salon_id}>)` : null;
-      return interaction.reply({ ...V.carteDelais({ nom, d, raid }), flags: EPH });
+      return interaction.reply({ ...carteAvecAbandon(d, V.carteDelais({ nom, d, raid })), flags: EPH });
     }
 
     if (sub === 'voyager') {

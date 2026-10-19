@@ -1480,18 +1480,23 @@ if ($action === 'serveur.bot.photo') {
     $photo = photo_bot_recue('photo');
     $valeur = $photo['url'];
     $note = null;
-    if (hote_prive(req_host())) {
-        if ($photo['taille'] < 700 * 1024) {
-            // Le bot ne joindrait pas cette adresse privée : la photo voyage
-            // dans la requête elle-même. L'agent relaie au plus 1 000 000
-            // caractères, d'où la limite de 700 Ko (≈ 955 000 en base64).
-            $valeur = 'data:' . $photo['mime'] . ';base64,' . base64_encode((string) file_get_contents($photo['fichier']));
-        } else {
-            // Le bot ne télécharge JAMAIS depuis une adresse privée (protection
-            // de son réseau interne) : au-delà de 700 Ko, l'envoi échouera.
-            $note = "Ce site tourne sur une adresse privée (" . req_host() . ") : le bot refuse de télécharger depuis une adresse privée. "
-                . "Réduisez la photo sous 700 Ko (elle voyagera alors avec la demande), ou collez plutôt un lien public (imgur…).";
-        }
+    if ($photo['taille'] < 700 * 1024) {
+        // La photo voyage TOUJOURS dans la requête elle-même quand elle le
+        // peut : le bot accepte une data URI telle quelle, sans rien
+        // télécharger. Quel que soit l'hôte du site — le bot ne télécharge
+        // que depuis une adresse publique, sur le port 80 ou 443, et PHP ne
+        // sait pas le reconnaître à coup sûr (Tailscale/CGNAT en 100.64/10,
+        // nom résolu en 192.168.* par un DNS local, port 8080…).
+        // L'agent relaie au plus 1 000 000 caractères, d'où la limite de
+        // 700 Ko (≈ 955 000 en base64).
+        $valeur = 'data:' . $photo['mime'] . ';base64,' . base64_encode((string) file_get_contents($photo['fichier']));
+    } else {
+        // Au-delà, le bot doit télécharger la photo depuis ce site : il n'y
+        // parvient que si le site lui est joignable à une adresse publique.
+        $note = "La photo dépasse 700 Ko : le bot doit alors la télécharger depuis ce site (" . req_host() . "), "
+            . "ce qui n'est possible que si le site est joignable à une adresse publique, sur le port 80 ou 443. "
+            . "Sinon, réduisez la photo sous 700 Ko (elle voyagera alors avec la demande, sans téléchargement), "
+            . "ou collez plutôt un lien public (imgur…).";
     }
     [$code, $data] = agent_post_json('/agent/bots/' . rawurlencode($bot) . '/proxy/config', [
         'guildId' => (string) $guildId,
@@ -1503,7 +1508,8 @@ if ($action === 'serveur.bot.photo') {
         $erreur = $data['error'] ?? ($code === 0 ? "Le bot ne répond pas — est-il démarré ?" : "Le bot a répondu HTTP $code.");
         respond(['ok' => false, 'error' => $erreur . ($note !== null ? ' — ' . $note : '')], 502);
     }
-    respond(['ok' => true, 'url' => $photo['url'], 'valeur' => $data['value'] ?? $photo['url'], 'note' => $note]);
+    // Posée : le bot a pu la télécharger, la note n'a plus d'objet.
+    respond(['ok' => true, 'url' => $photo['url'], 'valeur' => $data['value'] ?? $photo['url'], 'note' => null]);
 }
 
 // ⚔️ Réinitialise l'Aventure SAO : un joueur, ou tout le serveur.
