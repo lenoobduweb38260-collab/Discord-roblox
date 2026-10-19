@@ -27,6 +27,8 @@ register_shutdown_function(static function () {
 
 const DATA_FILE = __DIR__ . '/data/app.json';
 const PROOF_DIR = __DIR__ . '/uploads/proofs';
+// 🖼️ Photos du bot envoyées depuis l'appareil (créé au premier envoi).
+const AVATAR_DIR = __DIR__ . '/uploads/avatars';
 
 // Configuration facultative (liaison à l'agent hébergeur).
 if (is_file(__DIR__ . '/config.php')) require_once __DIR__ . '/config.php';
@@ -571,6 +573,10 @@ if ($action === 'selftest') {
         'donneesModifiables' => $dataOk,
         'dossierPreuves' => is_dir(PROOF_DIR) ? is_writable(PROOF_DIR) : 'absent',
         'dossierFonds' => is_dir($bgDir) ? is_writable($bgDir) : 'absent',
+        // Créé à la volée au premier envoi : « absent » n'est un problème que
+        // si uploads/ lui-même n'est pas modifiable.
+        'dossierAvatars' => is_dir(AVATAR_DIR) ? is_writable(AVATAR_DIR)
+            : (is_writable(dirname(AVATAR_DIR)) ? 'absent (créé au premier envoi)' : 'absent — uploads/ non modifiable (chmod 775)'),
         'tailleEnvoiMax' => taille_lisible(limite_envoi()) . ' (upload_max_filesize=' . ini_get('upload_max_filesize') . ', post_max_size=' . ini_get('post_max_size') . ')',
         'curl' => function_exists('curl_init'),
         'allow_url_fopen' => (bool) ini_get('allow_url_fopen'),
@@ -1275,17 +1281,176 @@ if ($action === 'serveur.config') {
     $in = body();
     $guildId = preg_replace('/\D+/', '', (string) ($in['serveur'] ?? ''));
     [, $bot] = exiger_serveur((string) $guildId);
+    $cle = (string) ($in['cle'] ?? '');
+    // 🖼️ Une photo (ou un profil) se TÉLÉCHARGE avant d'être posée : le bot
+    // s'accorde jusqu'à 25 s, on l'attend donc plus longtemps.
+    $delai = in_array($cle, ['bot_avatar_url', 'bot_profil'], true) ? 30 : 15;
     [$code, $data] = agent_post_json('/agent/bots/' . rawurlencode($bot) . '/proxy/config', [
         'guildId' => (string) $guildId,
-        'key' => (string) ($in['cle'] ?? ''),
+        'key' => $cle,
         'value' => $in['valeur'] ?? null,
-    ], 15);
+    ], $delai);
     if ($code !== 200) {
         respond(['ok' => false, 'error' => $data['error'] ?? ($code === 0
             ? "Le bot ne répond pas — est-il démarré ?"
             : "Le bot a répondu HTTP $code.")], 502);
     }
     respond(['ok' => true, 'valeur' => $data['value'] ?? null]);
+}
+
+// ----- 🖼️ Photos du bot envoyées depuis l'appareil -----
+// uploads/ n'est JAMAIS touché par la mise à jour du site (MAJ_PROTEGE dans
+// lib_maj.php) : un dossier versionné n'arriverait donc jamais sur un site
+// déjà installé. On le crée ici, avec la même protection que les fonds.
+function htaccess_televersements(): string {
+    return "Options -Indexes\n"
+        . "<FilesMatch \"\\.(php|phtml|phar|cgi|pl|py|sh)$\">\n"
+        . "    Require all denied\n"
+        . "</FilesMatch>\n"
+        . "RemoveHandler .php .phtml .phar\n"
+        . "RemoveType .php .phtml .phar\n";
+}
+function dossier_avatars(): string {
+    $dir = AVATAR_DIR;
+    if (!is_dir($dir) && !@mkdir($dir, 0775, true) && !is_dir($dir)) {
+        respond(['ok' => false, 'error' => "Impossible de créer le dossier uploads/avatars — donnez les droits d'écriture au dossier uploads/ (chmod 775)."], 500);
+    }
+    if (!is_file($dir . '/.htaccess')) @file_put_contents($dir . '/.htaccess', htaccess_televersements());
+    if (!is_file($dir . '/index.html')) @file_put_contents($dir . '/index.html', '');
+    return $dir;
+}
+
+// L'adresse du site est-elle privée (localhost, 127.*, 192.168.*, nom sans
+// point…) ? Le bot, souvent hébergé ailleurs, ne pourrait pas y télécharger
+// la photo.
+function hote_prive(string $hote): bool {
+    $h = strtolower(trim($hote));
+    if (preg_match('/^\[([0-9a-f:.]+)\](?::\d+)?$/', $h, $m)) $h = $m[1];       // [::1]:8080
+    elseif (substr_count($h, ':') === 1) $h = explode(':', $h)[0];               // hote:port
+    if ($h === '' || $h === 'localhost' || substr($h, -10) === '.localhost') return true;
+    if (filter_var($h, FILTER_VALIDATE_IP)) {
+        return filter_var($h, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false;
+    }
+    return strpos($h, '.') === false || (bool) preg_match('/\.(local|lan|home|internal|intranet)$/', $h);
+}
+
+// 📁 Reçoit une photo du bot ($_FILES[$champ]) : les contrôles des fonds du
+// site (site.background.upload), limités à ce que Discord accepte pour une
+// photo de profil — PNG, JPG, GIF, 8 Mo. Un WEBP est converti en PNG quand
+// GD sait le lire, refusé sinon. Renvoie le fichier enregistré et son URL
+// ABSOLUE (le bot, lui, ne connaît pas l'adresse du site).
+function photo_bot_recue(string $champ = 'photo'): array {
+    $envoi = (int) ($_SERVER['CONTENT_LENGTH'] ?? 0);
+    if (!$_FILES && $envoi > 0 && $envoi > taille_octets((string) ini_get('post_max_size'))) {
+        respond(['ok' => false, 'error' => "Photo trop lourde pour votre hébergeur : "
+            . taille_lisible($envoi) . " envoyés, mais PHP n'accepte que "
+            . taille_lisible(limite_envoi()) . " (post_max_size / upload_max_filesize). "
+            . "Réduisez l'image, ou collez plutôt un lien (imgur…)."], 413);
+    }
+    if (!isset($_FILES[$champ]) || !is_array($_FILES[$champ])) {
+        respond(['ok' => false, 'error' => 'Aucune photo reçue — choisissez une image PNG, JPG ou GIF.'], 422);
+    }
+    $file = $_FILES[$champ];
+    $err = (int) ($file['error'] ?? UPLOAD_ERR_NO_FILE);
+    if ($err === UPLOAD_ERR_INI_SIZE || $err === UPLOAD_ERR_FORM_SIZE) {
+        respond(['ok' => false, 'error' => "Photo trop lourde pour votre hébergeur : la limite de PHP est "
+            . taille_lisible(limite_envoi()) . " (upload_max_filesize). "
+            . "Réduisez l'image, ou collez plutôt un lien (imgur…)."], 413);
+    }
+    if ($err === UPLOAD_ERR_PARTIAL) {
+        respond(['ok' => false, 'error' => "L'envoi a été interrompu avant la fin. Réessayez."], 422);
+    }
+    if ($err !== UPLOAD_ERR_OK) {
+        respond(['ok' => false, 'error' => "Aucune photo valide reçue (code PHP $err)."], 422);
+    }
+
+    // Type reconnu par l'extension ET par le contenu réel du fichier.
+    $tmp = (string) $file['tmp_name'];
+    $extension = strtolower(pathinfo((string) $file['name'], PATHINFO_EXTENSION));
+    $mime = function_exists('mime_content_type') ? (mime_content_type($tmp) ?: '') : cleanString($file['type'] ?? '', 100);
+    $imagesOk = ['png' => 'image/png', 'jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'gif' => 'image/gif', 'webp' => 'image/webp'];
+    if (!isset($imagesOk[$extension]) || $imagesOk[$extension] !== $mime) {
+        respond(['ok' => false, 'error' => "Format non accepté (« $extension », détecté « $mime »). "
+            . "Discord n'accepte que PNG, JPG ou GIF pour une photo de profil."], 422);
+    }
+    $maxi = 8 * 1024 * 1024;
+    $taille = (int) $file['size'];
+    if ($taille > $maxi) {
+        respond(['ok' => false, 'error' => 'La photo dépasse ' . taille_lisible($maxi)
+            . ' (' . taille_lisible($taille) . " envoyés). Réduisez-la avant de l'envoyer."], 422);
+    }
+
+    $dir = dossier_avatars();
+    $base = 'bot_' . date('Ymd_His') . '_' . bin2hex(random_bytes(3));
+    if ($extension === 'webp') {
+        // Discord refuse le WEBP pour une photo de profil : converti en PNG.
+        $img = function_exists('imagecreatefromwebp') && function_exists('imagepng') ? @imagecreatefromwebp($tmp) : false;
+        if (!$img) {
+            respond(['ok' => false, 'error' => "Image WEBP : Discord la refuse pour une photo de profil, et cet hébergeur "
+                . "ne sait pas la convertir (WEBP animé, ou extension GD absente). Enregistrez-la en PNG ou JPG, puis renvoyez-la."], 422);
+        }
+        imagealphablending($img, false);
+        imagesavealpha($img, true);
+        $safeName = $base . '.png';
+        $converti = imagepng($img, $dir . '/' . $safeName);
+        unset($img);
+        if (!$converti) {
+            respond(['ok' => false, 'error' => "Impossible d'enregistrer la photo convertie — vérifiez les droits d'écriture sur uploads/avatars (chmod 775)."], 500);
+        }
+        clearstatcache();
+        $taille = (int) filesize($dir . '/' . $safeName);
+        $mime = 'image/png';
+        if ($taille > $maxi) {
+            @unlink($dir . '/' . $safeName);
+            respond(['ok' => false, 'error' => 'Une fois convertie en PNG, la photo dépasse ' . taille_lisible($maxi)
+                . '. Enregistrez-la en JPG, ou réduisez-la.'], 422);
+        }
+    } else {
+        $safeName = $base . '.' . ($extension === 'jpeg' ? 'jpg' : $extension);
+        if (!move_uploaded_file($tmp, $dir . '/' . $safeName)) {
+            respond(['ok' => false, 'error' => "Impossible d'enregistrer la photo — vérifiez les droits d'écriture sur uploads/avatars (chmod 775)."], 500);
+        }
+    }
+    return [
+        'fichier' => $dir . '/' . $safeName,
+        'chemin' => 'uploads/avatars/' . $safeName,
+        'url' => site_url() . '/uploads/avatars/' . $safeName,
+        'mime' => $mime,
+        'taille' => $taille,
+    ];
+}
+
+// 🖼️ La photo du bot SUR CE SERVEUR, envoyée depuis l'appareil. Même droit
+// que serveur.config (propriétaire, administrateur ou staff du site) : la
+// photo est stockée par le site, puis posée par le bot dans la même requête.
+if ($action === 'serveur.bot.photo') {
+    $guildId = preg_replace('/\D+/', '', (string) ($_POST['serveur'] ?? $_GET['serveur'] ?? ''));
+    [, $bot] = exiger_serveur((string) $guildId);
+    $photo = photo_bot_recue('photo');
+    $valeur = $photo['url'];
+    $note = null;
+    if (hote_prive(req_host())) {
+        if ($photo['taille'] < 700 * 1024) {
+            // Le bot ne joindrait pas cette adresse privée : la photo voyage
+            // dans la requête elle-même. L'agent relaie au plus 1 000 000
+            // caractères, d'où la limite de 700 Ko (≈ 955 000 en base64).
+            $valeur = 'data:' . $photo['mime'] . ';base64,' . base64_encode((string) file_get_contents($photo['fichier']));
+        } else {
+            $note = "Ce site tourne sur une adresse privée (" . req_host() . ") : le bot risque de ne pas pouvoir télécharger la photo. "
+                . "Si l'envoi échoue, réduisez la photo sous 700 Ko ou collez plutôt un lien public (imgur…).";
+        }
+    }
+    [$code, $data] = agent_post_json('/agent/bots/' . rawurlencode($bot) . '/proxy/config', [
+        'guildId' => (string) $guildId,
+        'key' => 'bot_avatar_url',
+        'value' => $valeur,
+    ], 30);
+    if ($code !== 200) {
+        @unlink($photo['fichier']);   // refusée : rien à garder
+        $erreur = $data['error'] ?? ($code === 0 ? "Le bot ne répond pas — est-il démarré ?" : "Le bot a répondu HTTP $code.");
+        respond(['ok' => false, 'error' => $erreur . ($note !== null ? ' — ' . $note : '')], 502);
+    }
+    respond(['ok' => true, 'url' => $photo['url'], 'valeur' => $data['value'] ?? $photo['url'], 'note' => $note]);
 }
 
 // 🎭 Donne les rôles automatiques à TOUS les membres déjà présents.
@@ -1354,6 +1519,18 @@ if ($action === 'bot.env.ecrire') {
         ['content' => (string) ($in['contenu'] ?? '')], 12);
     if ($code !== 200) respond(['ok' => false, 'error' => erreur_agent($code, $data)], 502);
     respond(['ok' => true]);
+}
+// ⚡ Les profils du bot pris À CHAUD, sans redémarrage. Le .env, déjà écrit
+// par bot.env.ecrire, reste la source au prochain démarrage.
+if ($action === 'bot.profils.recharger') {
+    exiger_admin();
+    $in = body();
+    $nom = trim((string) ($in['nom'] ?? ''));
+    if ($nom === '') respond(['ok' => false, 'error' => 'Nom du bot manquant.'], 422);
+    [$code, $data] = agent_post_json('/agent/bots/' . rawurlencode($nom) . '/proxy/profils-bot',
+        ['profils' => profils_propres($in['profils'] ?? [])], 12);
+    if ($code !== 200) respond(['ok' => false, 'error' => erreur_agent($code, $data)], 502);
+    respond(['ok' => true, 'profils' => (int) ($data['profils'] ?? 0)]);
 }
 if ($action === 'bot.demarrer' || $action === 'bot.arreter') {
     exiger_admin();
@@ -2073,6 +2250,18 @@ switch ($action) {
         appendActivity($state, 'config', $estVideo ? 'Vidéo de fond remplacée' : 'Fond du site remplacé', $safeName);
         saveState($state);
         respond(['ok' => true, 'path' => $path, 'video' => $estVideo, 'state' => $state]);
+    }
+
+    case 'bot.profil.photo': {
+        // 🪪 La photo d'un PROFIL du bot (⚙️ Créateur → Mes bots) : stockée
+        // sur le site ; son adresse absolue rejoint la ligne « Nom | URL ».
+        // Le bot la téléchargera quand un serveur choisira ce profil.
+        $photo = photo_bot_recue('photo');
+        respond(['ok' => true, 'url' => $photo['url'], 'chemin' => $photo['chemin'],
+            'avertissement' => hote_prive(req_host())
+                ? "Ce site tourne sur une adresse privée (" . req_host() . ") : le bot devra pouvoir joindre cette adresse pour poser la photo. "
+                  . "S'il est hébergé ailleurs, préférez un lien public (imgur…)."
+                : null]);
     }
 
     default:

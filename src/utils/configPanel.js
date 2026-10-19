@@ -1054,7 +1054,11 @@ function identiteBotView(guild) {
         liste.length
           ? `📚 ${liste.length} profil(s) proposé(s) par le créateur du bot — choisissez-en un dans le menu, ou saisissez un nom et une photo à vous.`
           : '📚 Le créateur du bot n\'a défini aucun profil : saisissez un nom et une photo à vous (ou laissez le profil global).',
-        '-# Le changement de photo est limité par Discord à une fois toutes les dix minutes environ. PNG, JPG ou GIF, 8 Mo maximum.',
+        fichierDansModalPossible()
+          ? '🖼️ Photo : un lien (imgur, Discord, Dropbox, Google Drive, GitHub, Tenor, Giphy, lien direct…) ou un fichier de votre appareil, dans « Nom et photo personnalisés ».'
+          : '🖼️ Photo : un lien (imgur, Discord, Dropbox, Google Drive, GitHub, Tenor, Giphy, lien direct…) dans « Nom et photo personnalisés ».',
+        '📁 Un fichier de votre appareil marche aussi avec `/config photo:` (pièce jointe).',
+        '-# PNG, JPG ou GIF, 8 Mo maximum. Discord limite le changement de photo à une fois toutes les dix minutes environ.',
       ].join('\n')
     );
   if (e.avatar) embed.setThumbnail(e.avatar);
@@ -1078,7 +1082,51 @@ function identiteBotView(guild) {
   return { embeds: [embed], components };
 }
 
+// 📁 Le modal peut-il recevoir un FICHIER ? Seulement avec une discord.js
+// qui connaît le Label et le composant d'envoi de fichier. Une plus ancienne
+// accepterait peut-être d'AFFICHER le modal, mais planterait à sa SOUMISSION
+// (elle ne sait pas lire un Label) : on décide donc ici, à l'affichage.
+function fichierDansModalPossible() {
+  try {
+    const D = require('discord.js');
+    return typeof D.FileUploadBuilder === 'function' && typeof D.LabelBuilder === 'function';
+  } catch {
+    return false;
+  }
+}
+
 function identiteBotModal(e) {
+  const titre = '🪪 Le bot sur ce serveur';
+  const nomActuel = e.pseudo || e.nomEnregistre;
+  if (fichierDansModalPossible()) {
+    try {
+      const { LabelBuilder, FileUploadBuilder } = require('discord.js');
+      // Dans un Label, le champ texte ne porte PAS de libellé : c'est le
+      // Label qui l'affiche, avec une ligne d'aide en dessous.
+      const nom = new TextInputBuilder().setCustomId('bot_nick').setStyle(TextInputStyle.Short)
+        .setRequired(false).setMaxLength(32).setPlaceholder('Arès');
+      if (nomActuel) nom.setValue(String(nomActuel).slice(0, 32));
+      const lien = new TextInputBuilder().setCustomId('bot_avatar_url').setStyle(TextInputStyle.Short)
+        .setRequired(false).setMaxLength(500).setPlaceholder('https://i.imgur.com/… ou tout lien d\'image');
+      if (e.avatarEnregistre) lien.setValue(String(e.avatarEnregistre).slice(0, 500));
+      return new ModalBuilder()
+        .setCustomId('cfgbotidentmodal')
+        .setTitle(titre)
+        .addLabelComponents(
+          new LabelBuilder().setLabel('Nom affiché')
+            .setDescription('Vide = nom global du bot. 32 caractères maximum.')
+            .setTextInputComponent(nom),
+          new LabelBuilder().setLabel('Lien de la photo')
+            .setDescription('imgur, Discord, Dropbox, Google Drive, GitHub, Tenor, Giphy, lien direct… Vide = photo du bot.')
+            .setTextInputComponent(lien),
+          new LabelBuilder().setLabel('Ou une photo depuis votre appareil')
+            .setDescription('PNG, JPG ou GIF, 8 Mo maximum. Prioritaire sur le lien.')
+            .setFileUploadComponent(new FileUploadBuilder().setCustomId('bot_avatar_fichier').setRequired(false).setMaxValues(1))
+        );
+    } catch {
+      // Constructeurs incomplets (version intermédiaire) : modal texte.
+    }
+  }
   const champ = (id, label, placeholder, valeur, max) => {
     const t = new TextInputBuilder().setCustomId(id).setLabel(label).setPlaceholder(placeholder)
       .setStyle(TextInputStyle.Short).setRequired(false).setMaxLength(max);
@@ -1087,11 +1135,128 @@ function identiteBotModal(e) {
   };
   return new ModalBuilder()
     .setCustomId('cfgbotidentmodal')
-    .setTitle('🪪 Le bot sur ce serveur')
+    .setTitle(titre)
     .addComponents(
-      champ('bot_nick', 'Nom affiché (vide = nom global du bot)', 'Arès', e.pseudo || e.nomEnregistre, 32),
-      champ('bot_avatar_url', 'Adresse de la photo (vide = photo du bot)', 'https://…/photo.png', e.avatarEnregistre, 500)
+      champ('bot_nick', 'Nom affiché (vide = nom global du bot)', 'Arès', nomActuel, 32),
+      champ('bot_avatar_url', 'Lien de la photo (vide = photo du bot)',
+        'imgur, Discord, Dropbox, Drive, GitHub, lien direct… Fichier : /config photo:', e.avatarEnregistre, 500)
     );
+}
+
+// Un champ texte du modal, sans lever s'il manque.
+function texteDuModal(interaction, cle) {
+  try {
+    return String(interaction.fields.getTextInputValue(cle) ?? '').trim();
+  } catch {
+    return '';
+  }
+}
+
+// 📁 Le fichier envoyé dans le modal, ou null. `getUploadedFiles` n'existe
+// qu'avec une discord.js récente ; le champ brut sert de repli.
+function lireFichierDuModal(interaction, cle) {
+  try {
+    const f = interaction.fields;
+    const liste = typeof f?.getUploadedFiles === 'function'
+      ? f.getUploadedFiles(cle, false)
+      : f?.getField?.(cle)?.attachments;
+    return liste?.first?.() || null;
+  } catch {
+    return null;
+  }
+}
+
+// Le modal « Nom et photo personnalisés » soumis : le fichier passe avant le
+// lien ; un lien INCHANGÉ ne retouche pas la photo (Discord n'en accepte
+// qu'un changement toutes les dix minutes — changer le seul nom ne doit pas
+// s'y heurter).
+async function appliquerIdentiteDuModal(interaction, I) {
+  const guild = interaction.guild;
+  const avant = I.etat(guild);
+  const nom = texteDuModal(interaction, 'bot_nick');
+  const photo = texteDuModal(interaction, 'bot_avatar_url');
+  const fichier = lireFichierDuModal(interaction, 'bot_avatar_fichier');
+  const options = { nom, profil: null };
+  let quoi = '';
+  if (fichier) {
+    options.avatarDonnees = await I.photoDepuisFichier(fichier);
+    quoi = ' + photo envoyée depuis l\'appareil';
+  } else if (photo !== String(avant.avatarEnregistre || '')) {
+    options.avatarUrl = photo;
+    quoi = photo ? ' + photo' : ' + photo d\'origine';
+  }
+  await I.appliquer(guild, options);
+  return `nom « ${nom || I.etat(guild).nomGlobal} »${quoi}`;
+}
+
+// ⏱️ Télécharger une photo puis la poser peut dépasser les 3 s que Discord
+// accorde. On lance le travail, et on n'accuse réception qu'au DERNIER moment
+// s'il traîne (même marge que `repondreVite`) : dans le cas courant, la vue
+// se met donc à jour en une seule fois. Renvoie true si l'on a dû différer.
+async function accuserSiLent(interaction, travail) {
+  const marge = Number(require('./reponse').MARGE) || 2200;
+  let minuteur = null;
+  const lent = await Promise.race([
+    Promise.resolve(travail).then(() => false, () => false),
+    new Promise((r) => { minuteur = setTimeout(() => r(true), marge); }),
+  ]);
+  clearTimeout(minuteur);
+  if (!lent || interaction.deferred || interaction.replied) return false;
+  try {
+    if (interaction.isMessageComponent?.() || interaction.isFromMessage?.()) await interaction.deferUpdate();
+    else await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+  } catch {
+    // Trop tard : la suite tentera quand même de répondre.
+  }
+  return true;
+}
+
+// 🔄 Le panneau, rafraîchi APRÈS un deferUpdate : update() n'est plus
+// possible, il faut modifier le message. Une carte se reconstruit en
+// composants (la modification n'est jamais convertie), un embed classique se
+// remplace tel quel.
+async function rafraichirPanneauIdentite(interaction, payload) {
+  const R = require('./reponse');
+  try {
+    if (R.estCarte(interaction.message)) {
+      const composants = R.enComposants(interaction.guild, interaction.client, payload);
+      if (!composants?.length) return false;
+      await interaction.editReply({ components: composants, flags: require('./cartes').DRAPEAU_V2 });
+    } else {
+      await interaction.editReply(payload);
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// 📁 `/config photo:` — le repli qui marche avec TOUTES les versions de
+// discord.js : une pièce jointe de commande. Administration uniquement ; la
+// réponse montre la vue « Identité du bot » à jour.
+async function photoDuBotParCommande(interaction, piece) {
+  if (getGrade(interaction.member) < GRADES.ADMIN) {
+    return interaction.reply({
+      content: '⛔ Sécurité : seul un membre de l\'**administration** peut changer la photo du bot. Ouvrez `/config` sans pièce jointe pour le reste.',
+      flags: MessageFlags.Ephemeral,
+    });
+  }
+  const I = require('./identiteBot');
+  return require('./reponse').repondreVite(interaction, async () => {
+    let ligne;
+    try {
+      const donnees = await I.photoDepuisFichier(piece);
+      await I.appliquer(interaction.guild, { avatarDonnees: donnees, profil: null });
+      ligne = '✅ Nouvelle photo du bot posée sur ce serveur.';
+      await sendLog(
+        interaction.guild,
+        logEmbed('🪪 Identité du bot', `📁 Photo envoyée depuis un fichier (\`/config photo:\`) par <@${interaction.user.id}>.`, COLORS.INFO)
+      );
+    } catch (err) {
+      ligne = `❌ Photo du bot : ${err.message}.`;
+    }
+    return { content: ligne, ...identiteBotView(interaction.guild), flags: MessageFlags.Ephemeral };
+  }, { ephemere: true });
 }
 
 // ----- Catégorie : absences (les salons d'annonce, sans plafond) -----
@@ -1658,28 +1823,43 @@ async function handleConfigInteraction(interaction) {
       }
       const I = require('./identiteBot');
       if (id === 'cfgbotident') return await interaction.showModal(identiteBotModal(I.etat(interaction.guild)));
-      // Télécharger une photo et la poser prend quelques secondes : on
-      // accuse réception d'abord, la vue suit.
-      let geste;
-      try {
+      // Télécharger une photo et la poser peut prendre plusieurs secondes :
+      // le travail part tout de suite, et l'accusé de réception n'arrive
+      // qu'au dernier moment s'il traîne (voir accuserSiLent).
+      const travail = (async () => {
         if (id === 'cfgbotprofil') {
           const choix = interaction.values?.[0];
           await I.appliquerProfil(interaction.guild, choix === '__global__' ? '' : choix);
-          geste = choix === '__global__' ? 'profil global rétabli' : `profil n°${choix} appliqué`;
-        } else if (id === 'cfgbotreset') {
-          await I.appliquer(interaction.guild, { nom: null, avatarUrl: null, profil: null });
-          geste = 'profil global rétabli';
-        } else {
-          const nom = interaction.fields.getTextInputValue('bot_nick').trim();
-          const photo = interaction.fields.getTextInputValue('bot_avatar_url').trim();
-          await I.appliquer(interaction.guild, { nom, avatarUrl: photo, profil: null });
-          geste = `nom « ${nom || I.etat(interaction.guild).nomGlobal} »${photo ? ' + photo' : ''}`;
+          return choix === '__global__' ? 'profil global rétabli' : `profil n°${choix} appliqué`;
         }
+        if (id === 'cfgbotreset') {
+          await I.appliquer(interaction.guild, { nom: null, avatarUrl: null, profil: null });
+          return 'profil global rétabli';
+        }
+        return appliquerIdentiteDuModal(interaction, I);
+      })();
+      await accuserSiLent(interaction, travail);
+      let geste;
+      try {
+        geste = await travail;
       } catch (err) {
         return await suivre(interaction, { content: `❌ Identité du bot : ${err.message}.`, flags: MessageFlags.Ephemeral });
       }
-      if (interaction.isFromMessage()) await mettreAJour(interaction, identiteBotView(interaction.guild));
-      else await interaction.reply({ content: `✅ Identité du bot mise à jour : ${geste}.`, flags: MessageFlags.Ephemeral });
+      // ⚠️ `isFromMessage()` n'existe que sur un modal : un menu ou un bouton
+      // le faisait planter APRÈS avoir posé le profil.
+      const depuisMessage = Boolean(interaction.isMessageComponent?.() || interaction.isFromMessage?.());
+      const fait = `✅ Identité du bot mise à jour : ${geste}.`;
+      if (interaction.deferred) {
+        // Accusé en retard : update() n'est plus possible. Le panneau se
+        // modifie, et la confirmation suit en éphémère.
+        if (depuisMessage) {
+          await rafraichirPanneauIdentite(interaction, identiteBotView(interaction.guild));
+          await suivre(interaction, { content: fait, flags: MessageFlags.Ephemeral });
+        } else {
+          await interaction.editReply({ content: fait }).catch(() => null);
+        }
+      } else if (depuisMessage) await mettreAJour(interaction, identiteBotView(interaction.guild));
+      else await interaction.reply({ content: fait, flags: MessageFlags.Ephemeral });
       await sendLog(
         interaction.guild,
         logEmbed('🪪 Identité du bot', `${geste} par <@${interaction.user.id}>.`, COLORS.INFO)
@@ -1900,4 +2080,4 @@ async function handleConfigInteraction(interaction) {
   }
 }
 
-module.exports = { mainView, handleConfigInteraction };
+module.exports = { mainView, handleConfigInteraction, photoDuBotParCommande };
