@@ -23,9 +23,9 @@ const CREATRICES = new Set(['annonce', 'forceupdate', 'esthetique', 'patchnote',
 // L'ordre de lecture : du quotidien vers l'outillage. Une commande absente de
 // ces listes n'est pas perdue : elle tombe dans « Autres », en fin de guide.
 const CATEGORIES = [
-  { emoji: '🎭', titre: 'Vie RP', noms: ['carte', 'permis', 'entreprise', 'assurance', 'matricule', 'service', 'temps', 'casierjudiciaire', 'interact', 'sao'] },
+  { emoji: '🎭', titre: 'Vie RP', noms: ['carte', 'permis', 'entreprise', 'assurance', 'matricule', 'service', 'temps', 'casierjudiciaire', 'interact'] },
   { emoji: '🎵', titre: 'Musique et vocal', noms: ['musique', 'radio', 'vocal'] },
-  { emoji: '👥', titre: 'Communauté', noms: ['niveau', 'xp', 'lc', 'mariage', 'confession', 'jeu', 'invites', 'invite', 'comptage', 'absence', 'report', 'partenariat', 'info', 'tuto', 'tutos'] },
+  { emoji: '👥', titre: 'Communauté', noms: ['niveau', 'xp', 'sao', 'lc', 'mariage', 'confession', 'jeu', 'invites', 'invite', 'comptage', 'absence', 'report', 'partenariat', 'info', 'tuto', 'tutos'] },
   { emoji: '📋', titre: 'Whitelists et fiches', noms: ['whitelist', 'whitelistrp', 'blacklistrp', 'casier', 'warnrp'] },
   { emoji: '👮', titre: 'Modération et sécurité', noms: ['ban', 'kick', 'mute', 'unmute', 'unban-all', 'banglobal', 'moderation', 'snipe', 'securite'] },
   { emoji: '🎫', titre: 'Organisation du serveur', noms: ['ticket', 'mode', 'preset', 'embed', 'arrivee', 'depart', 'staff', 'reseaux', 'rappel-bump', 'config'] },

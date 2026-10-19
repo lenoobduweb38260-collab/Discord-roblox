@@ -485,8 +485,11 @@ const recharger = () => P.oublierLancementsJeu();
     V('le bot n\'est jamais récompensé', P.preparerRecompenseJeu('G1', 'bot') === null);
     setGuildConfig('G1', 'sao_enabled', 1);
     setGuildConfig('G1', 'jeux_col_victoire', 50);
+    // Un personnage neuf commence avec une bourse de départ : on mesure l'écart.
+    S.ensurePlayer('G1', 'u3');
+    const avantCol = S.getPlayer('G1', 'u3').col;
     const c1 = P.preparerRecompenseJeu('G1', 'u3', { contreBot: true });
-    V('Col SAO versés quand SAO est actif', c1.col === 50 && S.getPlayer('G1', 'u3')?.col === 50 && /\+50 Col/.test(P.ligneRecompenseJeu(c1)));
+    V('Col SAO versés quand SAO est actif', c1.col === 50 && S.getPlayer('G1', 'u3')?.col === avantCol + 50 && /\+50 Col/.test(P.ligneRecompenseJeu(c1)));
     const c2 = P.preparerRecompenseJeu('G1', 'u4');
     V('plafond atteint : plus de Col non plus', c2.col === 0);
     setGuildConfig('G1', 'sao_enabled', 0);
