@@ -63,14 +63,14 @@ async function membreAuHasard(interaction) {
 }
 
 async function carteLc(interaction, auteur, cible, auHasard) {
-  const pourcentage = pourcentageDuJour(auteur.id, cible.id);
+  const { pourcentage, verdict: verdictCouple } = require('../utils/couple').pourcentageLcCouple(auteur.id, cible.id, pourcentageDuJour(auteur.id, cible.id), interaction.guildId); // 💍 conjoints : ≥ 90 %
   const nomA = nom(interaction, auteur);
   const nomB = nom(interaction, cible);
   const png = await fabriquer(planAmour({ pourcentage, nomA, nomB }), [auteur, cible]).catch(() => null);
   const lignes = [
     `**${nomA}** 💞 **${nomB}**`,
     `## ${pourcentage} %`,
-    verdict(pourcentage),
+    verdictCouple || verdict(pourcentage),
   ];
   if (auHasard) lignes.push('-# 🎲 Partenaire tiré au sort parmi les membres du serveur');
   lignes.push('-# 📅 Même duo, même résultat jusqu\'à minuit');

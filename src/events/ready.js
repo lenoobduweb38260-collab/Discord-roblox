@@ -56,6 +56,14 @@ module.exports = {
       console.warn(`⚠️ Rappels de bump non réarmés : ${err.message}`);
     }
 
+    // 🎂 Mensiversaires de mariage : une vérification légère toutes les 30
+    // minutes, une seule annonce par date (/config → 💍 Mariage).
+    try {
+      require('../utils/vieDeCouple').demarrerAnniversaires(client);
+    } catch (err) {
+      console.warn(`⚠️ Annonces des anniversaires de mariage non démarrées : ${err.message}`);
+    }
+
     // XP vocal : chaque minute, chaque membre connecté en vocal (non muet
     // serveur, hors salon AFK, hors bots) gagne l'XP vocal configuré.
     setInterval(() => {

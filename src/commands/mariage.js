@@ -126,8 +126,13 @@ module.exports = {
         .addUserOption((o) => o.setName('membre').setDescription('Qui veux-tu épouser ?').setRequired(true))
     )
     .addSubcommand((s) =>
-      s.setName('statut').setDescription('Voir avec qui un membre est marié')
+      s.setName('statut').setDescription('La fiche d\'un couple : alliance, flamme, anniversaire, bonus 💞')
         .addUserOption((o) => o.setName('membre').setDescription('Quel membre ? (vide : toi)').setRequired(false))
+    )
+    .addSubcommand((s) => s.setName('bisou').setDescription('Le bisou du jour : quand vous l\'avez fait tous les deux, la flamme grandit 🔥'))
+    .addSubcommand((s) =>
+      s.setName('motdoux').setDescription('Laisser un mot doux à ton conjoint, ou lire le sien 💌')
+        .addStringOption((o) => o.setName('texte').setDescription('Ton mot doux (vide : lire celui qu\'on t\'a laissé)').setRequired(false).setMaxLength(300))
     )
     .addSubcommand((s) => s.setName('divorcer').setDescription('Mettre fin à ton mariage 💔')),
 
@@ -136,19 +141,13 @@ module.exports = {
     const moi = interaction.user;
     const prive = (content) => interaction.reply({ content, flags: MessageFlags.Ephemeral });
 
+    // 💞 Avantages du mariage : fiche, bisou du jour, mot doux (utils/vieDeCouple.js).
     if (sub === 'statut') {
       const qui = interaction.options.getUser('membre') || moi;
-      const m = mariageDe(qui.id);
-      const embed = new EmbedBuilder().setColor(COULEUR).setTitle('💍 État civil');
-      if (!m) {
-        embed.setDescription(`**${nom(interaction, qui.id, qui)}** n'est marié·e à personne pour le moment.`);
-      } else {
-        const quand = Math.floor(new Date(m.depuis).getTime() / 1000);
-        const conjoint = await interaction.client.users.fetch(m.conjoint).catch(() => null);
-        embed.setDescription(`**${nom(interaction, qui.id, qui)}** est marié·e à **${nom(interaction, m.conjoint, conjoint)}** depuis <t:${quand}:R>.\n-# Le <t:${quand}:D>`);
-      }
-      return interaction.reply({ embeds: [embed] });
+      return require('../utils/reponse').repondreVite(interaction, () => require('../utils/vieDeCouple').ficheCouple(interaction, qui));
     }
+    if (sub === 'bisou') return require('../utils/vieDeCouple').commandeBisou(interaction);
+    if (sub === 'motdoux') return require('../utils/vieDeCouple').commandeMotDoux(interaction);
 
     if (sub === 'divorcer') {
       const m = mariageDe(moi.id);
@@ -182,6 +181,7 @@ module.exports = {
   async handleButton(interaction) {
     const [, action, x, y] = interaction.customId.split(':');
     const prive = (content) => suivre(interaction, { content, flags: MessageFlags.Ephemeral });
+    if (action === 'bisou') return require('../utils/vieDeCouple').boutonBisouCouple(interaction, x, y);
 
     if (action === 'div') {
       if (interaction.user.id !== x && interaction.user.id !== y) return prive('⛔ Seuls les deux mariés peuvent prononcer ce divorce.');
@@ -189,6 +189,7 @@ module.exports = {
       if (divorcer.run(a, b).changes !== 1) {
         return mettreAJour(interaction, { content: '💭 Ce mariage n\'existe déjà plus.', components: [] });
       }
+      require('../utils/couple').effacerCouple(a, b); // flamme, mots doux, annonces : tout part avec lui
       const autre = interaction.user.id === x ? y : x;
       await mettreAJour(interaction, { content: '💔 Divorce prononcé.', components: [] });
       return suivre(interaction, {
@@ -227,6 +228,7 @@ module.exports = {
     if (marier.run(a, b, depuis, interaction.guildId || null).changes !== 1) {
       return prive('💍 Ce mariage existe déjà.');
     }
+    require('../utils/couple').invaliderUnionsCouple(); // le bonus de couple le voit tout de suite
     await mettreAJour(interaction, { components: [] });
     const userA = await interaction.client.users.fetch(demandeur).catch(() => null);
     const payload = await carteMariage(interaction, userA || { id: demandeur }, interaction.user, depuis);
