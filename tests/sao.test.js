@@ -346,7 +346,12 @@ function redemarrer() {
     V('carte de défaite : conseils pour la revanche', /Monument of Life/.test(txt(fin.mises[0])) && /Lisbeth/.test(txt(fin.mises[0])));
     const chasse = await commande('chasser');
     V('pendant la réapparition, pas de chasse', /Monument of Life/.test(chasse.reponses[0].content));
-    const mort = await clic(`sao:cb:atk:${idCombat}:${e.tour + 1}`);
+    // Une AUTRE copie du combat (un ancien /sao boss) : ses boutons partent.
+    // Le message où le combat s'est conclu, lui, n'est jamais réécrit
+    // (tests/sao-revue.test.js, clics tardifs).
+    const mort = fausse({ type: 'bouton', customId: `sao:cb:atk:${idCombat}:${e.tour + 1}` });
+    mort.message = { ...mort.message, id: 'ANCIENNE_COPIE' };
+    await IC.execute(mort);
     V('un bouton d\'un combat terminé : boutons retirés, explication en privé', mort.mises[0]?.components?.length === 0 && /perdu/.test(mort.suivis[0]?.content || ''), JSON.stringify(mort.suivis));
 
     // Mort à 0 Col : toujours plus cher que l'auberge.

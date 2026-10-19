@@ -61,7 +61,7 @@ function saoConfigView(guild, { confirmer = null, message = null } = {}) {
     const cible = confirmer.type === 'joueur' ? `le personnage de <@${confirmer.userId}>` : '**TOUS les personnages de ce serveur**, ses raids et ses coffres';
     embed.setColor(COLORS.WARNING).setDescription(M.description([
       `⚠️ **Confirmer la réinitialisation ?**\nCela efface ${cible}. C'est définitif.`,
-      confirmer.type === 'joueur' ? '💞 Son coffre de couple éventuel est d\'abord partagé à parts égales avec son conjoint.' : null,
+      confirmer.type === 'joueur' ? '💞 Son coffre de couple éventuel revient d\'abord en entier à son conjoint.' : null,
     ]));
     return {
       embeds: [embed],
@@ -194,7 +194,15 @@ async function gererConfigSao(interaction, grade) {
   if (action === 'okt') {
     if (grade < GRADES.ADMIN) return refuserNonAdmin(interaction);
     const r = G.reinitialiserServeurSao(g);
-    await vue({ message: `🧨 Aventure remise à zéro : ${M.pluriel(r.joueurs, 'personnage')} effacé${r.joueurs > 1 ? 's' : ''}.` });
+    // Des phrases entières, singulier et pluriel : un « s » collé au vol ne
+    // se traduit pas. Au pluriel, le nombre vient en dernier : en russe ou
+    // en polonais, la forme du mot dépend du nombre qui le précède.
+    const bilan = r.joueurs > 1
+      ? `🧨 Aventure remise à zéro. Personnages effacés : ${r.joueurs}.`
+      : r.joueurs === 1
+        ? '🧨 Aventure remise à zéro : 1 personnage effacé.'
+        : '🧨 Aventure remise à zéro : il n\'y avait aucun personnage à effacer.';
+    await vue({ message: bilan });
     return journal(interaction, `🧨 Aventure SAO réinitialisée (${M.pluriel(r.joueurs, 'personnage')}).`, COLORS.DANGER);
   }
   return null;

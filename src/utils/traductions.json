@@ -1632,6 +1632,13 @@
     "pl": " Col (wypłacono: ",
     "ru": " Кол (выплачено: "
   },
+  " Col). `/sao boss` pour retenter ta chance.": {
+    "en": " Col). `/sao boss` to try your luck again.",
+    "de": " Col). `/sao boss`, um es noch einmal zu versuchen.",
+    "es": " Col). `/sao boss` para volver a intentarlo.",
+    "pl": " Col). `/sao boss`, aby spróbować ponownie.",
+    "ru": " Кол). `/sao boss` — чтобы попытать удачу снова."
+  },
   " Col** : ❤️ ": {
     "en": " Col**: ❤️ ",
     "de": " Col**: ❤️ ",
@@ -7827,12 +7834,47 @@
     "pl": "⌛ **Nikt nie kliknął na czas.** Zagraj ponownie z `/jeu reflexe`!",
     "ru": "⌛ **Никто не успел нажать.** Запусти снова через `/jeu reflexe`!"
   },
+  "⌛ Ce combat a été abandonné : il compte comme une fuite (−": {
+    "en": "⌛ This fight was abandoned: it counts as fleeing (−",
+    "de": "⌛ Dieser Kampf wurde abgebrochen: Er zählt als Flucht (−",
+    "es": "⌛ Este combate quedó abandonado: cuenta como una huida (−",
+    "pl": "⌛ Ta walka została porzucona: liczy się jako ucieczka (−",
+    "ru": "⌛ Этот бой брошен: это считается бегством (−"
+  },
+  "⌛ Ce combat a été abandonné. `/sao boss` pour retenter ta chance.": {
+    "en": "⌛ This fight was abandoned. `/sao boss` to try your luck again.",
+    "de": "⌛ Dieser Kampf wurde abgebrochen. `/sao boss`, um es noch einmal zu versuchen.",
+    "es": "⌛ Este combate quedó abandonado. `/sao boss` para volver a intentarlo.",
+    "pl": "⌛ Ta walka została porzucona. `/sao boss`, aby spróbować ponownie.",
+    "ru": "⌛ Этот бой брошен. `/sao boss` — чтобы попытать удачу снова."
+  },
   "⌛ Ce combat est ": {
     "en": "⌛ Fight ",
     "de": "⌛ Kampf ",
     "es": "⌛ Combate ",
     "pl": "⌛ Walka ",
     "ru": "⌛ Бой "
+  },
+  "⌛ Ce combat est déjà gagné. `/sao boss` pour affronter le suivant.": {
+    "en": "⌛ This fight is already won. `/sao boss` to face the next one.",
+    "de": "⌛ Dieser Kampf ist bereits gewonnen. `/sao boss`, um dich dem nächsten zu stellen.",
+    "es": "⌛ Este combate ya está ganado. `/sao boss` para enfrentarte al siguiente.",
+    "pl": "⌛ Ta walka jest już wygrana. `/sao boss`, aby zmierzyć się z następnym.",
+    "ru": "⌛ Этот бой уже выигран. `/sao boss` — чтобы сразиться со следующим."
+  },
+  "⌛ Ce combat est déjà perdu. `/sao boss` pour retenter ta chance.": {
+    "en": "⌛ This fight is already lost. `/sao boss` to try your luck again.",
+    "de": "⌛ Dieser Kampf ist bereits verloren. `/sao boss`, um es noch einmal zu versuchen.",
+    "es": "⌛ Este combate ya está perdido. `/sao boss` para volver a intentarlo.",
+    "pl": "⌛ Ta walka jest już przegrana. `/sao boss`, aby spróbować ponownie.",
+    "ru": "⌛ Этот бой уже проигран. `/sao boss` — чтобы попытать удачу снова."
+  },
+  "⌛ Ce combat est déjà terminé. `/sao boss` pour affronter le suivant.": {
+    "en": "⌛ This fight is already over. `/sao boss` to face the next one.",
+    "de": "⌛ Dieser Kampf ist bereits vorbei. `/sao boss`, um dich dem nächsten zu stellen.",
+    "es": "⌛ Este combate ya ha terminado. `/sao boss` para enfrentarte al siguiente.",
+    "pl": "⌛ Ta walka już się zakończyła. `/sao boss`, aby zmierzyć się z następnym.",
+    "ru": "⌛ Этот бой уже окончен. `/sao boss` — чтобы сразиться со следующим."
   },
   "⌛ Ce combat n'est plus actif. Relance `/sao boss`.": {
     "en": "⌛ This fight is no longer active. Run `/sao boss` again.",
@@ -7959,6 +8001,13 @@
     "es": "⌛ Demasiado tarde: ¡alguien fue más rápido!",
     "pl": "⌛ Za późno: ktoś był szybszy!",
     "ru": "⌛ Слишком поздно: кто-то оказался быстрее!"
+  },
+  "⌛ Tu as déjà fui ce combat. `/sao boss` pour retenter ta chance.": {
+    "en": "⌛ You already fled this fight. `/sao boss` to try your luck again.",
+    "de": "⌛ Aus diesem Kampf bist du bereits geflohen. `/sao boss`, um es noch einmal zu versuchen.",
+    "es": "⌛ Ya huiste de este combate. `/sao boss` para volver a intentarlo.",
+    "pl": "⌛ Już uciekłeś z tej walki. `/sao boss`, aby spróbować ponownie.",
+    "ru": "⌛ Ты уже сбежал из этого боя. `/sao boss` — чтобы попытать удачу снова."
   },
   "⏰ C'est l'heure du bump !": {
     "en": "⏰ It's bump time!",
@@ -16559,6 +16608,13 @@
     "pl": "💞 Ewentualna skrzynia pary zostanie najpierw podzielona po równo z małżonkiem.",
     "ru": "💞 Общий сундук пары, если он есть, сначала делится поровну с супругом."
   },
+  "💞 Son coffre de couple éventuel revient d'abord en entier à son conjoint.": {
+    "en": "💞 Any couple chest they have goes entirely to their spouse first.",
+    "de": "💞 Eine eventuelle Paartruhe geht zuerst vollständig an den Ehepartner.",
+    "es": "💞 Su posible cofre de pareja pasa antes íntegro a su cónyuge.",
+    "pl": "💞 Ewentualna skrzynia pary trafia najpierw w całości do małżonka.",
+    "ru": "💞 Общий сундук пары, если он есть, сначала целиком переходит супругу."
+  },
   "💡 Le staff reste disponible ici : <#": {
     "en": "💡 The staff is available here: <#",
     "de": "💡 Der Staff bleibt hier erreichbar: <#",
@@ -19669,6 +19725,27 @@
     "es": "🧨 Aventura reiniciada: ",
     "pl": "🧨 Przygoda zresetowana: ",
     "ru": "🧨 Приключение сброшено: "
+  },
+  "🧨 Aventure remise à zéro : 1 personnage effacé.": {
+    "en": "🧨 Adventure reset: 1 character deleted.",
+    "de": "🧨 Abenteuer zurückgesetzt: 1 Charakter gelöscht.",
+    "es": "🧨 Aventura reiniciada: 1 personaje borrado.",
+    "pl": "🧨 Przygoda zresetowana: usunięto 1 postać.",
+    "ru": "🧨 Приключение сброшено: удалён 1 персонаж."
+  },
+  "🧨 Aventure remise à zéro : il n'y avait aucun personnage à effacer.": {
+    "en": "🧨 Adventure reset: there were no characters to delete.",
+    "de": "🧨 Abenteuer zurückgesetzt: Es gab keine Charaktere zu löschen.",
+    "es": "🧨 Aventura reiniciada: no había ningún personaje que borrar.",
+    "pl": "🧨 Przygoda zresetowana: nie było żadnych postaci do usunięcia.",
+    "ru": "🧨 Приключение сброшено: удалять было некого."
+  },
+  "🧨 Aventure remise à zéro. Personnages effacés : ": {
+    "en": "🧨 Adventure reset. Characters deleted: ",
+    "de": "🧨 Abenteuer zurückgesetzt. Gelöschte Charaktere: ",
+    "es": "🧨 Aventura reiniciada. Personajes borrados: ",
+    "pl": "🧨 Przygoda zresetowana. Usunięte postacie: ",
+    "ru": "🧨 Приключение сброшено. Удалено персонажей: "
   },
   "🧨 Aventure SAO réinitialisée (": {
     "en": "🧨 SAO Adventure reset (",

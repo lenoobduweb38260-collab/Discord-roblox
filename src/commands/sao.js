@@ -28,6 +28,68 @@ function nomMembre(guild, user) {
 const contexteXp = (interaction) => ({ salon: interaction.channel || null, membre: interaction.member || null });
 const prive = (content) => ({ content, flags: EPH });
 
+// Le membre d'un joueur, pour verser SON XP serveur avec SES rôles :
+// exclusions, multiplicateurs, récompenses de palier. ⚠️ Jamais
+// `interaction.member` pour un autre que celui qui a cliqué : en duel, le
+// vainqueur recevait les exclusions de l'adversaire, et l'adversaire les
+// rôles de niveau du vainqueur.
+// Cache d'abord, puis une recherche bornée. Renvoie le membre, `null` s'il
+// n'est plus sur le serveur, `undefined` si la réponse n'est pas venue à
+// temps (on versera alors avec les seuls réglages du serveur).
+const DELAI_MEMBRE_MS = 3000;
+async function membreDe(interaction, userId, delai = DELAI_MEMBRE_MS) {
+  const id = String(userId);
+  if (id === interaction.user?.id && interaction.member) return interaction.member;
+  const enCache = interaction.guild?.members?.cache?.get?.(id);
+  if (enCache) return enCache;
+  if (typeof interaction.guild?.members?.fetch !== 'function') return undefined;
+  let minuteur;
+  const attente = new Promise((r) => { minuteur = setTimeout(() => r(undefined), delai); });
+  // « Membre inconnu » (10007) ou « utilisateur inconnu » (10013) : parti.
+  // Toute autre erreur (réseau) : on ne sait pas, ce n'est pas un départ.
+  const recherche = Promise.resolve()
+    .then(() => interaction.guild.members.fetch(id))
+    .then((m) => m || null, (err) => ([10007, 10013].includes(err?.code) ? null : undefined));
+  const m = await Promise.race([recherche, attente]);
+  clearTimeout(minuteur);
+  return m;
+}
+
+// L'XP serveur d'un AUTRE joueur que le cliqueur, en arrière-plan : la carte
+// n'attend personne. Rien n'est versé à qui a quitté le serveur.
+function xpServeurPour(interaction, userId, montant) {
+  if (!(montant > 0)) return;
+  (async () => {
+    const membre = await membreDe(interaction, userId);
+    if (membre === null) return;
+    await L.xpServeurSao(interaction.guild, String(userId), montant, { salon: interaction.channel || null, ...(membre ? { membre } : {}) });
+  })().catch(() => {});
+}
+
+// La pénalité d'un combat abandonné, clos au passage : toujours dite.
+const avecAbandon = (r, texte) => [V.abandonLigne(r.abandon), texte].filter(Boolean).join('\n');
+function carteAvecAbandon(r, vue) {
+  const ligne = V.abandonLigne(r.abandon);
+  const e = vue?.embeds?.[0];
+  if (ligne && e) e.setDescription([ligne, e.data?.description].filter(Boolean).join('\n'));
+  return vue;
+}
+
+// Un clic sur un combat déjà conclu. Une phrase ENTIÈRE par issue : un mot
+// glissé dans une phrase commune (« Ce combat est ${issue} ») ne se traduit
+// pas — l'accord et l'ordre des mots changent d'une langue à l'autre.
+function texteFinCombat(statut, perte = 0) {
+  switch (statut) {
+    case 'gagne': return '⌛ Ce combat est déjà gagné. `/sao boss` pour affronter le suivant.';
+    case 'perdu': return '⌛ Ce combat est déjà perdu. `/sao boss` pour retenter ta chance.';
+    case 'fui': return '⌛ Tu as déjà fui ce combat. `/sao boss` pour retenter ta chance.';
+    case 'abandon': return perte
+      ? `⌛ Ce combat a été abandonné : il compte comme une fuite (−${V.nombreSao(perte)} Col). \`/sao boss\` pour retenter ta chance.`
+      : '⌛ Ce combat a été abandonné. `/sao boss` pour retenter ta chance.';
+    default: return '⌛ Ce combat est déjà terminé. `/sao boss` pour affronter le suivant.';
+  }
+}
+
 // Les refus, dits clairement : ce qui s'est passé, et quoi faire.
 function texteRefus(r, extra = {}) {
   switch (r.refus) {
@@ -205,8 +267,10 @@ module.exports = {
       return interaction.respond(choix(objets.map(ligneInv)));
     }
     if (groupe === 'coffre') return interaction.respond(choix(G.inventaireSao(g, u).map(ligneInv)));
-    // /sao utiliser : ce qui s'utilise vraiment hors combat.
-    const utile = (o) => ['arme', 'armure', 'repas'].includes(o.type) || o.soin || o.coffre;
+    // /sao utiliser : ce qui s'utilise vraiment hors combat. Pendant un combat
+    // de boss vivant, ni soin ni équipement : ils passent par le menu du combat.
+    const enCombat = Boolean(G.combatVivant(g, u));
+    const utile = (o) => (enCombat ? false : ['arme', 'armure'].includes(o.type) || o.soin) || o.type === 'repas' || o.coffre;
     return interaction.respond(choix(G.inventaireSao(g, u).filter((r) => utile(D.OBJETS[r.objet])).map(ligneInv)));
   },
 
@@ -314,14 +378,14 @@ module.exports = {
 
     if (sub === 'soin') {
       const r = G.soignerAuberge(g, u);
-      if (r.refus) return interaction.reply(prive(texteRefus(r)));
-      return interaction.reply(prive(`🏥 Une nuit à l'auberge pour **${V.nombreSao(r.cout)} Col** : ❤️ ${V.nombreSao(r.joueur.hp)}/${V.nombreSao(r.pvMax)} PV · 💰 ${V.nombreSao(r.joueur.col)} Col.`));
+      if (r.refus) return interaction.reply(prive(avecAbandon(r, texteRefus(r))));
+      return interaction.reply(prive(avecAbandon(r, `🏥 Une nuit à l'auberge pour **${V.nombreSao(r.cout)} Col** : ❤️ ${V.nombreSao(r.joueur.hp)}/${V.nombreSao(r.pvMax)} PV · 💰 ${V.nombreSao(r.joueur.col)} Col.`)));
     }
 
     if (sub === 'utiliser') {
       const r = G.utiliserObjet(g, u, interaction.options.getString('objet'));
-      if (r.refus) return interaction.reply(prive(r.refus === 'manque' ? '🎒 Tu n\'as pas cet objet.' : r.refus === 'en_combat' ? '🐉 Pas pendant un combat de boss : utilise le menu du combat.' : texteRefus(r)));
-      return interaction.reply(V.carteObjetUtilise(r));
+      if (r.refus) return interaction.reply(prive(avecAbandon(r, r.refus === 'manque' ? '🎒 Tu n\'as pas cet objet.' : r.refus === 'en_combat' ? '🐉 Pas pendant un combat de boss : utilise le menu du combat.' : texteRefus(r))));
+      return interaction.reply(carteAvecAbandon(r, V.carteObjetUtilise(r)));
     }
 
     if (sub === 'boutique') {
@@ -373,14 +437,14 @@ module.exports = {
 
     if (sub === 'voyager') {
       const r = G.voyagerSao(g, u, interaction.options.getInteger('etage'));
-      if (r.refus) return interaction.reply(prive(texteRefus(r, { voyage: true })));
-      return interaction.reply(V.carteVoyage(r));
+      if (r.refus) return interaction.reply(prive(avecAbandon(r, texteRefus(r, { voyage: true }))));
+      return interaction.reply(carteAvecAbandon(r, V.carteVoyage(r)));
     }
 
     if (sub === 'pecher') {
       const r = G.lancerPeche(g, u);
-      if (r.refus) return interaction.reply(prive(texteRefus(r, { peche: true })));
-      return interaction.reply(V.cartePecheLancee(r, { userId: u }));
+      if (r.refus) return interaction.reply(prive(avecAbandon(r, texteRefus(r, { peche: true }))));
+      return interaction.reply(carteAvecAbandon(r, V.cartePecheLancee(r, { userId: u })));
     }
 
     if (sub === 'cuisiner') {
@@ -479,8 +543,8 @@ module.exports = {
     }
     if (type === 'au') {
       const r = G.soignerAuberge(g, u);
-      if (r.refus) return interaction.reply(prive(texteRefus(r)));
-      return interaction.reply(prive(`🏥 Une nuit à l'auberge pour **${V.nombreSao(r.cout)} Col** : ❤️ ${V.nombreSao(r.joueur.hp)}/${V.nombreSao(r.pvMax)} PV.`));
+      if (r.refus) return interaction.reply(prive(avecAbandon(r, texteRefus(r))));
+      return interaction.reply(prive(avecAbandon(r, `🏥 Une nuit à l'auberge pour **${V.nombreSao(r.cout)} Col** : ❤️ ${V.nombreSao(r.joueur.hp)}/${V.nombreSao(r.pvMax)} PV.`)));
     }
     if (type === 'bo') {
       const r = G.commencerBoss(g, u, { lien });
@@ -514,13 +578,13 @@ module.exports = {
     }
     if (type === 'ar') {
       const r = G.acheterRenseignement(g, u);
-      if (r.refus) return interaction.reply(prive(texteRefus(r)));
-      return mettreAJour(interaction, panneauArgo(g, u, `🐀 Marché conclu pour **${V.nombreSao(r.info.prix)} Col**. « Lis bien, je ne répète pas. »`));
+      if (r.refus) return interaction.reply(prive(avecAbandon(r, texteRefus(r))));
+      return mettreAJour(interaction, panneauArgo(g, u, avecAbandon(r, `🐀 Marché conclu pour **${V.nombreSao(r.info.prix)} Col**. « Lis bien, je ne répète pas. »`)));
     }
     if (type === 'pl') {
       const r = G.lancerPeche(g, u);
-      if (r.refus) return interaction.reply(prive(texteRefus(r, { peche: true })));
-      return mettreAJour(interaction, V.cartePecheLancee(r, { userId: u }));
+      if (r.refus) return interaction.reply(prive(avecAbandon(r, texteRefus(r, { peche: true }))));
+      return mettreAJour(interaction, carteAvecAbandon(r, V.cartePecheLancee(r, { userId: u })));
     }
     if (type === 'pe') {
       const r = G.ferrerSao(g, u, parts[3]);
@@ -545,16 +609,24 @@ module.exports = {
     const act = actions[action];
     if (!act) return interaction.reply(prive('❔ Action de combat inconnue.'));
     const lien = L.lienDuCoeur(c.guild_id, u);
-    const r = G.jouerTourSao(c.id, u, act, { tour: Number(tour), lien });
+    const r = G.jouerTourSao(c.id, u, act, { tour: Number(tour), lien, message: interaction.message?.id || null });
 
     if (r.refus === 'perime') {
       // Un message en retard d'un tour : on le remet à jour sans rien jouer.
       return mettreAJour(interaction, vueCombat(interaction, r.combat, 'Ce message n\'était plus à jour : voici l\'état actuel du combat. Rejoue ton action.'));
     }
     if (r.refus === 'termine' || r.refus === 'abandonne') {
-      const issue = { gagne: 'gagné', perdu: 'perdu', fui: 'fini par une fuite', abandon: 'abandonné' }[r.combat?.statut] || 'terminé';
+      const texte = texteFinCombat(r.combat?.statut, r.perte);
+      // ⚠️ Le message où le combat s'est CONCLU n'est jamais réécrit ici : ce
+      // clic est parti en même temps que le coup final (double clic, mobile
+      // qui rame). Retirer ses boutons reconstruisait la carte depuis
+      // l'instantané du clic — l'ancien état — par-dessus la carte de
+      // victoire, de défaite ou de fuite. Une autre copie du combat (un
+      // ancien /sao boss), elle, perd ses boutons.
+      const fin = r.combat?.etat?.messageFin;
+      if (r.refus === 'termine' && fin && fin === String(interaction.message?.id)) return interaction.reply(prive(texte));
       await mettreAJour(interaction, { components: [] });
-      return suivre(interaction, prive(`⌛ Ce combat est ${issue}${r.perte ? ` (−${V.nombreSao(r.perte)} Col)` : ''}. \`/sao boss\` pour le suivant.`));
+      return suivre(interaction, prive(texte));
     }
     if (r.refus === 'action') return interaction.reply(prive(`🚫 ${r.message}`));
     if (r.refus === 'sans_objet') return interaction.reply(prive('🎒 Tu n\'as plus cet objet.'));
@@ -565,7 +637,11 @@ module.exports = {
       const xp = await xpServeurDe(interaction, r.xpServeur || 0, r.quetes || []);
       return mettreAJour(interaction, V.carteFinBoss(r, { userId: u, nom, xpServeur: xp }));
     }
-    if (r.fin) return mettreAJour(interaction, V.carteFinBoss(r, { userId: u, nom }));
+    if (r.fin) {
+      // Une défaite peut boucler la quête « Sword Skills » au dernier tour.
+      const xp = r.quetes?.length ? await xpServeurDe(interaction, r.quetes) : null;
+      return mettreAJour(interaction, V.carteFinBoss(r, { userId: u, nom, xpServeur: xp }));
+    }
     // Quête « Sword Skills » accomplie en plein combat : dite dans l'avis.
     if (r.quetes?.length) L.xpServeurSao(interaction.guild, u, r.quetes.reduce((s, q) => s + q.xpServeur, 0), contexteXp(interaction));
     const avis = [r.pierre ? '✨ La Divine Stone of Returning Soul t\'a ramené à la vie !' : null, ...V.quetesLignes(r.quetes)].filter(Boolean).join('\n') || null;
@@ -586,7 +662,9 @@ module.exports = {
     const membre = (id2) => interaction.guild?.members?.cache?.get?.(id2)?.displayName || `<@${id2}>`;
     const noms = { a: membre(d.a), b: membre(d.b) };
     if (r.refus === 'expire') return mettreAJour(interaction, V.carteDuelFin({ statut: 'expire', duel: r.duel }, { noms }));
-    if (r.quetes?.length) L.xpServeurSao(interaction.guild, r.vainqueur, r.quetes.reduce((s, q) => s + q.xpServeur, 0), contexteXp(interaction));
+    // La quête « Gagner un duel » du VAINQUEUR, avec SON membre — pas celui
+    // de l'adversaire qui a cliqué « Accepter ».
+    if (r.quetes?.length) xpServeurPour(interaction, r.vainqueur, r.quetes.reduce((s, q) => s + q.xpServeur, 0));
     return mettreAJour(interaction, V.carteDuelFin(r, { noms }));
   },
 
@@ -598,8 +676,16 @@ module.exports = {
     const r = RAID.frapperRaid(raid.id, u, { lien: L.lienDuCoeur(raid.guild_id, u) });
     if (r.refus === 'delai') return interaction.reply(prive(`⏳ Tu reprends ton souffle : prochain coup dans **${V.dureeSao(r.ms)}**.`));
     if (r.refus === 'termine') {
-      await mettreAJour(interaction, { components: [] });
-      return suivre(interaction, prive('⌛ Ce raid est terminé. Le prochain boss surgira bientôt.'));
+      // ⚠️ Jamais de réécriture depuis `interaction.message` : c'est la carte
+      // telle que ce membre l'a vue en cliquant. Au moment de la chute, tout
+      // le monde clique ensemble, et ce vieil état effaçait la carte de
+      // victoire (Last Attack, récompenses). Celle-ci n'a plus de bouton :
+      // rien à retirer. Un raid expiré, lui, se redessine depuis la base.
+      if (r.raid?.statut !== 'vaincu') {
+        await mettreAJour(interaction, V.carteRaid(r.raid, { coups: RAID.coupsRaid(r.raid.id), fin: 'expire' }));
+        return suivre(interaction, prive('⌛ Ce raid est terminé. Le prochain boss surgira bientôt.'));
+      }
+      return interaction.reply(prive('⌛ Ce raid est terminé. Le prochain boss surgira bientôt.'));
     }
     if (r.refus === 'expire') return mettreAJour(interaction, V.carteRaid(r.raid, { coups: RAID.coupsRaid(r.raid.id), fin: 'expire' }));
     if (r.refus) return interaction.reply(prive(texteRefus(r)));
@@ -607,7 +693,9 @@ module.exports = {
     // En arrière-plan : la carte n'attend personne.
     const quetesXp = (r.quetes || []).reduce((s, q) => s + q.xpServeur, 0);
     if (quetesXp) L.xpServeurSao(interaction.guild, u, quetesXp, contexteXp(interaction));
-    for (const rec of r.recompenses) L.xpServeurSao(interaction.guild, rec.user_id, rec.xpServeur, { salon: interaction.channel || null });
+    // Chaque participant avec SON membre : ses exclusions et ses
+    // multiplicateurs par rôle s'appliquent comme partout ailleurs.
+    for (const rec of r.recompenses) xpServeurPour(interaction, rec.user_id, rec.xpServeur);
     return mettreAJour(interaction, V.carteRaid(r.raid, {
       coups: r.coups, fin: r.fin, recompenses: r.recompenses, dernier: { user_id: u, degats: r.degats, crit: r.crit, cree: r.cree },
     }));

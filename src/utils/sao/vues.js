@@ -59,6 +59,12 @@ function quetesLignes(quetes = []) {
 function xpServeurLigne(r) {
   return r && r.gagne > 0 ? `📈 **+${nombreSao(r.gagne)} XP serveur**` : null;
 }
+// Un combat de boss laissé en plan, clos au passage par l'action suivante :
+// sa pénalité est toujours dite, jamais prélevée en silence.
+function abandonLigne(abandon) {
+  if (!abandon?.combat) return null;
+  return `⌛ Ton combat contre **${abandon.combat.etat.boss.nom}** a été abandonné : il compte comme une fuite (−${nombreSao(abandon.perte)} Col).`;
+}
 const sansVide = (t) => t.filter(Boolean);
 // « d'Alice », « de Bob » : l'élision devant une voyelle.
 const deNom = (nom) => (/^[aeiouyàâäéèêëîïôöùûüœ]/i.test(String(nom)) ? `d'${nom}` : `de ${nom}`);
@@ -171,7 +177,7 @@ function carteChasse(r, { userId, xpServeur = null }) {
   const m = r.monstre;
   const embed = new EmbedBuilder();
   const blocs = [];
-  if (r.abandon) blocs.push(`⌛ Ton combat contre **${r.abandon.combat.etat.boss.nom}** a été abandonné : il compte comme une fuite (−${nombreSao(r.abandon.perte)} Col).`);
+  if (r.abandon) blocs.push(abandonLigne(r.abandon));
   if (r.victoire) {
     embed.setColor(r.rare ? OR : COLORS.SUCCESS).setTitle(`${r.rare ? '✨' : '🗡️'} ${m.emoji} ${m.nom} vaincu${r.rare ? ' — rencontre rare !' : ''}`);
     blocs.push(sansVide([
@@ -293,6 +299,9 @@ function carteFinBoss(sortie, { userId, nom, xpServeur = null }) {
     blocs.push(sansVide([
       `🪦 Ton nom s'ajoute au **Monument of Life**. Retour à 25 % de tes PV ${ts(sortie.mort.reapparition)}.`,
       `💸 Perte : **${nombreSao(sortie.mort.col)} Col** et **${nombreSao(sortie.mort.xp)} XP**.`,
+      // Le Sword Skill du dernier tour a pu boucler une quête : elle compte.
+      ...quetesLignes(sortie.quetes),
+      xpServeurLigne(xpServeur),
       ...badgesLignes(sortie.badges),
     ]).join('\n'));
     blocs.push(M.bloc('Pour la revanche', [
@@ -750,7 +759,7 @@ function carteRaid(raid, { coups = [], fin = null, recompenses = [], dernier = n
 }
 
 module.exports = {
-  OR, ROUGE_BOSS, nombreSao, dureeSao, deNom, objetLigne, rareteLigne, badgesLignes, quetesLignes, xpServeurLigne,
+  OR, ROUGE_BOSS, nombreSao, dureeSao, deNom, objetLigne, rareteLigne, badgesLignes, quetesLignes, xpServeurLigne, abandonLigne,
   carteBienvenue, carteProfil, carteBadges, carteChasse, carteBoss, carteFinBoss, carteInventaire, carteBoutique,
   carteForge, carteArgo, carteQuotidien, carteQuetes, carteDelais, carteVoyage, cartePecheLancee, cartePecheResultat,
   carteRecettes, carteAfk, carteObjetUtilise, carteClassement, carteDuelInvitation, carteDuelFin, carteCoffre, carteRaid, ligneQuete,

@@ -198,6 +198,12 @@ function statsJoueur(p, { lien = false } = {}) {
 
 // Charge un personnage, applique la régénération (2 %/min hors combat) et
 // le recale sur ses PV max. null s'il n'existe pas.
+//
+// ⚠️ L'horloge de régénération (`pv_le`) n'avance que du temps RÉELLEMENT
+// changé en PV. La remettre à « maintenant » à chaque chargement jetait la
+// fraction de PV en cours : il suffisait qu'un autre membre consulte la fiche
+// (ou clique le bouton de pages de l'inventaire) toutes les 25 secondes pour
+// geler la régénération d'un joueur — et le forcer à payer l'auberge.
 function chargerJoueur(guildId, userId, now) {
   const p = normaliser(getPlayer(guildId, userId));
   if (!p) return null;
@@ -206,15 +212,28 @@ function chargerJoueur(guildId, userId, now) {
   const combat = combatActif(p.guild_id, p.user_id);
   // Un combat abandonné (30 min sans clic) ne fige plus la régénération.
   const enCombat = Boolean(combat) && t - combat.maj_le <= ABANDON_MS;
-  const avant = p.hp;
+  const avant = { hp: p.hp, pv_le: p.pv_le };
   if (!enCombat && p.pv_le) {
-    const minutes = Math.max(0, (t - Number(p.pv_le)) / 60000);
-    p.hp = Math.min(s.pvMax, (p.hp || 0) + Math.floor(minutes * F.REGEN_PAR_MINUTE * s.pvMax));
+    // Un combat abandonné ne régénère qu'à partir de l'instant où il l'est.
+    const depuis = Math.max(Number(p.pv_le) || 0, combat ? combat.maj_le + ABANDON_MS : 0);
+    const parMinute = F.REGEN_PAR_MINUTE * s.pvMax;
+    const gain = parMinute > 0 ? Math.floor((Math.max(0, t - depuis) / 60000) * parMinute) : 0;
+    p.hp = Math.min(s.pvMax, (p.hp || 0) + gain);
+    // PV pleins : rien à reporter, l'horloge repart de maintenant.
+    p.pv_le = p.hp >= s.pvMax ? t : Math.min(t, depuis + Math.floor((gain / parMinute) * 60000 || 0));
+  } else if (!enCombat) {
+    p.pv_le = t;
   }
   p.hp = Math.max(0, Math.min(s.pvMax, p.hp ?? s.pvMax));
-  if (!enCombat) p.pv_le = t;
-  if (p.hp !== avant || !enCombat) savePlayer(p);
+  if (p.hp !== avant.hp || p.pv_le !== avant.pv_le) savePlayer(p);
   return p;
+}
+
+// Le combat de boss VIVANT de ce joueur (un clic il y a moins de 30 min),
+// sans rien modifier : pour l'affichage et l'autocomplétion.
+function combatVivant(guildId, userId, now) {
+  const c = combatActif(guildId, userId);
+  return c && maintenant(now) - c.maj_le <= ABANDON_MS ? c : null;
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -372,7 +391,10 @@ function quetesDuJour(guildId, userId, now) {
   if (existantes.length) return existantes;
   const p = getPlayer(g, u);
   const R = reglagesSao(g);
-  const eligibles = Object.entries(D.QUETES).filter(([, q]) => {
+  const eligibles = Object.entries(D.QUETES).filter(([cle, q]) => {
+    // Aincrad conquis : plus aucun boss d'étage, donc une quête impossible
+    // qui priverait le joueur du coffre des trois quêtes.
+    if (cle === 'boss') return (p?.floor || 1) <= MAX_FLOOR;
     if (q.cond === 'peche') return (p?.floor || 1) >= D.ETAGE_PECHE;
     if (q.cond === 'raid') return Boolean(R.salonRaid && R.raidHeures > 0);
     if (q.cond === 'pvp') return R.pvp;
@@ -556,7 +578,14 @@ function combatParId(id) {
 
 // Un combat laissé sans clic depuis 30 minutes compte comme une fuite SANS
 // cristal : on ne contourne plus la pénalité en abandonnant le message.
-// Les PV, eux, ont été enregistrés à chaque tour.
+//
+// Les PV, eux, ont été enregistrés à chaque tour : on ne les écrase plus avec
+// ceux du combat. Les remettre à `jPv` effaçait la régénération reprise
+// depuis l'abandon (et un soin pris entre-temps). La régénération repart de
+// l'instant où le combat est tenu pour abandonné.
+//
+// ⚠️ À appeler AVANT chargerJoueur : la pénalité est écrite en base, et un
+// personnage déjà chargé l'écraserait à son propre enregistrement.
 function expirerCombatAbandonne(guildId, userId, now) {
   const t = maintenant(now);
   const c = combatActif(guildId, userId);
@@ -567,8 +596,8 @@ function expirerCombatAbandonne(guildId, userId, now) {
   if (p) {
     perte = Math.floor(p.col * R.mortPenalite / 200);
     p.col -= perte;
-    p.hp = Math.max(1, c.etat.jPv);
-    p.pv_le = t;
+    if (!(p.hp > 0)) p.hp = Math.max(1, c.etat.jPv);
+    p.pv_le = Math.max(Number(p.pv_le) || 0, c.maj_le + ABANDON_MS);
     savePlayer(p);
   }
   combatMajStmt.run(JSON.stringify(c.etat), 'abandon', t, c.id);
@@ -610,7 +639,10 @@ function commencerBoss(guildId, userId, { lien = false, now } = {}) {
 // Joue un tour. `tour` : le numéro de tour porté par le bouton cliqué ; un
 // message périmé (autre tour) ne joue rien et se resynchronise.
 // action.type : 'attaque' | 'garde' | 'skill' | 'objet' | 'fuir'
-function jouerTourSao(idCombat, userId, action, { tour = null, now, rng = Math.random, lien = false } = {}) {
+// `message` : l'id du message cliqué. Celui où le combat se conclut est
+// retenu (etat.messageFin) : un clic tardif sur CE message ne doit jamais
+// remplacer la carte de fin par l'ancien état du combat.
+function jouerTourSao(idCombat, userId, action, { tour = null, now, rng = Math.random, lien = false, message = null } = {}) {
   const t = maintenant(now);
   const c = combatParId(idCombat);
   if (!c) return { refus: 'introuvable' };
@@ -634,6 +666,7 @@ function jouerTourSao(idCombat, userId, action, { tour = null, now, rng = Math.r
     p.pv_le = t;
     p.last_afk = iso(t);
     savePlayer(p);
+    if (message) etat.messageFin = String(message);
     combatMajStmt.run(JSON.stringify(etat), 'fui', t, c.id);
     return { fin: 'fuite', cristal, perte, antiCristal: etat.antiCristal, combat: combatParId(c.id), joueur: p };
   }
@@ -667,9 +700,15 @@ function jouerTourSao(idCombat, userId, action, { tour = null, now, rng = Math.r
     p.hp = Math.max(1, etat.jPv);
   }
 
-  if (r.fin === 'victoire') Object.assign(sortie, victoireBoss(p, etat, R, t, { lien }));
+  if (r.fin === 'victoire') {
+    // Fusionner, jamais écraser : un Sword Skill fatal peut AUSSI boucler la
+    // quête « Lancer N Sword Skills », déjà comptée en base plus haut.
+    const v = victoireBoss(p, etat, R, t, { lien });
+    Object.assign(sortie, v, { quetes: [...sortie.quetes, ...v.quetes], badges: [...sortie.badges, ...v.badges] });
+  }
 
   const statut = sortie.fin === 'victoire' ? 'gagne' : sortie.fin === 'defaite' ? 'perdu' : 'en_cours';
+  if (statut !== 'en_cours' && message) etat.messageFin = String(message);
   savePlayer(p);
   combatMajStmt.run(JSON.stringify(etat), statut, t, c.id);
   sortie.combat = combatParId(c.id);
@@ -724,20 +763,28 @@ function victoireBoss(p, etat, R, now, { lien = false } = {}) {
 // Auberge, AFK, voyage
 // ══════════════════════════════════════════════════════════════════
 
+// ⚠️ Toute action refusée « en plein combat » clôt d'abord le combat
+// ABANDONNÉ (expirerCombatAbandonne), comme la chasse et /sao boss. Sans
+// cela, un combat quitté depuis une heure bloquait encore l'auberge, et le
+// conseil « /sao boss le rouvre » ouvrait un NOUVEAU combat : une seconde
+// fuite, une seconde pénalité. `abandon` remonte dans la réponse, refus
+// compris, pour que la pénalité ne passe jamais sous silence.
 function soignerAuberge(guildId, userId, { now } = {}) {
   const t = maintenant(now);
+  const abandon = expirerCombatAbandonne(guildId, userId, t);
   const p = chargerJoueur(guildId, userId, t);
   if (!p) return { refus: 'sans_perso' };
-  if (combatActif(p.guild_id, p.user_id)) return { refus: 'en_combat' };
+  const combat = combatActif(p.guild_id, p.user_id);
+  if (combat) return { refus: 'en_combat', combat };
   const s = statsJoueur(p);
   const manquant = s.pvMax - p.hp;
-  if (manquant <= 0) return { refus: 'plein', joueur: p, pvMax: s.pvMax };
+  if (manquant <= 0) return { refus: 'plein', joueur: p, pvMax: s.pvMax, abandon };
   const cout = F.coutAuberge(Math.min(p.floor, MAX_FLOOR), manquant, s.pvMax);
-  if (p.col < cout) return { refus: 'fonds', cout, joueur: p, pvMax: s.pvMax };
+  if (p.col < cout) return { refus: 'fonds', cout, joueur: p, pvMax: s.pvMax, abandon };
   p.col -= cout;
   p.hp = s.pvMax;
   savePlayer(p);
-  return { cout, joueur: p, pvMax: s.pvMax };
+  return { cout, joueur: p, pvMax: s.pvMax, abandon };
 }
 
 // L'AFK ne compte que le temps passé SANS jouer : chaque action remet le
@@ -768,16 +815,19 @@ function recolterAfk(guildId, userId, { now } = {}) {
 }
 
 function voyagerSao(guildId, userId, etage, { now } = {}) {
-  const p = chargerJoueur(guildId, userId, now);
+  const t = maintenant(now);
+  const abandon = expirerCombatAbandonne(guildId, userId, t);
+  const p = chargerJoueur(guildId, userId, t);
   if (!p) return { refus: 'sans_perso' };
-  if (combatActif(p.guild_id, p.user_id)) return { refus: 'en_combat' };
+  const combat = combatActif(p.guild_id, p.user_id);
+  if (combat) return { refus: 'en_combat', combat };
   const haut = Math.min(p.floor, MAX_FLOOR);
   const cible = Math.floor(Number(etage));
-  if (!(cible >= 1 && cible <= haut)) return { refus: 'verrouille', haut };
-  if (cible === p.position) return { refus: 'deja', joueur: p };
+  if (!(cible >= 1 && cible <= haut)) return { refus: 'verrouille', haut, abandon };
+  if (cible === p.position) return { refus: 'deja', joueur: p, abandon };
   p.position = cible;
   savePlayer(p);
-  return { joueur: p, etage: cible, ...D.villeDe(cible) };
+  return { joueur: p, etage: cible, ...D.villeDe(cible), abandon };
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -948,18 +998,21 @@ function infoBoss(p) {
   };
 }
 
-function acheterRenseignement(guildId, userId) {
-  const p = chargerJoueur(guildId, userId);
+function acheterRenseignement(guildId, userId, { now } = {}) {
+  const t = maintenant(now);
+  const abandon = expirerCombatAbandonne(guildId, userId, t);
+  const p = chargerJoueur(guildId, userId, t);
   if (!p) return { refus: 'sans_perso' };
-  if (p.floor > MAX_FLOOR) return { refus: 'conquis' };
+  if (p.floor > MAX_FLOOR) return { refus: 'conquis', abandon };
   const info = infoBoss(p);
-  if (info.achete) return { refus: 'deja', info };
-  if (combatActif(p.guild_id, p.user_id)) return { refus: 'en_combat' };
-  if (p.col < info.prix) return { refus: 'fonds', info };
+  if (info.achete) return { refus: 'deja', info, abandon };
+  const combat = combatActif(p.guild_id, p.user_id);
+  if (combat) return { refus: 'en_combat', combat };
+  if (p.col < info.prix) return { refus: 'fonds', info, abandon };
   p.col -= info.prix;
   p.argo_etage = info.etage;
   savePlayer(p);
-  return { info: { ...info, achete: true }, joueur: p };
+  return { info: { ...info, achete: true }, joueur: p, abandon };
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -998,19 +1051,21 @@ function reclamerQuotidien(guildId, userId, { now } = {}) {
 // par le bouton « Ferrer », empêche de ferrer avec un vieux message.
 function lancerPeche(guildId, userId, { now, rng = Math.random } = {}) {
   const t = maintenant(now);
+  const abandon = expirerCombatAbandonne(guildId, userId, t);
   const p = chargerJoueur(guildId, userId, t);
   if (!p) return { refus: 'sans_perso' };
-  if (p.floor < D.ETAGE_PECHE) return { refus: 'verrouille' };
-  if (p.position !== D.ETAGE_PECHE) return { refus: 'ailleurs', position: p.position };
-  if (combatActif(p.guild_id, p.user_id)) return { refus: 'en_combat' };
+  if (p.floor < D.ETAGE_PECHE) return { refus: 'verrouille', abandon };
+  if (p.position !== D.ETAGE_PECHE) return { refus: 'ailleurs', position: p.position, abandon };
+  const combat = combatActif(p.guild_id, p.user_id);
+  if (combat) return { refus: 'en_combat', combat };
   const attente = Math.max(reapparitionRestante(p, t), PECHE_DELAI_MS - (t - Number(p.peche_le || 0)));
-  if (attente > 0) return { refus: 'delai', ms: attente };
+  if (attente > 0) return { refus: 'delai', ms: attente, abandon };
   p.peche_jeton = 1 + Math.floor(rng() * 999998);
   p.peche_morsure = t + 2000 + Math.floor(rng() * 4000);
   p.peche_le = t;
   p.last_afk = iso(t);
   savePlayer(p);
-  return { jeton: p.peche_jeton, morsure: p.peche_morsure, joueur: p };
+  return { jeton: p.peche_jeton, morsure: p.peche_morsure, joueur: p, abandon };
 }
 
 // Ferre : trop tôt, le poisson file ; trop tard (3 s), il a mangé l'appât.
@@ -1074,16 +1129,19 @@ function cuisinerSao(guildId, userId, recette, { now } = {}) {
 
 function utiliserObjet(guildId, userId, cle, { now, rng = Math.random } = {}) {
   const t = maintenant(now);
+  const abandon = expirerCombatAbandonne(guildId, userId, t);
   const p = chargerJoueur(guildId, userId, t);
   if (!p) return { refus: 'sans_perso' };
   const o = OBJETS[cle];
-  if (!o) return { refus: 'inconnu' };
-  if (quantiteSao(p.guild_id, p.user_id, cle) < 1) return { refus: 'manque' };
+  if (!o) return { refus: 'inconnu', abandon };
+  if (quantiteSao(p.guild_id, p.user_id, cle) < 1) return { refus: 'manque', abandon };
   const s = statsJoueur(p);
-  const sortie = { cle, objet: o, joueur: p };
+  const sortie = { cle, objet: o, joueur: p, abandon };
+  // Après l'expiration ci-dessus, seul un combat VIVANT reste actif.
+  const combat = combatActif(p.guild_id, p.user_id);
 
   if (o.type === 'arme' || o.type === 'armure') {
-    if (combatActif(p.guild_id, p.user_id)) return { refus: 'en_combat' };
+    if (combat) return { refus: 'en_combat', combat };
     const slot = o.type === 'armure' ? 'armure' : 'arme';
     retirerObjet(p.guild_id, p.user_id, cle, 1);
     const ancien = p[slot];
@@ -1117,18 +1175,21 @@ function utiliserObjet(guildId, userId, cle, { now, rng = Math.random } = {}) {
     return { ...sortie, coffre: { col, contenu }, badges };
   }
   if (o.soin) {
-    if (o.cristal && combatActif(p.guild_id, p.user_id)) return { refus: 'en_combat' };
-    if (p.hp >= s.pvMax) return { refus: 'plein' };
+    // Aucun soin, potion comprise, hors du menu du combat : pendant un boss,
+    // les PV qui comptent sont ceux du combat (etat.jPv). La potion était
+    // consommée, « +X PV » annoncé… puis écrasé au tour suivant.
+    if (combat) return { refus: 'en_combat', combat };
+    if (p.hp >= s.pvMax) return { refus: 'plein', abandon };
     retirerObjet(p.guild_id, p.user_id, cle, 1);
     const avant = p.hp;
     p.hp = Math.min(s.pvMax, p.hp + Math.round(s.pvMax * o.soin));
     savePlayer(p);
     return { ...sortie, soin: p.hp - avant, pvMax: s.pvMax };
   }
-  if (o.antidote) return { refus: 'antidote' };
-  if (o.fuite) return { refus: 'teleport' };
-  if (o.resurrection) return { refus: 'passif' };
-  return { refus: 'inutilisable' };
+  if (o.antidote) return { refus: 'antidote', abandon };
+  if (o.fuite) return { refus: 'teleport', abandon };
+  if (o.resurrection) return { refus: 'passif', abandon };
+  return { refus: 'inutilisable', abandon };
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -1245,49 +1306,67 @@ function coffreSao(guildId, couple) {
 }
 
 // Dépose ou retire du Col ou un objet. `sens` : 'deposer' | 'retirer'.
+//
+// ⚠️ TOUT est vérifié avant la moindre écriture, puis tout est écrit d'un
+// bloc (une transaction). Écrire le Col du coffre avant de contrôler l'objet
+// laissait un refus à moitié fait : `deposer col:100 objet:<inconnu>`
+// créditait le coffre sans débiter le joueur — du Col créé à l'infini — et
+// `retirer col:100 objet:<absent>` en détruisait autant.
 function mouvementCoffre(guildId, userId, couple, sens, { col = 0, cle = null, qte = 1 } = {}) {
   const g = String(guildId);
-  if (!couple.split(':').includes(String(userId))) return { refus: 'pas_a_toi' };
-  const p = chargerJoueur(g, userId);
+  const u = String(userId);
+  if (!couple.split(':').includes(u)) return { refus: 'pas_a_toi' };
+  const p = chargerJoueur(g, u);
   if (!p) return { refus: 'sans_perso' };
-  const coffre = coffreSao(g, couple);
-  const n = Math.floor(Number(col) || 0);
-  if (n > 0) {
-    if (sens === 'deposer') {
-      if (p.col < n) return { refus: 'fonds', possede: p.col };
-      p.col -= n;
-      coffreColStmt.run(g, couple, coffre.col + n);
-    } else {
-      if (coffre.col < n) return { refus: 'coffre_fonds', possede: coffre.col };
-      p.col += n;
-      coffreColStmt.run(g, couple, coffre.col - n);
-    }
+  const depot = sens === 'deposer';
+  const n = Math.max(0, Math.floor(Number(col) || 0));
+  const q = cle ? Math.floor(Number(qte)) : 0;
+
+  // 1) Vérifier, sans rien écrire.
+  if (cle && (!OBJETS[cle] || !(q >= 1))) return { refus: 'inconnu' };
+  if (!n && !cle) return { refus: 'rien' };
+  const soldeCoffre = coffreGetStmt.get(g, couple)?.col || 0;
+  const dansCoffre = cle ? coffreObjetGetStmt.get(g, couple, cle)?.qte || 0 : 0;
+  if (depot) {
+    if (n && p.col < n) return { refus: 'fonds', possede: p.col };
+    const possede = cle ? quantiteSao(g, u, cle) : 0;
+    if (cle && possede < q) return { refus: 'manque', possede };
+  } else {
+    if (n && soldeCoffre < n) return { refus: 'coffre_fonds', possede: soldeCoffre };
+    if (cle && dansCoffre < q) return { refus: 'coffre_manque', possede: dansCoffre };
   }
-  let objet = null;
-  if (cle) {
-    const q = Math.floor(Number(qte));
-    if (!OBJETS[cle] || !(q >= 1)) return { refus: 'inconnu' };
-    const dansCoffre = coffreObjetGetStmt.get(g, couple, cle)?.qte || 0;
-    if (sens === 'deposer') {
-      if (!retirerObjet(g, userId, cle, q)) return { refus: 'manque', possede: quantiteSao(g, userId, cle) };
-      coffreObjetSetStmt.run(g, couple, cle, dansCoffre + q);
-    } else {
-      if (dansCoffre < q) return { refus: 'coffre_manque', possede: dansCoffre };
-      coffreObjetSetStmt.run(g, couple, cle, dansCoffre - q);
-      ajouterObjet(g, userId, cle, q);
+
+  // 2) Écrire, tout ou rien : une exception annule aussi ce qui précède.
+  db.transaction(() => {
+    const solde = coffreGetStmt.get(g, couple)?.col || 0;
+    // La ligne du coffre existe toujours après un mouvement : c'est elle que
+    // le partage après un divorce retrouve.
+    coffreColStmt.run(g, couple, solde + (depot ? n : -n));
+    p.col += depot ? -n : n;
+    if (cle) {
+      const dedans = coffreObjetGetStmt.get(g, couple, cle)?.qte || 0;
+      if (depot) {
+        if (!retirerObjet(g, u, cle, q)) throw new Error('sao_coffre_sac_desynchronise');
+        coffreObjetSetStmt.run(g, couple, cle, dedans + q);
+      } else {
+        coffreObjetSetStmt.run(g, couple, cle, dedans - q);
+        ajouterObjet(g, u, cle, q);
+      }
     }
-    if (!coffreGetStmt.get(g, couple)) coffreColStmt.run(g, couple, coffreSao(g, couple).col);
-    objet = { cle, qte: q };
-  }
-  if (!(n > 0) && !objet) return { refus: 'rien' };
-  savePlayer(p);
-  return { col: n > 0 ? n : 0, objet, coffre: coffreSao(g, couple), joueur: p };
+    savePlayer(p);
+  })();
+  return { col: n, objet: cle ? { cle, qte: q } : null, coffre: coffreSao(g, couple), joueur: p };
 }
 
 // Après un divorce, le coffre est partagé à parts égales (comme le canon
 // partage l'inventaire commun) : la moitié (arrondie à l'avantage de celui
 // qui l'ouvre) pour chacun.
-function partagerCoffresOrphelins(guildId, userId, coupleActuel = null) {
+//
+// `toutALautre` : une REMISE À ZÉRO n'est pas un divorce. Le joueur effacé
+// n'a plus rien à recevoir — sa part serait détruite avec sa ligne, juste
+// après —, donc tout le coffre revient au conjoint, et la ligne du joueur
+// effacé n'est pas recréée (avec son kit de départ) pour rien.
+function partagerCoffresOrphelins(guildId, userId, coupleActuel = null, { toutALautre = false } = {}) {
   const g = String(guildId);
   const u = String(userId);
   const partages = [];
@@ -1295,6 +1374,16 @@ function partagerCoffresOrphelins(guildId, userId, coupleActuel = null) {
     if (couple === coupleActuel) continue;
     const autre = couple.split(':').find((x) => x !== u) || u;
     const c = coffreSao(g, couple);
+    if (toutALautre) {
+      if (autre !== u) {
+        if (c.col) crediterCol(g, autre, c.col);
+        for (const o of c.objets) donnerObjet(g, autre, o.objet, o.qte);
+      }
+      coffreDelStmt.run(g, couple);
+      coffreObjetsDelStmt.run(g, couple);
+      partages.push({ couple, autre, col: c.col, objets: c.objets, tout: true });
+      continue;
+    }
     const moitie = Math.floor(c.col / 2);
     if (c.col) {
       crediterCol(g, u, c.col - moitie);
@@ -1364,13 +1453,14 @@ const effacerJoueurStmts = TABLES_JOUEUR.map(([table, col]) => db.prepare(`DELET
 const effacerDuelsJoueurStmt = db.prepare('DELETE FROM sao_duels WHERE guild_id = ? AND (a = ? OR b = ?)');
 const effacerCoupsJoueurStmt = db.prepare('DELETE FROM sao_raid_coups WHERE user_id = ? AND raid_id IN (SELECT id FROM sao_raids WHERE guild_id = ?)');
 
-// Remet un aventurier à zéro sur ce serveur (son coffre de couple est
-// partagé d'abord, pour que son conjoint ne perde rien).
+// Remet un aventurier à zéro sur ce serveur. Son coffre de couple revient
+// d'abord EN ENTIER à son conjoint, pour que celui-ci ne perde rien — pas
+// même ce qu'il y avait déposé lui-même.
 function reinitialiserJoueurSao(guildId, userId) {
   const g = String(guildId);
   const u = String(userId);
   const existait = Boolean(getPlayer(g, u));
-  const partages = partagerCoffresOrphelins(g, u, null);
+  const partages = partagerCoffresOrphelins(g, u, null, { toutALautre: true });
   for (const s of effacerJoueurStmts) s.run(g, u);
   effacerDuelsJoueurStmt.run(g, u, u);
   effacerCoupsJoueurStmt.run(u, g);
@@ -1407,7 +1497,7 @@ module.exports = {
   crediterCol, donnerObjet, objetsRecompensables,
   reglagesSao, jourSao, msAvantMinuit, getPlayer, ensurePlayer, savePlayer, chargerJoueur, statsJoueur, plusArme,
   detenteurUnique, uniquesDe, quantiteSao, ajouterObjet, retirerObjet, inventaireSao, ownedBadges, award, syncMilestoneBadges,
-  rumeurDuJour, quetesDuJour, avancerQuete, texteQuete, appliquerMort, chasserSao, combatActif, combatParId,
+  rumeurDuJour, quetesDuJour, avancerQuete, texteQuete, appliquerMort, chasserSao, combatActif, combatVivant, combatParId,
   expirerCombatAbandonne, commencerBoss, jouerTourSao, soignerAuberge, recolterAfk, voyagerSao, prixAchat, prixRevente,
   acheterSao, vendreSao, vendreButin, offresForge, forgerSao, ameliorerSao, infoBoss, acheterRenseignement, reclamerQuotidien,
   lancerPeche, ferrerSao, cuisinerSao, utiliserObjet, duelParId, proposerDuel, simulerDuelSao, repondreDuel, cleCouple,

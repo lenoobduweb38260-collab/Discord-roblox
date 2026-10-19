@@ -25,7 +25,9 @@ const raidParIdStmt = db.prepare('SELECT * FROM sao_raids WHERE id = ?');
 const dernierRaidStmt = db.prepare('SELECT * FROM sao_raids WHERE guild_id = ? ORDER BY id DESC LIMIT 1');
 const raidAddStmt = db.prepare("INSERT INTO sao_raids (guild_id, salon_id, boss, etage, pv_max, pv, statut, cree_le, expire_le) VALUES (?, ?, ?, ?, ?, ?, 'actif', ?, ?)");
 const raidPvStmt = db.prepare('UPDATE sao_raids SET pv = ? WHERE id = ?');
-const raidFinStmt = db.prepare('UPDATE sao_raids SET statut = ?, fini_le = ?, dernier_coup = ? WHERE id = ?');
+// Ne clôt qu'un raid ENCORE actif : `.changes` dit qui l'a clos, et lui seul
+// paie (partage ou consolation). Deux clôtures ne paient jamais deux fois.
+const raidFinStmt = db.prepare("UPDATE sao_raids SET statut = ?, fini_le = ?, dernier_coup = ? WHERE id = ? AND statut = 'actif'");
 const raidMessageStmt = db.prepare('UPDATE sao_raids SET message_id = ?, salon_id = ? WHERE id = ?');
 const raidsExpiresStmt = db.prepare("SELECT * FROM sao_raids WHERE statut = 'actif' AND expire_le < ?");
 const coupsStmt = db.prepare('SELECT * FROM sao_raid_coups WHERE raid_id = ? ORDER BY degats DESC, user_id');
@@ -142,8 +144,7 @@ function frapperRaid(raidId, userId, { now = Date.now(), rng = Math.random, lien
   G.savePlayer(p);
 
   const sortie = { degats, crit: coup.crit, cree: created, quetes, fin: null, recompenses: [] };
-  if (pv <= 0) {
-    raidFinStmt.run('vaincu', now, String(userId), raid.id);
+  if (pv <= 0 && raidFinStmt.run('vaincu', now, String(userId), raid.id).changes === 1) {
     sortie.fin = 'vaincu';
     sortie.recompenses = partagerRaid(raidParId(raid.id), now);
   }
@@ -153,8 +154,13 @@ function frapperRaid(raidId, userId, { now = Date.now(), rng = Math.random, lien
 }
 
 // Le boss se retire : un lot de consolation pour ceux qui ont frappé.
+//
+// Idempotent : tourDeRaids travaille sur une liste lue d'un coup, puis attend
+// le réseau raid par raid. Un clic « Frapper » peut donc expirer un raid de
+// la liste entre-temps — sans la garde, la boucle le ré-expirait et versait
+// la consolation une seconde fois.
 function expirerRaid(raid, now = Date.now()) {
-  raidFinStmt.run('expire', now, null, raid.id);
+  if (raidFinStmt.run('expire', now, null, raid.id).changes !== 1) return raidParId(raid.id);
   for (const c of coupsRaid(raid.id)) {
     const p = G.getPlayer(raid.guild_id, c.user_id);
     if (p) G.crediterCol(raid.guild_id, c.user_id, 3 * F.colChasse(Math.min(p.floor, 100)));
@@ -208,6 +214,8 @@ async function tourDeRaids(client, now = Date.now()) {
   const bilan = { crees: [], expires: [] };
   for (const raid of raidsExpiresStmt.all(now)) {
     const fini = expirerRaid(raid, now);
+    // Clos entre-temps par un dernier coup : sa carte de victoire reste.
+    if (fini?.statut !== 'expire') continue;
     bilan.expires.push(fini.id);
     await rafraichirMessageRaid(client, fini, V.carteRaid(fini, { coups: coupsRaid(fini.id), fin: 'expire' }));
   }
