@@ -174,8 +174,7 @@ async function gererConfigComptage(interaction) {
     if (salonId !== avant) C.changerSalonComptage(guildId, salonId);
     await mettreAJour(interaction, vue());
     if (salonId && salonId !== avant) {
-      await C.annoncerComptage(guild, salonId,
-        '🔢 **Ce salon devient le salon de comptage !**\nChacun son tour, un nombre de plus que le précédent. Une erreur et on repart de **0**.\nLe premier nombre est **1**.');
+      await C.annoncerComptage(guild, salonId, C.ANNONCE_SALON_COMPTAGE);
     }
     await journal(interaction, `🔢 Salon de comptage → ${salonId ? `<#${salonId}>` : '*aucun (comptage coupé)*'}`);
     return;

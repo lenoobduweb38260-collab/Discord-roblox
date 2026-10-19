@@ -95,7 +95,147 @@ const CONFIG_KEYS = {
   bot_nick: 's',
   bot_avatar_url: 's',
   bot_profil: 's',
+
+  // 📈 XP & niveaux — mêmes clés et mêmes bornes que /config → 📈 XP & niveaux.
+  xp_text_min: 'n',
+  xp_text_max: 'n',
+  xp_longueur_min: 'n',
+  xp_vocal_seul: 'b',
+  xp_vocal_muet: 'b',
+  xp_mult_cumul: 'b',
+  xp_mult_global: 'n',
+  xp_boost_pourcent: 'n',
+  xp_boost_fin: 's',          // date ISO 8601, ou vide (sans fin)
+  xp_weekend_pourcent: 'n',
+  xp_sao_pourcent: 'n',
+  xp_courbe: 's',             // CHOIX_REGLAGES
+  xp_niveau_max: 'n',
+  level_annonce: 's',         // CHOIX_REGLAGES, vide = automatique
+  level_message: 't',
+  level_annonce_pas: 'n',
+  level_mention: 'b',
+  level_rewards_stack: 'b',
+  level_reset_depart: 'b',
+  // 🎲 Mini-jeux
+  jeux_enabled: 'b',
+  jeux_desactives: 's',       // clés du catalogue séparées par des virgules
+  jeux_xp_victoire: 'n',
+  jeux_xp_bot: 'n',
+  jeux_xp_plafond: 'n',
+  jeux_col_victoire: 'n',
+  // 🔢 Comptage
+  comptage_channel_id: 's',
+  comptage_meme_personne: 'b',
+  comptage_maths: 'b',
+  comptage_reactions: 'b',
+  comptage_supprimer: 'b',
+  comptage_role_erreur: 's',
+  comptage_xp: 'n',
+  // 💍 Mariage
+  mariage_avantages: 'b',
+  mariage_bonus_xp: 'n',
+  mariage_lune_de_miel_jours: 'n',
+  mariage_bisou_xp: 'n',
+  mariage_actif_minutes: 'n',
+  mariage_salon_id: 's',
+  // ⚔️ Aventure SAO (sao_enabled plus haut)
+  sao_salon_id: 's',
+  sao_raid_heures: 'n',
+  sao_pvp: 'b',
+  sao_chasse_delai: 'n',
+  sao_afk: 'b',
+  sao_afk_heures: 'n',
+  sao_mort_penalite: 'n',
+  sao_difficulte: 's',        // CHOIX_REGLAGES
 };
+
+// Bornes des réglages numériques : une clé 'n' sans borne est refusée.
+const NUM_LIMITS = {
+  xp_text: [1, 1000], xp_voice: [1, 1000], xp_cooldown: [5, 3600],
+  captcha_max_essais: [1, 10],
+  embed_filet_taille: [6, 30],
+  xp_text_min: [0, 1000], xp_text_max: [1, 1000], xp_longueur_min: [0, 2000],
+  xp_mult_global: [0, 1000], xp_boost_pourcent: [0, 1000], xp_weekend_pourcent: [0, 1000],
+  xp_sao_pourcent: [0, 1000], xp_niveau_max: [0, 1000], level_annonce_pas: [1, 100],
+  jeux_xp_victoire: [0, 1000], jeux_xp_bot: [0, 1000], jeux_xp_plafond: [0, 10000], jeux_col_victoire: [0, 10000],
+  comptage_xp: [0, 1000],
+  mariage_bonus_xp: [0, 100], mariage_lune_de_miel_jours: [0, 60], mariage_bisou_xp: [0, 1000], mariage_actif_minutes: [1, 120],
+  sao_raid_heures: [0, 168], sao_chasse_delai: [5, 300], sao_afk_heures: [1, 24], sao_mort_penalite: [0, 50],
+};
+// Nombres qu'on peut vider : vide = « pas de tirage », l'XP fixe revient.
+const NUM_VIDABLES = new Set(['xp_text_min', 'xp_text_max']);
+// Longueur maximale d'un texte ('t'). Au-delà : refusé, jamais coupé.
+const TEXTE_MAX = 1500;
+// Valeurs permises d'un réglage à choix. Vide (null) = le défaut du bot.
+const CHOIX_REGLAGES = {
+  xp_courbe: ['mee6', 'douce', 'raide', 'lineaire'],
+  level_annonce: ['salon', 'ici', 'mp', 'off'],
+  sao_difficulte: ['facile', 'normal', 'difficile', 'heroique'],
+};
+// Rôles que le bot DONNE lui-même : il faut qu'il puisse les attribuer.
+const ROLES_DONNES = new Set(['comptage_role_erreur']);
+
+// Le catalogue des mini-jeux, chargé à la demande (il tire la base).
+const clesJeux = () => require('./utils/jeux/parties').CLES_JEUX;
+
+// Contrôles propres à certains réglages, après la conversion de type.
+// Rend `{ valeur }` (normalisée) ou `{ erreur }`.
+function normaliserReglageDashboard(cle, valeur) {
+  if (valeur === null || valeur === undefined || valeur === '') return { valeur: null };
+  if (CHOIX_REGLAGES[cle]) {
+    const v = String(valeur).trim();
+    if (!CHOIX_REGLAGES[cle].includes(v)) {
+      return { erreur: `Valeur inconnue pour ${cle} : « ${v.slice(0, 40)} ». Possibles : ${CHOIX_REGLAGES[cle].join(', ')}.` };
+    }
+    return { valeur: v };
+  }
+  if (cle === 'xp_boost_fin') {
+    const v = String(valeur).trim();
+    const iso = /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2}(\.\d{1,3})?)?(Z|[+-]\d{2}:?\d{2})?)?$/.test(v);
+    const t = iso ? Date.parse(v) : NaN;
+    // Un jour qui n'existe pas (31 février) serait reporté au mois suivant.
+    const [a, m, j] = v.slice(0, 10).split('-').map(Number);
+    const jourReel = new Date(Date.UTC(a, m - 1, j));
+    const calendrier = jourReel.getUTCFullYear() === a && jourReel.getUTCMonth() === m - 1 && jourReel.getUTCDate() === j;
+    if (Number.isNaN(t) || !calendrier || t < Date.UTC(2000, 0, 1) || t > Date.UTC(2100, 0, 1)) {
+      return { erreur: 'Fin du boost : date ISO 8601 attendue (ex. 2026-10-25T20:00:00Z), ou vide pour un boost sans fin.' };
+    }
+    return { valeur: new Date(t).toISOString() };
+  }
+  if (cle === 'jeux_desactives') {
+    const brut = Array.isArray(valeur) ? valeur : String(valeur).split(',');
+    const demandes = [...new Set(brut.map((c) => String(c).trim()).filter(Boolean))];
+    const connus = clesJeux();
+    const inconnu = demandes.find((c) => !connus.includes(c));
+    if (inconnu) return { erreur: `Jeu inconnu : « ${inconnu.slice(0, 40)} ». Possibles : ${connus.join(', ')}.` };
+    const liste = connus.filter((c) => demandes.includes(c));
+    return { valeur: liste.length ? liste.join(',') : null };
+  }
+  if (cle === 'level_image_url') {
+    const v = String(valeur).trim();
+    if (!/^https?:\/\/\S+$/i.test(v) || v.length > 500) {
+      return { erreur: 'Image de fond : une adresse http(s) complète est attendue (500 signes au plus).' };
+    }
+    return { valeur: v };
+  }
+  return { valeur };
+}
+
+// Un rôle que le bot doit donner ou retirer : de ce serveur (déjà vérifié),
+// pas géré par une intégration, et sous le plus haut rôle du bot — le même
+// contrôle que /config. Rend un message d'erreur, ou null.
+function refusRoleDonne(guild, roleId) {
+  const role = guild?.roles?.cache?.get?.(String(roleId));
+  if (!role) return REFUS_REFERENCE.role(roleId);
+  const nom = role.name || role.id;
+  if (role.managed) return `Le rôle ${nom} est géré par une intégration : il ne se donne ni ne se retire à la main.`;
+  const moi = guild.members?.me;
+  const haut = moi?.roles?.highest?.position;
+  if (Number.isFinite(haut) && Number(role.position) >= haut) {
+    return `Le rôle ${nom} est au-dessus de mon rôle : remontez mon rôle dans Paramètres du serveur → Rôles, puis réessayez.`;
+  }
+  return null;
+}
 
 // 🔒 Les réglages qui désignent un salon, une catégorie ou un rôle.
 //
@@ -106,11 +246,15 @@ const CONFIG_KEYS = {
 // comprises, que tout membre de B peut envoyer.
 //
 // Le genre se lit dans le NOM de la clé : une clé ajoutée demain est couverte
-// sans y penser, et un test vérifie qu'aucune n'échappe à la règle.
+// sans y penser, et un test vérifie qu'aucune n'échappe à la règle. Les noms
+// français (`_salon_id`, `_categorie_id`) suivent la même règle ; ceux qui ne
+// se devinent pas sont dans la table.
+const REFERENCES_NOMMEES = { patch_mention: 'role', comptage_role_erreur: 'role' };
 function genreReference(cle) {
-  if (/_category_id$|_categories$/.test(cle)) return 'categorie';
-  if (/_channel_id$|_channels$/.test(cle)) return 'salon';
-  if (/_role_ids?$|_role_remove$/.test(cle) || cle === 'patch_mention') return 'role';
+  if (REFERENCES_NOMMEES[cle]) return REFERENCES_NOMMEES[cle];
+  if (/_category_id$|_categories$|_categorie_id$/.test(cle)) return 'categorie';
+  if (/_channel_id$|_channels$|_salon_id$|_salons$/.test(cle)) return 'salon';
+  if (/_role_ids?$|_role_remove$/.test(cle)) return 'role';
   return null;
 }
 // `patch_mention` accepte aussi ces valeurs, qui ne sont pas des rôles.
@@ -203,11 +347,6 @@ function startManagedApi(client, baseDir) {
     'INSERT INTO ticket_panels (guild_id, channel_id, message_id, options, webhook_id, webhook_token) VALUES (?, ?, ?, ?, ?, ?)'
   );
 
-  const NUM_LIMITS = {
-    xp_text: [1, 1000], xp_voice: [1, 1000], xp_cooldown: [5, 3600],
-    captcha_max_essais: [1, 10],
-    embed_filet_taille: [6, 30],
-  };
   // Nombre maximum d'identifiants par liste (défaut : 10).
   const LIST_LIMITS = { antispam_exempt_channels: 60, antispam_exempt_categories: 30 };
   const listWhitelist = db.prepare('SELECT * FROM whitelist_managers WHERE guild_id = ? ORDER BY role_id');
@@ -221,10 +360,161 @@ function startManagedApi(client, baseDir) {
     whitelist: db.prepare('SELECT COUNT(*) AS n FROM whitelist_entries WHERE guild_id = ?'),
     vehicules: db.prepare('SELECT COUNT(*) AS n FROM insured_vehicles WHERE guild_id = ?'),
   };
-  // 📊 Classement sur le compteur UNIQUE (écrit + vocal réunis).
-  const topNiveaux = db.prepare(
-    'SELECT user_id, xp, level FROM levels WHERE guild_id = ? ORDER BY xp DESC LIMIT 5'
-  );
+
+  // ── 📈 🎲 🔢 Données des modules pour le tableau de bord ───────────────
+  // Une partie qui échoue (module absent d'un vieux bot, table vide…) est
+  // simplement omise : la page s'affiche avec le reste.
+  const essayer = (f) => { try { return f(); } catch { return undefined; } };
+  function listesNiveaux(guild) {
+    const L = require('./utils/levels');
+    return {
+      recompensesNiveau: essayer(() => L.diagnostiquerRecompenses(guild)),
+      exclusionsXp: essayer(() => L.listerExclusionsXp(guild.id)),
+      multiplicateursXp: essayer(() => L.listerMultiplicateursXp(guild.id)),
+    };
+  }
+  function listesModules(guild) {
+    const L = require('./utils/levels');
+    const comptage = essayer(() => {
+      const C = require('./utils/comptage');
+      const salon = getGuildConfig(guild.id).comptage_channel_id || null;
+      const e = C.etatComptage(guild.id);
+      return {
+        salon,
+        courant: C.nombreActuelComptage(guild.id, salon),
+        record: Number(e.record || 0),
+        recordLe: e.record_le || null,
+        erreurs: Number(e.erreurs || 0),
+        compteurs: C.compterCompteursComptage(guild.id),
+        classement: C.classementComptage(guild.id, { limite: 5 }).map((r) => ({
+          userId: r.user_id, nom: client.users?.cache?.get(r.user_id)?.username || null, justes: r.justes, erreurs: r.erreurs,
+        })),
+      };
+    });
+    return {
+      ...listesNiveaux(guild),
+      objetsSao: essayer(() => L.objetsSaoNiveau()),
+      typesRecompense: L.TYPES_RECOMPENSE_NIVEAU,
+      courbesXp: L.COURBES_XP,
+      limitesNiveaux: {
+        niveau: L.NIVEAU_RECOMPENSE_MAX, recompenses: L.MAX_RECOMPENSES,
+        exclusions: L.MAX_EXCLUSIONS_PAR_PORTEE, multiplicateurs: L.MAX_MULTIPLICATEURS,
+      },
+      comptage,
+      jeux: essayer(() => require('./utils/jeux/parties').CATALOGUE_JEUX),
+      sao: essayer(() => ({
+        joueurs: db.prepare('SELECT COUNT(*) AS n FROM sao_players WHERE guild_id = ?').get(guild.id).n,
+        difficultes: require('./utils/sao/formules').DIFFICULTES,
+      })),
+    };
+  }
+
+  // ── Ce qu'un réglage change au-delà de sa colonne — comme /config ───────
+  //  • nouveau salon de comptage : le compte repart de 0 (record gardé) et le
+  //    salon est prévenu ;
+  //  • courbe ou niveau maximum : tous les niveaux sont recalculés, sans
+  //    annonce (personne n'a rien gagné, c'est la règle qui a changé).
+  // Rend une note pour le site, ou null.
+  async function effetReglageDashboard(guild, key, value, acteur) {
+    const { sendLog, logEmbed } = require('./utils/embeds');
+    const par = /^\d{15,25}$/.test(String(acteur || '')) ? `Par <@${acteur}> (tableau de bord)` : 'Depuis le tableau de bord';
+    const journal = (texte) => sendLog(guild, logEmbed('⚙️ Configuration modifiée', `${texte}\n${par}`));
+    if (key === 'comptage_channel_id') {
+      const C = require('./utils/comptage');
+      C.changerSalonComptage(guild.id, value);
+      if (value) await C.annoncerComptage(guild, value, C.ANNONCE_SALON_COMPTAGE);
+      await journal(`🔢 Salon de comptage → ${value ? `<#${value}>` : '*aucun (comptage coupé)*'}`);
+      return value ? 'Compte remis à 0 dans le nouveau salon (record et classement conservés).' : null;
+    }
+    if (key === 'xp_courbe' || key === 'xp_niveau_max') {
+      const n = require('./utils/levels').recalculerNiveaux(guild.id);
+      await journal(`📈 ${key === 'xp_courbe' ? `Courbe d'XP → **${value || 'mee6'}**` : `Niveau maximum → ${value || 'aucun'}`} · ${n} niveau(x) recalculé(s).`);
+      return `${n} niveau(x) recalculé(s). Les rôles de récompense se réalignent au prochain gain, ou avec /xp synchroniser.`;
+    }
+    return null;
+  }
+
+  // ── Opérations sur les listes des niveaux (récompenses, exclusions,
+  // multiplicateurs) — les fonctions de levels.js, avec les contrôles de
+  // /config : salon ou rôle DE CE SERVEUR, et rôle donnable par le bot.
+  const LISTES_NIVEAUX = new Set(['/niveau-recompenses', '/xp-exclusions', '/xp-multiplicateurs']);
+  async function operationListeNiveaux(guild, chemin, retrait, d) {
+    const L = require('./utils/levels');
+    const { sendLog, logEmbed, COLORS } = require('./utils/embeds');
+    const gid = guild.id;
+    const par = /^\d{15,25}$/.test(String(d.acteur || '')) ? `Par <@${d.acteur}> (tableau de bord)` : 'Depuis le tableau de bord';
+    const journal = (titre, texte, couleur = COLORS.INFO) => sendLog(guild, logEmbed(titre, `${texte}\n${par}`, couleur));
+    const refus = (erreur, code = 400) => ({ code, erreur });
+    const cible = String(d.cibleId ?? '').trim();
+    // « categorie » est un salon pour l'XP : une catégorie couvre ses salons.
+    const typeCible = d.type === 'categorie' ? 'salon' : String(d.type || '');
+    const mention = (type, id) => (type === 'role' ? `<@&${id}>` : `<#${id}>`);
+    const cibleDuServeur = () => {
+      if (typeCible === 'role') return guild.roles?.cache?.has?.(cible) ? null : REFUS_REFERENCE.role(cible);
+      if (typeCible === 'salon') return guild.channels?.cache?.has?.(cible) ? null : REFUS_REFERENCE.salon(cible);
+      return null; // type inconnu : levels.js le refuse avec son message
+    };
+
+    if (chemin === '/niveau-recompenses') {
+      if (retrait) {
+        const id = Number(d.id);
+        const avant = L.listerRecompensesNiveau(gid).find((r) => r.id === id);
+        if (!avant || !L.supprimerRecompenseNiveau(gid, id)) return refus('Cette récompense n\'existe déjà plus.', 404);
+        await journal('🏅 Récompense de niveau retirée',
+          `Niveau **${avant.niveau}** : ${L.libelleRecompenseNiveau(avant)}\n-# Ce qui a déjà été donné reste acquis.`, COLORS.WARNING);
+        return { corps: { id } };
+      }
+      const type = String(d.type || '');
+      const valeur = d.valeur === null || d.valeur === undefined ? null : String(d.valeur).trim();
+      if (type === 'role' || type === 'role_retrait') {
+        if (!guild.roles?.cache?.has?.(valeur)) return refus(REFUS_REFERENCE.role(valeur));
+        const souci = refusRoleDonne(guild, valeur);
+        if (souci) return refus(souci);
+      }
+      if (type === 'objet') {
+        const objets = L.objetsSaoNiveau();
+        if (!objets.length) return refus('Le catalogue d\'objets de l\'Aventure SAO n\'est pas disponible : les récompenses en Col fonctionnent déjà.');
+        if (!objets.some((o) => o.cle === valeur)) return refus(`L'objet « ${String(valeur).slice(0, 40)} » ne fait pas partie des objets proposables en récompense.`);
+      }
+      const vide = d.quantite === null || d.quantite === undefined || d.quantite === '';
+      const r = L.ajouterRecompenseNiveau(gid, { niveau: Number(d.niveau), type, valeur, quantite: vide ? 1 : Number(d.quantite) });
+      if (!r.ok) return refus(r.erreur);
+      const ajoutee = L.listerRecompensesNiveau(gid).find((x) => x.id === r.id);
+      await journal('🏅 Récompense de niveau ajoutée',
+        `Niveau **${ajoutee.niveau}** : ${L.libelleRecompenseNiveau(ajoutee)}\n`
+        + '-# Les membres qui ont déjà ce niveau la recevront à leur prochain gain, ou avec `/xp synchroniser`.', COLORS.SUCCESS);
+      return { corps: { id: r.id } };
+    }
+
+    if (chemin === '/xp-exclusions') {
+      if (retrait) {
+        if (!L.retirerExclusionXp(gid, typeCible, cible)) return refus('Cette exclusion n\'existe déjà plus.', 404);
+        await journal('⚙️ Configuration modifiée', `📈 Exclusion d'XP retirée : ${mention(typeCible, cible)}.`);
+        return { corps: {} };
+      }
+      const etranger = cibleDuServeur();
+      if (etranger) return refus(etranger);
+      const portee = d.portee ? String(d.portee) : 'tout';
+      const r = L.ajouterExclusionXp(gid, typeCible, cible, portee);
+      if (!r.ok) return refus(r.erreur);
+      await journal('⚙️ Configuration modifiée', `📈 Exclusion d'XP : ${mention(typeCible, cible)} (${portee}).`);
+      return { corps: {} };
+    }
+
+    // /xp-multiplicateurs
+    if (retrait) {
+      if (!L.retirerMultiplicateurXp(gid, typeCible, cible)) return refus('Ce multiplicateur n\'existe déjà plus.', 404);
+      await journal('⚙️ Configuration modifiée', `📈 Multiplicateur retiré : ${mention(typeCible, cible)}.`);
+      return { corps: {} };
+    }
+    const etranger = cibleDuServeur();
+    if (etranger) return refus(etranger);
+    if (d.pourcent === null || d.pourcent === undefined || d.pourcent === '') return refus('Le pourcentage va de 0 à 1000 (100 = normal).');
+    const r = L.definirMultiplicateurXp(gid, typeCible, cible, Number(d.pourcent));
+    if (!r.ok) return refus(r.erreur);
+    await journal('⚙️ Configuration modifiée', `📈 Multiplicateur ${mention(typeCible, cible)} : ${Number(d.pourcent)} %.`);
+    return { corps: {} };
+  }
 
   const server = http.createServer(async (req, res) => {
     const send = (code, obj) => {
@@ -354,7 +644,9 @@ function startManagedApi(client, baseDir) {
         for (const [key, stmt] of Object.entries(countStmts)) {
           stats[key] = stmt.get(GLOBAL_COUNT.has(key) ? RP_SCOPE : guild.id).n;
         }
-        const top = topNiveaux.all(guild.id).map((r) => ({
+        // 📊 Classement sur le compteur UNIQUE (écrit + vocal réunis), sans
+        // les membres partis : le même que /niveau classement.
+        const top = require('./utils/levels').classementNiveaux(guild.id).slice(0, 5).map((r) => ({
           user: client.users.cache.get(r.user_id)?.username || r.user_id,
           level: r.level,
           xp: r.xp,
@@ -383,9 +675,11 @@ function startManagedApi(client, baseDir) {
       if (req.method === 'GET' && url.pathname === '/parametres') {
         const guild = client.guilds.cache.get(url.searchParams.get('guild'));
         if (!guild) return send(404, { error: 'Serveur introuvable.' });
+        const hautBot = guild.members?.me?.roles?.highest?.position;
         const roles = [...guild.roles.cache.filter((r) => r.id !== guild.id && !r.managed).values()]
           .sort((a, b) => b.position - a.position)
-          .map((r) => ({ id: r.id, name: r.name }));
+          // `attribuable` : sous le rôle du bot, donc donnable par lui.
+          .map((r) => ({ id: r.id, name: r.name, couleur: r.hexColor, attribuable: !Number.isFinite(hautBot) || r.position < hautBot }));
         const channels = [...guild.channels.cache.filter((c) => c.isTextBased() && !c.isThread()).values()]
           .map((c) => ({ id: c.id, name: c.name }))
           .sort((a, b) => a.name.localeCompare(b.name));
@@ -429,7 +723,61 @@ function startManagedApi(client, baseDir) {
         return send(200, {
           config: getGuildConfig(guild.id), roles, channels, categories, whitelist, tickets, bans, profils,
           profilsBot: identite.profils(), identiteBot: identite.etat(guild),
+          ...listesModules(guild),
         });
+      }
+
+      // ----- 📈 Listes des niveaux : récompenses, exclusions, multiplicateurs -----
+      // Ajout : POST + corps JSON. Retrait : DELETE (?guild=&id= ou &type=&cible=),
+      // ou POST avec { op: 'retirer' } — l'agent de l'hébergeur ne relaie le
+      // corps que des POST et des PUT. Chaque réponse rend la liste à jour.
+      if (LISTES_NIVEAUX.has(url.pathname) && (req.method === 'POST' || req.method === 'DELETE')) {
+        const body = req.method === 'POST' ? await readBody(req) : {};
+        const champ = (cle, param = cle) => body[cle] ?? url.searchParams.get(param) ?? null;
+        const guild = client.guilds.cache.get(String(champ('guildId', 'guild') || ''));
+        if (!guild) return send(404, { error: 'Serveur introuvable.' });
+        const retrait = req.method === 'DELETE' || body.op === 'retirer';
+        const r = await operationListeNiveaux(guild, url.pathname, retrait, {
+          id: champ('id'), niveau: champ('niveau'), type: champ('type'), valeur: champ('valeur'),
+          quantite: champ('quantite'), cibleId: champ('cibleId', 'cible'), portee: champ('portee'),
+          pourcent: champ('pourcent'), acteur: champ('acteur'),
+        });
+        if (r.code) return send(r.code, { error: r.erreur });
+        return send(200, { ok: true, ...r.corps, ...listesNiveaux(guild) });
+      }
+
+      // ----- ⚔️ Réinitialiser l'Aventure SAO (un joueur, ou tout le serveur) -----
+      // Irréversible : réservé à l'administration du serveur, comme /config.
+      // Le site vérifie les droits et fait confirmer ; on revérifie ici le
+      // grade de celui qui agit (sauf l'équipe du site, qui peut ne pas être
+      // membre du serveur), et on exige le mot de confirmation.
+      if (req.method === 'POST' && url.pathname === '/sao-reinitialiser') {
+        const body = await readBody(req);
+        const guild = client.guilds.cache.get(String(body.guildId || ''));
+        if (!guild) return send(404, { error: 'Serveur introuvable.' });
+        if (body.confirmation !== 'REINITIALISER') return send(400, { error: 'Confirmation manquante : rien n\'a été effacé.' });
+        const acteur = String(body.acteur || '');
+        if (body.equipeSite !== true) {
+          const { GRADES, getGrade } = require('./utils/permissions');
+          const membre = /^\d{15,25}$/.test(acteur)
+            ? guild.members.cache.get(acteur) || (await guild.members.fetch(acteur).catch(() => null))
+            : null;
+          const admin = membre && (guild.ownerId === membre.id || getGrade(membre, getGuildConfig(guild.id)) >= GRADES.ADMIN);
+          if (!admin) return send(403, { error: 'Réservé à l\'administration du serveur : rien n\'a été effacé.' });
+        }
+        const G = require('./utils/saoGame');
+        const { sendLog, logEmbed, COLORS } = require('./utils/embeds');
+        const par = /^\d{15,25}$/.test(acteur) ? `Par <@${acteur}> (tableau de bord)` : 'Depuis le tableau de bord';
+        if (body.cible === 'serveur') {
+          const r = G.reinitialiserServeurSao(guild.id);
+          await sendLog(guild, logEmbed('⚙️ Configuration modifiée', `🧨 Aventure SAO réinitialisée (${r.joueurs} personnage(s)).\n${par}`, COLORS.DANGER));
+          return send(200, { ok: true, joueurs: r.joueurs, note: `${r.joueurs} personnage(s) effacé(s).` });
+        }
+        const userId = String(body.userId || '').trim();
+        if (!/^\d{15,25}$/.test(userId)) return send(400, { error: 'Identifiant Discord du joueur invalide (clic droit sur le membre → Copier l\'identifiant).' });
+        const r = G.reinitialiserJoueurSao(guild.id, userId);
+        if (r.existait) await sendLog(guild, logEmbed('⚙️ Configuration modifiée', `🧹 Personnage SAO de <@${userId}> réinitialisé.\n${par}`, COLORS.WARNING));
+        return send(200, { ok: true, existait: r.existait, note: r.existait ? 'Personnage effacé.' : 'Ce membre n\'avait pas de personnage ici : rien à effacer.' });
       }
 
       // 🪪 Profils du bot rechargés À CHAUD : le site vient d'écrire
@@ -918,7 +1266,7 @@ function startManagedApi(client, baseDir) {
         if (!(key in CONFIG_KEYS)) return send(400, { error: `Réglage inconnu : ${key}` });
         let value = body.value;
         if (value === '' || value === null || value === undefined) value = null;
-        if (CONFIG_KEYS[key] === 'n') {
+        if (CONFIG_KEYS[key] === 'n' && !(value === null && NUM_VIDABLES.has(key))) {
           value = parseInt(value, 10);
           // Sans borne déclarée, on refuse plutôt que de planter sur un
           // tableau absent (c'est arrivé en ajoutant une clé numérique).
@@ -927,9 +1275,14 @@ function startManagedApi(client, baseDir) {
           if (Number.isNaN(value)) return send(400, { error: 'Valeur numérique attendue.' });
           value = Math.min(max, Math.max(min, value));
         } else if (CONFIG_KEYS[key] === 'b') {
-          value = value ? 1 : 0;
+          // « 0 », « false » ou « off » envoyés en texte valent bien 0.
+          value = value && !['0', 'false', 'off', 'non'].includes(String(value).trim().toLowerCase()) ? 1 : 0;
         } else if (CONFIG_KEYS[key] === 't' && value !== null) {
-          value = String(value).slice(0, 1500);
+          value = String(value);
+          // Jamais coupé sans le dire : un texte trop long est refusé.
+          if (value.length > TEXTE_MAX) {
+            return send(400, { error: `Texte trop long : ${value.length} signes, ${TEXTE_MAX} au plus.` });
+          }
         } else if (CONFIG_KEYS[key] === 'j' && value !== null) {
           const ids = (Array.isArray(value) ? value : [value]).map((v) => String(v).trim()).filter((v) => /^\d{5,25}$/.test(v));
           // 10 suffit pour des rôles ; une liste d'exemptions couvre parfois
@@ -942,6 +1295,16 @@ function startManagedApi(client, baseDir) {
         );
         if (reference.erreur) return send(400, { error: reference.erreur });
         value = reference.valeur;
+        // 🎭 Un rôle que le bot donne lui-même : il doit pouvoir le donner.
+        if (ROLES_DONNES.has(key) && value) {
+          const souci = refusRoleDonne(client.guilds.cache.get(body.guildId), value);
+          if (souci) return send(400, { error: souci });
+        }
+        // 🧭 Choix, date, liste de jeux, adresse d'image : formes contrôlées.
+        const forme = normaliserReglageDashboard(key, value);
+        if (forme.erreur) return send(400, { error: forme.erreur });
+        value = forme.valeur;
+        const avant = getGuildConfig(body.guildId)[key] ?? null;
         // 🪪 Nom / photo / profil du bot : on l'applique à Discord d'abord —
         // enregistrer une photo que Discord refuse mentirait au dashboard.
         if (key === 'bot_nick' || key === 'bot_avatar_url' || key === 'bot_profil') {
@@ -977,7 +1340,11 @@ function startManagedApi(client, baseDir) {
             .then((result) => console.log(`🔄 Module RP ${result.rp ? 'activé' : 'désactivé'} — ${result.total} commande(s) synchronisées.`))
             .catch((err) => console.warn(`⚠️ Sync commandes : ${err.message}`));
         }
-        return send(200, { ok: true, value });
+        // Les effets de /config, à l'identique (voir effetReglageDashboard).
+        const note = String(avant ?? '') === String(value ?? '')
+          ? null
+          : await effetReglageDashboard(client.guilds.cache.get(body.guildId), key, value, body.acteur);
+        return send(200, note ? { ok: true, value, note } : { ok: true, value });
       }
 
       if (req.method === 'POST' && url.pathname === '/embed') {
@@ -1219,4 +1586,7 @@ function startManagedApi(client, baseDir) {
   });
 }
 
-module.exports = { startManagedApi, CONFIG_KEYS, genreReference, verifierReference };
+module.exports = {
+  startManagedApi, CONFIG_KEYS, NUM_LIMITS, CHOIX_REGLAGES, genreReference, verifierReference,
+  normaliserReglageDashboard, refusRoleDonne,
+};

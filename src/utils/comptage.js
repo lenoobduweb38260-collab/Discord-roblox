@@ -28,6 +28,9 @@ const BORNE = BigInt(Number.MAX_SAFE_INTEGER);
 
 const REACTIONS_COMPTAGE = { juste: '✅', centaine: '💯', record: '🏆', faux: '❌' };
 
+// Posté dans le salon qui devient le salon de comptage (/config ou site).
+const ANNONCE_SALON_COMPTAGE = '🔢 **Ce salon devient le salon de comptage !**\nChacun son tour, un nombre de plus que le précédent. Une erreur et on repart de **0**.\nLe premier nombre est **1**.';
+
 // Les réglages du serveur, défauts compris. Sur un serveur existant une
 // colonne neuve vaut NULL : on ne lit JAMAIS cfg.comptage_x sans repli.
 function reglagesComptage(cfg) {
@@ -636,7 +639,7 @@ async function surModificationComptage(ancien, nouveau) {
 }
 
 module.exports = {
-  LONGUEUR_MAX_EXPRESSION, XP_MAX_COMPTAGE, REACTIONS_COMPTAGE,
+  LONGUEUR_MAX_EXPRESSION, XP_MAX_COMPTAGE, REACTIONS_COMPTAGE, ANNONCE_SALON_COMPTAGE,
   reglagesComptage, lireNombreComptage, evaluerExpressionComptage, decouperDebutComptage, jugerComptage,
   etatComptage, nombreActuelComptage, changerSalonComptage, definirNombreComptage, remettreComptageAZero,
   classementComptage, compterCompteursComptage, statsMembreComptage,

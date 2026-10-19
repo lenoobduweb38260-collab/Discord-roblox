@@ -87,6 +87,10 @@
     { id: "roles", label: "Rôles & sécurité", desc: "Protection, permissions et autorôles" },
     { id: "channels", label: "Salons & logs", desc: "Journalisation complète du serveur" },
     { id: "levels", label: "Niveaux", desc: "XP, récompenses et progression" },
+    { id: "jeux", label: "🎲 Mini-jeux", desc: "Jeux ouverts et récompenses des victoires" },
+    { id: "comptage", label: "🔢 Comptage", desc: "Salon de comptage et ses règles" },
+    { id: "mariage", label: "💍 Mariage", desc: "Avantages des couples mariés" },
+    { id: "sao", label: "⚔️ Aventure SAO", desc: "Difficulté, raids, duels et gains" },
     { id: "messages", label: "Messages & embeds", desc: "Composer et envoyer sur Discord" },
     { id: "tickets", label: "Tickets", desc: "Configuration du support intégré" },
   ];
@@ -1219,11 +1223,30 @@
       ui.srvParams[guildId] = {
         config: r.config || {}, roles: r.roles || [], channels: r.channels || [], categories: r.categories || [],
         profilsBot: r.profilsBot || [], identiteBot: r.identiteBot || null,
+        ...donneesModulesBot(r),
       };
     } catch (e) {
-      ui.srvParams[guildId] = { erreur: e.message, config: {}, roles: [], channels: [], categories: [], profilsBot: [], identiteBot: null };
+      ui.srvParams[guildId] = { erreur: e.message, config: {}, roles: [], channels: [], categories: [], profilsBot: [], identiteBot: null, ...donneesModulesBot({}) };
     }
     if (ui.route === "server") render();
+  }
+
+  // 📈 🎲 🔢 ⚔️ Ce que /parametres rend en plus de la configuration : les
+  // listes des niveaux, les catalogues et l'état des modules. Un bot ancien
+  // ne les rend pas : chaque champ a son repli (`null` = « inconnu »).
+  function donneesModulesBot(r) {
+    return {
+      recompensesNiveau: Array.isArray(r.recompensesNiveau) ? r.recompensesNiveau : null,
+      exclusionsXp: Array.isArray(r.exclusionsXp) ? r.exclusionsXp : null,
+      multiplicateursXp: Array.isArray(r.multiplicateursXp) ? r.multiplicateursXp : null,
+      objetsSao: Array.isArray(r.objetsSao) ? r.objetsSao : [],
+      typesRecompense: r.typesRecompense || null,
+      courbesXp: r.courbesXp || null,
+      limitesNiveaux: r.limitesNiveaux || null,
+      comptage: r.comptage || null,
+      jeux: Array.isArray(r.jeux) ? r.jeux : null,
+      sao: r.sao || null,
+    };
   }
 
   // Liste déroulante de SALONS du serveur.
@@ -1402,7 +1425,7 @@
   function champChoix(cle, label, choix, aide = "", defaut = "") {
     const valeur = String(cfgCourant()[cle] ?? defaut);
     return `<div class="field"><label>${label}</label>
-      <select class="select" data-cfg="${esc(cle)}">
+      <select class="select" data-cfg="${esc(cle)}" data-defaut="${esc(defaut)}">
         ${choix.map(([v, l]) => `<option value="${esc(v)}"${valeur === v ? " selected" : ""}>${esc(l)}</option>`).join("")}
       </select>
       ${aide ? `<span class="field-note">${aide}</span>` : ""}</div>`;
@@ -1413,7 +1436,7 @@
     const brut = cfgCourant()[cle];
     const valeur = brut === null || brut === undefined || brut === "" ? defaut : brut;
     return `<div class="field"><label>${label}</label>
-      <input class="input" type="number" min="${min}" max="${max}" data-cfg="${esc(cle)}" value="${esc(String(valeur))}">
+      <input class="input" type="number" min="${min}" max="${max}" data-cfg="${esc(cle)}" data-defaut="${esc(String(defaut))}" value="${esc(String(valeur))}">
       ${aide ? `<span class="field-note">${aide}</span>` : ""}</div>`;
   }
 
@@ -1452,6 +1475,10 @@
       case "roles": return rolesModule();
       case "channels": return channelsModule();
       case "levels": return levelsModule();
+      case "jeux": return jeuxModule();
+      case "comptage": return comptageModule();
+      case "mariage": return mariageModule();
+      case "sao": return saoModule();
       case "messages": return messagesModule(server);
       case "tickets": return ticketModule();
       default: return overviewModule(server);
@@ -1469,10 +1496,11 @@
     </div>
     <div class="mt-22">
       ${champBascule("rp_enabled", "Module RP", "Cartes d'identité, permis, entreprises, assurances. Change les commandes disponibles sur le serveur.")}
-      ${champBascule("levels_enabled", "Niveaux", "XP écrit et vocal, classement et récompenses.")}
+      ${champBascule("levels_enabled", "Niveaux", "XP écrit et vocal, classement et récompenses.", 1)}
       ${champBascule("interact_enabled", "Interactions", "Câlins, bisous et autres interactions entre membres, /lc (calculateur d'amour) et /mariage.")}
       ${champBascule("confession_enabled", "Confessions", "Confessions anonymes. Celles qui parlent de suicide, de menace ou d'insulte sont relues par l'équipe du bot avant publication.")}
-      ${champBascule("sao_enabled", "Aventure SAO", "Les 100 étages d'Aincrad, boss et badges.")}
+      ${champBascule("sao_enabled", "Aventure SAO", "Les 100 étages d'Aincrad : combats, objets, raids, duels et quêtes.")}
+      ${champBascule("jeux_enabled", "Mini-jeux", "/jeu : morpion, puissance 4, pendu, quiz, blackjack… avec statistiques et classement.")}
     </div>`;
     return modulePanel("Vue d'ensemble", "Activez ou coupez les grands modules du bot sur ce serveur.", body, "overview");
   }
@@ -1943,14 +1971,530 @@
     return modulePanel("Salons & logs", "Où le bot écrit chacune de ses annonces.", body, "channels");
   }
 
-  function levelsModule() {
-    const body = `<div class="form-grid">
-        ${champSalon("level_channel_id", "Salon des annonces de niveau", "Vide = annonce dans le salon où le membre écrit.")}
-        ${champTexte("level_image_url", "Image de fond de la carte de niveau", "URL d'une image large (1000×300 environ).", false, "https://…/fond-niveau.png")}
+  // ══════════════════════════════════════════════════════════════════
+  // 📈 NIVEAUX — les réglages de /config → 📈 XP & niveaux, au complet
+  // ══════════════════════════════════════════════════════════════════
+  // Le formulaire porte les réglages simples (envoyés par « Enregistrer »).
+  // Les trois LISTES (récompenses, exclusions, multiplicateurs) vivent sous
+  // le formulaire, hors de lui : chaque ajout ou retrait part aussitôt au
+  // bot, qui rend la liste à jour. Leurs champs de saisie sont rangés dans
+  // le brouillon du serveur sous des clés « _niv_… » : un render() déclenché
+  // par un autre champ ne les efface donc pas, et rien ne les envoie comme
+  // réglage (seuls les champs DU formulaire partent dans le bot).
+
+  // Titre de rubrique à l'intérieur d'un module.
+  function rubrique(titre, aide = "") {
+    return `<h4 class="sous-titre mt-22">${titre}</h4>${aide ? `<div class="builder-hint">${aide}</div>` : ""}`;
+  }
+
+  // 📅 Date et heure saisies à l'heure de l'appareil, enregistrées en ISO
+  // (UTC) : le bot n'a pas à deviner le fuseau de celui qui a tapé.
+  function isoVersLocal(iso) {
+    const t = Date.parse(iso || "");
+    if (Number.isNaN(t)) return "";
+    const d = new Date(t);
+    const deux = n => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${deux(d.getMonth() + 1)}-${deux(d.getDate())}T${deux(d.getHours())}:${deux(d.getMinutes())}`;
+  }
+  function localVersIso(local) {
+    if (!local) return "";
+    const t = new Date(local).getTime();
+    return Number.isNaN(t) ? "" : new Date(t).toISOString();
+  }
+  function champDate(cle, label, aide = "") {
+    const iso = String(cfgCourant()[cle] ?? "");
+    return `<div class="field"><label>${label}</label>
+      <input class="input" type="datetime-local" data-cfg-date="${esc(cle)}" value="${esc(isoVersLocal(iso))}">
+      <input type="hidden" data-cfg="${esc(cle)}" value="${esc(iso)}">
+      ${aide ? `<span class="field-note">${aide}</span>` : ""}</div>`;
+  }
+
+  // Champs de saisie des listes : ni data-cfg ni formulaire, la valeur vit
+  // dans le brouillon (clé « _… ») à chaque frappe.
+  function champAjout(cle, label, aide = "", type = "text", attrs = "", placeholder = "") {
+    const v = String(cfgCourant()[cle] ?? "");
+    return `<div class="field"><label>${label}</label>
+      <input class="input" type="${type}" data-ajout="${esc(cle)}" value="${esc(v)}" placeholder="${esc(placeholder)}" ${attrs}>
+      ${aide ? `<span class="field-note">${aide}</span>` : ""}</div>`;
+  }
+  // `vide` : la clé d'un sélecteur lié, remise à zéro quand ce choix change
+  // (un rôle choisi n'a plus de sens quand on passe aux salons).
+  function choixAjout(cle, label, choix, aide = "", defaut = "", vide = "") {
+    const v = String(cfgCourant()[cle] ?? defaut);
+    return `<div class="field"><label>${label}</label>
+      <select class="select" data-ajout="${esc(cle)}"${vide ? ` data-ajout-vide="${esc(vide)}"` : ""}>
+        ${choix.map(([val, l]) => `<option value="${esc(val)}"${v === String(val) ? " selected" : ""}>${esc(l)}</option>`).join("")}
+      </select>
+      ${aide ? `<span class="field-note">${aide}</span>` : ""}</div>`;
+  }
+
+  const MODES_ANNONCE_NIVEAU = [
+    ["", "🔁 Automatique — le salon des niveaux s'il est réglé, sinon aucune annonce"],
+    ["salon", "📌 Dans le salon des niveaux"],
+    ["ici", "💬 Là où le membre gagne son niveau"],
+    ["mp", "✉️ En message privé"],
+    ["off", "🔕 Aucune annonce"],
+  ];
+  // Repli si le bot ne donne pas ses courbes (bot ancien).
+  const COURBES_NIVEAU_REPLI = [["mee6", "📈 Classique (MEE6)"], ["douce", "🌱 Douce"], ["raide", "⛰️ Raide"], ["lineaire", "📏 Linéaire"]];
+  const VARIABLES_NIVEAU = [
+    ["{membre}", "la mention du membre (ou son pseudo en gras)"],
+    ["{pseudo}", "son pseudo"],
+    ["{niveau}", "le nouveau niveau"],
+    ["{ancien_niveau}", "le niveau d'avant"],
+    ["{xp}", "son XP totale"],
+    ["{rang}", "son rang au classement"],
+    ["{recompenses}", "les récompenses débloquées"],
+    ["{serveur}", "le nom du serveur"],
+  ];
+  function aideVariablesNiveau() {
+    return `<div class="balises">
+      <span class="balises-titre">🧩 VARIABLES — remplacées au moment de l'annonce</span>
+      <div class="balises-liste">
+        ${VARIABLES_NIVEAU.map(([v, t]) => `<div><code>${esc(v)}</code><span>${esc(t)}</span></div>`).join("")}
       </div>
-      <div class="mt-16">${champBascule("levels_enabled", "Système de niveaux", "XP écrit et vocal.")}</div>
-      <div class="builder-hint mt-16">💡 Les valeurs d'XP (par message, par minute de vocal, temps de recharge) se règlent avec la commande <code>/config</code> sur Discord — elles demandent des bornes que le site ne peut pas deviner.</div>`;
-    return modulePanel("Niveaux", "Progression, annonces et carte personnalisée.", body, "levels");
+      <span class="field-note">Sans <code>{recompenses}</code> dans le message, les récompenses débloquées s'ajoutent en dessous.</span>
+    </div>`;
+  }
+
+  // Le texte d'une annonce, comme le bot le compose (levels.js,
+  // rendreMessageNiveau) : les balises D'ABORD, les variables ENSUITE.
+  function rendreModeleNiveau(modele, vars, B = window.Balises) {
+    const alias = { user: "membre", "user.mention": "membre", "user.username": "pseudo", level: "niveau", server: "serveur" };
+    const base = B && typeof B.appliquer === "function" ? String(B.appliquer(String(modele || "")) || "") : String(modele || "");
+    return base.replace(/\{([\w.]+)\}/g, (tout, nom) => {
+      const cle = alias[nom] || nom;
+      return Object.prototype.hasOwnProperty.call(vars, cle) ? vars[cle] : tout;
+    });
+  }
+  function texteAnnonceNiveauSite(cfg, nomServeur, B = window.Balises) {
+    const mention = Number(cfg.level_mention ?? 1) !== 0;
+    const recompense = "🎭 @Habitué";
+    const vars = {
+      membre: mention ? "@Membre" : "**Membre**", pseudo: "Membre", niveau: "5", ancien_niveau: "4",
+      xp: "1 234", rang: "3", recompenses: recompense, serveur: nomServeur || "Votre serveur",
+    };
+    const modele = String(cfg.level_message || "").trim();
+    if (!modele) return `🎉 ${vars.membre} passe au **niveau 5** ! *(en écrivant ✍️)*\n🏅 Récompense débloquée : ${recompense}`;
+    const texte = rendreModeleNiveau(modele, vars, B);
+    return /\{recompenses\}/.test(modele) ? texte : `${texte}\n🏅 Récompenses débloquées :\n➜ ${recompense}`;
+  }
+  function apercuAnnonceNiveau(cfg) {
+    const mode = String(cfg.level_annonce || "");
+    const coupee = mode === "off" || (!mode && !cfg.level_channel_id);
+    return `<div class="apercu mt-16">
+      <span class="apercu-titre">PRÉVISUALISATION — niveau 5, une récompense</span>
+      ${coupee ? `<div class="builder-hint">🔕 Avec ces réglages, aucune annonce ne part : ${mode === "off" ? "les annonces sont coupées" : "choisissez un salon des niveaux, ou un autre mode"}. Les récompenses, elles, sont toujours données.</div>` : ""}
+      <div class="dc-msg">
+        <div class="dc-pp"></div>
+        <div class="dc-corps">
+          <div class="dc-nom">Votre bot <span class="dc-tag">APP</span></div>
+          <div class="dc-embed" style="border-left-color:#57f287">
+            <div class="dc-embed-corps"><div class="dc-desc">${mdApercu(texteAnnonceNiveauSite(cfg, selectedServer()?.name))}</div></div>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  function levelsModule() {
+    const p = srvParams();
+    const cfg = cfgCourant();
+    const courbes = p?.courbesXp
+      ? Object.entries(p.courbesXp).map(([k, c]) => [k, `${c.emoji || ""} ${c.nom} — ${c.aide || ""}`.trim()])
+      : COURBES_NIVEAU_REPLI;
+    const body = `<div>${champBascule("levels_enabled", "Système de niveaux", "Coupé : plus personne ne gagne d'XP. Les niveaux déjà acquis sont gardés.", 1)}</div>
+
+      ${rubrique("✍️ Gains en écrivant")}
+      <div class="form-grid">
+        ${champNombre("xp_text", "XP par message (fixe)", "1 à 1000. Utilisée quand le minimum et le maximum sont vides.", 1, 1000, 20)}
+        ${champNombre("xp_cooldown", "Délai entre deux gains (s)", "5 à 3600 : un membre ne gagne qu'une fois par délai en écrivant.", 5, 3600, 60)}
+        ${champNombre("xp_text_min", "XP minimum par message", "Avec le maximum, le gain est tiré au hasard entre les deux. Vide = XP fixe.", 0, 1000, "")}
+        ${champNombre("xp_text_max", "XP maximum par message", "Vide = XP fixe. Inversés, ils sont remis dans l'ordre.", 1, 1000, "")}
+        ${champNombre("xp_longueur_min", "Longueur minimale d'un message", "En signes. Un message plus court ne rapporte rien (0 = tous).", 0, 2000, 0)}
+      </div>
+
+      ${rubrique("🎙️ Vocal")}
+      <div class="form-grid">
+        ${champNombre("xp_voice", "XP par minute de vocal", "1 à 1000, indépendante de l'XP par message.", 1, 1000, 20)}
+      </div>
+      <div class="mt-16">
+        ${champBascule("xp_vocal_seul", "XP vocale même seul", "Sinon, un membre seul (ou seul humain avec des bots) ne gagne rien.")}
+        ${champBascule("xp_vocal_muet", "XP vocale même muet ou sourd", "Sinon, micro ou casque coupé = aucune XP.")}
+      </div>
+
+      ${rubrique("⚡ Multiplicateurs & bonus", "Les facteurs se multiplient entre eux : rôle × salon × serveur × boost × week-end. Les multiplicateurs par rôle ou par salon se règlent plus bas.")}
+      <div class="form-grid">
+        ${champNombre("xp_mult_global", "Multiplicateur du serveur (%)", "S'applique à toute l'XP, sauf celle donnée par le staff. 100 = normal.", 0, 1000, 100)}
+        ${champNombre("xp_weekend_pourcent", "Bonus du week-end (%)", "Samedi et dimanche, heure de Paris. 0 = aucun.", 0, 1000, 0)}
+        ${champNombre("xp_boost_pourcent", "Boost temporaire (%)", "Bonus ajouté à toute l'XP jusqu'à la fin du boost. 0 = aucun.", 0, 1000, 0)}
+        ${champDate("xp_boost_fin", "Fin du boost", "À votre heure. Vide = sans fin.")}
+        ${champNombre("xp_sao_pourcent", "Part de l'XP SAO (%)", "Part de l'XP de l'Aventure SAO versée au niveau du serveur. 0 = aucune.", 0, 1000, 100)}
+      </div>
+      <div class="mt-16">
+        ${champBascule("xp_mult_cumul", "Cumuler les multiplicateurs de rôles", "Sinon, seul le plus haut rôle du membre compte. Cumulés : +50 % et +20 % = +70 %.")}
+      </div>
+
+      ${rubrique("📐 Courbe")}
+      <div class="form-grid">
+        ${champChoix("xp_courbe", "Courbe des niveaux", courbes, "En changer recalcule les niveaux de tout le serveur, sans annonce.", "mee6")}
+        ${champNombre("xp_niveau_max", "Niveau maximum", "0 = aucun. L'XP continue de compter pour le classement.", 0, 1000, 0)}
+      </div>
+
+      ${rubrique("📢 Annonces")}
+      <div class="form-grid">
+        ${champChoix("level_annonce", "Où annoncer les niveaux", MODES_ANNONCE_NIVEAU, "En message privé, un membre aux MP fermés n'est pas prévenu.", "")}
+        ${champSalon("level_channel_id", "Salon des annonces de niveau", "Utilisé par « Dans le salon des niveaux » et par le mode automatique. Vide en mode automatique = aucune annonce.")}
+        ${champNombre("level_annonce_pas", "Annoncer tous les N niveaux", "1 = chaque niveau. Un palier récompensé est toujours annoncé.", 1, 100, 1)}
+        ${champTexte("level_image_url", "Image de fond des cartes de niveau", "Adresse https d'une image PNG (environ 1000×300). Les autres formats ne sont pas lus : fond par défaut.", false, "https://…/fond-niveau.png")}
+        ${champTexte("level_message", "Message d'annonce", "Vide = message par défaut. 1500 signes au plus.", true, "🎉 {membre} passe au niveau {niveau} !")}
+        ${aideVariablesNiveau()}
+        ${aideBalises()}
+      </div>
+      <div class="mt-16">
+        ${champBascule("level_mention", "Mentionner le membre", "Sinon son pseudo en gras, sans notification.", 1)}
+      </div>
+      ${apercuAnnonceNiveau(cfg)}
+
+      ${rubrique("🏅 Récompenses", "Les paliers se gèrent plus bas, dans la liste : chaque ajout part aussitôt au bot.")}
+      <div>${champBascule("level_rewards_stack", "Cumuler les rôles de récompense", "Sinon, le rôle du plus haut palier atteint remplace les précédents.", 1)}</div>
+
+      ${rubrique("🚪 Départs")}
+      <div>${champBascule("level_reset_depart", "Effacer l'XP d'un membre qui part", "Sinon son XP est gardée (s'il revient) et il disparaît du classement.")}</div>`;
+    const panneau = modulePanel("Niveaux", "Gains, vocal, bonus, courbe, annonces et départs — les réglages de /config → 📈 XP & niveaux.", body, "levels");
+    if (!p || p.erreur) return panneau;
+    return panneau + listesNiveauxSite(p);
+  }
+
+  // ── Les trois listes ────────────────────────────────────────────────
+
+  // « @Rôle », « #salon » ou « 🗂️ catégorie », d'après les listes du serveur.
+  function nomCibleXp(p, type, id) {
+    const s = String(id ?? "");
+    if (type === "role") {
+      const r = (p?.roles || []).find(x => String(x.id) === s);
+      return r ? `@${r.name}` : `@${s} (introuvable)`;
+    }
+    const c = (p?.channels || []).find(x => String(x.id) === s);
+    if (c) return `#${c.name}`;
+    const k = (p?.categories || []).find(x => String(x.id) === s);
+    return k ? `🗂️ ${k.name}` : `#${s} (introuvable)`;
+  }
+
+  // Une récompense en une ligne, en texte brut (échappé à l'affichage).
+  function libelleRecompenseSite(r, p) {
+    const q = Math.max(1, Number(r.quantite) || 1);
+    const role = () => (r.nom ? `@${r.nom}` : nomCibleXp(p, "role", r.valeur));
+    switch (r.type) {
+      case "role": return `🎭 Donne ${role()}`;
+      case "role_retrait": return `🚫 Retire ${role()}`;
+      case "col": return `💰 ${q.toLocaleString("fr-FR")} Col`;
+      case "objet": {
+        const o = (p?.objetsSao || []).find(x => x.cle === r.valeur);
+        return `🎁 ${q} × ${o ? `${o.emoji ? `${o.emoji} ` : ""}${o.nom}` : r.valeur}`;
+      }
+      case "mp": {
+        const t = String(r.valeur || "").replace(/\s+/g, " ").trim();
+        return `✉️ Message privé « ${t.length > 60 ? `${t.slice(0, 59)}…` : t} »`;
+      }
+      default: return `❔ ${r.type}`;
+    }
+  }
+
+  // Ce que l'ajout d'une récompense envoie, lu dans le brouillon.
+  function donneesRecompenseSite(b, p) {
+    const type = b._niv_rec_type || "role";
+    const d = { op: "ajouter", niveau: String(b._niv_rec_niveau ?? "").trim(), type };
+    if (type === "role" || type === "role_retrait") d.valeur = b._niv_rec_role || "";
+    else if (type === "col") d.quantite = String(b._niv_rec_quantite ?? "").trim();
+    else if (type === "objet") {
+      d.valeur = b._niv_rec_objet || p?.objetsSao?.[0]?.cle || "";
+      d.quantite = String(b._niv_rec_quantite ?? "").trim() || "1";
+    } else if (type === "mp") d.valeur = String(b._niv_rec_texte ?? "");
+    return d;
+  }
+
+  function panneauListe(titre, description, corps) {
+    return `<section class="panel mt-16"><div class="panel-inner">
+      <div class="panel-head"><div><h3>${titre}</h3><p>${description}</p></div><span class="chip">ENREGISTRÉ AUSSITÔT</span></div>
+      <div class="panel-line"></div>${corps}</div></section>`;
+  }
+
+  function listesNiveauxSite(p) {
+    if (!Array.isArray(p.recompensesNiveau)) {
+      return panneauListe("🏅 Récompenses, exclusions et multiplicateurs", "",
+        `<div class="builder-hint">⏳ Votre bot ne sait pas encore gérer ces listes depuis le site. Mettez-le à jour (⚙️ Créateur → 🔄 Mises à jour), ou réglez-les avec <code>/config</code> → 📈 XP & niveaux sur Discord.</div>`);
+    }
+    return editeurRecompenses(p) + editeurExclusions(p) + editeurMultiplicateurs(p);
+  }
+
+  function editeurRecompenses(p) {
+    const b = cfgCourant();
+    const types = p.typesRecompense || {};
+    const type = types[b._niv_rec_type] ? b._niv_rec_type : "role";
+    const max = p.limitesNiveaux?.niveau || 1000;
+    const liste = [...p.recompensesNiveau].sort((x, y) => x.niveau - y.niveau || x.id - y.id);
+    const lignes = liste.length ? liste.map(r => `<tr>
+        <td><strong>Niveau ${esc(r.niveau)}</strong></td>
+        <td>${esc(libelleRecompenseSite(r, p))}</td>
+        <td>${r.souci ? `<span class="chip alerte">⚠️ ${esc(r.souci)}</span>` : `<span class="chip green">✓ prête</span>`}</td>
+        <td><button type="button" class="btn danger small" data-action="niv-rec-suppr" data-id="${esc(r.id)}" aria-label="Retirer cette récompense">🗑</button></td>
+      </tr>`).join("") : `<tr><td colspan="4"><i>Aucune récompense : un serveur qui n'en configure pas n'en donne aucune.</i></td></tr>`;
+    let valeur;
+    if (type === "role" || type === "role_retrait") {
+      valeur = champRole("_niv_rec_role", type === "role" ? "🎭 Rôle à donner" : "🚫 Rôle à retirer",
+        "Il doit être <b>sous le rôle du bot</b> et ne pas être géré par une intégration.");
+    } else if (type === "col") {
+      valeur = champAjout("_niv_rec_quantite", "💰 Montant de Col", "1 à 1 000 000, versés une seule fois par membre.", "number", 'min="1" max="1000000"', "500");
+    } else if (type === "objet") {
+      valeur = (p.objetsSao || []).length
+        ? choixAjout("_niv_rec_objet", "🎁 Objet", p.objetsSao.map(o => [o.cle, `${o.emoji ? `${o.emoji} ` : ""}${o.nom}`]), "Donné une seule fois par membre.", p.objetsSao[0].cle)
+          + champAjout("_niv_rec_quantite", "Quantité", "1 à 999.", "number", 'min="1" max="999"', "1")
+        : `<div class="builder-hint">🎁 Le catalogue d'objets de l'Aventure SAO n'est pas disponible sur ce bot. Les récompenses en Col fonctionnent déjà.</div>`;
+    } else {
+      const texte = String(b._niv_rec_texte ?? "");
+      valeur = `<div class="field full"><label>✉️ Message privé</label>
+        <textarea class="textarea" rows="3" maxlength="1500" data-ajout="_niv_rec_texte" placeholder="Bravo {membre}, tu as atteint le niveau {niveau} sur {serveur} !">${esc(texte)}</textarea>
+        <span class="field-note">Envoyé au moment où le membre franchit le palier, jamais en rattrapage. Mêmes variables et balises que l'annonce. 1500 signes au plus.</span></div>`;
+    }
+    const saoCoupe = types[type]?.sao && !Number(p.config?.sao_enabled);
+    const corps = `<div class="table-wrap"><table class="data-table">
+        <thead><tr><th>Palier</th><th>Récompense</th><th>État</th><th></th></tr></thead><tbody>${lignes}</tbody></table></div>
+      <h4 class="sous-titre mt-16">➕ Ajouter une récompense</h4>
+      <div class="form-grid">
+        ${choixAjout("_niv_rec_type", "Type", Object.entries(types).map(([k, t]) => [k, `${t.emoji} ${t.nom}`]), "", "role")}
+        ${champAjout("_niv_rec_niveau", "Niveau", `1 à ${max}.`, "number", `min="1" max="${max}"`, "10")}
+        ${valeur}
+      </div>
+      ${saoCoupe ? `<div class="builder-hint mt-16">⚠️ L'Aventure SAO est coupée sur ce serveur : cette récompense sera ignorée tant qu'elle ne sera pas activée.</div>` : ""}
+      <div class="page-actions mt-16">${button("➕ Ajouter la récompense", "niv-rec-ajouter", "primary")}</div>`;
+    return panneauListe("🏅 Récompenses de niveau",
+      `Plusieurs par palier. Tous les paliers atteints sont donnés, y compris aux membres déjà au-dessus (à leur prochain gain). ${liste.length}/${p.limitesNiveaux?.recompenses || 100}.`, corps);
+  }
+
+  const PORTEES_XP_SITE = [["tout", "Toute l'XP (sauf celle du staff)"], ["texte", "Les messages seulement"], ["vocal", "Le vocal seulement"]];
+  const GENRES_CIBLE_XP = { salon: "# Salon (et ses fils)", categorie: "🗂️ Catégorie (tous ses salons)", role: "@ Rôle" };
+
+  function editeurExclusions(p) {
+    const b = cfgCourant();
+    const genre = GENRES_CIBLE_XP[b._niv_exc_genre] ? b._niv_exc_genre : "salon";
+    const portees = Object.fromEntries(PORTEES_XP_SITE);
+    const liste = p.exclusionsXp || [];
+    const lignes = liste.length ? liste.map(e => `<tr>
+        <td><strong>${esc(nomCibleXp(p, e.type, e.cible_id))}</strong></td>
+        <td>${esc(portees[e.portee] || e.portee)}</td>
+        <td><button type="button" class="btn danger small" data-action="niv-exc-suppr" data-type="${esc(e.type)}" data-cible="${esc(e.cible_id)}" aria-label="Retirer cette exclusion">🗑</button></td>
+      </tr>`).join("") : `<tr><td colspan="3"><i>Aucune exclusion : partout, tout le monde gagne de l'XP.</i></td></tr>`;
+    const corps = `<div class="table-wrap"><table class="data-table">
+        <thead><tr><th>Exclu</th><th>Ce qui ne rapporte plus</th><th></th></tr></thead><tbody>${lignes}</tbody></table></div>
+      <h4 class="sous-titre mt-16">➕ Ajouter une exclusion</h4>
+      <div class="form-grid">
+        ${choixAjout("_niv_exc_genre", "Exclure", Object.entries(GENRES_CIBLE_XP), "", "salon", "_niv_exc_cible")}
+        ${champPicker(genre, "_niv_exc_cible", "Lequel", "", false)}
+        ${choixAjout("_niv_exc_portee", "Ce qui ne rapporte plus", PORTEES_XP_SITE, "Un salon exclu l'est avec ses fils, une catégorie avec tous ses salons.", "tout")}
+      </div>
+      <div class="page-actions mt-16">${button("➕ Exclure", "niv-exc-ajouter", "primary")}</div>`;
+    return panneauListe("🚫 Exclusions d'XP", `Salons, catégories et rôles qui ne rapportent pas d'XP. ${p.limitesNiveaux?.exclusions || 25} au plus par genre et par portée.`, corps);
+  }
+
+  // « ×1,5 » pour 150 %.
+  const facteurXp = (pourcent) => `×${(Number(pourcent) / 100).toLocaleString("fr-FR", { maximumFractionDigits: 2 })}`;
+
+  function editeurMultiplicateurs(p) {
+    const b = cfgCourant();
+    const genres = { role: GENRES_CIBLE_XP.role, salon: GENRES_CIBLE_XP.salon, categorie: GENRES_CIBLE_XP.categorie };
+    const genre = genres[b._niv_mul_genre] ? b._niv_mul_genre : "role";
+    const liste = p.multiplicateursXp || [];
+    const lignes = liste.length ? liste.map(m => `<tr>
+        <td><strong>${esc(nomCibleXp(p, m.type, m.cible_id))}</strong></td>
+        <td>${esc(m.pourcent)} % <span>(${esc(facteurXp(m.pourcent))})</span></td>
+        <td><button type="button" class="btn danger small" data-action="niv-mul-suppr" data-type="${esc(m.type)}" data-cible="${esc(m.cible_id)}" aria-label="Retirer ce multiplicateur">🗑</button></td>
+      </tr>`).join("") : `<tr><td colspan="3"><i>Aucun multiplicateur : chacun gagne l'XP normale.</i></td></tr>`;
+    const corps = `<div class="table-wrap"><table class="data-table">
+        <thead><tr><th>Rôle ou salon</th><th>XP</th><th></th></tr></thead><tbody>${lignes}</tbody></table></div>
+      <h4 class="sous-titre mt-16">➕ Ajouter ou modifier un multiplicateur</h4>
+      <div class="form-grid">
+        ${choixAjout("_niv_mul_genre", "Pour", Object.entries(genres), "", "role", "_niv_mul_cible")}
+        ${champPicker(genre === "categorie" ? "categorie" : genre, "_niv_mul_cible", "Lequel", "", false)}
+        ${champAjout("_niv_mul_pourcent", "XP (%)", "100 = normal, 150 = ×1,5, 50 = moitié, 0 = rien. Le même rôle ou salon : sa valeur est remplacée.", "number", 'min="0" max="1000"', "150")}
+      </div>
+      <div class="page-actions mt-16">${button("⚡ Enregistrer le multiplicateur", "niv-mul-ajouter", "primary")}</div>`;
+    return panneauListe("⚡ Multiplicateurs d'XP",
+      `Entre plusieurs rôles : le plus haut seulement, ou cumulés (réglage plus haut). Le salon le plus précis l'emporte. ${liste.length}/${p.limitesNiveaux?.multiplicateurs || 25}.`, corps);
+  }
+
+  // Ajout ou retrait dans une liste des niveaux : la réponse du bot
+  // remplace la liste affichée, et les champs de saisie sont vidés.
+  async function listeNiveauxSite(liste, donnees, aOublier = []) {
+    const serveur = ui.selectedServerId;
+    const r = await api(`serveur.niveaux.${liste}`, { serveur, ...donnees });
+    const p = ui.srvParams[serveur];
+    if (p && !p.erreur) {
+      for (const k of ["recompensesNiveau", "exclusionsXp", "multiplicateursXp"]) if (Array.isArray(r[k])) p[k] = r[k];
+    }
+    const b = ui.brouillons[serveur];
+    if (b) aOublier.forEach(k => { delete b[k]; });
+    ui.pickerOuvert = null;
+    render();
+    return r;
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  // 🎲 MINI-JEUX
+  // ══════════════════════════════════════════════════════════════════
+
+  // Coche ou décoche un jeu : rend la nouvelle liste des jeux COUPÉS, dans
+  // l'ordre du catalogue (sans quoi deux listes égales paraîtraient
+  // différentes à l'enregistrement).
+  function basculerJeuCoupe(valeur, cle, catalogue) {
+    const coupes = new Set(String(valeur || "").split(",").map(x => x.trim()).filter(Boolean));
+    if (coupes.has(cle)) coupes.delete(cle); else coupes.add(cle);
+    const ordre = (catalogue || []).map(j => j.cle);
+    return ordre.filter(c => coupes.has(c)).concat([...coupes].filter(c => !ordre.includes(c))).join(",");
+  }
+
+  function champJeuxOuverts() {
+    const p = srvParams();
+    const valeur = String(cfgCourant().jeux_desactives ?? "");
+    const coupes = new Set(valeur.split(",").map(x => x.trim()).filter(Boolean));
+    const cache = `<input type="hidden" data-cfg="jeux_desactives" value="${esc(valeur)}">`;
+    if (!Array.isArray(p?.jeux)) {
+      return `${cache}<div class="builder-hint">⏳ Votre bot ne donne pas encore la liste de ses jeux : mettez-le à jour, ou coupez les jeux un par un avec <code>/config</code> → 🎲 Mini-jeux.</div>`;
+    }
+    return `${cache}<div class="form-grid">${p.jeux.map(j => `<div class="row" style="justify-content:flex-start;gap:12px">
+        <button type="button" class="toggle ${coupes.has(j.cle) ? "" : "on"}" data-jeu-ouvert="${esc(j.cle)}" aria-label="${esc(j.nom)}"></button>
+        <span><b>${esc(j.emoji || "🎲")} ${esc(j.nom)}</b><i style="display:block;color:var(--muted);font-size:11.5px;font-style:normal">${esc(j.resume || "")}</i></span>
+      </div>`).join("")}</div>`;
+  }
+
+  function jeuxModule() {
+    const body = `<div>${champBascule("jeux_enabled", "Mini-jeux", "Active /jeu : neuf jeux, des statistiques et un classement.")}</div>
+      ${rubrique("🎮 Jeux ouverts", "Décochez un jeu pour le fermer sur ce serveur. Les autres restent jouables.")}
+      ${champJeuxOuverts()}
+      ${rubrique("🎁 Récompenses d'une victoire")}
+      <div class="form-grid">
+        ${champNombre("jeux_xp_victoire", "XP par victoire contre un membre", "XP de niveau, en battant un autre membre (ou dans un jeu collectif à deux joueurs ou plus).", 0, 1000, 20)}
+        ${champNombre("jeux_xp_bot", "XP par victoire contre le bot", "En solo, ou seul dans un quiz, un pendu ou un réflexe.", 0, 1000, 5)}
+        ${champNombre("jeux_xp_plafond", "Plafond d'XP par jour", "Par membre, remis à zéro à minuit (Paris). Atteint : plus d'XP ni de Col.", 0, 10000, 200)}
+        ${champNombre("jeux_col_victoire", "Col SAO par victoire", "Versés seulement si l'Aventure SAO est active. 0 = aucun.", 0, 10000, 0)}
+      </div>`;
+    return modulePanel("🎲 Mini-jeux", "Les jeux de /jeu et ce que rapporte une victoire — comme /config → 🎲 Mini-jeux.", body, "jeux");
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  // 🔢 COMPTAGE
+  // ══════════════════════════════════════════════════════════════════
+
+  function etatComptageSite(c) {
+    if (!c) return `<div class="builder-hint">⏳ L'état du comptage n'est pas disponible : mettez le bot à jour.</div>`;
+    const date = c.recordLe ? new Date(c.recordLe).toLocaleDateString("fr-FR") : null;
+    const top = (c.classement || []).map((m, i) => `<div>${["🥇", "🥈", "🥉"][i] || "➜"} <b>${esc(m.nom || m.userId)}</b> — ${formatNumber(m.justes)} bon(s) nombre(s)</div>`).join("");
+    return `<div class="grid-3">
+        <div class="stat-card"><span>Nombre actuel</span><strong>${formatNumber(c.courant || 0)}</strong><em>${c.salon ? "le prochain est " + formatNumber((c.courant || 0) + 1) : "aucun salon : comptage coupé"}</em></div>
+        <div class="stat-card"><span>Record</span><strong>${formatNumber(c.record || 0)}</strong><em>${date ? `atteint le ${esc(date)}` : "pas encore de record"}</em></div>
+        <div class="stat-card"><span>Séries cassées</span><strong>${formatNumber(c.erreurs || 0)}</strong><em>${formatNumber(c.compteurs || 0)} compteur(s) au classement</em></div>
+      </div>
+      ${top ? `<div class="builder-hint mt-16">🏆 <b>Meilleurs compteurs</b>${top}</div>` : ""}`;
+  }
+
+  function comptageModule() {
+    const p = srvParams();
+    const body = `${etatComptageSite(p?.comptage)}
+      ${rubrique("🔢 Salon")}
+      <div class="form-grid">
+        ${champSalon("comptage_channel_id", "🔢 Salon de comptage", "Vide = comptage coupé. Changer de salon remet le compte à 0 (record et classement conservés).")}
+        ${champRole("comptage_role_erreur", "🎭 Rôle d'erreur", "Donné à qui casse la série, retiré au fautif précédent. Il doit être sous le rôle du bot. Vide = aucun.")}
+        ${champNombre("comptage_xp", "✨ XP par bon nombre", "XP de niveau gagnée à chaque bon nombre. 0 = aucune.", 0, 1000, 0)}
+      </div>
+      ${rubrique("📏 Règles")}
+      <div>
+        ${champBascule("comptage_meme_personne", "Compter deux fois de suite", "Activé : la même personne peut enchaîner deux nombres. Coupé : cela casse la série.")}
+        ${champBascule("comptage_maths", "Calculs acceptés", "« 2*3 » compte pour 6 (entiers, + - × / ^ et parenthèses). Coupé : un calcul est ignoré.")}
+        ${champBascule("comptage_reactions", "Réactions ✅ 💯 🏆 ❌", "Le bot réagit à chaque nombre : ✅ juste, 💯 toutes les centaines, 🏆 record battu, ❌ erreur.", 1)}
+        ${champBascule("comptage_supprimer", "Effacer les messages hors-jeu", "Tout message qui ne commence pas par un nombre est supprimé (il faut au bot « Gérer les messages »).")}
+      </div>`;
+    return modulePanel("🔢 Comptage", "Un salon où l'on compte 1, 2, 3… chacun son tour — comme /config → 🔢 Comptage.", body, "comptage");
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  // 💍 MARIAGE
+  // ══════════════════════════════════════════════════════════════════
+
+  function mariageModule() {
+    const body = `<div>
+        ${champBascule("mariage_avantages", "💝 Avantages du mariage", "Bonus d'XP, lune de miel, alliance, flamme, mot doux et annonces.", 1)}
+        ${champBascule("interact_enabled", "Interactions", "/mariage fait partie des Interactions : elles doivent être activées pour se marier.")}
+      </div>
+      ${rubrique("💞 Bonus d'XP du couple")}
+      <div class="form-grid">
+        ${champNombre("mariage_bonus_xp", "💞 Bonus d'XP de couple (%)", "Quand les deux conjoints gagnent de l'XP ici à peu d'écart. Doublé pendant la lune de miel ; l'alliance ajoute 1 à 5 points. 0 coupe le bonus.", 0, 100, 10)}
+        ${champNombre("mariage_lune_de_miel_jours", "🌙 Lune de miel (jours)", "Premiers jours de mariage où le bonus est doublé. 0 = pas de lune de miel.", 0, 60, 7)}
+        ${champNombre("mariage_actif_minutes", "⏱️ Écart d'activité commune (min)", "Les conjoints sont « actifs ensemble » si chacun a gagné de l'XP ici dans cet intervalle.", 1, 120, 10)}
+        ${champNombre("mariage_bisou_xp", "🔥 XP du bisou du jour", "Donnée à chacun quand les deux ont fait /mariage bisou le même jour (Paris). 0 = pas d'XP.", 0, 1000, 30)}
+      </div>
+      ${rubrique("🎂 Anniversaires")}
+      <div class="form-grid">
+        ${champSalon("mariage_salon_id", "🎂 Salon des anniversaires de mariage", "Chaque mois la première année, puis chaque année. Vide = aucune annonce.")}
+      </div>`;
+    return modulePanel("💍 Mariage", "Ce que le mariage apporte aux couples de ce serveur — comme /config → 💍 Mariage.", body, "mariage");
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  // ⚔️ AVENTURE SAO
+  // ══════════════════════════════════════════════════════════════════
+
+  const DIFFICULTES_SAO_REPLI = [["facile", "🟢 Facile"], ["normal", "🟡 Normale"], ["difficile", "🟠 Difficile"], ["heroique", "🔴 Héroïque"]];
+
+  function saoModule() {
+    const p = srvParams();
+    const nombre = (x) => Number(x).toLocaleString("fr-FR", { maximumFractionDigits: 2 });
+    const difficultes = p?.sao?.difficultes
+      ? Object.entries(p.sao.difficultes).map(([k, d]) => [k, `${d.emoji || ""} ${d.nom} — ennemis ×${nombre(d.ennemi)}, gains ×${nombre(d.gains)}`.trim()])
+      : DIFFICULTES_SAO_REPLI;
+    const body = `<div>${champBascule("sao_enabled", "Aventure SAO", "/sao : les 100 étages d'Aincrad, combats, objets, marchands, raids, duels et quêtes.")}</div>
+      ${rubrique("🎚️ Difficulté")}
+      <div class="form-grid">
+        ${champChoix("sao_difficulte", "Difficulté", difficultes, "Plus difficile : des ennemis plus forts, et de meilleurs gains.", "normal")}
+        ${champNombre("xp_sao_pourcent", "Part de l'XP SAO au niveau du serveur (%)", "0 = l'aventure ne fait pas monter les niveaux du serveur. 100 = toute son XP.", 0, 1000, 100)}
+      </div>
+      ${rubrique("🐲 Raids")}
+      <div class="form-grid">
+        ${champSalon("sao_salon_id", "🐲 Salon des raids", "Là où surgissent les boss de raid communs au serveur. Vide = aucun raid.")}
+        ${champNombre("sao_raid_heures", "🐲 Fréquence des raids (heures)", "Un boss apparaît toutes les N heures et reste au plus N heures (entre 2 et 24). 0 coupe les raids.", 0, 168, 6)}
+      </div>
+      ${rubrique("⚔️ Combats")}
+      <div class="form-grid">
+        ${champNombre("sao_chasse_delai", "🗡️ Délai entre deux chasses (s)", "Temps d'attente entre deux /sao chasser.", 5, 300, 15)}
+        ${champNombre("sao_mort_penalite", "🪦 Col perdus à la mort (%)", "Une fuite sans cristal ou un combat abandonné en coûte la moitié.", 0, 50, 10)}
+      </div>
+      <div class="mt-16">${champBascule("sao_pvp", "🤺 Duels", "Autorise /sao duel : First Strike, toujours sur acceptation, sans perte de Col.", 1)}</div>
+      ${rubrique("😴 Absence")}
+      <div class="form-grid">
+        ${champNombre("sao_afk_heures", "😴 Plafond AFK (heures)", "Durée maximale d'absence prise en compte par /sao afk.", 1, 24, 8)}
+      </div>
+      <div class="mt-16">${champBascule("sao_afk", "😴 Gains AFK", "Autorise /sao afk. Ne compte que le temps passé sans jouer ; ne rapporte aucune XP serveur.", 1)}</div>`;
+    const panneau = modulePanel("⚔️ Aventure SAO", "Difficulté, raids, duels et gains de /sao — comme /config → ⚔️ Aventure SAO.", body, "sao");
+    if (!p || p.erreur) return panneau;
+    return panneau + reinitialisationSaoSite(p);
+  }
+
+  // 🧨 Effacer un personnage, ou toute l'aventure du serveur. Irréversible :
+  // l'administration du serveur seulement (le site et le bot le vérifient),
+  // après confirmation.
+  function reinitialisationSaoSite(p) {
+    const grade = ui.monGrade?.[ui.selectedServerId];
+    const autorise = estEquipeSite() || !grade || grade.grade === "admin" || grade.proprietaire;
+    const joueurs = p.sao ? `${formatNumber(p.sao.joueurs || 0)} personnage(s) sur ce serveur.` : "";
+    const corps = `<div class="builder-hint">⚠️ <b>Irréversible.</b> Niveau, objets, Col, quêtes et badges sont effacés. Réservé à l'administration du serveur. ${esc(joueurs)}</div>
+      ${autorise ? "" : `<div class="builder-hint mt-16">⛔ Votre grade sur ce serveur ne permet pas de réinitialiser l'aventure.</div>`}
+      <div class="form-grid mt-16">
+        ${champAjout("_sao_rz_membre", "Identifiant Discord du joueur", "Clic droit sur le membre → Copier l'identifiant (mode développeur).", "text", 'inputmode="numeric" autocomplete="off"', "123456789012345678")}
+      </div>
+      <div class="page-actions mt-16">
+        ${button("🧹 Réinitialiser ce joueur", "sao-reinit-joueur", "ghost", autorise ? "" : "disabled")}
+        ${button("🧨 Réinitialiser toute l'aventure", "sao-reinit-serveur", "danger", autorise ? "" : "disabled")}
+      </div>`;
+    return panneauListe("🧨 Réinitialisation", "Un personnage, ou tous ceux du serveur.", corps);
   }
 
   function ticketModule() {
@@ -2013,8 +2557,10 @@
       let valeur;
       if (ch.multiple) valeur = [...ch.selectedOptions].map(o => o.value).filter(Boolean);
       else valeur = ch.value;
-      // Inchangé ? on n'envoie rien.
-      const actuel = p.config[cle];
+      // Inchangé ? on n'envoie rien. Un réglage jamais touché (NULL) vaut
+      // le défaut AFFICHÉ par son champ : sans ça, ouvrir puis enregistrer
+      // une page enverrait tous ses défauts au bot.
+      const actuel = p.config[cle] ?? (ch.dataset.defaut !== undefined ? ch.dataset.defaut : undefined);
       const pareil = Array.isArray(valeur)
         ? JSON.stringify(valeur) === JSON.stringify((() => { try { return JSON.parse(actuel || "[]"); } catch { return []; } })())
         : String(actuel ?? "") === String(valeur);
@@ -2048,10 +2594,15 @@
     });
     if (!aEnvoyer.length) { toast("RIEN À ENREGISTRER", "Aucun réglage n'a changé."); return; }
     const echecs = [];
+    const notes = [];
     for (const { cle, valeur } of aEnvoyer) {
       try {
         const r = await api("serveur.config", { serveur, cle, valeur });
         p.config[cle] = Array.isArray(valeur) ? JSON.stringify(valeur) : valeur;
+        // La valeur que le bot a RÉELLEMENT enregistrée (bornée, mise en
+        // forme : date ISO, liste de jeux dans l'ordre…).
+        if (r && r.valeur !== undefined && r.valeur !== null) p.config[cle] = r.valeur;
+        if (r && r.note) notes.push(r.note);
         // 🖼️ Pour la photo, le bot renvoie l'adresse STABLE de l'image posée :
         // un lien de page (imgur.com/…, tenor…) ne s'afficherait pas en aperçu.
         if (cle === "bot_avatar_url" && r && r.valeur !== undefined) p.config[cle] = r.valeur;
@@ -2060,7 +2611,7 @@
     oublierBrouillon(serveur);   // enregistré : le brouillon n'a plus lieu d'être
     render();
     if (echecs.length) toast("ENREGISTREMENT PARTIEL", echecs[0], "error");
-    else toast("ENREGISTRÉ DANS LE BOT", `${aEnvoyer.length} réglage(s) appliqué(s) sur Discord.`);
+    else toast("ENREGISTRÉ DANS LE BOT", `${aEnvoyer.length} réglage(s) appliqué(s) sur Discord.${notes.length ? " " + notes.join(" ") : ""}`);
   }
 
   function brouillon() {
@@ -3172,6 +3723,12 @@
     { id: "mod.roles", cat: "🧩 Modules serveur", label: "Rôles & sécurité", desc: "Anti-raid, autorôles, permissions", g: ["admin", "createur"] },
     { id: "mod.channels", cat: "🧩 Modules serveur", label: "Salons & logs", desc: "Journalisation du serveur", g: ["admin", "createur"] },
     { id: "mod.levels", cat: "🧩 Modules serveur", label: "Niveaux", desc: "XP, récompenses et progression", g: ["staff", "admin", "createur"] },
+    { id: "mod.jeux", cat: "🧩 Modules serveur", label: "Mini-jeux", desc: "Jeux ouverts et récompenses", g: ["staff", "admin", "createur"] },
+    { id: "mod.comptage", cat: "🧩 Modules serveur", label: "Comptage", desc: "Salon de comptage et ses règles", g: ["staff", "admin", "createur"] },
+    { id: "mod.mariage", cat: "🧩 Modules serveur", label: "Mariage", desc: "Avantages des couples mariés", g: ["staff", "admin", "createur"] },
+    { id: "mod.sao", cat: "🧩 Modules serveur", label: "Aventure SAO", desc: "Difficulté, raids, duels et gains", g: ["staff", "admin", "createur"] },
+    { id: "mod.identite", cat: "🧩 Modules serveur", label: "Identité des embeds", desc: "Couleur et signature des messages du bot", g: ["staff", "admin", "createur"] },
+    { id: "mod.messages", cat: "🧩 Modules serveur", label: "Messages & embeds", desc: "Composer et envoyer sur Discord", g: ["staff", "admin", "createur"] },
     { id: "mod.whitelist", cat: "🧩 Modules serveur", label: "Whitelist métiers", desc: "Candidatures et métiers autorisés", g: ["staff", "admin", "createur"] },
     { id: "mod.tickets", cat: "🧩 Modules serveur", label: "Tickets", desc: "Panneau, rôles support et archives", g: ["staff", "admin", "createur"] },
   ];
@@ -4212,6 +4769,14 @@ Oy Bot? | https://…/oy.png">${esc(profilsEnTexte(bot.profils))}</textarea>
       document.querySelectorAll(".picker-liste").forEach(l => { l.hidden = true; });
       document.querySelectorAll(".picker.ouvert").forEach(p => p.classList.remove("ouvert"));
     }
+    // 🎲 Cases des jeux : la liste des jeux COUPÉS (jeux_desactives) suit,
+    // dans le brouillon ; elle part avec « Enregistrer dans le bot ».
+    const caseJeu = event.target.closest("[data-jeu-ouvert]");
+    if (caseJeu) {
+      brouillonModule().jeux_desactives = basculerJeuCoupe(cfgCourant().jeux_desactives, caseJeu.dataset.jeuOuvert, srvParams()?.jeux);
+      render();
+      return;
+    }
     // Interrupteurs des réglages du bot : bascule immédiate, enregistrée
     // seulement au clic sur « Enregistrer dans le bot ».
     const bascule = event.target.closest("[data-cfg-toggle]");
@@ -4806,6 +5371,69 @@ Oy Bot? | https://…/oy.png">${esc(profilsEnTexte(bot.profils))}</textarea>
           }
           break;
         }
+        // ── 📈 Listes des niveaux : enregistrées aussitôt ───────────
+        case "niv-rec-ajouter": {
+          const d = donneesRecompenseSite(cfgCourant(), srvParams());
+          if (!d.niveau) { toast("RÉCOMPENSE", "Indiquez d'abord le niveau du palier.", "error"); break; }
+          if ((d.type === "role" || d.type === "role_retrait") && !d.valeur) { toast("RÉCOMPENSE", "Choisissez d'abord le rôle.", "error"); break; }
+          await listeNiveauxSite("recompense", d, ["_niv_rec_role", "_niv_rec_quantite", "_niv_rec_texte"]);
+          toast("RÉCOMPENSE AJOUTÉE", `Niveau ${d.niveau} : les membres qui l'ont déjà la recevront à leur prochain gain.`);
+          break;
+        }
+        case "niv-rec-suppr":
+          if (!confirm("Retirer cette récompense ?\n\nCe qui a déjà été donné reste acquis.")) break;
+          await listeNiveauxSite("recompense", { op: "retirer", id: target.dataset.id });
+          toast("RÉCOMPENSE RETIRÉE", "Ce qui a déjà été donné reste acquis.");
+          break;
+        case "niv-exc-ajouter": {
+          const b = cfgCourant();
+          if (!b._niv_exc_cible) { toast("EXCLUSION", "Choisissez d'abord le salon, la catégorie ou le rôle.", "error"); break; }
+          await listeNiveauxSite("exclusion", {
+            op: "ajouter", type: b._niv_exc_genre || "salon", cible: b._niv_exc_cible, portee: b._niv_exc_portee || "tout",
+          }, ["_niv_exc_cible"]);
+          toast("EXCLUSION AJOUTÉE", "Elle s'applique dès le prochain gain d'XP.");
+          break;
+        }
+        case "niv-exc-suppr":
+          await listeNiveauxSite("exclusion", { op: "retirer", type: target.dataset.type, cible: target.dataset.cible });
+          toast("EXCLUSION RETIRÉE", "Ce salon ou ce rôle rapporte de nouveau de l'XP.");
+          break;
+        case "niv-mul-ajouter": {
+          const b = cfgCourant();
+          if (!b._niv_mul_cible) { toast("MULTIPLICATEUR", "Choisissez d'abord le rôle, le salon ou la catégorie.", "error"); break; }
+          const pourcent = String(b._niv_mul_pourcent ?? "").trim() || "150";
+          await listeNiveauxSite("multiplicateur", {
+            op: "ajouter", type: b._niv_mul_genre || "role", cible: b._niv_mul_cible, pourcent,
+          }, ["_niv_mul_cible", "_niv_mul_pourcent"]);
+          toast("MULTIPLICATEUR ENREGISTRÉ", `${pourcent} % d'XP (${facteurXp(pourcent)}).`);
+          break;
+        }
+        case "niv-mul-suppr":
+          await listeNiveauxSite("multiplicateur", { op: "retirer", type: target.dataset.type, cible: target.dataset.cible });
+          toast("MULTIPLICATEUR RETIRÉ", "L'XP redevient normale ici.");
+          break;
+        // ── ⚔️ Réinitialisation de l'Aventure SAO ────────────────────
+        case "sao-reinit-joueur": {
+          const membre = String(cfgCourant()._sao_rz_membre ?? "").replace(/\D+/g, "");
+          if (!/^\d{15,25}$/.test(membre)) { toast("SAO", "Collez l'identifiant Discord du joueur (17 à 20 chiffres).", "error"); break; }
+          if (!confirm(`Effacer le personnage SAO du membre ${membre} sur ce serveur ?\n\nNiveau, objets, Col, quêtes et badges : tout est perdu, sans retour.`)) break;
+          const r = await api("serveur.sao.reinitialiser", { serveur: ui.selectedServerId, cible: "joueur", membre, confirmation: "REINITIALISER" });
+          delete brouillonModule()._sao_rz_membre;
+          delete ui.srvParams[ui.selectedServerId];
+          render();
+          toast("AVENTURE SAO", r.note || "Personnage effacé.");
+          break;
+        }
+        case "sao-reinit-serveur": {
+          const saisie = prompt("Toute l'Aventure SAO de ce serveur va être effacée : tous les personnages, objets, Col, quêtes, raids et coffres.\n\nC'est irréversible. Pour confirmer, tapez REINITIALISER :");
+          if (saisie === null) break;
+          if (saisie.trim().toUpperCase() !== "REINITIALISER") { toast("AVENTURE SAO", "Mot de confirmation incorrect : rien n'a été effacé.", "error"); break; }
+          const r = await api("serveur.sao.reinitialiser", { serveur: ui.selectedServerId, cible: "serveur", confirmation: "REINITIALISER" });
+          delete ui.srvParams[ui.selectedServerId];
+          render();
+          toast("AVENTURE SAO RÉINITIALISÉE", r.note || "Tous les personnages ont été effacés.");
+          break;
+        }
         // ── 📨 Constructeur de messages ─────────────────────────────
         case "msg-embed-add":
           lireBrouillon();
@@ -5295,6 +5923,11 @@ Oy Bot? | https://…/oy.png">${esc(profilsEnTexte(bot.profils))}</textarea>
       ui.pickerRecherche = event.target.value;
       filtrerPicker(event.target);
     }
+    // Champs de saisie des listes (niveaux, SAO) : retenus à chaque frappe,
+    // sans redessiner — la saisie garde ainsi le focus.
+    if (event.target.matches?.("[data-ajout]") && event.target.tagName !== "SELECT") {
+      brouillonModule()[event.target.dataset.ajout] = event.target.value;
+    }
   });
 
   // La liste du sélecteur de rôles s'ouvre dès que son champ prend le focus.
@@ -5350,6 +5983,23 @@ Oy Bot? | https://…/oy.png">${esc(profilsEnTexte(bot.profils))}</textarea>
     // Le brouillon est séparé de la config enregistrée : sans ça, comparer
     // « ancien » et « nouveau » au moment d'enregistrer ne verrait plus rien
     // changer, et plus rien ne partirait dans le bot.
+    // Choix d'une liste (type de récompense, genre de cible…) : la forme des
+    // champs suit, on redessine. Le sélecteur lié repart de zéro.
+    if (target.matches?.("[data-ajout]")) {
+      const b = brouillonModule();
+      b[target.dataset.ajout] = target.value;
+      if (target.tagName === "SELECT") {
+        if (target.dataset.ajoutVide) delete b[target.dataset.ajoutVide];
+        render();
+      }
+      return;
+    }
+    // 📅 Date saisie à l'heure de l'appareil → ISO pour le bot.
+    if (target.matches?.("[data-cfg-date]") && target.closest('form[data-form="module-bot"]')) {
+      brouillonModule()[target.dataset.cfgDate] = localVersIso(target.value);
+      render();
+      return;
+    }
     if (target.matches("[data-cfg]") && target.closest('form[data-form="module-bot"]')) {
       brouillonModule()[target.dataset.cfg] = target.multiple
         ? JSON.stringify([...target.selectedOptions].map(o => o.value).filter(Boolean))

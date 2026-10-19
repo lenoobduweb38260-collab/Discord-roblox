@@ -219,9 +219,11 @@ const membresDe = (users) => new Map(users.map((u) => [u.id, { id: u.id, user: u
 
     // Aucune clé de salon, de catégorie ou de rôle n'échappe à la règle.
     const cles = Object.keys(API.CONFIG_KEYS);
-    const visees = cles.filter((k) => /channel|categor|role/.test(k) || k === 'patch_mention');
+    // Noms anglais ET français : comptage_role_erreur, mariage_salon_id, sao_salon_id…
+    const visees = cles.filter((k) => /channel|categor|role|salon/.test(k) || k === 'patch_mention');
     const oubliees = visees.filter((k) => !API.genreReference(k));
     V(`toutes les clés de salon / rôle sont vérifiées (${visees.length})`, visees.length >= 25 && oubliees.length === 0, oubliees.join());
+    V('… y compris les noms français (salon, rôle d\'erreur)', ['mariage_salon_id', 'sao_salon_id', 'comptage_role_erreur'].every((k) => visees.includes(k) && API.genreReference(k)));
     V('… et aucune autre (texte, couleur, image…)', cles.filter((k) => API.genreReference(k)).every((k) => visees.includes(k)) && !API.genreReference('embed_accent') && !API.genreReference('welcome_image'));
     V('… toutes de type identifiant ou liste d\'identifiants', visees.every((k) => ['s', 'j'].includes(API.CONFIG_KEYS[k])));
 

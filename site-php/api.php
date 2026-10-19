@@ -1289,13 +1289,58 @@ if ($action === 'serveur.config') {
         'guildId' => (string) $guildId,
         'key' => $cle,
         'value' => $in['valeur'] ?? null,
+        // Qui a changé le réglage : le journal du serveur le dit.
+        'acteur' => moi_id(),
     ], $delai);
     if ($code !== 200) {
         respond(['ok' => false, 'error' => $data['error'] ?? ($code === 0
             ? "Le bot ne répond pas — est-il démarré ?"
             : "Le bot a répondu HTTP $code.")], 502);
     }
-    respond(['ok' => true, 'valeur' => $data['value'] ?? null]);
+    // `note` : ce que le réglage a entraîné (niveaux recalculés, compte remis à 0…).
+    respond(['ok' => true, 'valeur' => $data['value'] ?? null, 'note' => $data['note'] ?? null]);
+}
+
+// 📈 Listes des niveaux : récompenses, exclusions et multiplicateurs d'XP.
+// Même droit que serveur.config. Tout passe en POST — l'agent ne relaie le
+// corps que des POST et des PUT — avec `op` : « ajouter » (défaut) ou
+// « retirer ». Le bot rend la liste à jour, prête à afficher.
+$LISTES_NIVEAUX = [
+    'serveur.niveaux.recompense' => 'niveau-recompenses',
+    'serveur.niveaux.exclusion' => 'xp-exclusions',
+    'serveur.niveaux.multiplicateur' => 'xp-multiplicateurs',
+];
+if (isset($LISTES_NIVEAUX[$action])) {
+    $in = body();
+    $guildId = preg_replace('/\D+/', '', (string) ($in['serveur'] ?? ''));
+    [, $bot] = exiger_serveur((string) $guildId);
+    $op = ($in['op'] ?? '') === 'retirer' ? 'retirer' : 'ajouter';
+    $champ = function (string $cle, int $max = 60) use ($in) {
+        $v = $in[$cle] ?? null;
+        if ($v === null || is_array($v) || is_object($v)) return null;
+        return cleanString($v, $max);
+    };
+    [$code, $data] = agent_post_json('/agent/bots/' . rawurlencode($bot) . '/proxy/' . $LISTES_NIVEAUX[$action], [
+        'guildId' => (string) $guildId,
+        'op' => $op,
+        'acteur' => moi_id(),
+        'id' => $champ('id', 20),
+        'niveau' => $champ('niveau', 10),
+        'type' => $champ('type', 20),
+        // Un message privé de récompense fait jusqu'à 1500 signes : le bot
+        // refuse au-delà, on lui laisse donc de quoi le dire.
+        'valeur' => $champ('valeur', 1600),
+        'quantite' => $champ('quantite', 10),
+        'cibleId' => $champ('cible', 30),
+        'portee' => $champ('portee', 10),
+        'pourcent' => $champ('pourcent', 10),
+    ], 15);
+    if ($code !== 200) {
+        respond(['ok' => false, 'error' => $data['error'] ?? ($code === 0
+            ? "Le bot ne répond pas — est-il démarré ?"
+            : "Le bot a répondu HTTP $code. S'il est ancien, mettez-le à jour (⚙️ Créateur → 🔄 Mises à jour).")], 502);
+    }
+    respond(['ok' => true] + $data);
 }
 
 // ----- 🖼️ Photos du bot envoyées depuis l'appareil -----
@@ -1451,6 +1496,42 @@ if ($action === 'serveur.bot.photo') {
         respond(['ok' => false, 'error' => $erreur . ($note !== null ? ' — ' . $note : '')], 502);
     }
     respond(['ok' => true, 'url' => $photo['url'], 'valeur' => $data['value'] ?? $photo['url'], 'note' => $note]);
+}
+
+// ⚔️ Réinitialise l'Aventure SAO : un joueur, ou tout le serveur.
+// Irréversible, donc plus strict que serveur.config : l'équipe du site, ou
+// l'administration RÉELLE du serveur (grade lu par le bot, propriétaire
+// compris) — « Gérer le serveur » ne suffit pas. Le site fait confirmer, et
+// le mot de confirmation voyage jusqu'au bot, qui revérifie le grade.
+if ($action === 'serveur.sao.reinitialiser') {
+    $in = body();
+    $guildId = preg_replace('/\D+/', '', (string) ($in['serveur'] ?? ''));
+    [$etat, $bot] = exiger_serveur((string) $guildId);
+    $equipe = est_staff();
+    if (!$equipe) {
+        $grade = grade_discord_du_membre($etat, (string) $guildId);
+        if (!$grade || (($grade['grade'] ?? '') !== 'admin' && empty($grade['proprietaire']))) {
+            respond(['ok' => false, 'error' => "Réservé à l'administration du serveur (rôle admin du bot, ou permission Administrateur)."], 403);
+        }
+    }
+    if (($in['confirmation'] ?? '') !== 'REINITIALISER') {
+        respond(['ok' => false, 'error' => "Confirmation manquante : rien n'a été effacé."], 422);
+    }
+    $cible = ($in['cible'] ?? '') === 'serveur' ? 'serveur' : 'joueur';
+    [$code, $data] = agent_post_json('/agent/bots/' . rawurlencode($bot) . '/proxy/sao-reinitialiser', [
+        'guildId' => (string) $guildId,
+        'cible' => $cible,
+        'userId' => preg_replace('/\D+/', '', (string) ($in['membre'] ?? '')),
+        'acteur' => moi_id(),
+        'equipeSite' => $equipe,
+        'confirmation' => 'REINITIALISER',
+    ], 20);
+    if ($code !== 200) {
+        respond(['ok' => false, 'error' => $data['error'] ?? ($code === 0
+            ? "Le bot ne répond pas — est-il démarré ?"
+            : "Le bot a répondu HTTP $code. S'il est ancien, mettez-le à jour (⚙️ Créateur → 🔄 Mises à jour).")], 502);
+    }
+    respond(['ok' => true] + $data);
 }
 
 // 🎭 Donne les rôles automatiques à TOUS les membres déjà présents.
