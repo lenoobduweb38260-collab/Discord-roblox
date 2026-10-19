@@ -41,6 +41,8 @@ class SelectBase {
   setMinValues(v) { this.d.min_values = v; return this; }
   setMaxValues(v) { this.d.max_values = v; return this; }
   addChannelTypes(...v) { this.d.channel_types = v.flat(); return this; }
+  setChannelTypes(...v) { this.d.channel_types = v.flat(); return this; }
+  setDefaultChannels(...v) { this.d.default_values = v.flat().map((id) => ({ id, type: 'channel' })); return this; }
   addOptions(...v) { this.d.options = [...(this.d.options || []), ...v.flat()]; return this; }
   toJSON() { return { ...this.d }; }
 }

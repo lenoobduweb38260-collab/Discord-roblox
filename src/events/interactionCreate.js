@@ -192,6 +192,23 @@ module.exports = {
       return interact.handleButton(interaction);
     }
 
+    // ----- Demandes en mariage et divorces (/mariage) -----
+    // Les boutons d'un module coupé se revérifient ici : guildModule ne
+    // protège que la commande slash, pas un vieux bouton resté dans un salon.
+    if (interaction.isButton() && interaction.customId.startsWith('mar:')) {
+      if (!interaction.inGuild()) return horsServeur(interaction);
+      if (!getGuildConfig(interaction.guildId).interact_enabled) {
+        return interaction.reply({ content: '⛔ Le module Interactions a été désactivé sur ce serveur : ce bouton ne fait plus rien.', flags: MessageFlags.Ephemeral });
+      }
+      return require('../commands/mariage').handleButton(interaction);
+    }
+
+    // ----- Relecture des confessions signalées (salon QG du staff du bot) -----
+    if (interaction.isButton() && interaction.customId.startsWith('cfs:')) {
+      if (!interaction.inGuild()) return horsServeur(interaction);
+      return require('../utils/confessions').handleButton(interaction);
+    }
+
     // ----- Bouton « Me désigner » de /info (preuve créateur/staff du bot) -----
     if (interaction.isButton() && interaction.customId.startsWith('infoclaim:')) {
       return require('../commands/info').handleButton(interaction);
@@ -453,9 +470,9 @@ module.exports = {
     // Modules par serveur (désactivés par défaut, activables via /config) :
     // chaque commande déclare `guildModule` et la config porte `<module>_enabled`.
     if (command.guildModule && interaction.inGuild() && !cfg[`${command.guildModule}_enabled`]) {
-      const labels = { interact: 'Interactions', sao: 'Aventure SAO' };
+      const labels = { interact: 'Interactions', sao: 'Aventure SAO', confession: 'Confessions' };
       return interaction.reply({
-        content: `⛔ Le **module ${labels[command.guildModule] || command.guildModule}** n'est pas activé sur ce serveur. Un staff peut l'activer via \`/config\` → 🎭 Modules.`,
+        content: `⛔ Le **module ${labels[command.guildModule] || command.guildModule}** n'est pas activé sur ce serveur. Un staff peut l'activer via \`/config\` → 🎉 Communauté.`,
         flags: MessageFlags.Ephemeral,
       });
     }

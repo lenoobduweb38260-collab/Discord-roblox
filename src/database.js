@@ -449,6 +449,40 @@ CREATE TABLE IF NOT EXISTS gif_cache (
   PRIMARY KEY (categorie, url)
 );
 
+-- 💌 Confessions anonymes (/confession). L'auteur n'est JAMAIS affiche sur
+-- le serveur : il n'apparait qu'au staff du bot, sur la carte d'une
+-- confession signalee (suicide, menace, insulte). statut : publiee |
+-- en_revue | refusee. numero : rang de publication sur le serveur.
+CREATE TABLE IF NOT EXISTS confessions (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  guild_id      TEXT NOT NULL,
+  guild_name    TEXT,
+  channel_id    TEXT NOT NULL,
+  author_id     TEXT NOT NULL,
+  author_tag    TEXT,
+  texte         TEXT NOT NULL,
+  categories    TEXT,
+  statut        TEXT NOT NULL,
+  numero        INTEGER,
+  message_id    TEXT,
+  qg_channel_id TEXT,
+  qg_message_id TEXT,
+  decide_par    TEXT,
+  decide_le     TEXT,
+  created_at    TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_confessions_guild ON confessions (guild_id, numero);
+
+-- 💍 Mariages (/mariage) : un seul couple par personne, partout ou le bot
+-- est present (comme les compteurs de /interact). a < b toujours.
+CREATE TABLE IF NOT EXISTS mariages (
+  a        TEXT NOT NULL,
+  b        TEXT NOT NULL,
+  depuis   TEXT NOT NULL,
+  guild_id TEXT,
+  PRIMARY KEY (a, b)
+);
+
 -- 🔢 Matricules RP : le numero qui suit une personne dans le RP.
 -- Relie les trois facons de la designer — matricule, pseudo du jeu, compte
 -- Discord — pour qu'aucune ne soit un cul-de-sac. Le retrait garde la ligne
@@ -631,6 +665,9 @@ for (const column of [
   'bot_nick TEXT',
   'bot_avatar_url TEXT',
   'bot_profil TEXT',
+  // 💌 Confessions anonymes : interrupteur et salon de publication
+  'confession_enabled INTEGER',
+  'confession_channel_id TEXT',
 ]) {
   try {
     db.exec(`ALTER TABLE guild_config ADD COLUMN ${column}`);
@@ -934,6 +971,8 @@ const DEFAULT_CONFIG = {
   bot_nick: null,
   bot_avatar_url: null,
   bot_profil: null,
+  confession_enabled: 0,
+  confession_channel_id: null,
   xp_text: 20,
   xp_voice: 20,
   xp_cooldown: 60,

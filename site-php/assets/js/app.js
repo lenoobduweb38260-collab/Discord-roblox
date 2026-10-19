@@ -1289,7 +1289,7 @@
     }).join("");
     const ouvert = ui.pickerOuvert === cle;
     return `<div class="field"><label>${label}</label>
-      <div class="picker${ouvert ? " ouvert" : ""}" data-picker="${esc(cle)}">
+      <div class="picker${ouvert ? " ouvert" : ""}" data-picker="${esc(cle)}" data-mode="${mode}">
         <div class="picker-champ">${jetons}
           <input class="picker-input" data-picker-cherche="${esc(cle)}" autocomplete="off" spellcheck="false"
             placeholder="${choisis.length ? (multiple ? "Ajouter…" : "Changer…") : habit.cherche}"></div>
@@ -1447,7 +1447,8 @@
     <div class="mt-22">
       ${champBascule("rp_enabled", "Module RP", "Cartes d'identité, permis, entreprises, assurances. Change les commandes disponibles sur le serveur.")}
       ${champBascule("levels_enabled", "Niveaux", "XP écrit et vocal, classement et récompenses.")}
-      ${champBascule("interact_enabled", "Interactions", "Câlins, bisous et autres interactions entre membres.")}
+      ${champBascule("interact_enabled", "Interactions", "Câlins, bisous et autres interactions entre membres, /lc (calculateur d'amour) et /mariage.")}
+      ${champBascule("confession_enabled", "Confessions", "Confessions anonymes. Celles qui parlent de suicide, de menace ou d'insulte sont relues par l'équipe du bot avant publication.")}
       ${champBascule("sao_enabled", "Aventure SAO", "Les 100 étages d'Aincrad, boss et badges.")}
     </div>`;
     return modulePanel("Vue d'ensemble", "Activez ou coupez les grands modules du bot sur ce serveur.", body, "overview");
@@ -1828,6 +1829,7 @@
         ${champMention("patch_mention", "🔔 Mentionner à chaque note", "Aucune mention par défaut : une note de version ne fait sonner personne tant que vous ne l'avez pas demandé.")}
         ${champSalon("update_channel_id", "🔄 Salon des mises à jour techniques", "")}
         ${champSalon("ticket_transcript_channel_id", "🗄️ Salon des transcriptions de tickets", "")}
+        ${champSalon("confession_channel_id", "💌 Salon des confessions", "Les confessions anonymes (/confession) y sont publiées. Activez-les aussi dans la vue d'ensemble.")}
       </div>`;
     return modulePanel("Salons & logs", "Où le bot écrit chacune de ses annonces.", body, "channels");
   }
@@ -1913,6 +1915,24 @@
       // actif par défaut aurait paru « changé » à chaque enregistrement.
       const defaut = b.dataset.defaut === undefined ? 0 : Number(b.dataset.defaut);
       if (Number(p.config[cle] ?? defaut) !== valeur) aEnvoyer.push({ cle, valeur });
+    });
+    // Sélecteurs façon Discord (salons, rôles, catégories) : leur choix ne
+    // vit que dans le brouillon, aucun champ du formulaire ne le porte.
+    // Sans ce passage, choisir un salon puis « Enregistrer » répondait
+    // « rien à enregistrer » et le choix était perdu.
+    const choixBrouillon = ui.brouillonModule || {};
+    form.querySelectorAll("[data-picker]").forEach(pk => {
+      const cle = pk.dataset.picker;
+      if (!(cle in choixBrouillon) || aEnvoyer.some(e => e.cle === cle)) return;
+      let valeur = choixBrouillon[cle];
+      if (pk.dataset.mode === "multi") {
+        try { valeur = JSON.parse(valeur || "[]"); } catch { valeur = []; }
+      }
+      const actuel = p.config[cle];
+      const pareil = Array.isArray(valeur)
+        ? JSON.stringify(valeur) === JSON.stringify((() => { try { return JSON.parse(actuel || "[]"); } catch { return []; } })())
+        : String(actuel ?? "") === String(valeur ?? "");
+      if (!pareil) aEnvoyer.push({ cle, valeur });
     });
     if (!aEnvoyer.length) { toast("RIEN À ENREGISTRER", "Aucun réglage n'a changé."); return; }
     const echecs = [];

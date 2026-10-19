@@ -1866,6 +1866,21 @@ const RELEASES = [
     amelioration: [],
     retrait: [],
   },
+  {
+    id: 'lc-mariage-confession-2026-10dd',
+    title: 'Calculateur d\'amour, mariages et confessions',
+    ajout: [
+      '💘 **`/lc`** : le calculateur d\'amour. Choisis un membre — ou laisse le hasard tirer un membre du serveur — et decouvre votre pourcentage, dessine dans une image avec vos deux photos, un coeur qui se remplit et une jauge. Le resultat est le meme pour un duo jusqu\'a minuit',
+      '💍 **`/mariage`** : `demander` (la personne demandee accepte ou refuse par bouton, 10 minutes pour repondre), `statut` et `divorcer`. Un seul conjoint a la fois, valable sur tous les serveurs du bot. Les maries ont leur GIF de mariage (avec une cle GIPHY), sinon une image avec leurs deux photos et des alliances',
+      '💌 **`/confession`** : une confession anonyme, publiee dans le salon choisi par le serveur sans le moindre nom. Celles qui parlent de suicide, de menace ou d\'insulte sont relues avant publication — et quand quelqu\'un semble en detresse, il recoit tout de suite le 3114',
+      '🎉 **`/config` → Communaute** : les interrupteurs Interactions (avec /lc et /mariage), Aventure SAO et Confessions, et le salon des confessions. Aussi dans le dashboard',
+    ],
+    fix: [
+      '🖥️ Dashboard : un salon, un role ou une categorie choisi dans un selecteur est enfin enregistre (« rien a enregistrer » s\'affichait et le choix etait perdu)',
+    ],
+    amelioration: [],
+    retrait: [],
+  },
 ];
 
 // Construit l'embed d'une note à partir d'une entrée { title, ajout, fix,

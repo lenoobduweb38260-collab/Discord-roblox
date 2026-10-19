@@ -218,6 +218,7 @@ function mainView(guild) {
       .setPlaceholder('⚙️ Choisissez une catégorie à configurer…')
       .addOptions(
         { label: 'Modules (RP, Interactions, SAO)', value: 'rp', emoji: '🎭', description: 'Activer/désactiver RP, Interactions et Aventure SAO' },
+        { label: 'Communauté', value: 'communaute', emoji: '🎉', description: 'Interactions, /lc, /mariage, SAO et confessions anonymes' },
         { label: 'Rôles', value: 'roles', emoji: '👮', description: 'Staff, administration, en service' },
         { label: 'Arrivées & départs', value: 'arrivees', emoji: '👋', description: 'Salon d\'arrivée, salon de départ, rôles automatiques' },
         { label: 'Salons', value: 'salons', emoji: '📢', description: 'Logs, niveaux, service, staff' },
@@ -582,6 +583,51 @@ function whitelistView(guild) {
 }
 
 // ----- Catégorie : Module RP (cartes, permis, entreprises, assurances, service) -----
+// 🎉 Communauté : les modules « pour s'amuser » et les confessions.
+// Les interrupteurs Interactions et SAO vivent ici : la vue Modules a déjà
+// ses cinq rangées, le maximum de Discord.
+function communauteView(guild) {
+  const cfg = getGuildConfig(guild.id);
+  const interactOn = Boolean(cfg.interact_enabled);
+  const saoOn = Boolean(cfg.sao_enabled);
+  const confOn = Boolean(cfg.confession_enabled);
+  const etat = (on) => (on ? '🟢 **Activé**' : '🔴 **Désactivé**');
+  const embed = new EmbedBuilder()
+    .setColor(COLORS.PRIMARY)
+    .setTitle('🎉 Configuration — Communauté')
+    .addFields(
+      {
+        name: '🎮 Interactions',
+        value: `${etat(interactOn)}\n\`/interact\` (bisous, câlins…), \`/lc\` (calculateur d'amour) et \`/mariage\`.`,
+      },
+      { name: '⚔️ Aventure SAO', value: `${etat(saoOn)}\n\`/sao\` : 100 étages d'Aincrad, badges, XP.` },
+      {
+        name: '💌 Confessions anonymes',
+        value: `${etat(confOn)} · salon : ${show(cfg.confession_channel_id, 'channel')}\n`
+          + '`/confession` publie sans nom. Celles qui parlent de suicide, de menace ou d\'insulte sont relues par l\'équipe du bot avant publication.',
+      }
+    );
+  const menuSalon = new ChannelSelectMenuBuilder()
+    .setCustomId('cfgconfsalon')
+    .setPlaceholder('💌 Le salon des confessions')
+    .setChannelTypes(ChannelType.GuildText)
+    .setMinValues(0)
+    .setMaxValues(1);
+  if (cfg.confession_channel_id) menuSalon.setDefaultChannels(cfg.confession_channel_id);
+  return {
+    embeds: [embed],
+    components: [
+      new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId(interactOn ? 'cfgintoff' : 'cfginton').setLabel(interactOn ? 'Couper les Interactions' : 'Activer les Interactions').setEmoji('🎮').setStyle(interactOn ? ButtonStyle.Secondary : ButtonStyle.Success),
+        new ButtonBuilder().setCustomId(saoOn ? 'cfgsaooff' : 'cfgsaoon').setLabel(saoOn ? 'Couper SAO' : 'Activer SAO').setEmoji('⚔️').setStyle(saoOn ? ButtonStyle.Secondary : ButtonStyle.Success),
+        new ButtonBuilder().setCustomId(confOn ? 'cfgconfoff' : 'cfgconfon').setLabel(confOn ? 'Couper les confessions' : 'Activer les confessions').setEmoji('💌').setStyle(confOn ? ButtonStyle.Secondary : ButtonStyle.Success)
+      ),
+      new ActionRowBuilder().addComponents(menuSalon),
+      backRow(),
+    ],
+  };
+}
+
 function rpView(guild) {
   const cfg = getGuildConfig(guild.id);
   const enabled = Boolean(cfg.rp_enabled);
@@ -1085,7 +1131,7 @@ function absencesView(guild) {
   };
 }
 
-const CATEGORY_VIEWS = { rp: rpView, roles: rolesView, arrivees: arriveesView, salons: salonsView, xp: xpView, securite: securiteView, whitelist: whitelistView, tickets: ticketsView, vocal: vocalView, musique: musiqueView, identitebot: identiteBotView, absences: absencesView, reseaux: reseauxView };
+const CATEGORY_VIEWS = { communaute: communauteView, rp: rpView, roles: rolesView, arrivees: arriveesView, salons: salonsView, xp: xpView, securite: securiteView, whitelist: whitelistView, tickets: ticketsView, vocal: vocalView, musique: musiqueView, identitebot: identiteBotView, absences: absencesView, reseaux: reseauxView };
 const SECURITY_TOGGLES = new Set(['antispam_enabled', 'antinuke_enabled', 'captcha_enabled']);
 
 function xpModal(cfg) {
@@ -1312,7 +1358,7 @@ async function handleConfigInteraction(interaction) {
     if (id === 'cfginton' || id === 'cfgintoff') {
       const enable = id === 'cfginton' ? 1 : 0;
       setGuildConfig(interaction.guildId, 'interact_enabled', enable);
-      await mettreAJour(interaction, rpView(interaction.guild));
+      await mettreAJour(interaction, communauteView(interaction.guild));
       await sendLog(
         interaction.guild,
         logEmbed('🎮 Module Interactions', `Interactions ${enable ? 'activées' : 'désactivées'} par <@${interaction.user.id}>.`, enable ? COLORS.SUCCESS : COLORS.DANGER)
@@ -1394,7 +1440,7 @@ async function handleConfigInteraction(interaction) {
     if (id === 'cfgsaoon' || id === 'cfgsaooff') {
       const enable = id === 'cfgsaoon' ? 1 : 0;
       setGuildConfig(interaction.guildId, 'sao_enabled', enable);
-      await mettreAJour(interaction, rpView(interaction.guild));
+      await mettreAJour(interaction, communauteView(interaction.guild));
       await sendLog(
         interaction.guild,
         logEmbed('⚔️ Module Aventure SAO', `Aventure SAO ${enable ? 'activée' : 'désactivée'} par <@${interaction.user.id}>.`, enable ? COLORS.SUCCESS : COLORS.DANGER)
@@ -1569,6 +1615,28 @@ async function handleConfigInteraction(interaction) {
     }
 
     // 🎛️ Musique : le salon de la carte de lecture — vide = celui de la commande.
+    if (id === 'cfgconfon' || id === 'cfgconfoff') {
+      const enable = id === 'cfgconfon' ? 1 : 0;
+      setGuildConfig(interaction.guildId, 'confession_enabled', enable);
+      await mettreAJour(interaction, communauteView(interaction.guild));
+      await sendLog(
+        interaction.guild,
+        logEmbed('💌 Confessions', `Confessions ${enable ? 'activées' : 'désactivées'} par <@${interaction.user.id}>.`, enable ? COLORS.SUCCESS : COLORS.DANGER)
+      );
+      return;
+    }
+
+    if (id === 'cfgconfsalon') {
+      const channelId = interaction.values[0] || null;
+      setGuildConfig(interaction.guildId, 'confession_channel_id', channelId);
+      await mettreAJour(interaction, communauteView(interaction.guild));
+      await sendLog(
+        interaction.guild,
+        logEmbed('⚙️ Configuration modifiée', `💌 Salon des confessions → ${channelId ? `<#${channelId}>` : '*aucun*'}\nPar <@${interaction.user.id}>`, COLORS.INFO)
+      );
+      return;
+    }
+
     if (id === 'cfgmusannonce') {
       const channelId = interaction.values[0] || null;
       setGuildConfig(interaction.guildId, 'musique_annonce_channel_id', channelId);

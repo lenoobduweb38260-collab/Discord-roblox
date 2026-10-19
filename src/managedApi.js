@@ -98,6 +98,8 @@ function startManagedApi(client, baseDir) {
     antinuke_enabled: 'b',
     captcha_enabled: 'b',
     interact_enabled: 'b',
+    confession_enabled: 'b',
+    confession_channel_id: 's',
     sao_enabled: 'b',
     // Apparence des arrivées / départs
     welcome_color: 's',
