@@ -63,7 +63,26 @@ class ModalBuilder {
   setCustomId(v) { this.d.custom_id = v; return this; }
   setTitle(v) { this.d.title = v; return this; }
   addComponents(...c) { this.d.components.push(...c.flat()); return this; }
+  addLabelComponents(...c) { this.d.components.push(...c.flat()); return this; }
   toJSON() { return { ...this.d, components: this.d.components.map((c) => c.toJSON()) }; }
+}
+// Modal « nouvelle génération » (discord.js récente) : Label (18) qui porte
+// un champ, et le composant d'envoi de fichier (19).
+class LabelBuilder {
+  constructor() { this.d = { type: 18 }; this.composant = null; }
+  setLabel(v) { this.d.label = v; return this; }
+  setDescription(v) { this.d.description = v; return this; }
+  setTextInputComponent(c) { this.composant = c; return this; }
+  setFileUploadComponent(c) { this.composant = c; return this; }
+  toJSON() { return { ...this.d, component: this.composant?.toJSON() }; }
+}
+class FileUploadBuilder {
+  constructor() { this.d = { type: 19 }; }
+  setCustomId(v) { this.d.custom_id = v; return this; }
+  setRequired(v) { this.d.required = v; return this; }
+  setMinValues(v) { this.d.min_values = v; return this; }
+  setMaxValues(v) { this.d.max_values = v; return this; }
+  toJSON() { return { ...this.d }; }
 }
 class Option {
   setName() { return this; } setDescription() { return this; } setRequired() { return this; }
@@ -96,6 +115,7 @@ class SlashCommandBuilder {
 }
 module.exports = {
   EmbedBuilder, ActionRowBuilder, ButtonBuilder, TextInputBuilder, ModalBuilder, SlashCommandBuilder,
+  LabelBuilder, FileUploadBuilder,
   ChannelSelectMenuBuilder: class extends SelectBase { constructor() { super(8); } },
   RoleSelectMenuBuilder: class extends SelectBase { constructor() { super(6); } },
   StringSelectMenuBuilder: class extends SelectBase { constructor() { super(3); } },

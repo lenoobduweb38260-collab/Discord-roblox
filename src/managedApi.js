@@ -432,6 +432,23 @@ function startManagedApi(client, baseDir) {
         });
       }
 
+      // 🪪 Profils du bot rechargés À CHAUD : le site vient d'écrire
+      // BOT_PROFILS dans le .env, le bot les prend sans redémarrer.
+      if (req.method === 'POST' && url.pathname === '/profils-bot') {
+        const body = await readBody(req);
+        const liste = (Array.isArray(body.profils) ? body.profils : [])
+          .map((p) => {
+            const avatar = String(p?.avatar || '').trim();
+            return { nom: String(p?.nom || '').trim().slice(0, 32), avatar: /^https?:\/\//i.test(avatar) ? avatar.slice(0, 500) : '' };
+          })
+          .filter((p) => p.nom)
+          .slice(0, 25);
+        const json = JSON.stringify(liste);
+        process.env.BOT_PROFILS = json;
+        try { require('./utils/botTeam').setState('bot_profils', json); } catch { /* le .env reste la source au démarrage */ }
+        return send(200, { ok: true, profils: require('./utils/identiteBot').profils().length });
+      }
+
       // ----- Profils d'envoi (nom + avatar) pour les panneaux -----
       if (req.method === 'POST' && url.pathname === '/profil-ajouter') {
         const body = await readBody(req);
@@ -937,6 +954,9 @@ function startManagedApi(client, baseDir) {
           } catch (err) {
             return send(400, { error: `Identité du bot : ${err.message}` });
           }
+          // La photo : on renvoie ce qui est VRAIMENT enregistré — l'adresse
+          // stable de la photo posée sur Discord, jamais une data URI.
+          if (key === 'bot_avatar_url') return send(200, { ok: true, value: getGuildConfig(body.guildId).bot_avatar_url ?? null });
           return send(200, { ok: true, value });
         }
         setGuildConfig(body.guildId, key, value);

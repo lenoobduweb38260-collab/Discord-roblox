@@ -1588,9 +1588,95 @@
               "Les profils proposés par le créateur du bot (définis dans ⚙️ Créateur → Mes bots). Choisir un profil remplace le nom et la photo ci-dessous.")
           : `<div class="field"><label>🎭 Profil du bot</label><span class="field-note">Aucun profil proposé par le créateur du bot — définissez-les dans ⚙️ Créateur → 🤖 Mes bots, ou saisissez un nom et une photo ci-contre.</span></div>`}
         ${champTexte("bot_nick", "🤖 Nom du bot sur ce serveur", "32 caractères maximum. Vide = le nom global du bot. Nécessite la permission « Changer le pseudo » pour le bot.", false, "Arès")}
-        ${champTexte("bot_avatar_url", "🖼️ Photo du bot sur ce serveur (URL)", "PNG, JPG ou GIF, 8 Mo maximum. Vide = la photo du bot. ⏱️ Discord n'accepte qu'un changement de photo toutes les dix minutes environ.", false, "https://…/photo.png")}
-        ${photo ? `<div class="field"><label>Aperçu de la photo</label><img src="${esc(photo)}" alt="" style="width:72px;height:72px;border-radius:50%;object-fit:cover;border:1px solid var(--line)"></div>` : ""}
+        ${champTexte("bot_avatar_url", "🖼️ Photo du bot sur ce serveur (lien)", "Un lien imgur, Discord, Dropbox, Google Drive, GitHub, Tenor, Giphy, ibb.co, postimg, Gyazo… ou un lien direct : le bot retrouve tout seul l'image derrière une page de partage. PNG, JPG ou GIF, 8 Mo maximum. Vide = la photo du bot. ⏱️ Discord n'accepte qu'un changement de photo toutes les dix minutes environ.", false, "https://i.imgur.com/…")}
+        <div class="field"><label>📁 Ou une photo depuis votre appareil</label>
+          <input class="input" type="file" accept="image/png,image/jpeg,image/gif" data-avatar-fichier>
+          <span class="field-note">PNG, JPG ou GIF, 8 Mo maximum. Envoyée au bot dès qu'elle est choisie — pas besoin d'« Enregistrer ».</span></div>
+        <div class="field" data-avatar-apercu${photo ? "" : ` style="display:none"`}><label>Aperçu de la photo</label><img ${photo ? `src="${esc(photo)}"` : ""} alt="" style="width:72px;height:72px;border-radius:50%;object-fit:cover;border:1px solid var(--line)"></div>
       </div>`;
+  }
+
+  // 📁 Photos du bot depuis l'appareil : les règles de Discord, vérifiées
+  // AVANT l'envoi pour ne pas faire monter 20 Mo pour rien.
+  const PHOTO_BOT_TYPES = ["image/png", "image/jpeg", "image/gif"];
+  const PHOTO_BOT_MAX = 8 * 1024 * 1024;
+  function photoBotRefusee(fichier) {
+    if (!fichier) return "Aucun fichier choisi.";
+    if (!PHOTO_BOT_TYPES.includes(fichier.type)) {
+      return `« ${fichier.name} » n'est pas une image PNG, JPG ou GIF : Discord refuse les autres formats (WEBP compris) pour une photo de profil.`;
+    }
+    if (fichier.size > PHOTO_BOT_MAX) return `« ${fichier.name} » pèse ${(fichier.size / 1048576).toFixed(1)} Mo : 8 Mo maximum.`;
+    return null;
+  }
+
+  // 🖼️ La photo du bot SUR CE SERVEUR : envoyée tout de suite au site, qui la
+  // stocke puis la fait poser par le bot. Le champ n'a PAS de data-cfg : à
+  // l'enregistrement du module, il enverrait « C:\fakepath\… ».
+  async function envoyerPhotoDuBot(champ) {
+    const fichier = champ.files?.[0];
+    if (!fichier) return;
+    const refus = photoBotRefusee(fichier);
+    if (refus) { champ.value = ""; toast("PHOTO DU BOT", refus, "error"); return; }
+    const gid = ui.selectedServerId;
+    // Aperçu immédiat, le temps que le bot télécharge et pose la photo.
+    const apercu = champ.closest(".form-grid")?.querySelector("[data-avatar-apercu]");
+    const locale = URL.createObjectURL(fichier);
+    // (`.field` impose display:flex : l'attribut hidden n'y suffirait pas.)
+    if (apercu) { apercu.style.display = ""; apercu.querySelector("img")?.setAttribute("src", locale); }
+    const note = champ.parentElement?.querySelector(".field-note");
+    if (note) note.textContent = "⏳ Envoi au bot…";
+    champ.disabled = true;
+    const fd = new FormData();
+    fd.append("action", "serveur.bot.photo");
+    fd.append("serveur", gid);
+    fd.append("photo", fichier);
+    try {
+      const r = await api("serveur.bot.photo", {}, { formData: fd });
+      const p = ui.srvParams[gid];
+      const adresse = r.valeur || r.url || "";
+      if (p?.config) p.config.bot_avatar_url = adresse;
+      if (p?.identiteBot) p.identiteBot.avatar = adresse;
+      if (ui.brouillons[gid]) delete ui.brouillons[gid].bot_avatar_url;
+      toast("PHOTO DU BOT", r.note ? `Photo posée sur ce serveur. ${r.note}` : "La nouvelle photo est posée sur ce serveur.");
+    } catch (e) {
+      toast("PHOTO DU BOT", e.message, "error");
+    } finally {
+      render();
+      URL.revokeObjectURL(locale);
+    }
+  }
+
+  // 🪪 La photo d'un PROFIL du bot (Créateur → Mes bots) : stockée sur le
+  // site, puis la ligne « Nom | adresse » s'ajoute à la zone des profils de
+  // CETTE carte. Rien n'est re-rendu : ce qui est déjà tapé reste en place.
+  async function envoyerPhotoDeProfil(champ) {
+    const fichier = champ.files?.[0];
+    if (!fichier) return;
+    const refus = photoBotRefusee(fichier);
+    if (refus) { champ.value = ""; toast("PHOTO DE PROFIL", refus, "error"); return; }
+    const zone = champ.closest(".botcfg")?.querySelector('[data-f="profils"]');
+    if (zone && zone.value.split(/\r?\n/).filter(l => l.trim()).length >= 25) {
+      champ.value = "";
+      toast("PHOTO DE PROFIL", "25 profils maximum : retirez-en un avant d'en ajouter.", "error");
+      return;
+    }
+    const fd = new FormData();
+    fd.append("action", "bot.profil.photo");
+    fd.append("photo", fichier);
+    champ.disabled = true;
+    try {
+      const r = await api("bot.profil.photo", {}, { formData: fd });
+      const nom = (fichier.name.replace(/\.[^.]+$/, "").replace(/[|\r\n]+/g, " ").trim() || "Profil").slice(0, 32);
+      if (zone) {
+        const avant = zone.value.replace(/\s+$/, "");
+        zone.value = `${avant ? avant + "\n" : ""}${nom} | ${r.url}`;
+      }
+      toast("PHOTO DE PROFIL", `Ligne « ${nom} » ajoutée : renommez-la si besoin, puis 💾 Enregistrer les bots.${r.avertissement ? " " + r.avertissement : ""}`);
+    } catch (e) {
+      toast("PHOTO DE PROFIL", e.message, "error");
+    } finally {
+      if (champ.isConnected) { champ.disabled = false; champ.value = ""; }
+    }
   }
 
   // Aperçu : trois embeds de nature différente, pour montrer l'effet de
@@ -1964,8 +2050,11 @@
     const echecs = [];
     for (const { cle, valeur } of aEnvoyer) {
       try {
-        await api("serveur.config", { serveur, cle, valeur });
+        const r = await api("serveur.config", { serveur, cle, valeur });
         p.config[cle] = Array.isArray(valeur) ? JSON.stringify(valeur) : valeur;
+        // 🖼️ Pour la photo, le bot renvoie l'adresse STABLE de l'image posée :
+        // un lien de page (imgur.com/…, tenor…) ne s'afficherait pas en aperçu.
+        if (cle === "bot_avatar_url" && r && r.valeur !== undefined) p.config[cle] = r.valeur;
       } catch (e) { echecs.push(`${cle} : ${e.message}`); }
     }
     oublierBrouillon(serveur);   // enregistré : le brouillon n'a plus lieu d'être
@@ -3171,10 +3260,11 @@
           <div class="field"><label>2️⃣ Client ID Discord <span style="color:var(--muted-2);font-weight:400">(facultatif)</span></label>
             <input class="input" data-f="clientId" value="${esc(bot.clientId || "")}" placeholder="1528910533183541308" inputmode="numeric">
             <span class="field-note">${clientIdNote(bot.clientId)}</span></div>
-          <div class="field full"><label>🪪 Profils du bot <span style="color:var(--muted-2);font-weight:400">(un par ligne : <code>Nom | https://adresse-de-la-photo.png</code>)</span></label>
-            <textarea class="textarea" rows="3" data-f="profils" placeholder="Arès | https://…/ares.png
+          <div class="field full"><label>🪪 Profils du bot <span style="color:var(--muted-2);font-weight:400">(un par ligne : <code>Nom | lien de la photo</code>)</span></label>
+            <textarea class="textarea" rows="3" data-f="profils" placeholder="Arès | https://i.imgur.com/…
 Oy Bot? | https://…/oy.png">${esc(profilsEnTexte(bot.profils))}</textarea>
-            <span class="field-note">Chaque serveur pourra choisir l'un de ces profils (nom + photo du bot, valables sur ce serveur seulement) depuis sa page ⚙️ Identité ou <code>/config → 🪪 Identité du bot</code>. Enregistrés dans le <code>.env</code> du bot (<code>BOT_PROFILS</code>) ; le bot les lit à son prochain démarrage.</span></div>
+            <input class="input" type="file" accept="image/png,image/jpeg,image/gif" data-profil-fichier style="margin-top:6px" aria-label="Ajouter une photo de profil depuis l'appareil">
+            <span class="field-note">Le lien peut venir d'imgur, Discord, Dropbox, Google Drive, GitHub, Tenor, Giphy… ou d'un lien direct — ou 📁 choisissez un fichier de votre appareil (PNG, JPG ou GIF, 8 Mo maximum) : il est stocké sur ce site et sa ligne s'ajoute toute seule. Chaque serveur pourra choisir l'un de ces profils (nom + photo du bot, valables sur ce serveur seulement) depuis sa page ⚙️ Identité ou <code>/config → 🪪 Identité du bot</code>. Enregistrés dans le <code>.env</code> du bot (<code>BOT_PROFILS</code>) et pris tout de suite si le bot tourne — sinon à son prochain démarrage.</span></div>
         </div>
       </div>`).join("");
     const etatAgent = ui.agentBots === null
@@ -4500,6 +4590,9 @@ Oy Bot? | https://…/oy.png">${esc(profilsEnTexte(bot.profils))}</textarea>
             try {
               const r = await api("bot.env.lire", { nom: bot.agentName });
               await api("bot.env.ecrire", { nom: bot.agentName, contenu: fusionnerEnv(r.contenu || "", "BOT_PROFILS", apres) });
+              // ⚡ Pris à chaud si le bot tourne ; arrêté (ou trop ancien),
+              // il les lira au prochain démarrage — rien à signaler.
+              await api("bot.profils.recharger", { nom: bot.agentName, profils: bot.profils || [] }).catch(() => null);
             } catch (e) {
               toast("PROFILS DU BOT", `« ${bot.agentName} » : ${e.message}`, "error");
             }
@@ -5249,6 +5342,9 @@ Oy Bot? | https://…/oy.png">${esc(profilsEnTexte(bot.profils))}</textarea>
       document.querySelectorAll(".db-sqlite").forEach(e => { e.style.display = sqlite ? "" : "none"; });
     }
     if (target.closest("#site-builder-form")) livePreview();
+    // 📁 Photos du bot choisies sur l'appareil : envoyées tout de suite.
+    if (target.matches?.("[data-avatar-fichier]")) { await envoyerPhotoDuBot(target); return; }
+    if (target.matches?.("[data-profil-fichier]")) { await envoyerPhotoDeProfil(target); return; }
     // ⚡ Réglages d'un module du bot : on note le changement dans un brouillon
     // et on reconstruit, pour que l'aperçu suive AVANT l'enregistrement.
     // Le brouillon est séparé de la config enregistrée : sans ça, comparer
