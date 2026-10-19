@@ -219,6 +219,7 @@ function mainView(guild) {
       .addOptions(
         { label: 'Modules (RP, Interactions, SAO)', value: 'rp', emoji: '🎭', description: 'Activer/désactiver RP, Interactions et Aventure SAO' },
         { label: 'Communauté', value: 'communaute', emoji: '🎉', description: 'Interactions, /lc, /mariage, SAO et confessions anonymes' },
+        { label: 'Aventure SAO', value: 'sao', emoji: '⚔️', description: 'Raids, duels, rythme de chasse, AFK, mort, difficulté' },
         { label: 'Rôles', value: 'roles', emoji: '👮', description: 'Staff, administration, en service' },
         { label: 'Arrivées & départs', value: 'arrivees', emoji: '👋', description: 'Salon d\'arrivée, salon de départ, rôles automatiques' },
         { label: 'Salons', value: 'salons', emoji: '📢', description: 'Logs, niveaux, service, staff' },
@@ -600,7 +601,7 @@ function communauteView(guild) {
         name: '🎮 Interactions',
         value: `${etat(interactOn)}\n\`/interact\` (bisous, câlins…), \`/lc\` (calculateur d'amour) et \`/mariage\`.`,
       },
-      { name: '⚔️ Aventure SAO', value: `${etat(saoOn)}\n\`/sao\` : 100 étages d'Aincrad, badges, XP.` },
+      { name: '⚔️ Aventure SAO', value: `${etat(saoOn)}\n\`/sao\` : 100 étages d'Aincrad, boss, raids, duels. Réglages détaillés : catégorie ⚔️ Aventure SAO.` },
       {
         name: '💌 Confessions anonymes',
         value: `${etat(confOn)} · salon : ${show(cfg.confession_channel_id, 'channel')}\n`
@@ -1131,7 +1132,9 @@ function absencesView(guild) {
   };
 }
 
-const CATEGORY_VIEWS = { communaute: communauteView, rp: rpView, roles: rolesView, arrivees: arriveesView, salons: salonsView, xp: xpView, securite: securiteView, whitelist: whitelistView, tickets: ticketsView, vocal: vocalView, musique: musiqueView, identitebot: identiteBotView, absences: absencesView, reseaux: reseauxView };
+// ⚔️ La vue SAO vit dans son module (utils/sao/configSao.js).
+const saoView = (guild) => require('./sao/configSao').saoConfigView(guild);
+const CATEGORY_VIEWS = { communaute: communauteView, sao: saoView, rp: rpView, roles: rolesView, arrivees: arriveesView, salons: salonsView, xp: xpView, securite: securiteView, whitelist: whitelistView, tickets: ticketsView, vocal: vocalView, musique: musiqueView, identitebot: identiteBotView, absences: absencesView, reseaux: reseauxView };
 const SECURITY_TOGGLES = new Set(['antispam_enabled', 'antinuke_enabled', 'captcha_enabled']);
 
 function xpModal(cfg) {
@@ -1206,6 +1209,13 @@ async function handleConfigInteraction(interaction) {
       const view = CATEGORY_VIEWS[interaction.values[0]];
       if (!view) return;
       return await mettreAJour(interaction, view(interaction.guild));
+    }
+
+    // ⚔️ Aventure SAO : réglages, raids, réinitialisations.
+    // ('cfgsaoon'.startsWith('cfgsao:') est faux : les bascules historiques
+    // de la vue Communauté gardent leur branche plus bas.)
+    if (id.startsWith('cfgsao:')) {
+      return await require('./sao/configSao').gererConfigSao(interaction, grade);
     }
 
     // Sécurité : bascule anti-spam / anti-nuke / captcha.

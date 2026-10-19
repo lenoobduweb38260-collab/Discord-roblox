@@ -56,6 +56,14 @@ module.exports = {
       console.warn(`⚠️ Rappels de bump non réarmés : ${err.message}`);
     }
 
+    // 🐲 Aventure SAO : les boss de raid surgissent dans le salon réglé, et
+    // ceux qui ont expiré pendant le sommeil du bot sont clos.
+    try {
+      require('../utils/sao/raid').demarrerRaids(client);
+    } catch (err) {
+      console.warn(`⚠️ Raids SAO non démarrés : ${err.message}`);
+    }
+
     // XP vocal : chaque minute, chaque membre connecté en vocal (non muet
     // serveur, hors salon AFK, hors bots) gagne l'XP vocal configuré.
     setInterval(() => {

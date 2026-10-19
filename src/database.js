@@ -668,6 +668,15 @@ for (const column of [
   // 💌 Confessions anonymes : interrupteur et salon de publication
   'confession_enabled INTEGER',
   'confession_channel_id TEXT',
+  // ⚔️ Aventure SAO : raids, PvP, rythme, AFK, mort et difficulté
+  'sao_salon_id TEXT',
+  'sao_raid_heures INTEGER',
+  'sao_pvp INTEGER',
+  'sao_chasse_delai INTEGER',
+  'sao_afk INTEGER',
+  'sao_afk_heures INTEGER',
+  'sao_mort_penalite INTEGER',
+  'sao_difficulte TEXT',
 ]) {
   try {
     db.exec(`ALTER TABLE guild_config ADD COLUMN ${column}`);
@@ -843,6 +852,127 @@ db.exec(`CREATE TABLE IF NOT EXISTS invitations (
 )`);
 db.exec('CREATE INDEX IF NOT EXISTS idx_invitations_guild ON invitations (guild_id, inviter_id)');
 
+// ⚔️ Aventure SAO : inventaire, combats de boss PERSISTÉS (un bouton porte
+// l'id du combat et survit à un redémarrage), améliorations de forge,
+// quêtes du jour, raids du serveur, duels, coffres de couple et compétences
+// uniques (un seul détenteur par serveur).
+db.exec(`
+CREATE TABLE IF NOT EXISTS sao_inventaire (
+  guild_id TEXT NOT NULL,
+  user_id  TEXT NOT NULL,
+  objet    TEXT NOT NULL,
+  qte      INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (guild_id, user_id, objet)
+);
+CREATE TABLE IF NOT EXISTS sao_combats (
+  id       INTEGER PRIMARY KEY AUTOINCREMENT,
+  guild_id TEXT NOT NULL,
+  user_id  TEXT NOT NULL,
+  etage    INTEGER NOT NULL,
+  etat     TEXT NOT NULL,
+  statut   TEXT NOT NULL DEFAULT 'en_cours',
+  cree_le  INTEGER NOT NULL,
+  maj_le   INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_sao_combats_joueur ON sao_combats (guild_id, user_id, statut);
+CREATE TABLE IF NOT EXISTS sao_ameliorations (
+  guild_id TEXT NOT NULL,
+  user_id  TEXT NOT NULL,
+  arme     TEXT NOT NULL,
+  plus     INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (guild_id, user_id, arme)
+);
+CREATE TABLE IF NOT EXISTS sao_quetes (
+  guild_id TEXT NOT NULL,
+  user_id  TEXT NOT NULL,
+  jour     TEXT NOT NULL,
+  cle      TEXT NOT NULL,
+  objectif INTEGER NOT NULL,
+  progres  INTEGER NOT NULL DEFAULT 0,
+  faite    INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (guild_id, user_id, jour, cle)
+);
+CREATE TABLE IF NOT EXISTS sao_raids (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  guild_id     TEXT NOT NULL,
+  salon_id     TEXT,
+  message_id   TEXT,
+  boss         TEXT NOT NULL,
+  etage        INTEGER NOT NULL,
+  pv_max       INTEGER NOT NULL,
+  pv           INTEGER NOT NULL,
+  statut       TEXT NOT NULL DEFAULT 'actif',
+  cree_le      INTEGER NOT NULL,
+  expire_le    INTEGER NOT NULL,
+  fini_le      INTEGER,
+  dernier_coup TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_sao_raids_guild ON sao_raids (guild_id, statut);
+CREATE TABLE IF NOT EXISTS sao_raid_coups (
+  raid_id    INTEGER NOT NULL,
+  user_id    TEXT NOT NULL,
+  degats     INTEGER NOT NULL DEFAULT 0,
+  coups      INTEGER NOT NULL DEFAULT 0,
+  dernier_le INTEGER,
+  PRIMARY KEY (raid_id, user_id)
+);
+CREATE TABLE IF NOT EXISTS sao_duels (
+  id        INTEGER PRIMARY KEY AUTOINCREMENT,
+  guild_id  TEXT NOT NULL,
+  a         TEXT NOT NULL,
+  b         TEXT NOT NULL,
+  statut    TEXT NOT NULL DEFAULT 'attente',
+  cree_le   INTEGER NOT NULL,
+  vainqueur TEXT,
+  journal   TEXT
+);
+CREATE TABLE IF NOT EXISTS sao_coffres (
+  guild_id TEXT NOT NULL,
+  couple   TEXT NOT NULL,
+  col      INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (guild_id, couple)
+);
+CREATE TABLE IF NOT EXISTS sao_coffre_objets (
+  guild_id TEXT NOT NULL,
+  couple   TEXT NOT NULL,
+  objet    TEXT NOT NULL,
+  qte      INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (guild_id, couple, objet)
+);
+CREATE TABLE IF NOT EXISTS sao_uniques (
+  guild_id   TEXT NOT NULL,
+  competence TEXT NOT NULL,
+  user_id    TEXT NOT NULL,
+  obtenu_le  TEXT,
+  PRIMARY KEY (guild_id, competence)
+);
+`);
+for (const column of [
+  'position INTEGER',        // étage où l'on chasse (≤ floor) : /sao voyager
+  'arme TEXT',               // clé de l'arme équipée (NULL = reprise de weapon)
+  'armure TEXT',
+  'morts INTEGER',           // Monument of Life
+  'boss_vaincus INTEGER',
+  'monstres INTEGER',
+  'quotidien_jour TEXT',     // AAAA-MM-JJ de la dernière quotidienne
+  'serie INTEGER',
+  'repas TEXT',              // repas actif et chasses restantes
+  'repas_reste INTEGER',
+  'argo_etage INTEGER',      // renseignement d'Argo acheté pour ce boss
+  'pv_le INTEGER',           // dernière régénération (ms)
+  'reapparition INTEGER',    // retour du Monument of Life (ms)
+  'peche_morsure INTEGER',   // ligne à l'eau : instant de la morsure (ms)
+  'peche_jeton INTEGER',
+  'peche_le INTEGER',
+  'pvp_victoires INTEGER',
+  'pvp_defaites INTEGER',
+  'poissons INTEGER',
+]) {
+  try {
+    db.exec(`ALTER TABLE sao_players ADD COLUMN ${column}`);
+  } catch {}
+}
+
 try {
   const done = db.prepare("SELECT value FROM app_state WHERE key = 'rp_global_migrated'").get();
   if (!done) {
@@ -973,6 +1103,14 @@ const DEFAULT_CONFIG = {
   bot_profil: null,
   confession_enabled: 0,
   confession_channel_id: null,
+  sao_salon_id: null,
+  sao_raid_heures: 6,
+  sao_pvp: 1,
+  sao_chasse_delai: 15,
+  sao_afk: 1,
+  sao_afk_heures: 8,
+  sao_mort_penalite: 10,
+  sao_difficulte: 'normal',
   xp_text: 20,
   xp_voice: 20,
   xp_cooldown: 60,

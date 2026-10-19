@@ -282,8 +282,10 @@ module.exports = {
       return require('../commands/vgache').handleButton(interaction);
     }
 
-    // ----- Aventure SAO : boutons de combat / chasse / forge -----
-    if (interaction.isButton() && interaction.customId.startsWith('sao:')) {
+    // ----- Aventure SAO : boutons ET menus (combat, boutique, classements…) -----
+    // Le gestionnaire revérifie sao_enabled : un vieux bouton d'un module
+    // coupé ne doit plus rien faire.
+    if ((interaction.isButton() || interaction.isStringSelectMenu()) && interaction.customId.startsWith('sao:')) {
       if (!interaction.inGuild()) return horsServeur(interaction);
       return require('../commands/sao').handleButton(interaction);
     }
@@ -471,8 +473,10 @@ module.exports = {
     // chaque commande déclare `guildModule` et la config porte `<module>_enabled`.
     if (command.guildModule && interaction.inGuild() && !cfg[`${command.guildModule}_enabled`]) {
       const labels = { interact: 'Interactions', sao: 'Aventure SAO', confession: 'Confessions' };
+      // La catégorie de /config où se trouve l'interrupteur.
+      const categories = { sao: '⚔️ Aventure SAO' };
       return interaction.reply({
-        content: `⛔ Le **module ${labels[command.guildModule] || command.guildModule}** n'est pas activé sur ce serveur. Un staff peut l'activer via \`/config\` → 🎉 Communauté.`,
+        content: `⛔ Le **module ${labels[command.guildModule] || command.guildModule}** n'est pas activé sur ce serveur. Un staff peut l'activer via \`/config\` → ${categories[command.guildModule] || '🎉 Communauté'}.`,
         flags: MessageFlags.Ephemeral,
       });
     }
