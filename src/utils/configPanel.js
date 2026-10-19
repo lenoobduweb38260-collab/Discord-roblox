@@ -23,6 +23,7 @@ const { themeParCle, listeThemes, CLES } = require('./rpThemes');
 const LG = require('./langues');
 const { lien: lienCommunaute, demanderLiaison, delier } = require('./communaute');
 const M = require('./miseEnPage');
+const { mariageView, gererConfigMariage } = require('./configMariage');
 
 // Panneau central de configuration : /config ouvre une vue d'ensemble avec un
 // menu de catégories ; chaque catégorie se règle via des sélecteurs de rôles,
@@ -219,6 +220,7 @@ function mainView(guild) {
       .addOptions(
         { label: 'Modules (RP, Interactions, SAO)', value: 'rp', emoji: '🎭', description: 'Activer/désactiver RP, Interactions et Aventure SAO' },
         { label: 'Communauté', value: 'communaute', emoji: '🎉', description: 'Interactions, /lc, /mariage, SAO et confessions anonymes' },
+        { label: 'Mariage', value: 'mariage', emoji: '💍', description: 'Avantages des couples : bonus d\'XP, flamme, anniversaires' },
         { label: 'Rôles', value: 'roles', emoji: '👮', description: 'Staff, administration, en service' },
         { label: 'Arrivées & départs', value: 'arrivees', emoji: '👋', description: 'Salon d\'arrivée, salon de départ, rôles automatiques' },
         { label: 'Salons', value: 'salons', emoji: '📢', description: 'Logs, niveaux, service, staff' },
@@ -1131,7 +1133,7 @@ function absencesView(guild) {
   };
 }
 
-const CATEGORY_VIEWS = { communaute: communauteView, rp: rpView, roles: rolesView, arrivees: arriveesView, salons: salonsView, xp: xpView, securite: securiteView, whitelist: whitelistView, tickets: ticketsView, vocal: vocalView, musique: musiqueView, identitebot: identiteBotView, absences: absencesView, reseaux: reseauxView };
+const CATEGORY_VIEWS = { communaute: communauteView, rp: rpView, roles: rolesView, arrivees: arriveesView, salons: salonsView, xp: xpView, securite: securiteView, whitelist: whitelistView, tickets: ticketsView, vocal: vocalView, musique: musiqueView, identitebot: identiteBotView, absences: absencesView, reseaux: reseauxView, mariage: mariageView };
 const SECURITY_TOGGLES = new Set(['antispam_enabled', 'antinuke_enabled', 'captcha_enabled']);
 
 function xpModal(cfg) {
@@ -1207,6 +1209,9 @@ async function handleConfigInteraction(interaction) {
       if (!view) return;
       return await mettreAJour(interaction, view(interaction.guild));
     }
+
+    // 💍 Mariage : avantages, valeurs (fenêtre), salon des anniversaires.
+    if (id.startsWith('cfgmar:')) return await gererConfigMariage(interaction);
 
     // Sécurité : bascule anti-spam / anti-nuke / captcha.
     if (id.startsWith('cfgsec:')) {

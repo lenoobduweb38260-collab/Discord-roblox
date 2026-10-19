@@ -98,7 +98,9 @@ async function membreAuHasard(interaction) {
 }
 
 async function carteLc(interaction, auteur, cible, auHasard, maintenant = new Date()) {
-  const pourcentage = pourcentageDuJour(auteur.id, cible.id, maintenant);
+  // 💍 Entre conjoints : jamais moins de 90 %, avec un verdict à part.
+  const { pourcentage, verdict: verdictCouple } = require('../utils/couple')
+    .pourcentageLcCouple(auteur.id, cible.id, pourcentageDuJour(auteur.id, cible.id, maintenant), interaction.guildId);
   const nomA = nom(interaction, auteur);
   const nomB = nom(interaction, cible);
   // Dans l'image, un nom que la police ne sait pas écrire (cyrillique,
@@ -108,7 +110,7 @@ async function carteLc(interaction, auteur, cible, auHasard, maintenant = new Da
   const lignes = [
     `**${nomA}** 💞 **${nomB}**`,
     `## ${pourcentage} %`,
-    verdict(pourcentage),
+    verdictCouple || verdict(pourcentage),
   ];
   if (auHasard) lignes.push('-# 🎲 Partenaire tiré au sort parmi les membres du serveur');
   lignes.push(`-# 📅 Même duo, même résultat jusqu'à <t:${finDuJour(maintenant)}:t>`);

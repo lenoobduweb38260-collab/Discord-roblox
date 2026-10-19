@@ -483,6 +483,43 @@ CREATE TABLE IF NOT EXISTS mariages (
   PRIMARY KEY (a, b)
 );
 
+-- 💞 Vie de couple (avantages du mariage, utils/couple.js). Meme cle que
+-- mariages (a < b) : tout s'efface au divorce. Les jours sont ceux de Paris
+-- (AAAA-MM-JJ). flamme = serie de jours ou LES DEUX ont fait leur bisou,
+-- flamme_jour = dernier de ces jours ; un jour manque eteint la flamme,
+-- record la garde en memoire.
+CREATE TABLE IF NOT EXISTS mariage_flammes (
+  a           TEXT NOT NULL,
+  b           TEXT NOT NULL,
+  bisou_a     TEXT,
+  bisou_b     TEXT,
+  flamme      INTEGER NOT NULL DEFAULT 0,
+  flamme_jour TEXT,
+  record      INTEGER NOT NULL DEFAULT 0,
+  jours       INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (a, b)
+);
+
+-- 💌 Mot doux : un seul par destinataire, le nouveau remplace l'ancien.
+CREATE TABLE IF NOT EXISTS mariage_mots_doux (
+  a     TEXT NOT NULL,
+  b     TEXT NOT NULL,
+  pour  TEXT NOT NULL,
+  texte TEXT NOT NULL,
+  at    TEXT NOT NULL,
+  lu    INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (a, b, pour)
+);
+
+-- 🎂 Mensiversaires deja annonces : une seule annonce par serveur et par date.
+CREATE TABLE IF NOT EXISTS mariage_annonces (
+  guild_id TEXT NOT NULL,
+  a        TEXT NOT NULL,
+  b        TEXT NOT NULL,
+  jour     TEXT NOT NULL,
+  PRIMARY KEY (guild_id, a, b, jour)
+);
+
 -- 🔢 Matricules RP : le numero qui suit une personne dans le RP.
 -- Relie les trois facons de la designer — matricule, pseudo du jeu, compte
 -- Discord — pour qu'aucune ne soit un cul-de-sac. Le retrait garde la ligne
@@ -668,6 +705,13 @@ for (const column of [
   // 💌 Confessions anonymes : interrupteur et salon de publication
   'confession_enabled INTEGER',
   'confession_channel_id TEXT',
+  // 💍 Avantages du mariage (utils/couple.js) — NULL = valeur par défaut
+  'mariage_avantages INTEGER',
+  'mariage_bonus_xp INTEGER',
+  'mariage_lune_de_miel_jours INTEGER',
+  'mariage_bisou_xp INTEGER',
+  'mariage_actif_minutes INTEGER',
+  'mariage_salon_id TEXT',
 ]) {
   try {
     db.exec(`ALTER TABLE guild_config ADD COLUMN ${column}`);
@@ -976,6 +1020,12 @@ const DEFAULT_CONFIG = {
   xp_text: 20,
   xp_voice: 20,
   xp_cooldown: 60,
+  mariage_avantages: 1,
+  mariage_bonus_xp: 10,
+  mariage_lune_de_miel_jours: 7,
+  mariage_bisou_xp: 30,
+  mariage_actif_minutes: 10,
+  mariage_salon_id: null,
 };
 
 const getConfigStmt = db.prepare('SELECT * FROM guild_config WHERE guild_id = ?');
