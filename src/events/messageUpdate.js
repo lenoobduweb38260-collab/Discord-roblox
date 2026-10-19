@@ -18,6 +18,16 @@ module.exports = {
     // Ignore les « modifications » sans changement de texte (ex : aperçu de lien ajouté).
     if (oldMessage.content === newMessage.content) return;
 
+    // ══ 🔢 SALON DE COMPTAGE : le dernier nombre modifié ═══════════════
+    // Réécrit en autre chose, il ne dit plus où en est le compte : le bot
+    // rappelle le vrai nombre. Le journal suit son cours ensuite.
+    try {
+      await require('../utils/comptage').surModificationComptage(oldMessage, newMessage);
+    } catch (err) {
+      console.warn(`⚠️ Salon de comptage (modification) : ${err.message}`);
+    }
+    // ══ fin du salon de comptage ═══════════════════════════════════════
+
     const cfg = getGuildConfig(newMessage.guild.id);
     // 🔇 Pas de log pour une modification DANS le salon de logs.
     if (cfg.log_channel_id && String(newMessage.channelId) === String(cfg.log_channel_id)) return;

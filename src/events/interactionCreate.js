@@ -276,6 +276,14 @@ module.exports = {
       return require('../commands/partenariat').handleButton(interaction);
     }
 
+    // ----- Comptage : pages du classement, remise à zéro confirmée -----
+    // L'interrupteur du module (un salon réglé) est revérifié dans le
+    // gestionnaire, au moment du clic.
+    if (interaction.isButton() && interaction.customId?.startsWith('cpt:')) {
+      if (!interaction.inGuild()) return horsServeur(interaction);
+      return require('../commands/comptage').handleButton(interaction);
+    }
+
     // ----- Vgache : bouton « Réclamer » -----
     if (interaction.isButton() && interaction.customId.startsWith('vg:claim:')) {
       if (!interaction.inGuild()) return horsServeur(interaction);

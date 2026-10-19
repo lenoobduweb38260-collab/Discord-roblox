@@ -33,6 +33,20 @@ module.exports = {
     }
 
     if (!message.guild) return;
+
+    // ══ 🔢 SALON DE COMPTAGE : le dernier nombre effacé ════════════════
+    // Avant tout autre filtre : un message hors cache arrive partiel (ni
+    // auteur ni contenu) et seul son identifiant permet de le reconnaître.
+    // Le bot republie alors le bon nombre. Un hors-jeu que le comptage a
+    // effacé lui-même ne remplit pas le journal.
+    try {
+      const compte = await require('../utils/comptage').surSuppressionComptage(message);
+      if (compte?.silencieux) return;
+    } catch (err) {
+      console.warn(`⚠️ Salon de comptage (suppression) : ${err.message}`);
+    }
+    // ══ fin du salon de comptage ═══════════════════════════════════════
+
     if (message.author?.bot) return;
 
     const cfg = getGuildConfig(message.guild.id);

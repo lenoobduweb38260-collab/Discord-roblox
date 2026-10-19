@@ -44,6 +44,22 @@ module.exports = {
       if (handled) return;
     }
 
+    // ══ 🔢 SALON DE COMPTAGE ═══════════════════════════════════════════
+    // Après l'anti-scam et l'anti-spam : un message qu'ils ont supprimé ne
+    // compte pas. Avant le délai d'XP, dont le `return` sauterait le jeu.
+    // Un nombre compté continue ensuite son chemin normal (IA, XP) ; seul un
+    // hors-jeu que le comptage vient d'EFFACER s'arrête ici.
+    if (cfg.comptage_channel_id && String(message.channelId) === String(cfg.comptage_channel_id)) {
+      const compte = await require('../utils/comptage')
+        .traiterMessageComptage(message, cfg)
+        .catch((err) => {
+          console.error('Erreur salon de comptage :', err);
+          return null;
+        });
+      if (compte?.supprime) return;
+    }
+    // ══ fin du salon de comptage ═══════════════════════════════════════
+
     // Réponse IA supervisée : sur mention du bot, il propose une réponse au
     // créateur en MP (ne bloque pas l'XP ; inactif sans AI_API_KEY).
     if (process.env.AI_API_KEY && message.mentions.has(message.client.user) && !message.mentions.everyone) {

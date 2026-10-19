@@ -449,6 +449,39 @@ CREATE TABLE IF NOT EXISTS gif_cache (
   PRIMARY KEY (categorie, url)
 );
 
+-- 🔢 Salon de comptage : l'etat du compte, UN par serveur (le salon regle
+-- dans comptage_channel_id). Il vit en base pour survivre au redemarrage.
+-- channel_id dit pour quel salon l'etat vaut : un salon change (depuis
+-- /config ou le site) remet le compte a zero, record conserve.
+-- dernier_message_id : le dernier nombre VALIDE, surveille par l'anti-triche
+-- (supprime ou modifie -> le bot republie le bon nombre).
+-- dernier_fautif : celui qui porte le role d'erreur (retire au suivant).
+-- record_depart : le record tel qu'il etait au DEBUT de la serie en cours —
+-- le depasser vaut la reaction du record, une seule fois par serie.
+CREATE TABLE IF NOT EXISTS comptage (
+  guild_id           TEXT PRIMARY KEY,
+  channel_id         TEXT,
+  courant            INTEGER NOT NULL DEFAULT 0,
+  dernier_user       TEXT,
+  dernier_message_id TEXT,
+  record             INTEGER NOT NULL DEFAULT 0,
+  record_le          TEXT,
+  record_depart      INTEGER NOT NULL DEFAULT 0,
+  erreurs            INTEGER NOT NULL DEFAULT 0,
+  dernier_fautif     TEXT,
+  maj_le             TEXT
+);
+
+-- 🔢 Classement du comptage : bons nombres et series cassees, par membre.
+CREATE TABLE IF NOT EXISTS comptage_stats (
+  guild_id TEXT NOT NULL,
+  user_id  TEXT NOT NULL,
+  justes   INTEGER NOT NULL DEFAULT 0,
+  erreurs  INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (guild_id, user_id)
+);
+CREATE INDEX IF NOT EXISTS idx_comptage_stats_rang ON comptage_stats (guild_id, justes);
+
 -- 💌 Confessions anonymes (/confession). L'auteur n'est JAMAIS affiche sur
 -- le serveur : il n'apparait qu'au staff du bot, sur la carte d'une
 -- confession signalee (suicide, menace, insulte). statut : publiee |
@@ -598,6 +631,15 @@ for (const column of [
   'captcha_max_essais INTEGER',
   'captcha_kick INTEGER',
   'partner_channel_id TEXT',
+  // 🔢 Salon de comptage (vide = désactivé) et ses règles. NULL = défaut :
+  // lire avec `?? défaut` (voir reglagesComptage dans utils/comptage.js).
+  'comptage_channel_id TEXT',
+  'comptage_meme_personne INTEGER',     // 1 = on peut compter deux fois de suite
+  'comptage_maths INTEGER',             // 1 = « 2*3 » compte pour 6
+  'comptage_reactions INTEGER',         // 1 = ✅ / 💯 / 🏆 / ❌ (défaut)
+  'comptage_supprimer INTEGER',         // 1 = les messages hors-jeu sont effacés
+  'comptage_role_erreur TEXT',          // rôle donné à celui qui casse la série
+  'comptage_xp INTEGER',                // XP par bon nombre (0 = aucune, défaut)
   'level_image_url TEXT',
   'goodbye_channel_id TEXT',
   'patch_channel_id TEXT',
@@ -952,6 +994,13 @@ const DEFAULT_CONFIG = {
   captcha_max_essais: 3,
   captcha_kick: 1,
   partner_channel_id: null,
+  comptage_channel_id: null,
+  comptage_meme_personne: 0,
+  comptage_maths: 0,
+  comptage_reactions: 1,
+  comptage_supprimer: 0,
+  comptage_role_erreur: null,
+  comptage_xp: 0,
   patch_channel_id: null,
   patch_mention: null,
   interact_enabled: 0,

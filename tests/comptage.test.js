@@ -1,0 +1,609 @@
+// 🔢 Salon de comptage — lecture des nombres et des calculs, suite, erreurs,
+// même personne, hors-jeu, record, file par salon, anti-triche (nombre effacé
+// ou modifié), redémarrage, rôle d'erreur, XP, /comptage et /config.
+const path = require('path');
+const fs = require('fs');
+const os = require('os');
+const AIDES = path.join(__dirname, 'aides');
+const SRC = path.join(__dirname, '..', 'src');
+
+// ⚠️ AVANT tout require : src/database.js ouvre sa base au chargement.
+const RACINE = fs.mkdtempSync(path.join(os.tmpdir(), 'comptage-'));
+process.env.DATA_FILE = path.join(RACINE, 'data.sqlite');
+delete process.env.AI_API_KEY;
+
+const Module = require('module');
+const vrai = Module.prototype.require;
+Module.prototype.require = function (n) {
+  if (n === 'discord.js') return vrai.call(this, path.join(AIDES, 'stub-discord.js'));
+  if (n === 'better-sqlite3') return vrai.call(this, path.join(AIDES, 'shim-sqlite.js'));
+  return vrai.apply(this, arguments);
+};
+
+const { db, setGuildConfig, getGuildConfig } = require('../src/database');
+let C = require('../src/utils/comptage');
+let MC = require('../src/events/messageCreate');
+const MD = require('../src/events/messageDelete');
+const MU = require('../src/events/messageUpdate');
+const IC = require('../src/events/interactionCreate');
+const CMD = require('../src/commands/comptage');
+const CC = require('../src/utils/comptageConfig');
+const { getLevels } = require('../src/utils/levels');
+const TUTO = require('../src/utils/tutoriel');
+
+let ok = 0, ko = 0;
+const V = (t, c, d = '') => { if (c) { ok++; console.log('  ✅ ' + t); } else { ko++; console.log('  ❌ ' + t + (d ? ' — ' + d : '')); } };
+const texte = (o) => JSON.stringify(o);
+const warnOrig = console.warn;
+console.warn = () => {};
+const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// ── Faux Discord ────────────────────────────────────────────────────────
+const personne = (id, nom, bot = false) => ({
+  id, username: nom, displayName: nom, globalName: nom, bot, tag: `${nom}#0`, displayAvatarURL: () => '',
+});
+const USERS = {
+  u1: personne('u1', 'Alice'), u2: personne('u2', 'Bob'), u3: personne('u3', 'Chloé'),
+  staff: personne('staff', 'Modo'), b1: personne('b1', 'RoboBot', true), bot: personne('bot', 'Bot', true),
+};
+const ROLES = new Map([
+  ['RERR', { id: 'RERR', name: 'Boulet', position: 1, managed: false }],
+  ['HAUT', { id: 'HAUT', name: 'Tout en haut', position: 99, managed: false }],
+  ['GERE', { id: 'GERE', name: 'Intégration', position: 1, managed: true }],
+]);
+
+let seq = 0;
+function salon(id) {
+  const s = {
+    id, envois: [], isTextBased: () => true, guild: null,
+    async send(m) { const msg = { id: `B${++seq}`, channelId: id, ...m }; s.envois.push(msg); return msg; },
+  };
+  return s;
+}
+const SALONS = { CPT: salon('CPT'), AUTRE: salon('AUTRE'), GEN: salon('GEN'), LOGS: salon('LOGS') };
+const CMDS = new Map([['comptage', CMD]]);
+const client = {
+  user: { id: 'bot' }, commands: CMDS,
+  users: { fetch: async (id) => USERS[id] || null },
+  channels: { fetch: async (id) => SALONS[id] || null },
+  guilds: { cache: new Map() },
+};
+const MEMBRES = new Map();
+const guild = {
+  id: 'G1', name: 'Labo', iconURL: () => null,
+  members: {
+    cache: new Map(),
+    fetch: async (id) => (USERS[id] ? membre(id) : null),
+    me: { id: 'bot', roles: { highest: { position: 50 } } },
+  },
+  channels: { fetch: async (id) => SALONS[id] || null, cache: new Map() },
+  roles: { cache: ROLES },
+  fetchAuditLogs: async () => ({ entries: new Map() }),
+};
+Object.values(SALONS).forEach((s) => { s.guild = guild; });
+function membre(id) {
+  if (!MEMBRES.has(id)) {
+    const roles = new Map();
+    MEMBRES.set(id, {
+      id, user: USERS[id], guild, displayName: USERS[id]?.displayName,
+      roles: {
+        cache: roles, highest: { position: 0 },
+        async add(r) { roles.set(String(r), true); return this; },
+        async remove(r) { roles.delete(String(r)); return this; },
+      },
+      permissions: { has: () => id === 'staff' },
+    });
+  }
+  return MEMBRES.get(id);
+}
+
+// Réactions : délai réglable, ordre d'achèvement et nombre de jugements
+// simultanés — c'est ce que la file par salon doit garder à 1.
+let delaiReaction = 0;
+let enCours = 0;
+let maxEnCours = 0;
+const ORDRE = [];
+function fauxMessage({ user = 'u1', contenu = '', salonId = 'CPT', system = false } = {}) {
+  const s = SALONS[salonId];
+  const m = {
+    id: `U${++seq}`, content: contenu, client, guild, guildId: 'G1', channel: s, channelId: salonId,
+    author: USERS[user], member: USERS[user] ? membre(user) : null, system, partial: false,
+    url: `https://discord.com/channels/G1/${salonId}/x`,
+    inGuild: () => true, attachments: { size: 0, values: () => [][Symbol.iterator]() },
+    mentions: { has: () => false, everyone: false, users: { size: 0 }, roles: { size: 0 } },
+    reactions: [], supprime: false,
+    async react(e) {
+      enCours++;
+      maxEnCours = Math.max(maxEnCours, enCours);
+      if (delaiReaction) await attendre(delaiReaction * (1 + (Number(m.id.slice(1)) % 3)));
+      m.reactions.push(e);
+      ORDRE.push(m.id);
+      enCours--;
+      return {};
+    },
+    async delete() { m.supprime = true; return m; },
+  };
+  return m;
+}
+const poster = async (user, contenu, salonId = 'CPT') => {
+  const m = fauxMessage({ user, contenu, salonId });
+  await MC.execute(m);
+  return m;
+};
+const dernierEnvoi = (s = 'CPT') => SALONS[s].envois[SALONS[s].envois.length - 1] || {};
+const etat = () => C.etatComptage('G1');
+
+// type : 'commande' | 'bouton' | 'modal' | 'salon' | 'role' | 'texte'
+function fausse({ type = 'commande', user = 'u1', nom = null, sub = null, options = {}, customId = null, champs = {}, valeurs = [] } = {}) {
+  const menu = ['salon', 'role', 'texte'].includes(type);
+  return {
+    client, guild, guildId: 'G1', channelId: 'GEN', channel: SALONS.GEN, locale: 'fr', user: USERS[user], member: membre(user),
+    commandName: nom, customId, values: valeurs, deferred: false, replied: false,
+    message: { id: 'MSG', flags: 0, components: [], embeds: [{}], createdTimestamp: Date.now() },
+    inGuild: () => true, isAutocomplete: () => false, isChatInputCommand: () => type === 'commande',
+    isButton: () => type === 'bouton', isModalSubmit: () => type === 'modal', isFromMessage: () => type === 'modal',
+    isMessageComponent: () => type === 'bouton' || menu, isStringSelectMenu: () => type === 'texte',
+    isChannelSelectMenu: () => type === 'salon', isRoleSelectMenu: () => type === 'role', isUserSelectMenu: () => false,
+    isAnySelectMenu: () => menu,
+    options: {
+      getSubcommand: () => sub, getString: (k) => options[k] ?? null, getInteger: (k) => options[k] ?? null,
+      getBoolean: (k) => options[k] ?? null,
+    },
+    fields: { getTextInputValue: (k) => champs[k] ?? '' },
+    reponses: [], suivis: [], mises: [], modales: [],
+    async reply(p) { this.replied = true; this.reponses.push(p); return p; },
+    async deferReply() { this.deferred = true; },
+    async editReply(p) { this.reponses.push(p); return p; },
+    async followUp(p) { this.suivis.push(p); return p; },
+    async update(p) { this.replied = true; this.mises.push(p); return p; },
+    async deferUpdate() { this.deferred = true; },
+    async showModal(m) { this.modales.push(m.toJSON ? m.toJSON() : m); },
+  };
+}
+const embedDe = (p) => p?.embeds?.[0]?.data || p?.embeds?.[0] || {};
+const rangees = (p) => (p?.components || []).map((r) => (r.toJSON ? r.toJSON() : r));
+const ids = (p) => rangees(p).flatMap((r) => r.components.map((c) => c.custom_id).filter(Boolean));
+const titreLog = () => embedDe(SALONS.LOGS.envois[SALONS.LOGS.envois.length - 1]).title;
+
+(async () => {
+  console.log('\n1) Lecture des nombres et des calculs (sans eval)');
+  {
+    const L = (t, maths = false) => C.lireNombreComptage(t, { maths });
+    V('« 5 » → 5', L('5').ok && L('5').valeur === 5);
+    V('« 12 lol » → 12 : seul le DÉBUT compte', L('  12 lol').valeur === 12);
+    V('« 5 xD » → 5 : un sourire n\'est pas une multiplication', L('5 xD').valeur === 5 && !L('5 xD', true).expression);
+    V('« 5 - c\'est moi » → 5', L('5 - c\'est moi', true).valeur === 5);
+    V('« bonjour », « @Bob 5 » → hors-jeu', !L('bonjour').ok && !L('<@u2> 5').ok);
+    V('décimal « 1,5 » / « 2.5 » → hors-jeu', L('1,5').raison === 'decimal' && L('2.5', true).raison === 'decimal');
+    V('plus de 15 chiffres → hors-jeu', L('1234567890123456').raison === 'trop_grand');
+    V('calculs coupés : « 2+2 » ignoré (jamais lu comme 2)', !L('2+2').ok && L('2+2').raison === 'calcul_refuse');
+    const calc = (t) => L(t, true).valeur;
+    V('calculs : 2+2, (10+2)/4, 2**3, 5x3, 3 × 4, 9 ÷ 3, 10 − 4',
+      calc('2+2') === 4 && calc('(10+2)/4') === 3 && calc('2**3') === 8 && calc('5x3') === 15 && calc('3 × 4') === 12
+      && calc('9 ÷ 3') === 3 && calc('10 − 4') === 6);
+    V('priorités : 2+3*4 = 14, 2^3^2 = 512, -2^2 = -4, -1+3 = 2',
+      calc('2+3*4') === 14 && calc('2^3^2') === 512 && calc('-2^2') === -4 && calc('-1+3') === 2);
+    V('division non entière ou par zéro → refusée', !L('7/2', true).ok && !L('1/0', true).ok);
+    V('puissance démesurée → refusée (9^9^9, 2^1000, 2^53)', !L('9^9^9', true).ok && !L('2^1000', true).ok && !L('2^53', true).ok && calc('2^52') === 2 ** 52);
+    V('parenthèse non fermée → refusée', !L('(2+3', true).ok);
+    V('12 parenthèses imbriquées passent, 13 non',
+      calc('('.repeat(12) + '7' + ')'.repeat(12)) === 7 && !L('('.repeat(13) + '7' + ')'.repeat(13), true).ok);
+    V('calcul trop long → refusé en bloc', L('1' + '+1'.repeat(70), true).raison === 'trop_long');
+    V('« 5 » suivi de 150 espaces puis du texte → 5 (seul le calcul est borné)', L('5' + ' '.repeat(150) + 'salut').valeur === 5);
+    const E = C.evaluerExpressionComptage;
+    V('évaluateur : tout le texte doit être un calcul', E('2+3*4') === 14 && E('2+3 lol') === null);
+    V('code JavaScript : jamais exécuté, toujours refusé',
+      [`process.exit()`, 'constructor', 'this', '__proto__', 'require("fs")', '1;process.exit()', '[]+{}', '0x10', '1e308', 'Infinity', 'NaN']
+        .every((t) => E(t) === null || Number.isSafeInteger(E(t))) && E('1;process.exit()') === null && E('constructor') === null);
+    V('texte énorme → refusé sans lenteur', (() => { const t0 = Date.now(); const r = E('('.repeat(5000)); return r === null && Date.now() - t0 < 200; })());
+    const source = fs.readFileSync(path.join(SRC, 'utils/comptage.js'), 'utf8').replace(/\/\/.*$/gm, '');
+    V('ni eval ni Function dans le module', !/\beval\s*\(|new\s+Function|\bFunction\s*\(/.test(source));
+  }
+
+  console.log('\n2) Jugement (logique pure)');
+  {
+    const J = C.jugerComptage;
+    const e = { courant: 4, dernier_user: 'u1' };
+    V('5 par un autre → juste', J(e, 5, 'u2').verdict === 'juste');
+    V('5 par le même → faux (deux fois de suite)', J(e, 5, 'u1').raison === 'deux_fois');
+    V('… sauf si le serveur l\'autorise', J(e, 5, 'u1', { memePersonne: true }).verdict === 'juste');
+    V('6 au lieu de 5 → faux (nombre)', J(e, 6, 'u2').raison === 'nombre' && J(e, 6, 'u2').attendu === 5);
+    const R = C.reglagesComptage({ comptage_channel_id: null });
+    V('réglages par défaut : coupé, réactions oui, calculs non, XP 0', !R.salon && R.reactions && !R.maths && !R.memePersonne && !R.supprimer && R.xp === 0 && !R.roleErreur);
+    V('XP bornée à 0…1000', C.reglagesComptage({ comptage_xp: 99999 }).xp === 1000 && C.reglagesComptage({ comptage_xp: -5 }).xp === 0);
+    V('réglages en base (colonnes + défauts)', ['comptage_channel_id', 'comptage_meme_personne', 'comptage_maths', 'comptage_reactions', 'comptage_supprimer', 'comptage_role_erreur', 'comptage_xp'].every((k) => k in getGuildConfig('ZZ')));
+  }
+
+  setGuildConfig('G1', 'log_channel_id', 'LOGS');
+  setGuildConfig('G1', 'comptage_channel_id', 'CPT');
+
+  console.log('\n3) Une suite correcte');
+  {
+    const m1 = await poster('u1', '1');
+    const m2 = await poster('u2', '2');
+    const m3 = await poster('u1', '3 !');
+    V('trois ✅', [m1, m2, m3].every((m) => texte(m.reactions) === '["✅"]'), texte([m1.reactions, m2.reactions, m3.reactions]));
+    const e = etat();
+    V('état : 3, dernier compteur Alice, dernier message retenu', e.courant === 3 && e.dernier_user === 'u1' && e.dernier_message_id === m3.id && e.channel_id === 'CPT');
+    V('classement : Alice 2, Bob 1', C.statsMembreComptage('G1', 'u1').justes === 2 && C.statsMembreComptage('G1', 'u2').justes === 1 && C.statsMembreComptage('G1', 'u1').rang === 1);
+    const ailleurs = await poster('u2', '4', 'GEN');
+    V('un nombre dans un autre salon ne compte pas', etat().courant === 3 && !ailleurs.reactions.length);
+    const robot = fauxMessage({ user: 'b1', contenu: '4' });
+    await MC.execute(robot);
+    V('un autre bot est ignoré', etat().courant === 3 && !robot.reactions.length);
+    V('… le bot lui-même aussi, et les messages système', (await C.traiterMessageComptage(fauxMessage({ user: 'bot', contenu: '4' }))).traite === false
+      && (await C.traiterMessageComptage(fauxMessage({ user: 'u2', contenu: '4', system: true }))).traite === false);
+  }
+
+  console.log('\n4) Messages hors-jeu');
+  {
+    const a = await poster('u2', 'salut tout le monde');
+    const b = await poster('u2', '2+2');
+    V('ignorés : ni réaction ni effacement, compte inchangé', !a.reactions.length && !a.supprime && !b.reactions.length && etat().courant === 3);
+    setGuildConfig('G1', 'comptage_supprimer', 1);
+    const logsAvant = SALONS.LOGS.envois.length;
+    const c = await poster('u2', 'blabla');
+    V('suppression activée → le hors-jeu est effacé', c.supprime === true && etat().courant === 3);
+    const t0 = Date.now();
+    await MD.execute(c);
+    V('… et son effacement ne remplit pas le journal', SALONS.LOGS.envois.length === logsAvant && Date.now() - t0 < 1000);
+    const d = await poster('u2', '4');
+    V('un nombre n\'est jamais effacé', !d.supprime && texte(d.reactions) === '["✅"]' && etat().courant === 4);
+    setGuildConfig('G1', 'comptage_supprimer', 0);
+  }
+
+  console.log('\n5) Une erreur → retour à 0');
+  {
+    const avant = SALONS.CPT.envois.length;
+    const m = await poster('u1', '7');
+    const msg = dernierEnvoi();
+    V('réaction ❌', texte(m.reactions) === '["❌"]');
+    V('le message exact', SALONS.CPT.envois.length === avant + 1
+      && msg.content.startsWith('💥 <@u1> a cassé la série à **4** ! Le prochain nombre était **5**. On repart de **0** : le prochain est **1**.'), msg.content);
+    V('… avec le record du serveur', /🏆 Record du serveur : \*\*4\*\*/.test(msg.content));
+    V('… sans pinguer personne', texte(msg.allowedMentions) === '{"parse":[]}');
+    const e = etat();
+    V('compte à 0, plus de dernier compteur, une série cassée', e.courant === 0 && e.dernier_user === null && e.dernier_message_id === null && e.erreurs === 1 && e.record === 4);
+    V('le fautif a une erreur au classement', C.statsMembreComptage('G1', 'u1').erreurs === 1);
+    const zero = await poster('u3', '5');
+    V('à 0 : ❌ sans message ni sanction', texte(zero.reactions) === '["❌"]' && SALONS.CPT.envois.length === avant + 1 && etat().erreurs === 1);
+    setGuildConfig('G1', 'comptage_reactions', 0);
+    const sans = await poster('u3', '9');
+    V('à 0, réactions coupées : un mot à la place', !sans.reactions.length && dernierEnvoi().content === '❌ <@u3>, le compte commence à **1**.');
+    setGuildConfig('G1', 'comptage_reactions', 1);
+  }
+
+  console.log('\n6) La même personne deux fois de suite');
+  {
+    await poster('u1', '1');
+    const m = await poster('u1', '2');
+    V('casse la série', texte(m.reactions) === '["❌"]' && etat().courant === 0 && /Pas deux fois de suite/.test(dernierEnvoi().content));
+    setGuildConfig('G1', 'comptage_meme_personne', 1);
+    const a = await poster('u1', '1');
+    const b = await poster('u1', '2');
+    V('autorisé par le serveur → deux ✅', texte(a.reactions) === '["✅"]' && texte(b.reactions) === '["✅"]' && etat().courant === 2);
+    setGuildConfig('G1', 'comptage_meme_personne', 0);
+  }
+
+  console.log('\n7) Les calculs dans le salon');
+  {
+    setGuildConfig('G1', 'comptage_maths', 1);
+    const a = await poster('u2', '(1+2)');
+    const b = await poster('u1', '2*2 voilà');
+    const c = await poster('u2', '10/2');
+    V('(1+2), 2*2, 10/2 → 3, 4, 5 (et 5 bat le record de 4 : 🏆)', [a, b].every((m) => m.reactions[0] === '✅') && c.reactions[0] === '🏆' && etat().courant === 5,
+      texte([a, b, c].map((m) => m.reactions)));
+    const d = await poster('u1', '7/2');
+    V('un calcul invalide est hors-jeu, pas une erreur', !d.reactions.length && etat().courant === 5);
+    const f = await poster('u1', '2+2');
+    V('un calcul faux casse la série, avec l\'explication', f.reactions[0] === '❌' && /`2\+2` = \*\*4\*\*, il fallait \*\*6\*\*/.test(dernierEnvoi().content), dernierEnvoi().content);
+    setGuildConfig('G1', 'comptage_maths', 0);
+  }
+
+  console.log('\n8) Record, 💯 et 🏆');
+  {
+    V('record actuel : 5', etat().record === 5);
+    const qui = ['u1', 'u2'];
+    const msgs = [];
+    for (let n = 1; n <= 7; n++) msgs.push(await poster(qui[n % 2], String(n)));
+    V('égaler le record → ✅ ; le battre → 🏆 ; ensuite → ✅', msgs[4].reactions[0] === '✅' && msgs[5].reactions[0] === '🏆' && msgs[6].reactions[0] === '✅', texte(msgs.map((m) => m.reactions)));
+    const e = etat();
+    V('record à 7, daté', e.record === 7 && !!e.record_le);
+    C.definirNombreComptage('G1', 99, 'CPT');
+    const saut = await poster('u3', '100');
+    V('compte corrigé au-delà du record : le premier nombre au-dessus → 🏆', saut.reactions[0] === '🏆' && etat().record === 100);
+    C.definirNombreComptage('G1', 99, 'CPT');
+    const cent = await poster('u1', '100');
+    V('100 sans battre le record → 💯', cent.reactions[0] === '💯' && etat().record === 100);
+  }
+
+  console.log('\n9) File par salon : messages simultanés');
+  {
+    C.definirNombreComptage('G1', 0, 'CPT');
+    delaiReaction = 5;
+    maxEnCours = 0;
+    ORDRE.length = 0;
+    const lot = ['u1', 'u2', 'u1', 'u2', 'u1'].map((u, i) => fauxMessage({ user: u, contenu: String(i + 1) }));
+    await Promise.all(lot.map((m) => MC.execute(m)));
+    V('cinq nombres postés d\'un coup → cinq ✅', lot.every((m) => m.reactions[0] === '✅') && etat().courant === 5, texte(lot.map((m) => m.reactions)));
+    V('jamais deux jugements à la fois dans le salon', maxEnCours === 1, String(maxEnCours));
+    V('jugés dans l\'ordre d\'arrivée', texte(ORDRE) === texte(lot.map((m) => m.id)), texte(ORDRE));
+    const x = fauxMessage({ user: 'u2', contenu: '6' });
+    const y = fauxMessage({ user: 'u3', contenu: '6' });
+    await Promise.all([MC.execute(x), MC.execute(y)]);
+    V('deux « 6 » simultanés : le premier ✅, le second casse la série', x.reactions[0] === '✅' && y.reactions[0] === '❌' && /<@u3> a cassé la série à \*\*6\*\*/.test(dernierEnvoi().content));
+    delaiReaction = 0;
+    const panne = C.enFileComptage('X', async () => { throw new Error('boom'); }).catch(() => 'rattrapé');
+    const apres = C.enFileComptage('X', async () => 42);
+    V('un travail qui échoue ne bloque pas la file', (await panne) === 'rattrapé' && (await apres) === 42);
+  }
+
+  console.log('\n10) Anti-triche : le dernier nombre effacé ou modifié');
+  {
+    await poster('u1', '1');
+    const m2 = await poster('u2', '2');
+    const partiel = { id: m2.id, channelId: 'CPT', guild, guildId: 'G1', client, partial: true, author: null, content: null, channel: SALONS.CPT };
+    await MD.execute(partiel);
+    V('effacé (même hors cache) → le bot republie le bon nombre',
+      dernierEnvoi().content === '⚠️ <@u2> a supprimé son nombre **2**. Le prochain est **3**.', dernierEnvoi().content);
+    V('… le compte, lui, ne bouge pas', etat().courant === 2 && etat().dernier_user === 'u2' && etat().dernier_message_id === null);
+    const n = SALONS.CPT.envois.length;
+    await MD.execute(partiel);
+    V('une seule alerte par nombre', SALONS.CPT.envois.length === n);
+    const m3 = await poster('u1', '3');
+    await MD.execute({ ...partiel, id: m2.id });
+    V('effacer un nombre plus ancien ne dit rien', SALONS.CPT.envois.length === n);
+    await MU.execute({ content: '3' }, { ...m3, content: '3 (pardon, faute de frappe)' });
+    V('modifier sans changer le nombre ne dit rien', SALONS.CPT.envois.length === n);
+    await MU.execute({ content: null, partial: true }, { ...m3, content: '33' });
+    V('modifier le nombre → le bot rappelle le vrai', dernierEnvoi().content === '⚠️ <@u1> a modifié son nombre **3**. Le prochain est **4**.', dernierEnvoi().content);
+    V('… et le journal des modifications suit son cours', titreLog() === '✏️ Message modifié');
+    const m4 = await poster('u2', '4');
+    V('le compte continue normalement', m4.reactions[0] === '✅' && etat().courant === 4);
+  }
+
+  console.log('\n11) Redémarrage simulé');
+  {
+    const avant = etat();
+    for (const k of Object.keys(require.cache)) if (k.startsWith(SRC)) delete require.cache[k];
+    const C2 = require('../src/utils/comptage');
+    const MC2 = require('../src/events/messageCreate');
+    V('modules rechargés (nouvelle connexion à la base)', C2 !== C && MC2 !== MC);
+    const e = C2.etatComptage('G1');
+    V('le compte, le dernier compteur et le record ont survécu', e.courant === avant.courant && e.dernier_user === 'u2' && e.record === avant.record && e.erreurs === avant.erreurs);
+    const juste = fauxMessage({ user: 'u3', contenu: '5' });
+    V('Bob ne peut toujours pas compter deux fois', C2.jugerComptage(e, 5, 'u2').raison === 'deux_fois');
+    await MC2.execute(juste);
+    V('Chloé continue : 5 ✅', juste.reactions[0] === '✅' && C2.etatComptage('G1').courant === 5);
+    C = C2;
+    MC = MC2;
+  }
+
+  console.log('\n12) Changement de salon');
+  {
+    const record = etat().record;
+    setGuildConfig('G1', 'comptage_channel_id', 'AUTRE'); // comme depuis le site, sans passer par /config
+    const a = await poster('u1', '6', 'AUTRE');
+    V('nouveau salon : le compte repart de 0 (le 6 n\'y vaut rien)', a.reactions[0] === '❌' && etat().courant === 0 && etat().channel_id === 'AUTRE');
+    const b = await poster('u1', '1', 'AUTRE');
+    V('… on y compte depuis 1, record conservé', b.reactions[0] === '✅' && etat().record === record);
+    const ancien = await poster('u2', '2', 'CPT');
+    V('l\'ancien salon ne compte plus', !ancien.reactions.length && etat().courant === 1);
+    setGuildConfig('G1', 'comptage_channel_id', 'CPT');
+  }
+
+  console.log('\n13) Rôle d\'erreur');
+  {
+    setGuildConfig('G1', 'comptage_role_erreur', 'RERR');
+    await poster('u1', '1');
+    await poster('u2', '2');
+    await poster('u1', '9');
+    V('celui qui casse reçoit le rôle', membre('u1').roles.cache.has('RERR'));
+    await poster('u2', '1');
+    await poster('u3', '5');
+    V('le suivant le reçoit, le précédent le perd', membre('u3').roles.cache.has('RERR') && !membre('u1').roles.cache.has('RERR') && etat().dernier_fautif === 'u3');
+    setGuildConfig('G1', 'comptage_role_erreur', null);
+  }
+
+  console.log('\n14) XP par bon nombre');
+  {
+    setGuildConfig('G1', 'comptage_xp', 15);
+    const avant = getLevels('G1', 'u3').xp || 0;
+    const r = await C.traiterMessageComptage(fauxMessage({ user: 'u3', contenu: '1' }));
+    V('un bon nombre rapporte l\'XP réglée', r.verdict === 'juste' && (getLevels('G1', 'u3').xp || 0) === avant + 15, `${avant} → ${getLevels('G1', 'u3').xp}`);
+    const avantFaux = getLevels('G1', 'u1').xp || 0;
+    const faux = await C.traiterMessageComptage(fauxMessage({ user: 'u1', contenu: '7' }));
+    V('une erreur ne rapporte rien', faux.verdict === 'faux' && faux.sanction === true && (getLevels('G1', 'u1').xp || 0) === avantFaux);
+    setGuildConfig('G1', 'comptage_xp', 0);
+    const avant2 = getLevels('G1', 'u2').xp || 0;
+    await C.traiterMessageComptage(fauxMessage({ user: 'u2', contenu: '1' }));
+    V('XP à 0 → aucune', (getLevels('G1', 'u2').xp || 0) === avant2);
+    const src = fs.readFileSync(path.join(SRC, 'utils/comptage.js'), 'utf8');
+    V('XP via gagnerXpServeur (contrat C), repli addXp, source « comptage »', /gagnerXpServeur\(message\.guild, message\.author\.id, 'comptage'/.test(src) && /L\.addXp\(message\.guild\.id, message\.author\.id, 'comptage'/.test(src));
+  }
+
+  console.log('\n15) /comptage');
+  {
+    let it = fausse({ nom: 'comptage', sub: 'info', user: 'u3' });
+    await IC.execute(it);
+    const info = embedDe(it.reponses[0]);
+    V('info : privée, nombre actuel, prochain, record, mes chiffres',
+      it.reponses[0]?.flags === 64 && /Nombre actuel : \*\*1\*\*/.test(info.description) && /Prochain nombre : \*\*2\*\*/.test(info.description)
+      && /Record : \*\*100\*\*/.test(info.description) && /◆ 👤 · \*\*Toi\*\*/.test(info.description), info.description);
+    V('… sans pinguer', texte(it.reponses[0].allowedMentions) === '{"parse":[]}');
+
+    const ajout = db.prepare('INSERT INTO comptage_stats (guild_id, user_id, justes, erreurs) VALUES (?, ?, ?, ?)');
+    for (let i = 0; i < 25; i++) ajout.run('G1', `x${String(i).padStart(2, '0')}`, 1000 - i, i % 2);
+    const total = C.compterCompteursComptage('G1');
+    it = fausse({ nom: 'comptage', sub: 'classement' });
+    await CMD.execute(it);
+    const p1 = it.reponses[0];
+    const lignes = embedDe(p1).description.split('\n').filter((l) => l.startsWith('➜'));
+    V('classement : 10 par page, grammaire ◆/➜, médailles', lignes.length === 10 && /^◆ 🔢 · \*\*Meilleurs compteurs\*\*/.test(embedDe(p1).description) && lignes[0].includes('🥇 <@x00> — **1000** bons nombres'), lignes[0]);
+    V('pied de page : total et page', embedDe(p1).footer.text === `${total} compteurs • Page 1/${Math.ceil(total / 10)}`, embedDe(p1).footer.text);
+    V('boutons ⏮️/⏭️ : cpt:page:0 (grisé) et cpt:page:2', texte(ids(p1)) === '["cpt:page:0","cpt:page:2"]' && rangees(p1)[0].components[0].disabled === true);
+    it = fausse({ type: 'bouton', customId: 'cpt:page:3' });
+    await IC.execute(it);
+    V('page 3 par le routeur (bouton persistant)', /\*\*21\.\*\*/.test(embedDe(it.mises[0]).description) && !/version précédente/.test(texte(it.reponses)), texte(it.mises[0]).slice(0, 200));
+
+    it = fausse({ nom: 'comptage', sub: 'definir', options: { nombre: 41 }, user: 'u1' });
+    await IC.execute(it);
+    V('definir : refusé à un membre', /réservé au \*\*staff\*\*/.test(it.reponses[0]?.content) && etat().courant !== 41);
+    it = fausse({ nom: 'comptage', sub: 'definir', options: { nombre: 41 }, user: 'staff' });
+    await IC.execute(it);
+    V('definir (staff) : compte à 41, dernier compteur oublié', etat().courant === 41 && etat().dernier_user === null && /fixé à \*\*41\*\*/.test(it.reponses[0].content));
+    V('… les joueurs sont prévenus dans le salon', dernierEnvoi().content === '🛠️ Le staff a corrigé le compte : on en est à **41**. Le prochain est **42**.');
+    V('… et c\'est journalisé', titreLog() === '🔢 Comptage corrigé');
+    const suite = await poster('u1', '42');
+    V('le compte reprend à 42', suite.reactions[0] === '✅');
+
+    it = fausse({ nom: 'comptage', sub: 'reinitialiser', user: 'staff' });
+    await IC.execute(it);
+    V('reinitialiser : une confirmation d\'abord (boutons cpt:)', texte(ids(it.reponses[0])) === '["cpt:raz:staff:0","cpt:annuler:staff"]' && it.reponses[0].flags === 64 && etat().courant === 42);
+    it = fausse({ type: 'bouton', customId: 'cpt:raz:staff:0', user: 'u1' });
+    await IC.execute(it);
+    V('un autre membre ne peut pas confirmer', /Seule la personne/.test(texte(it.reponses)) && etat().courant === 42);
+    it = fausse({ type: 'bouton', customId: 'cpt:annuler:staff', user: 'staff' });
+    await IC.execute(it);
+    V('annuler : rien ne change', /annulée/.test(texte(it.mises[0])) && etat().courant === 42);
+    it = fausse({ type: 'bouton', customId: 'cpt:raz:staff:0', user: 'staff' });
+    await IC.execute(it);
+    const e = etat();
+    V('confirmer : compte, record et séries cassées à 0', e.courant === 0 && e.record === 0 && e.erreurs === 0 && /remis à zéro/.test(texte(it.mises[0])));
+    V('… classement conservé, joueurs prévenus, journal', C.compterCompteursComptage('G1') === total && /remis le comptage à zéro/.test(dernierEnvoi().content) && titreLog() === '🔢 Comptage remis à zéro');
+    it = fausse({ type: 'bouton', customId: 'cpt:raz:staff:1', user: 'staff' });
+    await IC.execute(it);
+    V('avec classement : le classement est vidé', C.compterCompteursComptage('G1') === 0);
+
+    setGuildConfig('G1', 'comptage_channel_id', null);
+    it = fausse({ type: 'bouton', customId: 'cpt:raz:staff:0', user: 'staff' });
+    await IC.execute(it);
+    V('salon retiré : le bouton revérifie et refuse', /coupé/.test(texte(it.reponses)));
+    it = fausse({ nom: 'comptage', sub: 'definir', options: { nombre: 3 }, user: 'staff' });
+    await IC.execute(it);
+    V('… /comptage definir dit quoi faire', /Aucun salon de comptage/.test(it.reponses[0].content) && /\/config/.test(it.reponses[0].content));
+    it = fausse({ nom: 'comptage', sub: 'info' });
+    await IC.execute(it);
+    V('… /comptage info le dit aussi', /Aucun salon de comptage/.test(embedDe(it.reponses[0]).description));
+    setGuildConfig('G1', 'comptage_channel_id', 'CPT');
+
+    V('guide : /comptage rangée dans Communauté', TUTO.CATEGORIES.find((c) => c.titre === 'Communauté').noms.includes('comptage'));
+    V('commande ouverte à tous (staff vérifié à l\'exécution)', CMD.grade === 0 && !CMD.public && !CMD.guildModule);
+    const json = CMD.data;
+    V('4 sous-commandes', (json.subs || []).length === 4);
+  }
+
+  console.log('\n16) /config → 🔢 Comptage');
+  {
+    const src = fs.readFileSync(path.join(SRC, 'utils/configPanel.js'), 'utf8');
+    V('catégorie dans cfgcat, CATEGORY_VIEWS et routeur cfgcpt:', /value: 'comptage'/.test(src) && /comptage: \(g\) => require\('\.\/comptageConfig'\)/.test(src) && /startsWith\('cfgcpt:'\)/.test(src));
+    const P = require('../src/utils/configPanel');
+    const options = P.mainView(guild).components[0].toJSON().components[0].options;
+    V('menu cfgcat : ≤ 25 options, comptage inclus', options.length <= 25 && options.some((o) => o.value === 'comptage' && o.emoji === '🔢'));
+
+    let it = fausse({ type: 'texte', customId: 'cfgcat', valeurs: ['comptage'], user: 'staff' });
+    await IC.execute(it);
+    const vue = it.mises[0];
+    V('la catégorie s\'ouvre', embedDe(vue).title === '🔢 Configuration — Comptage', texte(it.reponses).slice(0, 200));
+    const R = rangees(vue);
+    V('≤ 5 rangées, ≤ 5 composants par rangée', R.length <= 5 && R.every((r) => r.components.length <= 5), String(R.length));
+    V('identifiants cfg…, ≤ 100 signes, préfixe cfgcpt: (sauf le retour)', ids(vue).every((i) => i.length <= 100 && (i.startsWith('cfgcpt:') || i === 'cfgback')), texte(ids(vue)));
+    V('salon (vide permis), rôle (vide permis), bascules, XP, remise à zéro', R[0].components[0].type === 8 && R[0].components[0].min_values === 0
+      && R[2].components[0].type === 6 && R[2].components[0].min_values === 0
+      && ['cfgcpt:b:meme', 'cfgcpt:b:maths', 'cfgcpt:b:reac', 'cfgcpt:b:suppr', 'cfgcpt:xp', 'cfgcpt:raz'].every((i) => ids(vue).includes(i)));
+    V('état actuel affiché (nombre, record)', /Nombre actuel : \*\*/.test(embedDe(vue).description) && /Record : \*\*/.test(embedDe(vue).description));
+    V('texte de carte < 4000 signes', embedDe(vue).description.length < 4000);
+
+    it = fausse({ type: 'bouton', customId: 'cfgcpt:b:maths', user: 'u1' });
+    await IC.execute(it);
+    V('un membre est refusé par la garde du panneau', /réservé au \*\*staff\*\*/.test(texte(it.reponses)) && !getGuildConfig('G1').comptage_maths);
+    it = fausse({ type: 'bouton', customId: 'cfgcpt:b:maths', user: 'staff' });
+    await IC.execute(it);
+    V('bascule calculs → activée, vue rafraîchie, journal', getGuildConfig('G1').comptage_maths === 1 && embedDe(it.mises[0]).title === '🔢 Configuration — Comptage' && titreLog() === '⚙️ Configuration modifiée');
+    it = fausse({ type: 'bouton', customId: 'cfgcpt:b:maths', user: 'staff' });
+    await IC.execute(it);
+    V('… puis désactivée', getGuildConfig('G1').comptage_maths === 0);
+    setGuildConfig('G1', 'comptage_reactions', null);
+    it = fausse({ type: 'bouton', customId: 'cfgcpt:b:reac', user: 'staff' });
+    await IC.execute(it);
+    V('réactions : NULL vaut « actif », le clic les coupe', getGuildConfig('G1').comptage_reactions === 0);
+    await IC.execute(fausse({ type: 'bouton', customId: 'cfgcpt:b:reac', user: 'staff' }));
+    await IC.execute(fausse({ type: 'bouton', customId: 'cfgcpt:b:meme', user: 'staff' }));
+    await IC.execute(fausse({ type: 'bouton', customId: 'cfgcpt:b:suppr', user: 'staff' }));
+    const cfg = getGuildConfig('G1');
+    V('les quatre bascules écrivent leur colonne', cfg.comptage_reactions === 1 && cfg.comptage_meme_personne === 1 && cfg.comptage_supprimer === 1);
+    setGuildConfig('G1', 'comptage_meme_personne', 0);
+    setGuildConfig('G1', 'comptage_supprimer', 0);
+
+    await poster('u1', '1');
+    await poster('u2', '2');
+    it = fausse({ type: 'salon', customId: 'cfgcpt:salon', valeurs: ['GEN'], user: 'staff' });
+    await IC.execute(it);
+    V('choisir un salon : réglé, compte remis à 0', getGuildConfig('G1').comptage_channel_id === 'GEN' && etat().channel_id === 'GEN' && etat().courant === 0);
+    V('… le nouveau salon est prévenu', /Ce salon devient le salon de comptage/.test(dernierEnvoi('GEN').content) && /\*\*1\*\*/.test(dernierEnvoi('GEN').content));
+    V('… et c\'est journalisé', /Salon de comptage → <#GEN>/.test(embedDe(SALONS.LOGS.envois[SALONS.LOGS.envois.length - 1]).description));
+    it = fausse({ type: 'salon', customId: 'cfgcpt:salon', valeurs: [], user: 'staff' });
+    await IC.execute(it);
+    V('vider le menu coupe le comptage', getGuildConfig('G1').comptage_channel_id === null && /le comptage est coupé/.test(embedDe(it.mises[0]).description));
+    const coupe = await poster('u1', '1', 'GEN');
+    V('… et plus rien n\'est compté', !coupe.reactions.length);
+    await IC.execute(fausse({ type: 'salon', customId: 'cfgcpt:salon', valeurs: ['CPT'], user: 'staff' }));
+
+    it = fausse({ type: 'role', customId: 'cfgcpt:role', valeurs: ['HAUT'], user: 'staff' });
+    await IC.execute(it);
+    V('rôle au-dessus du mien → refusé, expliqué', !getGuildConfig('G1').comptage_role_erreur && /au-dessus de mon rôle/.test(texte(it.suivis)), texte(it.suivis));
+    it = fausse({ type: 'role', customId: 'cfgcpt:role', valeurs: ['GERE'], user: 'staff' });
+    await IC.execute(it);
+    V('rôle d\'intégration → refusé', !getGuildConfig('G1').comptage_role_erreur && /intégration/.test(texte(it.suivis)));
+    it = fausse({ type: 'role', customId: 'cfgcpt:role', valeurs: ['RERR'], user: 'staff' });
+    await IC.execute(it);
+    V('rôle valable → réglé, présélectionné dans le menu', getGuildConfig('G1').comptage_role_erreur === 'RERR' && texte(rangees(it.mises[0])[2].components[0].default_values) === '[{"id":"RERR","type":"role"}]');
+    await IC.execute(fausse({ type: 'role', customId: 'cfgcpt:role', valeurs: [], user: 'staff' }));
+    V('menu vidé → aucun rôle', getGuildConfig('G1').comptage_role_erreur === null);
+
+    it = fausse({ type: 'bouton', customId: 'cfgcpt:xp', user: 'staff' });
+    await IC.execute(it);
+    V('XP : le formulaire s\'ouvre (cfgcpt:xpmodal)', it.modales[0]?.custom_id === 'cfgcpt:xpmodal' && it.modales[0].components[0].components[0].custom_id === 'xp');
+    it = fausse({ type: 'modal', customId: 'cfgcpt:xpmodal', champs: { xp: '25' }, user: 'staff' });
+    await IC.execute(it);
+    V('XP 25 enregistrée, vue rafraîchie', getGuildConfig('G1').comptage_xp === 25 && /XP par bon nombre : \*\*25\*\*/.test(embedDe(it.mises[0]).description));
+    for (const mauvais of ['5000', 'abc', '-3', '']) {
+      it = fausse({ type: 'modal', customId: 'cfgcpt:xpmodal', champs: { xp: mauvais }, user: 'staff' });
+      await IC.execute(it);
+    }
+    V('valeurs invalides refusées (5000, abc, -3, vide)', getGuildConfig('G1').comptage_xp === 25 && /entre \*\*0\*\* et \*\*1000\*\*/.test(texte(it.reponses)));
+    setGuildConfig('G1', 'comptage_xp', 0);
+
+    await poster('u1', '1');
+    it = fausse({ type: 'bouton', customId: 'cfgcpt:raz', user: 'staff' });
+    await IC.execute(it);
+    V('remise à zéro : confirmation demandée d\'abord', ids(it.mises[0]).includes('cfgcpt:razok') && ids(it.mises[0]).includes('cfgcpt:vue') && etat().courant === 1);
+    it = fausse({ type: 'bouton', customId: 'cfgcpt:vue', user: 'staff' });
+    await IC.execute(it);
+    V('annuler revient à la vue', ids(it.mises[0]).includes('cfgcpt:raz') && etat().courant === 1);
+    it = fausse({ type: 'bouton', customId: 'cfgcpt:razok', user: 'staff' });
+    await IC.execute(it);
+    V('confirmer : compte et record à 0, joueurs prévenus, journal', etat().courant === 0 && etat().record === 0 && /remis le comptage à zéro/.test(dernierEnvoi().content) && titreLog() === '🔢 Comptage remis à zéro');
+    it = fausse({ type: 'bouton', customId: 'cfgcpt:inconnu', user: 'staff' });
+    await IC.execute(it);
+    V('identifiant inconnu → la vue du jour, sans erreur', embedDe(it.mises[0]).title === '🔢 Configuration — Comptage');
+    const confirmation = CC.vueConfigComptage(guild, { confirmer: true });
+    V('vue de confirmation : toujours ≤ 5 rangées', rangees(confirmation).length <= 5);
+
+    // 🩺 Une permission qui manque se voit dans la vue (Gérer les rôles ici).
+    const { PermissionFlagsBits } = require('discord.js');
+    setGuildConfig('G1', 'comptage_role_erreur', 'RERR');
+    guild.members.me.permissionsIn = () => ({ has: (b) => b !== PermissionFlagsBits.ManageRoles });
+    const diag = embedDe(CC.vueConfigComptage(guild)).description;
+    V('permission manquante signalée, avec quoi faire', /Il me manque des permissions/.test(diag) && /\*\*Gérer les rôles\*\*/.test(diag) && /Ajoutez-les/.test(diag), diag.slice(-200));
+    guild.members.me.permissionsIn = () => ({ has: () => true });
+    V('… et rien quand tout y est', !/Il me manque/.test(embedDe(CC.vueConfigComptage(guild)).description));
+    delete guild.members.me.permissionsIn;
+    setGuildConfig('G1', 'comptage_role_erreur', null);
+  }
+
+  console.warn = warnOrig;
+  fs.rmSync(RACINE, { recursive: true, force: true });
+  console.log(`\n${ko === 0 ? '✅' : '❌'} ${ok} réussis, ${ko} échoués`);
+  process.exit(ko === 0 ? 0 : 1);
+})().catch((e) => { console.warn = warnOrig; console.error(e); console.log('\n0 réussis, 1 échoués'); process.exit(1); });
