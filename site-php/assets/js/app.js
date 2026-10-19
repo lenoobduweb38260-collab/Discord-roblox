@@ -1607,9 +1607,15 @@
     const e = p?.identiteBot || {};
     const photo = String(cfg.bot_avatar_url || "").trim();
     const etat = e.pseudo || e.avatar
-      ? `Sur ce serveur, le bot s'appelle <b>${esc(e.nom || "")}</b>${e.avatar ? " avec sa photo personnalisée" : ""}.`
+      ? `Sur ce serveur, le bot s'appelle <b>${esc(e.nom || "")}</b>${e.avatar ? " avec sa photo personnalisée" : ""}${e.profilNom ? ` (profil « ${esc(e.profilNom)} »)` : ""}.`
       : `Ce serveur utilise le <b>profil global</b> du bot (<b>${esc(e.nomGlobal || "bot")}</b>).`;
+    // 🎭 Le profil choisi a été retiré de la liste par le créateur : le menu
+    // retombe sur le profil global (jamais sur un AUTRE profil), et on le dit.
+    const retire = e.profilRetire
+      ? `<div class="builder-hint mt-16">⚠️ <b>Le profil choisi pour ce serveur a été retiré de la liste</b> par le créateur du bot : ce serveur retombe sur le profil global. Le bot garde pour l'instant son nom et sa photo actuels — choisissez un autre profil, ou videz le nom et la photo ci-dessous puis enregistrez pour revenir à ceux d'origine.</div>`
+      : "";
     return `<div class="builder-hint mt-16">🪪 <b>Le bot sur ce serveur</b> — ${etat} Le nom et la photo choisis ici ne valent que pour <b>ce serveur</b> : les autres gardent les leurs.</div>
+      ${retire}
       <div class="form-grid mt-16">
         ${profils.length
           ? champChoix("bot_profil", "🎭 Profil du bot", [["", "Profil global du bot (défaut)"], ...profils.map(x => [x.id, x.nom + (x.avatar ? " — nom + photo" : " — nom seul")])],
@@ -3821,7 +3827,7 @@
             <textarea class="textarea" rows="3" data-f="profils" placeholder="Arès | https://i.imgur.com/…
 Oy Bot? | https://…/oy.png">${esc(profilsEnTexte(bot.profils))}</textarea>
             <input class="input" type="file" accept="image/png,image/jpeg,image/gif" data-profil-fichier style="margin-top:6px" aria-label="Ajouter une photo de profil depuis l'appareil">
-            <span class="field-note">Le lien peut venir d'imgur, Discord, Dropbox, Google Drive, GitHub, Tenor, Giphy… ou d'un lien direct — ou 📁 choisissez un fichier de votre appareil (PNG, JPG ou GIF, 8 Mo maximum) : il est stocké sur ce site et sa ligne s'ajoute toute seule. Chaque serveur pourra choisir l'un de ces profils (nom + photo du bot, valables sur ce serveur seulement) depuis sa page ⚙️ Identité ou <code>/config → 🪪 Identité du bot</code>. Enregistrés dans le <code>.env</code> du bot (<code>BOT_PROFILS</code>) et pris tout de suite si le bot tourne — sinon à son prochain démarrage.</span></div>
+            <span class="field-note">Le lien peut venir d'imgur, Discord, Dropbox, Google Drive, GitHub, Tenor, Giphy… ou d'un lien direct — ou 📁 choisissez un fichier de votre appareil (PNG, JPG ou GIF, 8 Mo maximum) : il est stocké sur ce site et sa ligne s'ajoute toute seule. Chaque serveur pourra choisir l'un de ces profils (nom + photo du bot, valables sur ce serveur seulement) depuis sa page ⚙️ Identité ou <code>/config → 🪪 Identité du bot</code>. Enregistrés dans le <code>.env</code> du bot (<code>BOT_PROFILS</code>) et pris tout de suite si le bot tourne — sinon à son prochain démarrage. 🔑 Un profil se reconnaît à son <b>nom</b> : retirer ou réordonner des lignes ne change le profil d'aucun serveur ; renommer un profil en fait un nouveau (les serveurs qui l'avaient choisi reviennent au profil global, prévenus).</span></div>
         </div>
       </div>`).join("");
     const etatAgent = ui.agentBots === null
@@ -4236,7 +4242,7 @@ Oy Bot? | https://…/oy.png">${esc(profilsEnTexte(bot.profils))}</textarea>
       const get = f => card.querySelector(`[data-f="${f}"]`)?.value.trim() || "";
       const index = Number(card.dataset.botIndex);
       const existing = (state.bots || [])[index] || {};
-      return { ...existing, name: get("name"), tag: get("tag"), accent: get("accent"), description: get("description"), agentName: get("agentName"), clientId: get("clientId"), profils: profilsDepuisTexte(get("profils")) };
+      return { ...existing, name: get("name"), tag: get("tag"), accent: get("accent"), description: get("description"), agentName: get("agentName"), clientId: get("clientId"), profils: profilsDepuisTexte(get("profils"), existing.profils) };
     }).filter(bot => bot.name);
   }
 
@@ -4244,11 +4250,21 @@ Oy Bot? | https://…/oy.png">${esc(profilsEnTexte(bot.profils))}</textarea>
   function profilsEnTexte(profils) {
     return (Array.isArray(profils) ? profils : []).map(p => p.avatar ? `${p.nom} | ${p.avatar}` : p.nom).join("\n");
   }
-  function profilsDepuisTexte(texte) {
+  // 🔑 Le texte ne porte pas l'identifiant d'un profil : celui d'un profil
+  // déjà connu (même nom) est REPRIS, pour que BOT_PROFILS le garde. Sans
+  // identifiant, le bot prend l'empreinte du nom — jamais la position :
+  // retirer ou réordonner une ligne ne change donc le profil d'aucun serveur.
+  function profilsDepuisTexte(texte, anciens = []) {
+    const ids = new Map((Array.isArray(anciens) ? anciens : [])
+      .filter(p => p && p.id && /^[A-Za-z0-9_-]{1,32}$/.test(String(p.id)))
+      .map(p => [String(p.nom || "").trim(), String(p.id)]));
     return String(texte || "").split(/\r?\n/).map(l => l.trim()).filter(Boolean).slice(0, 25).map(l => {
       const [nom, ...reste] = l.split("|");
       const avatar = reste.join("|").trim();
-      return { nom: nom.trim().slice(0, 32), avatar: /^https?:\/\//i.test(avatar) ? avatar.slice(0, 500) : "" };
+      const propre = nom.trim().slice(0, 32);
+      const profil = { nom: propre, avatar: /^https?:\/\//i.test(avatar) ? avatar.slice(0, 500) : "" };
+      if (ids.has(propre)) profil.id = ids.get(propre);
+      return profil;
     }).filter(p => p.nom);
   }
   // Pose (ou remplace) UNE clé dans un .env sans toucher au reste — jamais

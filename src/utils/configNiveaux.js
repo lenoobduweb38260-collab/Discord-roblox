@@ -296,13 +296,69 @@ function vueAnnonces(guild) {
   };
 }
 
-const PAR_PAGE_RECOMPENSES = 25;
+// 📄 Une page de récompenses doit tenir dans UNE carte : 40 composants au
+// plus, et chaque palier en coûte deux (son texte, et le filet qui le sépare
+// du suivant). Découper par récompenses (25 par page) donnait 41 composants
+// dès 13 paliers : Discord refusait la mise à jour, et la rubrique restait
+// figée sans un mot. On découpe donc par PALIERS (10 au plus, soit 37
+// composants avec les boutons de page), par récompenses (25 au plus : les
+// options du menu de retrait) et par longueur de texte (une carte en porte
+// 4000 signes). Un palier n'est coupé que s'il dépasse à lui seul ces bornes.
+const MAX_PALIERS_PAGE = 10;
+const MAX_RECOMPENSES_PAGE = 25;
+const BUDGET_TEXTE_PAGE = 2600;
+const COUT_ENTETE_PALIER = 48; // « ◆ 🏅 · **Niveau 1000** », le filet, les sauts de ligne
+
+function pagesRecompenses(toutes) {
+  const cout = (r) => String(r.libelle || '').length + (r.souci ? String(r.souci).length + 10 : 0) + 4;
+  // Les récompenses arrivent triées par niveau : on les regroupe par palier.
+  const paliers = [];
+  for (const r of toutes) {
+    const dernier = paliers[paliers.length - 1];
+    if (dernier && dernier[0].niveau === r.niveau) dernier.push(r);
+    else paliers.push([r]);
+  }
+  const pages = [];
+  let page = [];
+  let nb = 0;
+  let texte = 0;
+  const fermer = () => {
+    if (page.length) pages.push(page);
+    page = [];
+    nb = 0;
+    texte = 0;
+  };
+  for (const groupe of paliers) {
+    const poids = COUT_ENTETE_PALIER + groupe.reduce((s, r) => s + cout(r), 0);
+    // Un palier entier passe à la page suivante plutôt que d'être coupé…
+    if (page.length && (nb >= MAX_PALIERS_PAGE || page.length + groupe.length > MAX_RECOMPENSES_PAGE || texte + poids > BUDGET_TEXTE_PAGE)) fermer();
+    // … sauf s'il dépasse à lui seul une page : on le découpe alors.
+    let entame = false;
+    for (const r of groupe) {
+      if (page.length && (page.length >= MAX_RECOMPENSES_PAGE || texte + cout(r) + (entame ? 0 : COUT_ENTETE_PALIER) > BUDGET_TEXTE_PAGE)) {
+        fermer();
+        entame = false;
+      }
+      if (!entame) {
+        nb++;
+        texte += COUT_ENTETE_PALIER;
+        entame = true;
+      }
+      page.push(r);
+      texte += cout(r);
+    }
+  }
+  fermer();
+  return pages.length ? pages : [[]];
+}
+
 function vueRecompenses(guild, { page = 1 } = {}) {
   const cfg = getGuildConfig(guild.id);
   const toutes = L.diagnostiquerRecompenses(guild);
-  const pages = Math.max(1, Math.ceil(toutes.length / PAR_PAGE_RECOMPENSES));
+  const decoupe = pagesRecompenses(toutes);
+  const pages = decoupe.length;
   const p = Math.min(Math.max(1, Number(page) || 1), pages);
-  const tranche = toutes.slice((p - 1) * PAR_PAGE_RECOMPENSES, p * PAR_PAGE_RECOMPENSES);
+  const tranche = decoupe[p - 1];
   const niveaux = [...new Set(tranche.map((r) => r.niveau))];
   const blocs = niveaux.map((n) => M.bloc(
     `Niveau ${n}`,
@@ -378,9 +434,10 @@ function vueAjoutRecompense(guild, type) {
         })))
     ));
   } else {
-    embed.setDescription(type === 'role'
+    embed.setDescription((type === 'role'
       ? 'Choisissez le rôle à **donner**, puis le niveau à atteindre.\n-# Le rôle doit être sous le mien et ne pas être géré par une intégration.'
-      : 'Choisissez le rôle à **retirer** quand le membre atteint le niveau (un rôle « Nouveau », par exemple).');
+      : 'Choisissez le rôle à **retirer** quand le membre atteint le niveau (un rôle « Nouveau », par exemple).')
+      + '\n-# 🛡️ Jamais un rôle qui porte une permission de modération ou d\'administration, ni un rôle staff ou admin du bot.');
     lignes.push(new ActionRowBuilder().addComponents(
       new RoleSelectMenuBuilder().setCustomId(`cfgniv:recrole:${type}`).setPlaceholder('🎭 Quel rôle ?').setMinValues(1).setMaxValues(1)
     ));
@@ -391,7 +448,7 @@ function vueAjoutRecompense(guild, type) {
   return { embeds: [embed], components: lignes };
 }
 
-function vueExclusions(guild, { portee = 'tout' } = {}) {
+function vueExclusions(guild, { portee = 'tout', notes = [] } = {}) {
   const po = PORTEES[portee] ? portee : 'tout';
   const exclusions = L.listerExclusionsXp(guild.id);
   const liste = (type, p) => exclusions.filter((e) => e.type === type && e.portee === p).map((e) => e.cible_id);
@@ -409,10 +466,17 @@ function vueExclusions(guild, { portee = 'tout' } = {}) {
     ].filter(Boolean);
     return M.bloc(`${P.nom} — ${P.desc.charAt(0).toLowerCase()}${P.desc.slice(1)}`, entrees, { prefixe: P.emoji, compte: null, vide: 'Rien d\'exclu' });
   });
+  // Ce que le dernier choix a fusionné : cinq lignes au plus, la carte doit
+  // rester sous ses 4000 signes.
+  const avis = notes.length
+    ? `${notes.slice(0, 5).map((n) => `ℹ️ ${n}`).join('\n')}${notes.length > 5 ? `\n*… et ${notes.length - 5} autre(s)*` : ''}\n\n`
+    : '';
   const embed = enteteVue('🚫 Exclusions')
     .setDescription(M.borner(
-      'Une **catégorie** exclut tous ses salons, un **salon** exclut aussi ses fils.\n'
-      + `➜ Vous réglez la portée **${PORTEES[po].emoji} ${PORTEES[po].nom}** : cochez les salons et les rôles concernés.\n\n`
+      avis
+      + 'Une **catégorie** exclut tous ses salons, un **salon** exclut aussi ses fils.\n'
+      + `➜ Vous réglez la portée **${PORTEES[po].emoji} ${PORTEES[po].nom}** : cochez les salons et les rôles concernés.\n`
+      + '-# Une cible n\'a qu\'une portée : exclue à l\'écrit ET en vocal, elle passe en 🌐 Tout.\n\n'
       + M.description(blocs),
       M.MAX_DESCRIPTION - 96
     ));
@@ -659,6 +723,37 @@ const lireEntier = (interaction, nom) => {
   return parseInt(brut, 10);
 };
 const prive = (interaction, content) => suivre(interaction, { content, flags: MessageFlags.Ephemeral });
+
+// 🛡️ Une récompense de RÔLE touche aux droits du serveur : elle est réservée
+// à l'administration, comme les rôles automatiques. Le staff (« Modérer les
+// membres ») faisait sinon distribuer un rôle Administrateur à quiconque
+// atteignait un niveau — lui compris.
+const ADMIN_ROLES_RECOMPENSE = '⛔ Les récompenses de **rôle** sont réservées à l\'**administration** : un rôle distribué à '
+  + 'quiconque atteint un niveau touche aux droits du serveur.\n'
+  + '➜ Le Col, les objets et les messages privés restent ouverts au staff.';
+const NOTE_REALIGNEMENT = '-# Les rôles des paliers perdus sont repris en arrière-plan ; ceux des paliers gagnés arrivent au '
+  + 'prochain gain, ou tout de suite avec `/xp synchroniser`.';
+
+// Les contrôles d'un rôle de récompense, au choix ET à l'envoi du formulaire.
+// Rend un message prêt à afficher, ou null.
+function refusRoleChoisi(interaction, role, type) {
+  const guild = interaction.guild;
+  if (!role) return '❌ Rôle introuvable : choisissez-en un autre.';
+  const moi = guild.members?.me;
+  if (role.managed) return `❌ **${role.name}** est géré par une intégration : il ne se donne ni ne se retire à la main.`;
+  if (moi && role.position >= moi.roles.highest.position) {
+    return `❌ **${role.name}** est au-dessus de mon rôle : je ne pourrai pas le ${type === 'role' ? 'donner' : 'retirer'}.\n`
+      + '➜ Remontez mon rôle dans **Paramètres du serveur → Rôles**, puis réessayez.';
+  }
+  // Comme Discord : on ne fait pas distribuer un rôle placé au niveau du
+  // sien, ou au-dessus — sauf le propriétaire du serveur.
+  const haut = interaction.member?.roles?.highest?.position;
+  if (guild.ownerId !== interaction.user?.id && Number.isFinite(haut) && role.position >= haut) {
+    return `❌ **${role.name}** est au niveau de votre plus haut rôle, ou au-dessus : vous ne pouvez pas en faire une récompense.`;
+  }
+  const refus = L.refusRoleRecompense(guild, role);
+  return refus ? `❌ ${refus}` : null;
+}
 const journal = (interaction, texte, couleur = COLORS.INFO) => sendLog(
   interaction.guild,
   logEmbed('⚙️ Configuration modifiée', `📈 ${texte}\nPar <@${interaction.user.id}>`, couleur)
@@ -675,9 +770,9 @@ async function gererConfigNiveaux(interaction, grade) {
   const guild = interaction.guild;
   const gid = interaction.guildId;
   const cfg = getGuildConfig(gid);
-  const exigerAdmin = async () => {
+  const exigerAdmin = async (texte = '⛔ Ce réglage change le niveau de tout le serveur : il est réservé à l\'**administration**.') => {
     if (grade >= GRADES.ADMIN) return false;
-    await prive(interaction, '⛔ Ce réglage change le niveau de tout le serveur : il est réservé à l\'**administration**.');
+    await prive(interaction, texte);
     return true;
   };
 
@@ -766,6 +861,7 @@ async function gererConfigNiveaux(interaction, grade) {
   if (action === 'recajout') {
     const type = interaction.values?.[0];
     if (!L.TYPES_RECOMPENSE_NIVEAU[type]) return prive(interaction, '❌ Type de récompense inconnu.');
+    if ((type === 'role' || type === 'role_retrait') && (await exigerAdmin(ADMIN_ROLES_RECOMPENSE))) return;
     if (type === 'col' || type === 'mp') return interaction.showModal(formulaireNiveaux('rec', cfg, { type }));
     if (type === 'objet' && !L.objetsSaoNiveau().length) {
       return prive(interaction, '❌ Le catalogue d\'objets de l\'Aventure SAO n\'est pas disponible.\n'
@@ -774,16 +870,11 @@ async function gererConfigNiveaux(interaction, grade) {
     return mettreAJour(interaction, vueAjoutRecompense(guild, type));
   }
   if (action === 'recrole') {
+    if (await exigerAdmin(ADMIN_ROLES_RECOMPENSE)) return;
     const type = a === 'role_retrait' ? 'role_retrait' : 'role';
-    const roleId = interaction.values?.[0];
-    const role = guild.roles.cache.get(roleId);
-    if (!role) return prive(interaction, '❌ Rôle introuvable : choisissez-en un autre.');
-    const moi = guild.members.me;
-    if (role.managed) return prive(interaction, `❌ **${role.name}** est géré par une intégration : il ne se donne ni ne se retire à la main.`);
-    if (moi && role.position >= moi.roles.highest.position) {
-      return prive(interaction, `❌ **${role.name}** est au-dessus de mon rôle : je ne pourrai pas le ${type === 'role' ? 'donner' : 'retirer'}.\n`
-        + '➜ Remontez mon rôle dans **Paramètres du serveur → Rôles**, puis réessayez.');
-    }
+    const role = guild.roles.cache.get(interaction.values?.[0]);
+    const refus = refusRoleChoisi(interaction, role, type);
+    if (refus) return prive(interaction, refus);
     return interaction.showModal(formulaireNiveaux('rec', cfg, { type, valeur: role.id }));
   }
   if (action === 'recobjet') {
@@ -809,10 +900,22 @@ async function gererConfigNiveaux(interaction, grade) {
     const portee = PORTEES[a] ? a : 'tout';
     const type = action === 'exsalon' ? 'salon' : 'role';
     const r = L.remplacerExclusionsXp(gid, type, portee, interaction.values || []);
-    await mettreAJour(interaction, vueExclusions(guild, { portee }));
-    if (r.ajoutes || r.retires) {
+    const cible = (x) => (type === 'salon' ? `<#${x}>` : `<@&${x}>`);
+    const porteeDe = (x) => `${PORTEES[x].emoji} ${PORTEES[x].nom}`;
+    // Rien ne bouge en silence : ce qui était exclu ailleurs est dit.
+    const notes = (r.fusions || []).map((f) => {
+      if (f.avant === f.apres && f.avant === 'tout') return `${cible(f.id)} est déjà exclu de **${porteeDe('tout')}** : rien à changer.`;
+      if (f.avant === f.apres) {
+        return `${cible(f.id)} reste exclu en **${porteeDe(f.avant)}** : la portée ${porteeDe('tout')} est déjà pleine `
+          + `(${L.MAX_EXCLUSIONS_PAR_PORTEE}). Retirez-en une d'abord.`;
+      }
+      return `${cible(f.id)} était déjà exclu en **${porteeDe(f.avant)}** : il passe en **${porteeDe(f.apres)}**.`;
+    });
+    await mettreAJour(interaction, vueExclusions(guild, { portee, notes }));
+    if (r.ajoutes || r.retires || notes.length) {
       await journal(interaction, `Exclusions d'XP (${type === 'salon' ? 'salons' : 'rôles'}, ${PORTEES[portee].nom.toLowerCase()}) : `
-        + `${r.ajoutes} ajoutée(s), ${r.retires} retirée(s).`);
+        + `${r.ajoutes} ajoutée(s), ${r.retires} retirée(s).`
+        + (notes.length ? `\n${notes.slice(0, 10).map((n) => M.entree(n)).join('\n')}` : ''));
     }
     return;
   }
@@ -839,8 +942,10 @@ async function gererConfigNiveaux(interaction, grade) {
     setGuildConfig(gid, 'xp_courbe', choix);
     const changes = L.recalculerNiveaux(gid);
     await mettreAJour(interaction, vueCourbe(guild));
-    await journal(interaction, `Courbe d'XP → **${L.COURBES_XP[choix].nom}** · ${changes} niveau(x) recalculé(s).\n`
-      + '-# Les rôles de récompense se réalignent au prochain gain, ou tout de suite avec `/xp synchroniser`.');
+    await journal(interaction, `Courbe d'XP → **${L.COURBES_XP[choix].nom}** · ${changes} niveau(x) recalculé(s).\n${NOTE_REALIGNEMENT}`);
+    // Les rôles des paliers perdus partent en arrière-plan : le panneau a
+    // déjà répondu.
+    L.realignerBaisses(guild).catch(() => null);
     return;
   }
   if (action === 'boostfin') {
@@ -941,7 +1046,8 @@ async function soumettreFormulaire(interaction, { nom, type, valeur, cfg, exiger
     setGuildConfig(gid, 'xp_niveau_max', max);
     const changes = L.recalculerNiveaux(gid);
     await afficher(interaction, vueCourbe(guild));
-    await journal(interaction, `Niveau maximum → ${max || 'aucun'} · ${changes} niveau(x) recalculé(s).`);
+    await journal(interaction, `Niveau maximum → ${max || 'aucun'} · ${changes} niveau(x) recalculé(s).\n${NOTE_REALIGNEMENT}`);
+    L.realignerBaisses(guild).catch(() => null);
     return;
   }
 
@@ -955,15 +1061,29 @@ async function soumettreFormulaire(interaction, { nom, type, valeur, cfg, exiger
   }
 
   if (nom === 'rec') {
+    // Un rôle : l'administration seulement, et les contrôles du choix sont
+    // REFAITS ici — le rôle voyage dans l'identifiant du formulaire.
+    if (type === 'role' || type === 'role_retrait') {
+      if (await exigerAdmin(ADMIN_ROLES_RECOMPENSE)) return;
+      const refus = refusRoleChoisi(interaction, guild.roles.cache.get(String(valeur || '')), type);
+      if (refus) return prive(interaction, refus);
+    }
     const niveau = lireEntier(interaction, 'niveau');
     const donnees = { niveau, type, valeur: valeur || null, quantite: 1 };
-    if (type === 'col' || type === 'objet') donnees.quantite = lireEntier(interaction, 'quantite');
+    if (type === 'col' || type === 'objet') {
+      donnees.quantite = lireEntier(interaction, 'quantite');
+      // « 500 Col », « 1,000 », « 10k » : refusé, jamais changé en 1.
+      if (donnees.quantite === null) {
+        return prive(interaction, type === 'col'
+          ? '❌ Montant illisible : écrivez un nombre entier seul, de 1 à 1 000 000 (par exemple `500` ou `1 000`, sans « Col » ni « k »).'
+          : '❌ Quantité illisible : écrivez un nombre entier seul, de 1 à 999 (par exemple `3`).');
+      }
+    }
     if (type === 'mp') donnees.valeur = String(interaction.fields.getTextInputValue('texte') ?? '').trim();
     const r = L.ajouterRecompenseNiveau(gid, donnees);
     if (!r.ok) return prive(interaction, `❌ ${r.erreur}`);
     const ajoutee = L.listerRecompensesNiveau(gid).find((x) => x.id === r.id);
-    const toutes = L.listerRecompensesNiveau(gid);
-    const page = Math.floor(toutes.findIndex((x) => x.id === r.id) / PAR_PAGE_RECOMPENSES) + 1;
+    const page = Math.max(1, pagesRecompenses(L.diagnostiquerRecompenses(guild)).findIndex((p) => p.some((x) => x.id === r.id)) + 1);
     await afficher(interaction, vueRecompenses(guild, { page }), `🏅 Niveau **${niveau}** → ${ajoutee ? L.libelleRecompenseNiveau(ajoutee) : 'récompense ajoutée'}.`);
     await sendLog(guild, logEmbed('🏅 Récompense de niveau ajoutée',
       `Niveau **${niveau}** : ${ajoutee ? L.libelleRecompenseNiveau(ajoutee) : type}\nPar <@${interaction.user.id}>\n`
@@ -975,4 +1095,4 @@ async function soumettreFormulaire(interaction, { nom, type, valeur, cfg, exiger
   return prive(interaction, '❌ Formulaire inconnu.');
 }
 
-module.exports = { vueConfigNiveaux, gererConfigNiveaux, estIdConfigNiveaux, formulaireNiveaux, PAGES_CONFIG_NIVEAUX };
+module.exports = { vueConfigNiveaux, gererConfigNiveaux, estIdConfigNiveaux, formulaireNiveaux, pagesRecompenses, PAGES_CONFIG_NIVEAUX };

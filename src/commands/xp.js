@@ -156,7 +156,8 @@ module.exports = {
         .setDescription([
           `**${nombreFr(nb)}** membre(s) ont de l'XP sur ce serveur.`,
           M.entree('XP et niveaux de **tout le monde** repartent de 0.'),
-          M.entree('Les rôles de récompense sont repris ; le Col et les objets déjà versés restent acquis.'),
+          M.entree('Les rôles de récompense sont repris ; le Col et les objets déjà versés restent acquis, '
+            + 'et seront versés de nouveau aux paliers regagnés.'),
           M.entree('**Irréversible.**'),
           '-# Ce bouton expire dans 10 minutes.',
         ].join('\n'));

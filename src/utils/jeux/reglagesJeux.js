@@ -40,7 +40,7 @@ function vueConfigJeux(guild) {
           M.entree(`Contre le bot ou en solo : **${r.xpBot} XP**`),
           M.entree(`Plafond par membre et par jour : **${r.plafond} XP**`),
           M.entree(`Col SAO : **${r.col}**${r.col && !cfg.sao_enabled ? ' *(Aventure SAO coupée : rien n\'est versé)*' : ''}`),
-          '-# Le plafond atteint coupe aussi les Col. Une victoire par abandon ne rapporte rien.',
+          '-# Le plafond atteint coupe aussi les Col, même sans XP versée : chaque victoire y compte pour son XP prévue, et 1 au moins. Une victoire par abandon ne rapporte rien.',
         ].join('\n'),
       }
     );

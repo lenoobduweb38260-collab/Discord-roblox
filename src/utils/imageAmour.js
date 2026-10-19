@@ -90,8 +90,9 @@ function decoderPng(buf) {
     if (!largeur || !hauteur || profondeur !== 8 || entrelace || largeur * hauteur > 4096 * 4096) return null;
     const canaux = { 0: 1, 2: 3, 3: 1, 4: 2, 6: 4 }[type];
     if (!canaux) return null;
-    const donnees = zlib.inflateSync(Buffer.concat(idat));
     const ligne = largeur * canaux;
+    // Jamais plus que ce que l'image annonce : un PNG « bombe » est refusé net.
+    const donnees = zlib.inflateSync(Buffer.concat(idat), { maxOutputLength: (ligne + 1) * hauteur });
     const pixels = Buffer.alloc(ligne * hauteur);
     let precedente = Buffer.alloc(ligne);
     for (let y = 0; y < hauteur; y++) {

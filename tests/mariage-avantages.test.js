@@ -468,6 +468,53 @@ function unir(x, y, depuis) {
     V('remariés : tout repart de zéro (flamme 0, record 0)', MAR.mariageDe('u1')?.conjoint === 'u2' && etat.flamme === 0 && etat.record === 0 && !etat.bisouA);
   }
 
+  console.log('\n12 bis) Divorcer puis se remarier ne rouvre pas l\'XP du bisou du jour');
+  {
+    // Alice et Bob ont déjà eu leur XP du bisou aujourd'hui (section 6), puis
+    // divorcé et se sont remariés (section 12) : la flamme est vierge.
+    const xp = (u) => getLevels('G1', u).xp;
+    const bisouComplet = async (a, b) => {
+      await MAR.execute(fausse({ user: a, sub: 'bisou' }));
+      const [x, y] = [a, b].sort();
+      const it = fausse({ user: b, type: 'bouton', customId: `mar:bisou:${x}:${y}` });
+      await MAR.handleButton(it);
+      return it.mises[0] || {};
+    };
+    const divorcer = async (a, b) => {
+      const [x, y] = [a, b].sort();
+      await MAR.handleButton(fausse({ user: a, type: 'bouton', customId: `mar:div:${x}:${y}` }));
+    };
+    const marier = async (a, b) => {
+      await MAR.execute(fausse({ user: a, sub: 'demander', users: { membre: b } }));
+      const [x, y] = [a, b].sort();
+      await MAR.handleButton(fausse({ user: b, type: 'bouton', customId: `mar:oui:${a}:${b}` }));
+      return MAR.mariageDe(a)?.conjoint === b && x && y;
+    };
+    V('l\'XP du bisou d\'aujourd\'hui est notée pour chacun, hors de la flamme', C.xpBisouRecueCouple('u1') && C.xpBisouRecueCouple('u2'));
+    const avant = [xp('u1'), xp('u2')];
+    let maj = await bisouComplet('u1', 'u2');
+    V('remariés le même jour : les deux bisous rallument la flamme…', /flamme grandit/.test(embedDe(maj).title) && C.etatFlammeCouple('u1', 'u2').flamme === 1);
+    V('… mais AUCUNE XP de plus, et la carte le dit', xp('u1') === avant[0] && xp('u2') === avant[1] && !/\+30 XP/.test(descDe(maj))
+      && /qu'une fois par jour et par personne : vous l'avez déjà reçue aujourd'hui/.test(descDe(maj)), `${xp('u1') - avant[0]} / ${xp('u2') - avant[1]} · ${descDe(maj)}`);
+    // Trois cycles divorce → remariage → bisou, le même jour (la revue).
+    for (let k = 0; k < 3; k++) {
+      await divorcer('u1', 'u2');
+      await marier('u1', 'u2');
+      await bisouComplet('u1', 'u2');
+    }
+    V('trois cycles divorce → remariage → bisou : toujours rien', xp('u1') === avant[0] && xp('u2') === avant[1], `${xp('u1') - avant[0]} / ${xp('u2') - avant[1]}`);
+    // Changer de conjoint : la nouvelle venue, elle, gagne son XP du jour.
+    await divorcer('u1', 'u2');
+    V('Chloé est libre', await marier('u1', 'u3'));
+    const avantC = xp('u3');
+    maj = await bisouComplet('u3', 'u1');
+    V('nouveau conjoint : Chloé gagne son XP, Alice pas une seconde fois', xp('u3') === avantC + 30 && xp('u1') === avant[0], `${xp('u3') - avantC} / ${xp('u1') - avant[0]}`);
+    V('… la carte nomme qui gagne, et qui l\'a déjà reçue', /\*\*Chloé\*\* : \*\*\+30 XP\*\*/.test(descDe(maj)) && /\*\*Alice\*\* l'a déjà reçue aujourd'hui/.test(descDe(maj)), descDe(maj));
+    V('le lendemain (heure de Paris), l\'XP revient', !C.xpBisouRecueCouple('u1', C.decalerJourCouple(C.jourDeParis(), 1)));
+    await divorcer('u1', 'u3');
+    await marier('u1', 'u2');
+  }
+
   console.log('\n13) /config → 💍 Mariage');
   {
     setGuildConfig('G1', 'log_channel_id', 'LOGS');

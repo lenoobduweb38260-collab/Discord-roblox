@@ -40,29 +40,54 @@ const page = (meta) => Buffer.from(`<!DOCTYPE html><html><head><title>x</title>$
 
 // ── Un faux Internet : adresse → réponse. Les URL inconnues donnent du PNG,
 // celles en .webp du VRAI webp (octets RIFF…WEBP — l'en-tête seul ne suffit
-// plus, ce sont les octets qui font foi). ──
+// plus, ce sont les octets qui font foi).
+//
+// 🛡️ AUCUN accès réseau réel : le DNS et la requête HTTP du module sont
+// remplacés (I._reseau). Le faux transport se comporte comme net.connect :
+// une IP écrite en clair ne passe pas par `lookup`, un nom passe par le
+// `lookup` QU'ON LUI DONNE — et la « connexion » part vers l'adresse que ce
+// lookup a rendue. C'est elle qu'on note dans `connexions`. ──
+const net = require('net');
 const WEB = new Map();
 const appelsWeb = [];
-const vraiFetch = global.fetch;
-global.fetch = async (url, opts = {}) => {
-  const u = String(url);
-  appelsWeb.push({ url: u, accept: opts.headers?.Accept || '', agent: opts.headers?.['User-Agent'] || '' });
-  let r = WEB.get(u);
-  if (typeof r === 'function') r = await r(u, opts);
+const connexions = [];
+const DNS = new Map(); // nom → [adresses] ou fonction() → [adresses]
+const appelsDNS = [];
+const PUBLIQUE = '93.184.216.34';
+const requeteReelle = I._reseau.requete;
+const lookupReel = I._reseau.lookup;
+const fauxLookup = (hote, opts, rappel) => {
+  if (typeof opts === 'function') { rappel = opts; opts = {}; }
+  appelsDNS.push(hote);
+  let r = DNS.get(hote);
+  if (typeof r === 'function') r = r();
+  const liste = (r || [PUBLIQUE]).map((a) => ({ address: a, family: net.isIP(a) }));
+  setImmediate(() => {
+    if (r && !r.length) return rappel(Object.assign(new Error(`getaddrinfo ENOTFOUND ${hote}`), { code: 'ENOTFOUND' }));
+    if (opts?.all) return rappel(null, liste);
+    return rappel(null, liste[0].address, liste[0].family);
+  });
+};
+const fauxTransport = async (u, { lookup, entetes = {}, signal } = {}) => {
+  const hote = u.hostname.replace(/^\[|\]$/g, '');
+  const adresse = net.isIP(hote) ? hote
+    : await new Promise((ok, ko) => lookup(hote, { all: true, hints: 32 }, (err, liste) => (err ? ko(err) : ok(liste[0].address))));
+  const url = u.toString();
+  connexions.push({ url, adresse });
+  appelsWeb.push({ url, accept: entetes.Accept || '', agent: entetes['User-Agent'] || '' });
+  let r = WEB.get(url);
+  if (typeof r === 'function') r = await r(url, { signal });
   if (!r) {
-    if (u.endsWith('.webp')) r = { type: 'image/webp', body: WEBP };
-    else if (u.endsWith('/404.png')) r = { status: 404, type: 'text/html', body: Buffer.from('introuvable') };
+    if (url.endsWith('.webp')) r = { type: 'image/webp', body: WEBP };
+    else if (url.endsWith('/404.png')) r = { status: 404, type: 'text/html', body: Buffer.from('introuvable') };
     else r = { type: 'image/png; charset=binary', body: PNG };
   }
-  const status = r.status || 200;
-  const entetes = { 'content-type': r.type || '', ...(r.entetes || {}) };
-  const corps = r.body || Buffer.alloc(0);
-  return {
-    ok: status >= 200 && status < 300, status, url: r.url || u,
-    headers: { get: (k) => entetes[String(k).toLowerCase()] ?? null },
-    arrayBuffer: async () => corps.buffer.slice(corps.byteOffset, corps.byteOffset + corps.length),
-  };
+  const extra = Object.fromEntries(Object.entries(r.entetes || {}).map(([k, v]) => [k.toLowerCase(), v]));
+  return { status: r.status || 200, entetes: { 'content-type': r.type || '', ...extra }, corps: r.body || Buffer.alloc(0) };
 };
+I._reseau.lookup = fauxLookup;
+I._reseau.requete = fauxTransport;
+const redirige = (vers, status = 302) => ({ status, entetes: { location: vers }, body: Buffer.alloc(0) });
 const urlsDepuis = (i) => appelsWeb.slice(i).map((a) => a.url);
 async function erreurDe(promesse) {
   try { await promesse; return null; } catch (e) { return e; }
@@ -73,8 +98,9 @@ async function erreurDe(promesse) {
   {
     const liste = I.profils();
     V('deux profils lus', liste.length === 2, JSON.stringify(liste));
-    V('… numérotés, avec nom et photo', liste[0].id === '1' && liste[0].nom === 'Arès' && liste[0].avatar === 'https://cdn.test/ares.png');
-    V('… un profil sans photo reste valable', liste[1].id === '2' && liste[1].avatar === null);
+    V('… identifiés par l\'empreinte de leur nom (pas leur position), avec nom et photo',
+      liste[0].id === I.empreinteProfil('Arès') && /^[0-9a-f]{8}$/.test(liste[0].id) && liste[0].nom === 'Arès' && liste[0].avatar === 'https://cdn.test/ares.png', JSON.stringify(liste[0]));
+    V('… un profil sans photo reste valable', liste[1].id === I.empreinteProfil('Oy Bot?') && liste[1].avatar === null);
   }
 
   console.log('\n2) Poser nom + photo sur UN serveur : PATCH /guilds/{id}/members/@me');
@@ -114,12 +140,15 @@ async function erreurDe(promesse) {
 
     I._dernierAvatar.delete('G1');
     appels.length = 0;
-    await I.appliquerProfil(guild, '1');
+    const ares = I.empreinteProfil('Arès');
+    const pose = await I.appliquerProfil(guild, ares);
     V('choisir un profil pose son nom et sa photo', appels[0]?.body?.nick === 'Arès' && /^data:image\/png/.test(appels[0]?.body?.avatar || ''));
-    V('… et retient le profil choisi', getGuildConfig('G1').bot_profil === '1');
+    V('… retient le profil choisi par son identifiant stable', getGuildConfig('G1').bot_profil === ares, getGuildConfig('G1').bot_profil);
+    V('… et le renvoie (son nom sert au message)', pose?.nom === 'Arès');
     erreur = null;
+    appels.length = 0;
     await I.appliquerProfil(guild, '9').catch((e) => { erreur = e; });
-    V('un profil inconnu est refusé', /introuvable/.test(erreur?.message || ''));
+    V('un profil inconnu est refusé en disant pourquoi, sans rien poser', /retiré de la liste/.test(erreur?.message || '') && /\/config/.test(erreur?.message || '') && !appels.length, erreur?.message);
   }
 
   console.log('\n3) Le nom du bot dans les cartes suit le pseudo du serveur');
@@ -295,12 +324,12 @@ async function erreurDe(promesse) {
     V('Gyazo : lien deviné introuvable → la page d\'origine, puis son og:image', /^data:image\/jpeg/.test(gy) && urlsDepuis(n).length === 3, JSON.stringify(urlsDepuis(n)));
     // Drive non partagé : page de connexion — son og:image serait un logo.
     n = appelsWeb.length;
-    WEB.set('https://drive.google.com/uc?export=download&id=1PrivePriveePrive', {
-      type: 'text/html', url: 'https://accounts.google.com/ServiceLogin?continue=x',
-      body: page('<meta property="og:image" content="https://www.google.com/logo.png">') });
-    WEB.set('https://drive.google.com/file/d/1PrivePriveePrive/view', {
-      type: 'text/html', url: 'https://accounts.google.com/ServiceLogin?continue=y',
-      body: page('<meta property="og:image" content="https://www.google.com/logo.png">') });
+    WEB.set('https://drive.google.com/uc?export=download&id=1PrivePriveePrive', redirige('https://accounts.google.com/ServiceLogin?continue=x'));
+    WEB.set('https://drive.google.com/file/d/1PrivePriveePrive/view', redirige('https://accounts.google.com/ServiceLogin?continue=y'));
+    for (const suite of ['x', 'y']) {
+      WEB.set(`https://accounts.google.com/ServiceLogin?continue=${suite}`, {
+        type: 'text/html', body: page('<meta property="og:image" content="https://www.google.com/logo.png">') });
+    }
     const e3 = await erreurDe(I.dataUriDepuis('https://drive.google.com/file/d/1PrivePriveePrive/view'));
     V('Google Drive non partagé : le dit et dit quoi faire, sans suivre le logo de la page',
       /pas partagé publiquement/.test(e3?.message || '') && /Tous les utilisateurs disposant du lien/.test(e3?.message || '')
@@ -365,13 +394,35 @@ async function erreurDe(promesse) {
   const CP = require('../src/utils/configPanel');
   const R = require('../src/utils/reponse');
   const appelsPatch = [];
-  let reponsePatch = () => ({ avatar: 'hashfichier', user: { id: 'BOT1' } });
+  const ajoutsCache = [];
+  // Discord renvoie le membre À JOUR : pseudo et photo tels que posés.
+  let reponsePatch = (b) => ({
+    ...('nick' in b ? { nick: b.nick } : {}),
+    ...('avatar' in b ? { avatar: b.avatar ? 'hashfichier' : null } : {}),
+    user: { id: 'BOT1' },
+  });
   const BOT = { id: 'BOT1', username: 'BotGlobal' };
+  class Coll extends Map {
+    filter(f) { const m = new Coll(); for (const [k, v] of this) if (f(v, k)) m.set(k, v); return m; }
+    find(f) { for (const v of this.values()) if (f(v)) return v; return undefined; }
+  }
+  // Le cache comme discord.js : `me` ne change QUE par `_add` (réponse REST
+  // versée au cache) — ici, aucun GUILD_MEMBER_UPDATE n'arrive jamais.
   const guildeP = {
     id: 'GP', name: 'Labo', iconURL: () => null,
-    client: { user: BOT, rest: { patch: async (route, opts) => { appelsPatch.push(opts.body); return reponsePatch(); } } },
-    members: { me: { id: 'BOT1', displayName: 'BotGlobal', nickname: null, avatarURL: () => null }, cache: new Map(), fetch: async () => null },
-    channels: { fetch: async () => null },
+    client: { user: BOT, rest: { patch: async (route, opts) => { appelsPatch.push(opts.body); return reponsePatch(opts.body); } } },
+    members: {
+      me: { id: 'BOT1', displayName: 'BotGlobal', nickname: null, avatar: null, avatarURL() { return this.avatar ? `https://cdn.test/membres/${this.avatar}.png` : null; } },
+      _add(d) {
+        ajoutsCache.push(d);
+        if ('nick' in d) { this.me.nickname = d.nick; this.me.displayName = d.nick || BOT.username; }
+        if ('avatar' in d) this.me.avatar = d.avatar;
+        return this.me;
+      },
+      cache: new Coll(), fetch: async () => null,
+    },
+    roles: { cache: new Coll() },
+    channels: { cache: new Coll(), fetch: async () => null },
   };
   const membre = (id, admin) => ({ id, guild: guildeP, roles: { cache: new Map() },
     permissions: { has: (bit) => (admin ? true : bit === D.PermissionFlagsBits.ModerateMembers) } });
@@ -453,6 +504,14 @@ async function erreurDe(promesse) {
     V('… l\'adresse signée de la pièce jointe n\'est PAS enregistrée, l\'adresse stable si',
       cfg.bot_avatar_url === 'https://cdn.discordapp.com/guilds/GP/users/BOT1/avatars/hashfichier.png?size=512', cfg.bot_avatar_url);
     V('… le panneau se met à jour en une fois (update, sans différer)', it.mises.length === 1 && !it.journal.includes('deferUpdate') && !it.suivis.length, it.journal.join(','));
+    // 🔄 Le panneau montre ce que Discord a CONFIRMÉ, sans attendre
+    // GUILD_MEMBER_UPDATE (qui n'arrive jamais dans ce test).
+    const vue = texte(it.mises[0]);
+    V('… la réponse du PATCH est versée au cache (guild.members._add)', ajoutsCache.length === 1 && ajoutsCache[0].nick === 'Arès' && ajoutsCache[0].avatar === 'hashfichier', texte(ajoutsCache));
+    V('… le panneau rafraîchi montre le NOUVEAU nom et la photo personnalisée',
+      /Nom affiché sur ce serveur : \*\*Arès\*\*/.test(vue) && !/nom global du bot/.test(vue) && /Photo sur ce serveur : \*\*personnalisée\*\*/.test(vue), vue.slice(0, 300));
+    const reset = (it.mises[0]?.components || []).flatMap((r) => (r.toJSON ? r.toJSON() : r).components || []).find((c) => c.custom_id === 'cfgbotreset');
+    V('… et « Profil global » y est actif', reset && !reset.disabled, texte(reset));
 
     // Changer SEULEMENT le nom : le lien inchangé ne retouche pas la photo —
     // sinon la limite des dix minutes de Discord bloquerait le renommage.
@@ -567,7 +626,7 @@ async function erreurDe(promesse) {
     }
     console.log = journal;
     const poster = async (route, corps) => {
-      const r = await vraiFetch(`http://127.0.0.1:${port}${route}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corps) });
+      const r = await fetch(`http://127.0.0.1:${port}${route}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corps) });
       return { status: r.status, data: await r.json() };
     };
     V('l\'API locale démarre', Boolean(port));
@@ -580,14 +639,33 @@ async function erreurDe(promesse) {
       V('… et renvoie l\'adresse stable, jamais la data URI', r1.data.value === 'https://cdn.discordapp.com/guilds/GP/users/BOT1/avatars/hashsite.png?size=512', texte(r1.data).slice(0, 120));
 
       const r2 = await poster('/profils-bot', { profils: [
-        { nom: 'Zeus', avatar: 'https://site.test/uploads/avatars/bot_1.png' }, { nom: '', avatar: 'https://x/y.png' },
-        { nom: 'Héra', avatar: 'javascript:alert(1)' },
+        { id: 'zeus01', nom: 'Zeus', avatar: 'https://site.test/uploads/avatars/bot_1.png' }, { nom: '', avatar: 'https://x/y.png' },
+        { id: 'pas valide !', nom: 'Héra', avatar: 'javascript:alert(1)' },
       ] });
       V('POST /profils-bot : les profils sont pris à chaud (sans redémarrer)', r2.status === 200 && r2.data.profils === 2, texte(r2));
       const liste = I.profils();
       V('… nettoyés : sans nom écarté, adresse non http(s) vidée',
         liste.length === 2 && liste[0].nom === 'Zeus' && liste[0].avatar === 'https://site.test/uploads/avatars/bot_1.png' && liste[1].nom === 'Héra' && liste[1].avatar === null, texte(liste));
-      V('… et retenus en base (repli du .env)', /Zeus/.test(require('../src/utils/botTeam').state('bot_profils') || ''));
+      V('… l\'identifiant explicite est GARDÉ, un identifiant invalide cède la place à l\'empreinte du nom',
+        liste[0].id === 'zeus01' && liste[1].id === I.empreinteProfil('Héra'), texte(liste));
+      V('… et retenus en base (repli du .env)', /Zeus/.test(require('../src/utils/botTeam').state('bot_profils') || '') && /zeus01/.test(require('../src/utils/botTeam').state('bot_profils') || ''));
+
+      // GET /parametres : le site reçoit l'identifiant STABLE du profil posé
+      // (un ancien numéro de position est traduit), jamais un autre profil.
+      const lireParametres = async () => {
+        const r = await fetch(`http://127.0.0.1:${port}/parametres?guild=GP`);
+        return { status: r.status, data: await r.json() };
+      };
+      setGuildConfig('GP', 'bot_profil', '1');
+      setGuildConfig('GP', 'bot_nick', 'Héra');
+      let p = await lireParametres();
+      V('/parametres : ancien « 1 » (position) + pseudo « Héra » → l\'identifiant de Héra', p.status === 200 && p.data.config?.bot_profil === I.empreinteProfil('Héra')
+        && p.data.identiteBot?.profilNom === 'Héra' && p.data.identiteBot?.profilRetire === null, texte(p.data.identiteBot || p.data).slice(0, 200));
+      setGuildConfig('GP', 'bot_profil', 'disparu1');
+      p = await lireParametres();
+      V('/parametres : profil retiré → bot_profil null (le menu retombe sur le profil global) et profilRetire signalé',
+        p.data.config?.bot_profil === null && p.data.identiteBot?.profilRetire === 'disparu1', texte(p.data.identiteBot || p.data).slice(0, 200));
+      setGuildConfig('GP', 'bot_profil', null);
     }
   }
 
@@ -616,9 +694,302 @@ async function erreurDe(promesse) {
     V('app.js : Mes bots — envoi par carte, ligne « Nom | URL » ajoutée', /data-profil-fichier/.test(app) && /api\("bot\.profil\.photo", \{\}, \{ formData: fd \}\)/.test(app) && /\$\{nom\} \| \$\{r\.url\}/.test(app));
     V('app.js : aides à jour (imgur, Discord, Dropbox, Drive, GitHub)', (app.match(/imgur, Discord, Dropbox, Google Drive, GitHub/g) || []).length >= 2);
     V('app.js : profils rechargés à chaud après l\'écriture du .env', /api\("bot\.profils\.recharger"/.test(app));
+
+    // 🔑 Identifiants stables, côté site.
+    const fonctionPhp = (nom) => {
+      const i = api.indexOf(`function ${nom}(`);
+      return i < 0 ? '' : api.slice(i, api.indexOf('\n}\n', i) + 2);
+    };
+    const pp = fonctionPhp('profils_propres');
+    V('api.php : profils_propres GARDE un id valide (jamais « __global__ »)', /\$profil\['id'\] = \$id/.test(pp) && /__global__/.test(pp) && /\[A-Za-z0-9_-\]\{1,32\}/.test(pp));
+    // Exécuté pour de vrai quand PHP est là (le site en dépend) : la fonction
+    // seule, sans le reste d'api.php.
+    const { spawnSync } = require('child_process');
+    const php = spawnSync('php', ['-r', `${fonctionPhp('cleanString')}\n${pp}\necho json_encode(profils_propres([
+      ['id' => 'ares01', 'nom' => 'Arès', 'avatar' => 'https://x.test/a.png'],
+      ['id' => '__global__', 'nom' => 'Zeus', 'avatar' => 'ftp://x'],
+      ['id' => 'pas valide', 'nom' => 'Héra'],
+      ['nom' => ''],
+    ]), JSON_UNESCAPED_UNICODE);`], { encoding: 'utf8' });
+    if (php.status === 0) {
+      let sortie = null;
+      try { sortie = JSON.parse(php.stdout); } catch { /* sortie illisible */ }
+      V('… exécutée : id gardé, « __global__ » et id invalide écartés, profil sans nom retiré',
+        texte(sortie) === texte([{ nom: 'Arès', avatar: 'https://x.test/a.png', id: 'ares01' }, { nom: 'Zeus', avatar: '' }, { nom: 'Héra', avatar: '' }]), php.stdout + php.stderr);
+    } else {
+      console.log('  ⚠️ php absent : profils_propres vérifiée par son texte seulement');
+    }
+    // app.js : la conversion texte → profils, exécutée telle qu'écrite.
+    const iPdt = app.indexOf('function profilsDepuisTexte(');
+    const srcPdt = app.slice(iPdt, app.indexOf('\n  }\n', iPdt) + 4);
+    const profilsDepuisTexte = new Function(`${srcPdt}; return profilsDepuisTexte;`)();
+    const relus = profilsDepuisTexte('Hermès | https://h.test/h.png\nArès | https://a.test/a.png\nNouveau', [
+      { nom: 'Arès', avatar: 'https://a.test/a.png', id: 'ares01' }, { nom: 'Zeus', id: 'zeus01' }, { nom: 'Hermès' }]);
+    V('app.js : l\'id d\'un profil déjà connu (même nom) est repris, même après réordonnancement ou retrait d\'un autre',
+      texte(relus) === texte([{ nom: 'Hermès', avatar: 'https://h.test/h.png' }, { nom: 'Arès', avatar: 'https://a.test/a.png', id: 'ares01' }, { nom: 'Nouveau', avatar: '' }]), texte(relus));
+    V('app.js : collectBots passe les profils existants', /profilsDepuisTexte\(get\("profils"\), existing\.profils\)/.test(app));
+    const bloc2 = app.slice(app.indexOf('function identiteBotBloc('), app.indexOf('function identiteBotBloc(') + 3000);
+    V('app.js : la page Identité signale un profil retiré et nomme le profil posé', /e\.profilRetire/.test(bloc2) && /retiré de la liste/.test(bloc2) && /e\.profilNom/.test(bloc2));
   }
 
-  global.fetch = vraiFetch;
+  console.log('\n13) 🛡️ Aucune adresse interne : adresses écrites en clair, ports, schémas');
+  {
+    const interdites = ['127.0.0.1', '127.8.9.10', '10.0.0.1', '172.16.0.1', '172.31.255.255', '192.168.1.10', '169.254.169.254',
+      '100.64.0.1', '100.127.255.254', '0.0.0.0', '0.1.2.3', '224.0.0.1', '239.255.255.250', '255.255.255.255', '198.18.0.1',
+      '::1', '::', '::ffff:127.0.0.1', '::ffff:7f00:1', '::ffff:a9fe:a9fe', '::ffff:10.0.0.1', '::127.0.0.1', '64:ff9b::7f00:1',
+      '2002:7f00:1::1', '2002:c0a8:0101::', 'fc00::1', 'fd12:3456::1', 'fe80::1', 'fe80::1%eth0', 'ff02::1', '[::1]', 'pas-une-ip'];
+    const faux = interdites.filter((a) => !I.adresseInterdite(a));
+    V(`${interdites.length} adresses internes ou réservées refusées (IPv4, IPv6, IPv4 enveloppées)`, faux.length === 0, faux.join(', '));
+    const publiques = ['93.184.216.34', '8.8.8.8', '1.1.1.1', '172.32.0.1', '100.128.0.1', '2606:4700:4700::1111', '::ffff:8.8.8.8', '2002:0808:0808::1'];
+    const fermees = publiques.filter((a) => I.adresseInterdite(a));
+    V('… et les adresses publiques passent', fermees.length === 0, fermees.join(', '));
+
+    const avant = connexions.length;
+    const liens = ['http://127.0.0.1/a.png', 'http://127.0.0.1:8080/archive-fichier?id=1', 'http://[::1]/a.png', 'http://[::ffff:127.0.0.1]/a.png',
+      'http://2130706433/a.png', 'http://0x7f.1/a.png', 'http://017700000001/a.png', 'http://169.254.169.254/latest/meta-data/iam',
+      'http://[::ffff:a9fe:a9fe]/', 'http://10.0.0.1/', 'http://[fd00::1]/', 'http://[fe80::1]/', 'http://100.64.0.1/', 'http://0.0.0.0/',
+      'http://[64:ff9b::7f00:1]/', 'http://[2002:7f00:1::]/'];
+    for (const lien of liens) {
+      const e = await erreurDe(I.dataUriDepuis(lien));
+      V(`refusé sans connexion : ${lien}`, e?.cibleRefusee === true && /adresse publique/.test(e.message), e?.message);
+    }
+    V('… aucune connexion n\'est partie', connexions.length === avant, texte(connexions.slice(avant)));
+
+    const ports = await erreurDe(I.dataUriDepuis('https://cdn.test:8443/a.png'));
+    V('un port exotique (8443) est refusé, sans connexion', ports?.cibleRefusee === true && connexions.length === avant, ports?.message);
+    const p443 = await I.dataUriDepuis('https://cdn.test:443/a.png');
+    V('… le port 443 écrit en clair passe', /^data:image\/png/.test(p443));
+    const p80 = await I.dataUriDepuis('http://cdn.test:80/b.png');
+    V('… le port 80 aussi', /^data:image\/png/.test(p80));
+    for (const lien of ['file:///etc/passwd', 'ftp://cdn.test/a.png', 'gopher://127.0.0.1:6379/_x']) {
+      const e = await erreurDe(I.dataUriDepuis(lien));
+      V(`schéma refusé : ${lien.split(':')[0]}`, Boolean(e) && /http\(s\)/.test(e.message));
+    }
+    const enveloppe = 'https://www.google.com/imgres?imgurl=http%3A%2F%2F127.0.0.1%2Fphoto.png';
+    WEB.set(enveloppe, { type: 'text/html', body: page('') });
+    const k = connexions.length;
+    const g = await erreurDe(I.dataUriDepuis(enveloppe));
+    V('Google Images qui ENVELOPPE une adresse interne : refusé aussi, 127.0.0.1 jamais contacté',
+      g?.cibleRefusee === true && connexions.slice(k).every((c) => c.adresse !== '127.0.0.1'), `${g?.message} ${texte(connexions.slice(k))}`);
+  }
+
+  console.log('\n14) 🛡️ Noms résolus, redirections, og:image, DNS qui change de réponse');
+  {
+    DNS.set('interne.test', ['10.20.30.40']);
+    DNS.set('melange.test', [PUBLIQUE, '127.0.0.1']);
+    DNS.set('metadonnees.test', ['169.254.169.254']);
+    DNS.set('v6interne.test', ['::ffff:192.168.0.1']);
+    DNS.set('localhost', ['127.0.0.1', '::1']);
+    DNS.set('inconnu.test', []);
+    let avant = connexions.length;
+    for (const [lien, quoi] of [['https://interne.test/a.png', 'un nom qui résout en 10.x'], ['https://melange.test/a.png', 'un nom dont UNE des adresses est 127.0.0.1'],
+      ['http://metadonnees.test/latest/meta-data/', 'un nom vers 169.254.169.254'], ['https://v6interne.test/a.png', 'un nom vers ::ffff:192.168.0.1'],
+      ['http://localhost/a.png', 'localhost']]) {
+      const e = await erreurDe(I.dataUriDepuis(lien));
+      V(`${quoi} : refusé`, e?.cibleRefusee === true, e?.message);
+    }
+    V('… et la connexion ne part JAMAIS (le refus a lieu dans le lookup de la connexion)', connexions.length === avant, texte(connexions.slice(avant)));
+    const injoignable = await erreurDe(I.dataUriDepuis('https://inconnu.test/a.png'));
+    V('un nom qui ne résout pas : « site injoignable », comme avant', /site injoignable/.test(injoignable?.message || ''), injoignable?.message);
+
+    // Un seul message, quoi qu'il y ait derrière : rien sur le service.
+    const msgs = new Set();
+    for (const lien of ['http://127.0.0.1:1/x', 'http://127.0.0.1:43550/', 'http://10.0.0.1/a.png', 'https://interne.test/x.json']) {
+      msgs.add((await erreurDe(I.dataUriDepuis(lien)))?.message);
+    }
+    V('port fermé, port ouvert, privé, nom interne : UN SEUL message, sans statut HTTP ni type', msgs.size === 1 && ![...msgs][0].match(/HTTP|type annoncé|injoignable/), [...msgs].join(' | '));
+
+    // Redirections suivies À LA MAIN, chacune revérifiée.
+    avant = connexions.length;
+    WEB.set('https://redirige.test/vers-local', redirige('http://127.0.0.1:8080/archive-fichier?id=1'));
+    const r1 = await erreurDe(I.dataUriDepuis('https://redirige.test/vers-local'));
+    V('302 vers 127.0.0.1 : refusé au saut, la cible n\'est pas contactée', r1?.cibleRefusee === true
+      && connexions.slice(avant).every((c) => c.adresse === PUBLIQUE) && connexions.length === avant + 1, `${r1?.message} ${texte(connexions.slice(avant))}`);
+    avant = connexions.length;
+    WEB.set('https://redirige.test/vers-nom-interne', redirige('http://metadonnees.test/latest/meta-data/', 301));
+    const r2 = await erreurDe(I.dataUriDepuis('https://redirige.test/vers-nom-interne'));
+    V('301 vers un NOM qui résout en 169.254.169.254 : refusé', r2?.cibleRefusee === true && connexions.length === avant + 1, r2?.message);
+    WEB.set('https://redirige.test/vers-port', redirige('https://cdn.test:6379/a.png', 307));
+    const r3 = await erreurDe(I.dataUriDepuis('https://redirige.test/vers-port'));
+    V('307 vers un port exotique : refusé', r3?.cibleRefusee === true, r3?.message);
+    WEB.set('https://redirige.test/relative', redirige('/images/photo.gif', 308));
+    WEB.set('https://redirige.test/images/photo.gif', { type: 'image/gif', body: GIF });
+    const r4 = await I.dataUriDepuis('https://redirige.test/relative');
+    V('308 relative vers une image publique : suivie et acceptée', /^data:image\/gif/.test(r4));
+    for (let i = 0; i < 6; i++) WEB.set(`https://chaine.test/${i}`, redirige(`https://chaine.test/${i + 1}`));
+    WEB.set('https://chaine.test/6', { type: 'image/png', body: PNG });
+    WEB.set('https://chaine.test/5', redirige('https://chaine.test/6'));
+    const cinq = await I.dataUriDepuis('https://chaine.test/1');
+    V('5 redirections : acceptées', /^data:image\/png/.test(cinq));
+    avant = connexions.length;
+    const six = await erreurDe(I.dataUriDepuis('https://chaine.test/0'));
+    V('6 redirections : refusé (5 au plus), la 7e requête ne part pas', /redirige plus de 5 fois/.test(six?.message || '') && connexions.length === avant + 6, `${six?.message} ${connexions.length - avant}`);
+
+    // La relance og:image passe par le même contrôle.
+    avant = connexions.length;
+    WEB.set('https://page.test/og-local', { type: 'text/html', body: page('<meta property="og:image" content="http://localhost/admin.png">') });
+    const og = await erreurDe(I.dataUriDepuis('https://page.test/og-local'));
+    V('og:image vers localhost : refusé, seule la page a été contactée', og?.cibleRefusee === true && connexions.length === avant + 1, og?.message);
+    WEB.set('https://page.test/og-ip', { type: 'text/html', body: page('<meta property="og:image" content="http://169.254.169.254/x.png">') });
+    const og2 = await erreurDe(I.dataUriDepuis('https://page.test/og-ip'));
+    V('og:image vers 169.254.169.254 : refusé', og2?.cibleRefusee === true, og2?.message);
+
+    // 🔁 DNS rebinding : le nom répond « public » puis « 127.0.0.1 ». Chaque
+    // connexion passe par le lookup filtré et part vers l'adresse qu'IL a
+    // vérifiée — la seconde réponse, interne, est donc refusée.
+    let tour = 0;
+    DNS.set('rebind.test', () => (tour++ === 0 ? [PUBLIQUE] : ['127.0.0.1']));
+    WEB.set('https://rebind.test/page', { type: 'text/html', body: page('<meta property="og:image" content="https://rebind.test/photo.png">') });
+    avant = connexions.length;
+    const rb = await erreurDe(I.dataUriDepuis('https://rebind.test/page'));
+    const faites = connexions.slice(avant);
+    V('rebinding : 2e résolution en 127.0.0.1 → refusé', rb?.cibleRefusee === true, rb?.message);
+    V('… la seule connexion faite est partie vers l\'adresse VÉRIFIÉE', faites.length === 1 && faites[0].adresse === PUBLIQUE, texte(faites));
+    let n = 0;
+    DNS.set('rebind2.test', () => (n++ === 0 ? [PUBLIQUE] : ['10.0.0.9']));
+    const direct = await erreurDe(I.telechargerPublic('https://rebind2.test/a.png'));
+    V('telechargerPublic : le nom est résolu UNE fois par connexion, dans le lookup filtré', !direct && n === 1, `${direct?.message} n=${n}`);
+  }
+
+  console.log('\n15) 🛡️ Les photos de la liste du CRÉATEUR peuvent venir de son site local — pas celles d\'un serveur');
+  {
+    const local = 'http://192.168.1.10:8080/uploads/avatars/bot_1.png';
+    WEB.set(local, { type: 'image/png', body: PNG });
+    process.env.BOT_PROFILS = JSON.stringify([{ nom: 'Local', avatar: local }]);
+    const appels = [];
+    const guild = { id: 'GL', client: { user: { id: 'BOTL', username: 'BotGlobal' }, rest: { patch: async (r, o) => { appels.push(o.body); return { avatar: 'h', user: { id: 'BOTL' } }; } } }, members: { me: null } };
+    const p = await I.appliquerProfil(guild, I.empreinteProfil('Local'));
+    V('profil du créateur avec photo sur le réseau local : posé', p?.nom === 'Local' && /^data:image\/png/.test(appels[0]?.avatar || ''), texte(appels[0]).slice(0, 60));
+    I._dernierAvatar.delete('GL');
+    const e = await erreurDe(I.appliquer(guild, { avatarUrl: local }));
+    V('… le MÊME lien saisi par un serveur : refusé', e?.cibleRefusee === true && appels.length === 1, e?.message);
+    const e2 = await erreurDe(I.dataUriDepuis(local));
+    V('… dataUriDepuis seul (sans le drapeau du créateur) : refusé', e2?.cibleRefusee === true);
+    const src = fs.readFileSync(path.join(__dirname, '..', 'src', 'managedApi.js'), 'utf8');
+    V('managedApi : aucune route ne passe le drapeau du créateur', !/photoDuCreateur|reseauLocal/.test(src));
+    V('managedApi : plus d\'`avatar` téléchargé par discord.js pour un webhook', !/createWebhook\(\{[^}]*avatar:/.test(src) && (src.match(/createWebhook\(/g) || []).length >= 2);
+  }
+
+  console.log('\n16) 🛡️ La vraie pile HTTP de Node suit le lookup imposé (serveur local, aucun accès extérieur)');
+  {
+    const http = require('http');
+    const zlib = require('zlib');
+    const recus = [];
+    const serveurLocal = http.createServer((req, res) => {
+      recus.push(req.url);
+      if (req.url === '/redir') { res.writeHead(302, { Location: '/photo.png' }); return res.end(); }
+      if (req.url === '/photo.png') { res.writeHead(200, { 'Content-Type': 'image/png' }); return res.end(PNG); }
+      if (req.url === '/page') {
+        res.writeHead(200, { 'Content-Type': 'text/html', 'Content-Encoding': 'gzip' });
+        return res.end(zlib.gzipSync(page('<meta property="og:image" content="/photo.png">')));
+      }
+      // Un serveur qui envoie l'en-tête puis se tait.
+      if (req.url === '/muet') { res.writeHead(200, { 'Content-Type': 'image/png' }); return res.write(PNG.subarray(0, 4)); }
+      if (req.url === '/muet-gz') {
+        res.writeHead(200, { 'Content-Type': 'text/html', 'Content-Encoding': 'gzip' });
+        return res.write(zlib.gzipSync(page('')).subarray(0, 6));
+      }
+      res.writeHead(404); res.end();
+    });
+    await new Promise((r) => serveurLocal.listen(0, '127.0.0.1', r));
+    const port = serveurLocal.address().port;
+    I._reseau.requete = requeteReelle;
+    // Le nom n'existe dans aucun DNS : seule la réponse du lookup imposé
+    // peut mener la connexion jusqu'ici.
+    DNS.set('site-createur.test', ['127.0.0.1']);
+    try {
+      const r = await I.telechargerPublic(`http://site-createur.test:${port}/redir`, { reseauLocal: true, signal: AbortSignal.timeout(3000) });
+      const corps = Buffer.concat(await (async () => { const m = []; for await (const x of r.corps) m.push(x); return m; })());
+      V('requête réelle : connexion vers l\'adresse du lookup, 302 suivie à la main', r.status === 200 && r.url.endsWith('/photo.png') && corps.equals(PNG) && texte(recus) === texte(['/redir', '/photo.png']), `${r.status} ${r.url} ${texte(recus)}`);
+      const page1 = await I.dataUriDepuis(`http://site-createur.test:${port}/page`, { reseauLocal: true });
+      V('… page compressée (gzip) lue, puis son og:image', /^data:image\/png/.test(page1));
+      recus.length = 0;
+      const refus = await erreurDe(I._reseau.requete(new URL(`http://site-createur.test:${port}/photo.png`), { lookup: I._lookupPublic, signal: AbortSignal.timeout(3000) }));
+      V('… avec le lookup PUBLIC, la vraie pile échoue avant de se connecter', refus?.cibleRefusee === true && recus.length === 0, `${refus?.message} ${texte(recus)}`);
+      for (const chemin of ['/muet', '/muet-gz']) {
+        const debut = Date.now();
+        const e = await erreurDe((async () => {
+          const r = await I.telechargerPublic(`http://site-createur.test:${port}${chemin}`, { reseauLocal: true, signal: AbortSignal.timeout(250) });
+          for await (const morceau of r.corps) void morceau;
+        })());
+        V(`… un serveur qui se tait (${chemin}) : la lecture échoue au délai, sans pendre`, Boolean(e) && Date.now() - debut < 2000, `${e?.message} ${Date.now() - debut} ms`);
+      }
+    } catch (err) {
+      V('requête réelle sur le serveur local', false, err.message);
+    } finally {
+      I._reseau.requete = fauxTransport;
+      serveurLocal.close();
+    }
+    V('le DNS des tests est faux de bout en bout (aucun accès extérieur)', I._reseau.lookup === fauxLookup && lookupReel !== fauxLookup);
+  }
+
+  console.log('\n17) 🔑 Profils identifiés par un identifiant STABLE');
+  {
+    const liste = (noms) => JSON.stringify(noms.map((n) => (typeof n === 'string' ? { nom: n, avatar: `https://cdn.test/${encodeURIComponent(n)}.png` } : n)));
+    const id = I.empreinteProfil;
+    process.env.BOT_PROFILS = liste(['Zeus', 'Arès', 'Hermès']);
+    const guildeQ = {
+      ...guildeP, id: 'GQ',
+      members: { ...guildeP.members, me: { id: 'BOT1', displayName: 'BotGlobal', nickname: null, avatar: null, avatarURL() { return null; } } },
+    };
+    guildeQ.members._add = guildeP.members._add;
+    const itxQ = (o) => ({ ...itx(o), guild: guildeQ, guildId: 'GQ' });
+    I._dernierAvatar.delete('GQ');
+    const choix = itxQ({ type: 'menu', customId: 'cfgbotprofil', valeurs: [id('Arès')] });
+    await CP.handleConfigInteraction(choix);
+    V('menu : choisir « Arès » enregistre son identifiant stable', getGuildConfig('GQ').bot_profil === id('Arès'), getGuildConfig('GQ').bot_profil);
+    const panneau = async () => {
+      const it = itxQ({ type: 'menu', customId: 'cfgcat', valeurs: ['identitebot'] });
+      await CP.handleConfigInteraction(it);
+      const brut = it.mises[0] || {};
+      const lignes = (brut.components || []).map((r) => (r.toJSON ? r.toJSON() : r));
+      const menu = lignes.flatMap((r) => r.components || []).find((c) => c.custom_id === 'cfgbotprofil');
+      return { texte: texte(brut), coches: (menu?.options || []).filter((o) => o.default).map((o) => o.value) };
+    };
+
+    process.env.BOT_PROFILS = liste(['Arès', 'Hermès']); // Zeus retiré : Arès passe en 1re position
+    let e = I.etat(guildeQ);
+    let v = await panneau();
+    V('Zeus retiré : c\'est TOUJOURS Arès qui est choisi (et pas Hermès, nouveau n°2)', e.profil === id('Arès') && e.profilNom === 'Arès' && !e.profilRetire, texte(e));
+    V('… le panneau coche Arès et le nomme', texte(v.coches) === texte([id('Arès')]) && /Profil choisi : \*\*Arès\*\*/.test(v.texte), `${texte(v.coches)} ${v.texte.slice(0, 200)}`);
+
+    process.env.BOT_PROFILS = liste(['Hermès', 'Zeus', 'Arès']); // réordonnés
+    V('profils réordonnés : toujours Arès', I.etat(guildeQ).profil === id('Arès'));
+
+    process.env.BOT_PROFILS = liste(['Zeus', 'Hermès']); // Arès retiré
+    e = I.etat(guildeQ);
+    v = await panneau();
+    V('Arès retiré : aucun profil désigné à sa place, la valeur retirée est signalée', e.profil === null && e.profilNom === null && e.profilRetire === id('Arès'), texte(e));
+    V('… le panneau retombe sur le profil global (seule option cochée) et le dit',
+      texte(v.coches) === texte([I.VALEUR_GLOBALE]) && /retiré de la liste par le créateur du bot/.test(v.texte) && /« Profil global »/.test(v.texte), `${texte(v.coches)} ${v.texte.slice(0, 300)}`);
+    const appelsAvant = appelsPatch.length;
+    const vieux = itxQ({ type: 'menu', customId: 'cfgbotprofil', valeurs: [id('Arès')] });
+    await CP.handleConfigInteraction(vieux);
+    V('un VIEUX menu qui propose encore Arès : refus clair, rien posé', /retiré de la liste/.test(texte(vieux.reponses) + texte(vieux.suivis)) && appelsPatch.length === appelsAvant,
+      texte(vieux.reponses) + texte(vieux.suivis));
+
+    // Les enregistrements d'avant : un numéro de position.
+    process.env.BOT_PROFILS = liste(['Zeus', 'Arès', 'Hermès']);
+    setGuildConfig('GQ', 'bot_profil', '2');
+    setGuildConfig('GQ', 'bot_nick', 'Arès');
+    V('ancien « 2 » + pseudo Arès, liste inchangée → Arès', I.etat(guildeQ).profil === id('Arès'));
+    process.env.BOT_PROFILS = liste(['Arès', 'Hermès']);
+    V('ancien « 2 » + pseudo Arès, Zeus retiré → Arès (pas Hermès, le nouveau n°2)', I.etat(guildeQ).profil === id('Arès'), texte(I.etat(guildeQ)));
+    setGuildConfig('GQ', 'bot_nick', 'Autre');
+    V('ancien « 2 » sans pseudo reconnu → profil retiré, aucun autre désigné', I.etat(guildeQ).profil === null && I.etat(guildeQ).profilRetire === '2');
+
+    // Ids explicites (y compris numériques, déjà écrits à la main dans un .env).
+    process.env.BOT_PROFILS = JSON.stringify([{ id: 1, nom: 'Zeus' }, { id: '2', nom: 'Arès' }, { id: '__global__', nom: 'Piège' }, { nom: 'Double' }, { nom: 'Double' }]);
+    const ids = I.profils().map((p) => p.id);
+    V('ids explicites gardés (1, 2), « __global__ » refusé, doublons départagés',
+      texte(ids) === texte(['1', '2', id('Piège'), id('Double'), `${id('Double')}-2`]), texte(ids));
+    setGuildConfig('GQ', 'bot_profil', '2');
+    V('… un id explicite « 2 » désigne CE profil, quelle que soit sa place', I.etat(guildeQ).profil === '2' && I.etat(guildeQ).profilNom === 'Arès');
+    setGuildConfig('GQ', 'bot_profil', null);
+    const apercu = fs.readFileSync(path.join(__dirname, '..', 'src', 'utils', 'configPanel.js'), 'utf8');
+    V('le résumé de /config nomme le profil (plus de « profil n°… »)', !/profil n°/.test(apercu) && /profil appliqué : « \$\{e\.profilNom\} »/.test(apercu));
+  }
+
   fs.rmSync(RACINE, { recursive: true, force: true });
   console.log(`\n${ko === 0 ? '✅' : '❌'} ${ok} réussis, ${ko} échoués`);
   process.exit(ko === 0 ? 0 : 1);

@@ -81,6 +81,11 @@ const embedDe = (p) => json(p?.embeds?.[0]) || {};
 console.warn = () => {};
 console.log = ((log) => (...a) => { if (!/^(📊|🏅|🌐)/.test(String(a[0]))) log(...a); })(console.log);
 global.fetch = async () => { throw new Error('pas de réseau dans les tests'); };
+// Les images de la carte de rang (fond, avatar) passent par le téléchargeur
+// public des photos du bot : son DNS et sa requête sont coupés aussi.
+const ID = require('../src/utils/identiteBot');
+ID._reseau.requete = async () => { throw new Error('pas de réseau dans les tests'); };
+ID._reseau.lookup = (h, o, rappel) => setImmediate(() => (typeof o === 'function' ? o : rappel)(Object.assign(new Error('ENOTFOUND'), { code: 'ENOTFOUND' })));
 
 // ── Faux Discord ────────────────────────────────────────────────────────
 const personne = (id, nom, bot = false) => ({
@@ -865,7 +870,9 @@ const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
     V('chaque rubrique se convertit en carte (4000 signes, 40 composants)',
       Object.entries(vues).every(([, v]) => enComposants(g, client, v)), Object.entries(vues).filter(([, v]) => !enComposants(g, client, v)).map(([n]) => n).join(', '));
     const suppr = json(vues.recompenses.components[1]).components[0];
-    V('30 récompenses : menu de retrait paginé (25 puis 5)', suppr.options.length === 25 && json(vues['recompenses p2'].components[1]).components[0].options.length === 5);
+    // Une page par dizaine de PALIERS (deux composants chacun dans la carte) :
+    // 30 paliers donnent trois pages de 10.
+    V('30 récompenses sur 30 paliers : menu de retrait paginé (10, puis 10)', suppr.options.length === 10 && json(vues['recompenses p2'].components[1]).components[0].options.length === 10);
     const exTexte = json(vues['exclusions texte'].components[1]).components[0];
     V('exclusions : le menu reprend les salons déjà exclus', exTexte.default_values?.length === 25 && exTexte.custom_id === 'cfgniv:exsalon:texte');
     for (const nom of ['gains', 'annonce', 'global', 'boost', 'weekend', 'nivmax']) {
@@ -936,15 +943,18 @@ const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
     L.listerRecompensesNiveau(g.id).forEach((r) => L.supprimerRecompenseNiveau(g.id, r.id));
     it = fausse(g, { type: 'menu', user: 'staff', customId: 'cfgniv:recajout', valeurs: ['role'] });
     await cfg(it);
+    V('ajout d\'un rôle : réservé à l\'administration', !it.mises.length && /réservées à l'\*\*administration\*\*/.test(it.reponses[0]?.content || ''), texte(it.reponses));
+    it = fausse(g, { type: 'menu', user: 'admin', customId: 'cfgniv:recajout', valeurs: ['role'] });
+    await cfg(it);
     V('ajout d\'un rôle : étape du choix du rôle', json(it.mises[0]?.components?.[0])?.components?.[0]?.custom_id === 'cfgniv:recrole:role');
     V('étape « rôle » dans les limites Discord', soucisVue(it.mises[0]).length === 0, soucisVue(it.mises[0]).join(' ; '));
-    it = fausse(g, { type: 'role', user: 'staff', customId: 'cfgniv:recrole:role', valeurs: [R.HAUT] });
+    it = fausse(g, { type: 'role', user: 'admin', customId: 'cfgniv:recrole:role', valeurs: [R.HAUT] });
     await cfg(it);
     V('rôle au-dessus du bot : refusé, avec la marche à suivre', /au-dessus de mon rôle/.test(it.reponses[0]?.content || '') && !it.modales.length);
-    it = fausse(g, { type: 'role', user: 'staff', customId: 'cfgniv:recrole:role', valeurs: [R.N5] });
+    it = fausse(g, { type: 'role', user: 'admin', customId: 'cfgniv:recrole:role', valeurs: [R.N5] });
     await cfg(it);
     V('rôle valide : formulaire du niveau', it.modales[0]?.custom_id === `cfgniv:m:rec:role:${R.N5}`);
-    it = fausse(g, { type: 'modal', user: 'staff', customId: `cfgniv:m:rec:role:${R.N5}`, champs: { niveau: '5' } });
+    it = fausse(g, { type: 'modal', user: 'admin', customId: `cfgniv:m:rec:role:${R.N5}`, champs: { niveau: '5' } });
     await cfg(it);
     V('rôle ajouté au niveau 5', L.listerRecompensesNiveau(g.id).some((r) => r.type === 'role' && r.niveau === 5 && r.valeur === R.N5));
     it = fausse(g, { type: 'menu', user: 'staff', customId: 'cfgniv:recajout', valeurs: ['objet'] });

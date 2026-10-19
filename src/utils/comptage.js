@@ -59,7 +59,12 @@ const OPERATEURS = {
   '^': '^',
 };
 const estChiffre = (c) => c >= '0' && c <= '9';
-const estBlanc = (c) => c === ' ' || c === '\t' || c === '\n' || c === '\r' || c === ' ';
+// Les espaces qu'on tape entre les milliers : espace, insécable (U+00A0) et
+// fine insécable (U+202F, celle des claviers et correcteurs français).
+const SEPARATEURS_MILLIERS = new Set([' ', '\u00a0', '\u202f']);
+const estBlanc = (c) => c === ' ' || c === '\t' || c === '\n' || c === '\r' || c === '\u00a0' || c === '\u202f';
+// Un blanc sur la MÊME ligne : « 5 6 » est ambigu, « 5⏎6 » est un 5.
+const estBlancDeLigne = (c) => c === ' ' || c === '\t' || c === '\u00a0' || c === '\u202f';
 
 // Après un signe ou une parenthèse ouvrante, vient-il un opérande ?
 // C'est ce qui sépare « 5 x 3 » (un calcul) de « 5 xD » (un 5 et un sourire),
@@ -101,12 +106,28 @@ function decouperDebutComptage(texte) {
       if (estChiffre(c)) {
         let j = i;
         while (j < s.length && estChiffre(s[j])) j++;
-        if (j - i > CHIFFRES_MAX) return { erreur: 'trop_grand', jetons, debut, fin: j };
+        let chiffres = s.slice(i, j);
+        // « 1 000 », « 12 345 678 » : les milliers séparés à la française
+        // (espace, insécable ou fine). Un groupe de 1 à 3 chiffres, puis des
+        // groupes d'EXACTEMENT trois chiffres, un seul séparateur entre eux.
+        if (chiffres.length <= 3) {
+          while (SEPARATEURS_MILLIERS.has(s[j]) && estChiffre(s[j + 1] || '') && estChiffre(s[j + 2] || '')
+            && estChiffre(s[j + 3] || '') && !estChiffre(s[j + 4] || '')) {
+            chiffres += s.slice(j + 1, j + 4);
+            j += 4;
+          }
+        }
+        if (chiffres.length > CHIFFRES_MAX) return { erreur: 'trop_grand', jetons, debut, fin: j };
         // « 1,5 » ou « 2.5 » : un décimal n'est pas un compte.
         if ((s[j] === ',' || s[j] === '.') && estChiffre(s[j + 1] || '')) {
           return { erreur: 'decimal', jetons, debut, fin: j };
         }
-        if (!prendre({ t: 'n', v: BigInt(s.slice(i, j)) }, j)) return tropLong();
+        // « 5 6 », « 1 0000 » : deux nombres côte à côte sur la ligne. Lire
+        // le premier jugerait de travers : c'est un hors-jeu, pas un 5.
+        let k = j;
+        while (k < s.length && estBlancDeLigne(s[k])) k++;
+        if (k > j && estChiffre(s[k] || '')) return { erreur: 'ambigu', jetons, debut, fin: j };
+        if (!prendre({ t: 'n', v: BigInt(chiffres) }, j)) return tropLong();
         attendOperande = false;
         continue;
       }
@@ -302,9 +323,13 @@ const avancerStmt = db.prepare(`
 `);
 const casserStmt = db.prepare(`
   UPDATE comptage SET courant = 0, dernier_user = NULL, dernier_message_id = NULL,
-    erreurs = erreurs + 1, dernier_fautif = ?, record_depart = record, maj_le = ?
+    erreurs = erreurs + 1, dernier_fautif = ?, role_fautif = ?, record_depart = record, maj_le = ?
   WHERE guild_id = ?
 `);
+// Plus personne ne porte le rôle d'erreur (retiré au dernier fautif).
+const libererFautifStmt = db.prepare(
+  'UPDATE comptage SET dernier_fautif = NULL, role_fautif = NULL WHERE guild_id = ? AND dernier_fautif = ?'
+);
 const oublierDernierStmt = db.prepare(
   'UPDATE comptage SET dernier_message_id = NULL, maj_le = ? WHERE guild_id = ? AND dernier_message_id = ?'
 );
@@ -348,7 +373,7 @@ const maintenant = () => new Date().toISOString();
 function etatComptage(guildId) {
   return lireEtatStmt.get(String(guildId)) || {
     guild_id: String(guildId), channel_id: null, courant: 0, dernier_user: null, dernier_message_id: null,
-    record: 0, record_le: null, record_depart: 0, erreurs: 0, dernier_fautif: null, maj_le: null,
+    record: 0, record_le: null, record_depart: 0, erreurs: 0, dernier_fautif: null, role_fautif: null, maj_le: null,
   };
 }
 
@@ -470,18 +495,131 @@ async function sansEchec(appel) {
   }
 }
 
-// Le rôle d'erreur passe au nouveau fautif ; l'ancien le perd. Un rôle
-// au-dessus du mien ou disparu échoue sans bruit : le jeu continue.
-async function passerRoleErreur(message, roleId, ancienFautif) {
-  if (!roleId) return;
-  const guild = message.guild;
-  const fautif = message.author.id;
-  if (ancienFautif && String(ancienFautif) !== String(fautif)) {
-    const ancien = guild.members?.cache?.get(ancienFautif) || await sansEchec(() => guild.members.fetch(ancienFautif));
-    await sansEchec(() => ancien?.roles?.remove(roleId, 'Comptage : un autre membre a cassé la série'));
+// ══════════════════════════════════════════════════════════════════════════
+// 🎭 LE RÔLE D'ERREUR
+// ══════════════════════════════════════════════════════════════════════════
+//
+// Le bot le donne TOUT SEUL à quiconque casse la série — il suffit de poster
+// deux nombres. Un rôle qui porte un pouvoir ferait donc du comptage une
+// porte dérobée : un modo (grade staff) choisissait un rôle « Administrateur »
+// placé sous celui du bot, comptait « 1 » puis « 2 »… et le recevait.
+//
+// D'où trois verrous : le rôle se règle par l'ADMINISTRATION, il ne porte
+// aucune permission sensible, et ces permissions sont revérifiées à chaque
+// fois qu'on le donne (elles ont pu changer depuis le réglage).
+
+// Les permissions qu'un rôle d'erreur ne doit JAMAIS porter. Les valeurs
+// sont celles de l'API de Discord, écrites ici plutôt que lues dans
+// discord.js : une constante absente ne doit pas ouvrir le verrou.
+const PERMISSIONS_SENSIBLES_COMPTAGE = [
+  [1n << 3n, 'Administrateur'],
+  [1n << 5n, 'Gérer le serveur'],
+  [1n << 28n, 'Gérer les rôles'],
+  [1n << 4n, 'Gérer les salons'],
+  [1n << 29n, 'Gérer les webhooks'],
+  [1n << 2n, 'Bannir des membres'],
+  [1n << 1n, 'Expulser des membres'],
+  [1n << 40n, 'Exclure temporairement des membres'],
+  [1n << 13n, 'Gérer les messages'],
+  [1n << 17n, 'Mentionner @everyone'],
+  [1n << 27n, 'Gérer les pseudos'],
+  [1n << 30n, 'Gérer les expressions'],
+  [1n << 33n, 'Gérer les évènements'],
+  [1n << 34n, 'Gérer les fils'],
+  [1n << 22n, 'Rendre les membres muets'],
+  [1n << 23n, 'Mettre en sourdine des membres'],
+  [1n << 24n, 'Déplacer des membres'],
+];
+
+// Les permissions d'un rôle en bits, quelle que soit sa forme : objet de
+// discord.js (bitfield), ou valeur brute de l'API (texte, nombre).
+function bitsDuRole(role) {
+  const p = role?.permissions;
+  try {
+    if (p === null || p === undefined) return 0n;
+    if (typeof p === 'bigint') return p;
+    if (typeof p === 'object' && p.bitfield !== undefined) return BigInt(p.bitfield);
+    return BigInt(p);
+  } catch {
+    return 0n;
   }
+}
+
+// Les noms des permissions sensibles que porte ce rôle ([] : aucune).
+function permissionsSensiblesRole(role) {
+  const bits = bitsDuRole(role);
+  return PERMISSIONS_SENSIBLES_COMPTAGE.filter(([bit]) => (bits & bit) === bit).map(([, nom]) => nom);
+}
+
+// Le refus du site (API) pour un rôle d'erreur porteur de pouvoirs, ou null.
+// Les autres contrôles (rôle du serveur, géré, sous le bot) sont faits avant.
+function refusRoleErreurComptage(guild, roleId) {
+  const role = guild?.roles?.cache?.get?.(String(roleId));
+  if (!role) return null;
+  const sensibles = permissionsSensiblesRole(role);
+  if (!sensibles.length) return null;
+  return `Le rôle ${role.name || role.id} porte des permissions sensibles (${sensibles.join(', ')}) : `
+    + 'le rôle d\'erreur du comptage est donné automatiquement, il ne doit en porter aucune.';
+}
+
+// Retire un rôle à un membre, sans jamais lever.
+async function retirerRole(guild, userId, roleId, raison) {
+  if (!guild || !userId || !roleId) return;
+  const membre = guild.members?.cache?.get(String(userId)) || await sansEchec(() => guild.members.fetch(String(userId)));
+  await sansEchec(() => membre?.roles?.remove(String(roleId), raison));
+}
+
+// Le rôle d'erreur passe au nouveau fautif ; l'ancien perd celui qu'il a
+// RÉELLEMENT reçu — pas celui du réglage du moment, qui a pu changer
+// entretemps. Un rôle au-dessus du mien ou disparu échoue sans bruit : le
+// jeu continue. Un rôle devenu sensible n'est plus donné.
+async function passerRoleErreur(message, roleId, { ancienFautif = null, ancienRole = null } = {}) {
+  const guild = message.guild;
+  const fautif = String(message.author.id);
+  if (ancienFautif && ancienRole && (String(ancienFautif) !== fautif || String(ancienRole) !== String(roleId))) {
+    await retirerRole(guild, ancienFautif, ancienRole, 'Comptage : un autre membre a cassé la série');
+  }
+  if (!roleId) return;
   const membre = message.member || await sansEchec(() => guild.members.fetch(fautif));
   await sansEchec(() => membre?.roles?.add(roleId, 'Comptage : a cassé la série'));
+}
+
+// Le rôle qu'on peut donner maintenant : celui du réglage, s'il existe
+// encore et ne porte aucune permission sensible. Sinon null.
+function roleErreurDonnable(guild, roleId) {
+  if (!roleId) return null;
+  const role = guild?.roles?.cache?.get?.(String(roleId));
+  if (!role) return null;
+  if (permissionsSensiblesRole(role).length) {
+    console.warn(`⚠️ Comptage : le rôle d'erreur ${role.name || role.id} porte des permissions sensibles — il n'est plus donné.`);
+    return null;
+  }
+  return String(roleId);
+}
+
+// Le rôle que porte le dernier fautif, ou null. role_fautif vaut « » quand
+// rien ne lui a été donné ; NULL sur une ligne d'avant cette colonne — il
+// porte alors le rôle du réglage.
+function roleDuFautif(e, R) {
+  if (!e?.dernier_fautif) return null;
+  if (e.role_fautif === null || e.role_fautif === undefined) return R.roleErreur || null;
+  return e.role_fautif || null;
+}
+
+// Le staff change le rôle d'erreur, le vide ou coupe le comptage : le
+// dernier fautif perd le rôle qu'il porte (sauf s'il reste le même). Ne
+// lève jamais. Renvoie true si un rôle a été retiré.
+// ⚠️ La lecture et la base se font AVANT le premier `await` : appelée avant
+// d'écrire le nouveau réglage, elle lit bien l'ancien, même sans l'attendre.
+async function retirerRoleFautifComptage(guild, { garder = null } = {}) {
+  if (!guild?.id) return false;
+  const e = lireEtatStmt.get(String(guild.id));
+  if (!e?.dernier_fautif) return false;
+  const porte = roleDuFautif(e, reglagesComptage(getGuildConfig(guild.id)));
+  if (!porte || (garder && String(garder) === String(porte))) return false;
+  libererFautifStmt.run(String(guild.id), String(e.dernier_fautif));
+  await retirerRole(guild, e.dernier_fautif, porte, 'Comptage : le rôle d\'erreur a été changé ou retiré');
+  return true;
 }
 
 const reagir = (message, emoji) => Promise.resolve()
@@ -530,7 +668,11 @@ async function jugerMessageComptage(message, lu, R) {
     return { traite: true, verdict: 'faux', raison: j.raison, casse: 0, sanction: false };
   }
 
-  casserStmt.run(String(message.author.id), maintenant(), guildId);
+  // Le rôle réellement donné est noté (« » : aucun) : c'est lui qu'on
+  // retirera plus tard, quel que soit le réglage d'alors.
+  const roleDonne = roleErreurDonnable(message.guild, R.roleErreur);
+  const ancienRole = roleDuFautif(etat, R);
+  casserStmt.run(String(message.author.id), roleDonne || '', maintenant(), guildId);
   statErreurStmt.run(guildId, String(message.author.id));
   const apres = etatComptage(guildId);
 
@@ -546,32 +688,85 @@ async function jugerMessageComptage(message, lu, R) {
 
   const effets = [envoyer(message.channel, lignes.join('\n'))];
   if (R.reactions) effets.push(reagir(message, REACTIONS_COMPTAGE.faux));
-  if (R.roleErreur) effets.push(passerRoleErreur(message, R.roleErreur, etat.dernier_fautif));
+  if (roleDonne || ancienRole) {
+    effets.push(passerRoleErreur(message, roleDonne, { ancienFautif: etat.dernier_fautif, ancienRole }));
+  }
   await Promise.all(effets);
   return { traite: true, verdict: 'faux', raison: j.raison, casse, sanction: true };
+}
+
+// Le message concerne-t-il le comptage ? null si non ; sinon ses réglages
+// et ce qu'on y lit. Synchrone : rien ne peut se glisser avant.
+function examinerComptage(message, cfg) {
+  if (!message?.guild || !message.author) return null;
+  // Le bot ignore ses propres messages et ceux des autres bots (webhooks
+  // compris), comme les messages système (« … a épinglé un message »).
+  if (message.author.bot || message.system || message.author.id === message.client?.user?.id) return null;
+  const R = reglagesComptage(cfg || getGuildConfig(message.guild.id));
+  if (!R.salon || String(message.channelId) !== R.salon) return null;
+  return { R, lu: lireNombreComptage(message.content, { maths: R.maths }) };
+}
+
+// L'anti-scam qui télécharge une image ne doit pas figer le salon : passé
+// ce délai, le nombre est jugé quand même.
+const ATTENTE_FILTRES_MS = 10_000;
+
+function placerEnFile(message, { R, lu }) {
+  let feu;
+  const filtres = new Promise((r) => { feu = r; });
+  const tour = enFileComptage(R.salon, async () => {
+    let minuteur;
+    const garder = await Promise.race([
+      filtres,
+      new Promise((r) => { minuteur = setTimeout(() => r(true), ATTENTE_FILTRES_MS); minuteur.unref?.(); }),
+    ]);
+    clearTimeout(minuteur);
+    // Effacé par l'anti-scam ou l'anti-spam : ce message ne compte pas.
+    if (!garder) return { traite: true, filtre: true };
+    return jugerMessageComptage(message, lu, R);
+  });
+  return { tour, liberer: (garder = true) => feu(Boolean(garder)) };
+}
+
+// 🎫 Réserve la place d'un NOMBRE dans la file de son salon, DÈS SA
+// RÉCEPTION — avant l'anti-scam et l'anti-spam, qui prennent du temps.
+// Sans cela, un « 6 » accompagné d'une image (téléchargée et comparée aux
+// arnaques connues) entrait dans la file après le « 7 » posté 200 ms plus
+// tard : le 7 était jugé contre 5, et la série cassait à tort.
+//
+// Renvoie null (pas un nombre du salon de comptage), ou { tour, liberer } :
+// `liberer(true)` une fois les filtres passés, `liberer(false)` s'ils ont
+// effacé le message — sa place est alors rendue sans rien juger.
+function reserverPlaceComptage(message, cfg = null) {
+  const ex = examinerComptage(message, cfg);
+  return ex?.lu.ok ? placerEnFile(message, ex) : null;
 }
 
 // Point d'entrée depuis messageCreate. Ne lève jamais d'elle-même ; renvoie
 //   { traite: false }                 — pas le salon de comptage, ou un bot
 //   { traite: true, horsJeu: true }   — pas un nombre (supprime: effacé)
 //   { traite: true, verdict, … }      — un nombre jugé
-async function traiterMessageComptage(message, cfg = null) {
-  if (!message?.guild || !message.author) return { traite: false };
-  // Le bot ignore ses propres messages et ceux des autres bots (webhooks
-  // compris), comme les messages système (« … a épinglé un message »).
-  if (message.author.bot || message.system || message.author.id === message.client?.user?.id) return { traite: false };
-  const R = reglagesComptage(cfg || getGuildConfig(message.guild.id));
-  if (!R.salon || String(message.channelId) !== R.salon) return { traite: false };
-
-  const lu = lireNombreComptage(message.content, { maths: R.maths });
-  if (!lu.ok) {
-    if (!R.supprimer) return { traite: true, horsJeu: true, raison: lu.raison };
-    noterEffacement(message.id);
-    const efface = await Promise.resolve().then(() => message.delete()).then(() => true).catch(() => false);
-    if (!efface) effacesParLeBot.delete(String(message.id));
-    return { traite: true, horsJeu: true, raison: lu.raison, supprime: efface };
+//   { traite: true, filtre: true }    — un nombre effacé par un filtre
+// `place` : celle réservée à la réception (reserverPlaceComptage).
+async function traiterMessageComptage(message, cfg = null, place = null) {
+  if (place) {
+    place.liberer(true);
+    return place.tour;
   }
-  return enFileComptage(R.salon, () => jugerMessageComptage(message, lu, R));
+  const ex = examinerComptage(message, cfg);
+  if (!ex) return { traite: false };
+  const { R, lu } = ex;
+  if (lu.ok) {
+    const p = placerEnFile(message, ex);
+    p.liberer(true);
+    return p.tour;
+  }
+  // Un hors-jeu n'a pas de place dans la file : rien à juger.
+  if (!R.supprimer) return { traite: true, horsJeu: true, raison: lu.raison };
+  noterEffacement(message.id);
+  const efface = await Promise.resolve().then(() => message.delete()).then(() => true).catch(() => false);
+  if (!efface) effacesParLeBot.delete(String(message.id));
+  return { traite: true, horsJeu: true, raison: lu.raison, supprime: efface };
 }
 
 // Prévient les joueurs, dans le salon même, de ce que le staff a changé
@@ -597,7 +792,7 @@ async function salonDe(message, channelId) {
 // messageDelete. Un message hors cache arrive PARTIEL (ni auteur ni
 // contenu) : seul son identifiant compte, comparé au dernier nombre en base.
 // Renvoie { silencieux: true } pour un hors-jeu effacé par le bot lui-même.
-async function surSuppressionComptage(message) {
+async function surSuppressionComptage(message, { enMasse = false } = {}) {
   const id = String(message?.id || '');
   if (!id) return {};
   if (effacesParLeBot.delete(id)) return { silencieux: true };
@@ -611,9 +806,32 @@ async function surSuppressionComptage(message) {
     // Une seule alerte par nombre : le message n'existe plus.
     oublierDernierStmt.run(maintenant(), String(guildId), id);
     const salon = await salonDe(message, R.salon);
-    await envoyer(salon, `⚠️ <@${e.dernier_user}> a supprimé son nombre **${e.courant}**. Le prochain est **${e.courant + 1}**.`);
+    // Une purge (bannissement avec nettoyage, bot de modération) n'est pas
+    // le fait de l'auteur : on le dit sans l'accuser.
+    await envoyer(salon, enMasse
+      ? `⚠️ Le dernier nombre, **${e.courant}**, a été effacé avec d'autres messages (il était de <@${e.dernier_user}>). Le prochain est **${e.courant + 1}**.`
+      : `⚠️ <@${e.dernier_user}> a supprimé son nombre **${e.courant}**. Le prochain est **${e.courant + 1}**.`);
     return { republie: true, courant: e.courant };
   });
+}
+
+// messageDeleteBulk. Discord n'émet alors AUCUN messageDelete : sans ce
+// relais, une purge qui emportait le dernier nombre laissait le salon
+// afficher l'avant-dernier, et le joueur suivant « cassait » la série en
+// écrivant le bon nombre. Une seule alerte, et seulement si le dernier
+// nombre fait partie du lot.
+async function surSuppressionEnMasseComptage(messages, salon) {
+  const guildId = salon?.guild?.id || salon?.guildId;
+  if (!guildId || !messages || typeof messages.get !== 'function') return {};
+  const R = reglagesComptage(getGuildConfig(guildId));
+  if (!R.salon || String(salon.id) !== R.salon) return {};
+  const id = String(etatComptage(guildId).dernier_message_id || '');
+  const m = id ? messages.get(id) : null;
+  if (!m) return {};
+  return surSuppressionComptage({
+    id, guildId: String(guildId), guild: salon.guild || m.guild, channelId: String(salon.id), channel: salon,
+    client: salon.client || m.client,
+  }, { enMasse: true });
 }
 
 // messageUpdate. Le dernier nombre réécrit en autre chose : on rappelle le
@@ -644,4 +862,6 @@ module.exports = {
   etatComptage, nombreActuelComptage, changerSalonComptage, definirNombreComptage, remettreComptageAZero,
   classementComptage, compterCompteursComptage, statsMembreComptage,
   enFileComptage, traiterMessageComptage, surSuppressionComptage, surModificationComptage, annoncerComptage,
+  reserverPlaceComptage, surSuppressionEnMasseComptage,
+  PERMISSIONS_SENSIBLES_COMPTAGE, permissionsSensiblesRole, refusRoleErreurComptage, retirerRoleFautifComptage,
 };

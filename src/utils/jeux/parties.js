@@ -294,22 +294,42 @@ function jourJeux(date = new Date()) {
 //  • plafond quotidien jeux_xp_plafond par membre : au-delà, plus rien ;
 //  • Col SAO jeux_col_victoire, seulement si l'Aventure SAO est active, et
 //    tant que le plafond du jour n'est pas atteint.
+//
+// ⚠️ Le plafond se mesure à CHAQUE victoire récompensée, que l'XP soit
+// versée ou non. Il ne comptait que l'XP réellement réservée : niveaux
+// coupés, ou XP de victoire réglée à 0, rien ne s'inscrivait dans
+// jeux_gains, le plafond n'était jamais atteint… et les Col coulaient sans
+// fin (/jeu nombre se gagne à coup sûr, toutes les 5 s). Désormais une
+// victoire consomme sa part du plafond — l'XP prévue, et 1 au moins — même
+// quand cette XP n'est pas versée. Niveaux coupés, on paie donc en Col
+// exactement autant de victoires qu'avec les niveaux actifs ; XP à 0, le
+// plafond devient un nombre de victoires par jour. La colonne `xp` de
+// jeux_gains ne sert qu'à ce plafond : la part d'une victoire sans XP peut
+// donc s'y inscrire.
 function preparerRecompenseJeu(guildId, userId, { contreBot = false } = {}) {
   if (!userId || userId === 'bot') return null;
   const cfg = getGuildConfig(String(guildId));
   if (!cfg.jeux_enabled) return null;
   const r = recompensesJeux(cfg);
   const voulu = contreBot ? r.xpBot : r.xpVictoire;
-  const jour = jourJeux();
-  const deja = Number(lireGain.get(String(guildId), String(userId), jour)?.xp || 0);
   const niveaux = cfg.levels_enabled !== 0;
-  const xp = niveaux ? Math.max(0, Math.min(voulu, r.plafond - deja)) : 0;
-  if (xp > 0) ajouterGain.run(String(guildId), String(userId), jour, xp);
+  const xpPossible = niveaux && voulu > 0;
+  const colPossible = r.col > 0 && Boolean(cfg.sao_enabled);
+  // Rien à verser : rien à mesurer non plus.
+  if (!xpPossible && !colPossible) return { xp: 0, col: 0, plafonne: false, sansXp: !xpPossible };
+  const g = String(guildId);
+  const u = String(userId);
+  const jour = jourJeux();
+  const deja = Number(lireGain.get(g, u, jour)?.xp || 0);
+  const unite = Math.max(voulu, 1);
+  const part = Math.max(0, Math.min(unite, r.plafond - deja));
+  if (part > 0) ajouterGain.run(g, u, jour, part);
+  const xp = xpPossible ? Math.min(voulu, part) : 0;
   let col = 0;
-  if (r.col > 0 && cfg.sao_enabled && deja < r.plafond) {
+  if (colPossible && part > 0) {
     if (crediterColJeu(guildId, userId, r.col) !== null) col = r.col;
   }
-  return { xp, col, plafonne: niveaux && voulu > 0 && xp < voulu };
+  return { xp, col, plafonne: part < unite, sansXp: !xpPossible };
 }
 
 // Verse l'XP réservée (contrat C). Ne lève jamais : une annonce de niveau
@@ -336,7 +356,7 @@ function ligneRecompenseJeu(r) {
   const morceaux = [];
   if (r.xp > 0) morceaux.push(`+${r.xp} XP`);
   if (r.col > 0) morceaux.push(`+${r.col} Col`);
-  if (r.plafonne) morceaux.push('plafond d\'XP du jour atteint');
+  if (r.plafonne) morceaux.push(r.sansXp ? 'plafond du jour atteint' : 'plafond d\'XP du jour atteint');
   return morceaux.length ? `-# 🎁 ${morceaux.join(' · ')}` : '';
 }
 
@@ -409,6 +429,7 @@ async function envoyerPartieJeu(interaction, partie, payload) {
   const message = typeof interaction.fetchReply === 'function'
     ? await interaction.fetchReply().catch(() => null)
     : null;
+  retenirJetonJeu(partie.id, interaction, message);
   // Relue : un premier clic a pu passer pendant l'attente du réseau.
   const fraiche = lirePartieJeu(partie.id);
   if (fraiche && message?.id && !fraiche.message_id) {
@@ -416,6 +437,109 @@ async function envoyerPartieJeu(interaction, partie, payload) {
     sauverPartieJeu(fraiche);
   }
   return fraiche || partie;
+}
+
+// 🔑 Le jeton de l'interaction qui tient le message de la partie.
+//
+// Rééditer un message hors interaction passait par le salon :
+// GET /channels/…/messages/…, qui exige « Voir le salon » et, hors cache,
+// « Voir les anciens messages ». Or /jeu se lance aussi là où le bot ne voit
+// rien — une interaction ne dépend pas de ses permissions. Le réflexe n'y
+// passait jamais au vert, et aucune partie expirée n'y grisait ses boutons.
+//
+// Le webhook de l'interaction, lui, n'exige AUCUNE permission : pendant
+// 15 minutes, `editReply` réédite le message qu'elle a publié (la commande)
+// ou celui de son bouton (un clic répondu par une mise à jour). Chaque clic
+// de ce genre rafraîchit le jeton ; comme toute partie prolonge son
+// échéance à ce moment-là (10 minutes au plus), l'expiration tombe presque
+// toujours dans les 15 minutes. Le salon reste le repli.
+//
+// En mémoire seulement : un jeton d'interaction n'a rien à faire en base.
+const VALIDITE_JETON = 14 * 60_000; // 15 min chez Discord, une de marge
+const jetonsJeux = new Map();
+
+function retenirJetonJeu(partieId, interaction, message) {
+  if (!message || typeof interaction?.editReply !== 'function') return;
+  const maintenant = Date.now();
+  const depuis = Number(interaction.createdTimestamp) || maintenant;
+  if (depuis + VALIDITE_JETON <= maintenant) return;
+  jetonsJeux.set(String(partieId), {
+    interaction,
+    carte: require('../reponse').estCarte(message),
+    expire: depuis + VALIDITE_JETON,
+  });
+  if (jetonsJeux.size > 500) {
+    for (const [cle, j] of jetonsJeux) if (j.expire <= maintenant) jetonsJeux.delete(cle);
+  }
+}
+
+const oublierJetonJeu = (partieId) => jetonsJeux.delete(String(partieId));
+
+// Le corps d'une réédition : une carte se reconstruit en composants, un
+// message classique reçoit le payload tel quel. Null si rien ne tient.
+function corpsEditionJeu(guild, client, payload, carte) {
+  if (!carte) return { content: '', ...payload, allowedMentions: { parse: [] } };
+  const composants = require('../reponse').enComposants(guild || null, client, payload);
+  return composants?.length ? { components: composants, allowedMentions: { parse: [] } } : null;
+}
+
+// ✏️ Par le webhook de l'interaction, tant que son jeton vit.
+async function editerParJetonJeu(client, partie, payload) {
+  const j = jetonsJeux.get(String(partie.id));
+  if (!j) return false;
+  if (j.expire <= Date.now()) {
+    jetonsJeux.delete(String(partie.id));
+    return false;
+  }
+  const guild = j.interaction.guild || client?.guilds?.cache?.get?.(partie.guild_id) || null;
+  const corps = corpsEditionJeu(guild, client, payload, j.carte);
+  if (!corps) return false;
+  try {
+    await j.interaction.editReply(corps);
+    return true;
+  } catch (err) {
+    // Jeton périmé ou refusé : on n'y reviendra pas, le salon prend le relais.
+    jetonsJeux.delete(String(partie.id));
+    console.warn(`⚠️ Mini-jeux : partie ${partie.id} non rééditée par son interaction (${err.message}).`);
+    return false;
+  }
+}
+
+// ✏️ Par le salon : exige d'y voir le message (cache, ou « Voir les anciens
+// messages »).
+async function editerParSalonJeu(client, partie, payload) {
+  if (!client || !partie?.message_id || !partie.channel_id) return false;
+  try {
+    const salon = await client.channels.fetch(partie.channel_id).catch(() => null);
+    const message = await salon?.messages?.fetch?.(partie.message_id).catch(() => null);
+    if (!message) return false;
+    const { estCarte } = require('../reponse');
+    const corps = corpsEditionJeu(salon.guild || null, client, payload, estCarte(message));
+    if (!corps) return false;
+    await message.edit(corps);
+    return true;
+  } catch (err) {
+    console.warn(`⚠️ Mini-jeux : message de la partie ${partie.id} non réédité (${err.message}).`);
+    return false;
+  }
+}
+
+// Les rééditions d'une même partie partent L'UNE APRÈS L'AUTRE. Sans cela,
+// une réédition lente (le réflexe qui passe au vert) pouvait arriver chez
+// Discord APRÈS la conclusion de la partie, et l'écraser.
+const editionsEnVol = new Map();
+
+// Attend la réédition en cours d'une partie — sans jamais dépasser `max` ms :
+// une interaction n'a que trois secondes pour répondre.
+async function attendreEditionJeu(id, max = 1500) {
+  const envol = editionsEnVol.get(String(id));
+  if (!envol) return;
+  let minuteur;
+  await Promise.race([
+    envol.catch(() => null),
+    new Promise((r) => { minuteur = setTimeout(r, max); minuteur.unref?.(); }),
+  ]);
+  clearTimeout(minuteur);
 }
 
 // « jeu:<id>:<action>[:<arg>] » — 100 caractères au plus, jamais davantage.
@@ -451,25 +575,20 @@ const echeanceJeu = (partie, texte = 'Sans action, la partie expire') =>
 // ✏️ Réédite le message d'une partie hors interaction (expiration, signal
 // du réflexe…). Une carte se reconstruit en composants : lui renvoyer des
 // `embeds` serait refusé par Discord, et l'échec serait muet.
-async function editerMessageJeu(client, partie, payload) {
-  if (!client || !partie?.message_id || !partie.channel_id) return false;
-  try {
-    const salon = await client.channels.fetch(partie.channel_id).catch(() => null);
-    const message = await salon?.messages?.fetch?.(partie.message_id).catch(() => null);
-    if (!message) return false;
-    const { enComposants, estCarte } = require('../reponse');
-    if (estCarte(message)) {
-      const composants = enComposants(salon.guild || null, client, payload);
-      if (!composants?.length) return false;
-      await message.edit({ components: composants, allowedMentions: { parse: [] } });
-    } else {
-      await message.edit({ content: '', ...payload, allowedMentions: { parse: [] } });
-    }
-    return true;
-  } catch (err) {
-    console.warn(`⚠️ Mini-jeux : message de la partie ${partie.id} non réédité (${err.message}).`);
-    return false;
-  }
+//
+// D'abord par le jeton de l'interaction (aucune permission requise), puis
+// par le salon. Les rééditions d'une partie se suivent dans l'ordre.
+function editerMessageJeu(client, partie, payload) {
+  if (!partie?.id) return Promise.resolve(false);
+  const cle = String(partie.id);
+  const precedente = editionsEnVol.get(cle) || Promise.resolve();
+  const envoi = precedente.catch(() => null).then(async () => {
+    if (await editerParJetonJeu(client, partie, payload)) return true;
+    return editerParSalonJeu(client, partie, payload);
+  });
+  editionsEnVol.set(cle, envoi);
+  envoi.catch(() => null).then(() => { if (editionsEnVol.get(cle) === envoi) editionsEnVol.delete(cle); });
+  return envoi;
 }
 
 module.exports = {
@@ -481,4 +600,5 @@ module.exports = {
   jourJeux, preparerRecompenseJeu, verserXpJeu, ligneRecompenseJeu, purgerGainsJeux, conclureDuelJeu,
   programmerJeu, annulerMinuteurJeu,
   idJeu, boutonJeu, quiJeu, embedJeu, echeanceJeu, editerMessageJeu, priveJeu, lienPartieJeu, envoyerPartieJeu,
+  retenirJetonJeu, oublierJetonJeu, attendreEditionJeu, VALIDITE_JETON,
 };

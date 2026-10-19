@@ -7,6 +7,7 @@ const { COLORS, sendLog, logEmbed } = require('./embeds');
 const { mettreAJour, suivre } = require('./reponse');
 const M = require('./miseEnPage');
 const C = require('./comptage');
+const { GRADES, getGrade } = require('./permissions');
 
 // ⚙️ /config → 🔢 Comptage.
 //
@@ -169,10 +170,15 @@ async function gererConfigComptage(interaction) {
   if (action === 'salon') {
     const avant = C.reglagesComptage(getGuildConfig(guildId)).salon;
     const salonId = interaction.values?.[0] ? String(interaction.values[0]) : null;
+    // Comptage coupé : le dernier fautif n'a plus à porter le rôle d'erreur.
+    // La base change tout de suite ; le retrait (réseau) s'attend APRÈS la
+    // réponse, qui n'a que trois secondes.
+    const retrait = !salonId && avant ? C.retirerRoleFautifComptage(guild) : null;
     setGuildConfig(guildId, 'comptage_channel_id', salonId);
     // Changer de salon remet le compte à 0 (record et classement gardés).
     if (salonId !== avant) C.changerSalonComptage(guildId, salonId);
     await mettreAJour(interaction, vue());
+    await retrait;
     if (salonId && salonId !== avant) {
       await C.annoncerComptage(guild, salonId, C.ANNONCE_SALON_COMPTAGE);
     }
@@ -193,21 +199,44 @@ async function gererConfigComptage(interaction) {
 
   if (action === 'role') {
     const roleId = interaction.values?.[0] ? String(interaction.values[0]) : null;
-    // Un rôle que je ne peux pas donner ne servirait à rien : le dire ici
-    // évite de chercher pourquoi personne ne le reçoit.
+    const refuser = async (content) => {
+      await mettreAJour(interaction, vue());
+      return suivre(interaction, { content, flags: MessageFlags.Ephemeral });
+    };
+    // 🔒 Le bot donne ce rôle TOUT SEUL à qui casse la série : le choisir,
+    // c'est pouvoir se le faire donner en postant deux nombres. Réservé à
+    // l'administration — un staff s'offrait ainsi un rôle « Administrateur ».
+    if (getGrade(interaction.member) < GRADES.ADMIN) {
+      return refuser('⛔ Le rôle d\'erreur du comptage est réservé à l\'**administration** : le bot le donne de lui-même à qui casse la série.\n➜ Demandez à un administrateur de le choisir.');
+    }
     const role = roleId ? guild.roles?.cache?.get(roleId) : null;
     const moi = guild.members?.me;
+    // Un rôle que je ne peux pas donner ne servirait à rien : le dire ici
+    // évite de chercher pourquoi personne ne le reçoit.
     if (role && (role.managed || (moi && role.position >= moi.roles.highest.position))) {
-      await mettreAJour(interaction, vue());
-      return suivre(interaction, {
-        content: role.managed
-          ? `❌ **${role.name}** est géré par une intégration : il ne s'attribue pas à la main.`
-          : `❌ **${role.name}** est au-dessus de mon rôle : je ne pourrai pas le donner.\n➜ Remontez mon rôle dans **Paramètres du serveur → Rôles**, puis réessayez.`,
-        flags: MessageFlags.Ephemeral,
-      });
+      return refuser(role.managed
+        ? `❌ **${role.name}** est géré par une intégration : il ne s'attribue pas à la main.`
+        : `❌ **${role.name}** est au-dessus de mon rôle : je ne pourrai pas le donner.\n➜ Remontez mon rôle dans **Paramètres du serveur → Rôles**, puis réessayez.`);
     }
+    // Aucun pouvoir : un rôle d'erreur sanctionne, il n'élève personne.
+    const sensibles = role ? C.permissionsSensiblesRole(role) : [];
+    if (sensibles.length) {
+      return refuser(`❌ **${role.name}** porte des permissions sensibles : ${sensibles.join(', ')}.\n`
+        + '➜ Le bot le donnerait à n\'importe qui casse la série : choisissez un rôle sans aucun pouvoir de modération.');
+    }
+    // Ni au-dessus de celui qui règle : le bot ne distribue pas, à sa
+    // place, un rôle qu'il ne pourrait pas donner lui-même.
+    const haut = interaction.member?.roles?.highest?.position;
+    if (role && interaction.user.id !== guild.ownerId && Number.isFinite(haut) && role.position >= haut) {
+      return refuser(`❌ **${role.name}** est au niveau de votre rôle le plus haut, ou au-dessus : vous ne pouvez pas le faire distribuer par le bot.`);
+    }
+    const avantRole = C.reglagesComptage(getGuildConfig(guildId)).roleErreur;
+    // Le dernier fautif perd l'ancien rôle (sauf s'il reste le même) : lu
+    // AVANT d'écrire le nouveau réglage, retiré après la réponse.
+    const retrait = avantRole !== roleId ? C.retirerRoleFautifComptage(guild, { garder: roleId }) : null;
     setGuildConfig(guildId, 'comptage_role_erreur', roleId);
     await mettreAJour(interaction, vue());
+    await retrait;
     await journal(interaction, `🎭 Rôle d'erreur du comptage → ${roleId ? `<@&${roleId}>` : '*aucun*'}`);
     return;
   }

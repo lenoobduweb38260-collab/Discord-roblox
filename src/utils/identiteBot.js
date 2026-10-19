@@ -1,3 +1,10 @@
+const crypto = require('crypto');
+const dns = require('dns');
+const net = require('net');
+const http = require('http');
+const https = require('https');
+const stream = require('stream');
+const zlib = require('zlib');
 const { getGuildConfig, setGuildConfig } = require('../database');
 
 // 🪪 L'identité du bot PAR SERVEUR : pseudo + photo de profil de membre.
@@ -18,7 +25,8 @@ const { getGuildConfig, setGuildConfig } = require('../database');
 //  • un LIEN — imgur, Discord, Dropbox, Google Drive, GitHub, Tenor, Giphy,
 //    ibb.co, postimg, Gyazo… : `normaliserUrlImage` le change en lien direct
 //    quand l'hébergeur le permet, et une page web est lue pour y trouver son
-//    image (og:image) ;
+//    image (og:image). Vers une adresse PUBLIQUE seulement (🛡️ plus bas :
+//    ni réseau privé, ni bouclage, ni port exotique, redirections comprises) ;
 //  • un FICHIER envoyé depuis l'appareil (modal, `/config photo:`, site) :
 //    `appliquer(guild, { avatarDonnees })` ;
 //  • une data URI toute faite (le site, quand le bot ne peut pas le joindre).
@@ -57,26 +65,63 @@ const NOMS_FORMATS = {
   'video/webm': 'vidéo WEBM',
 };
 
+// 🔑 L'identifiant d'un profil est STABLE : retirer ou réordonner les autres
+// profils ne le change pas. C'est l'`id` explicite de BOT_PROFILS quand il y
+// en a un, sinon une empreinte de son nom. (Il valait autrefois sa POSITION :
+// retirer le profil n°1 faisait du n°2 un autre profil.)
+const ID_PROFIL = /^[A-Za-z0-9_-]{1,32}$/;
+const VALEUR_GLOBALE = '__global__'; // la valeur « profil global » du menu
+const empreinteProfil = (nom) => crypto.createHash('sha1').update(String(nom)).digest('hex').slice(0, 8);
+
 // Les profils proposés par le créateur : [{ id, nom, avatar }].
 function profils() {
   let brut = process.env.BOT_PROFILS;
   if (!brut) {
     try { brut = require('./botTeam').state('bot_profils'); } catch { brut = null; }
   }
-  try {
-    const liste = JSON.parse(brut || '[]');
-    if (!Array.isArray(liste)) return [];
-    return liste
-      .map((p, i) => ({
-        id: String(p?.id || i + 1),
-        nom: String(p?.nom || p?.name || '').trim().slice(0, 32),
+  let liste;
+  try { liste = JSON.parse(brut || '[]'); } catch { return []; }
+  if (!Array.isArray(liste)) return [];
+  const pris = new Set();
+  return liste
+    .map((p) => {
+      const nom = String(p?.nom || p?.name || '').trim().slice(0, 32);
+      const explicite = p?.id === undefined || p?.id === null ? '' : String(p.id).trim();
+      return {
+        id: ID_PROFIL.test(explicite) && explicite !== VALEUR_GLOBALE ? explicite : empreinteProfil(nom),
+        nom,
         avatar: String(p?.avatar || p?.avatarUrl || '').trim() || null,
-      }))
-      .filter((p) => p.nom)
-      .slice(0, 25);
-  } catch {
-    return [];
+      };
+    })
+    .filter((p) => p.nom)
+    .slice(0, 25)
+    .map((p) => {
+      // Deux profils du même nom : le second prend un suffixe.
+      let id = p.id;
+      for (let n = 2; pris.has(id); n++) id = `${p.id}-${n}`;
+      pris.add(id);
+      return { ...p, id };
+    });
+}
+
+// 🎭 Le profil enregistré pour ce serveur, retrouvé par son identifiant.
+// `retire` : un profil avait été choisi, mais il n'est plus dans la liste —
+// le serveur retombe alors sur « aucun profil » (le profil global dans les
+// menus) et on le lui dit, plutôt que d'en désigner un autre.
+function profilEnregistre(cfg, liste = profils()) {
+  const brut = cfg?.bot_profil === undefined || cfg?.bot_profil === null ? '' : String(cfg.bot_profil);
+  if (!brut) return { profil: null, retire: null };
+  const exact = liste.find((p) => p.id === brut);
+  if (exact) return { profil: exact, retire: null };
+  // Un enregistrement d'avant les identifiants stables : un numéro de
+  // POSITION. Il ne dit plus rien de sûr ; le profil se reconnaît au nom
+  // qu'il a posé (bot_nick), que choisir un profil enregistre toujours.
+  if (/^\d{1,2}$/.test(brut) && cfg?.bot_nick) {
+    const memeNom = liste.filter((p) => p.nom === cfg.bot_nick);
+    const choisi = memeNom.find((p) => p === liste[Number(brut) - 1]) || memeNom[0];
+    if (choisi) return { profil: choisi, retire: null };
   }
+  return { profil: null, retire: brut };
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -313,6 +358,222 @@ function imageDeLaPage(html, base) {
 }
 
 // ══════════════════════════════════════════════════════════════════
+// 🛡️ DES ADRESSES PUBLIQUES SEULEMENT
+// ══════════════════════════════════════════════════════════════════
+//
+// Le lien d'une photo vient d'un administrateur de serveur (modal, site). Le
+// bot, lui, tourne à côté de services qui ne doivent pas sortir : son API
+// locale sur 127.0.0.1, les métadonnées du nuage (169.254.169.254), le
+// réseau privé de l'hébergeur. Sans contrôle, « télécharger une photo »
+// devenait « lire une image interne et l'afficher en photo du bot ».
+//
+// Donc, à CHAQUE requête (redirections et page og:image comprises) :
+//  • http ou https, sur le port 80 ou 443, rien d'autre ;
+//  • le nom est résolu, et TOUTES ses adresses doivent être publiques ;
+//  • la connexion part vers l'adresse ainsi vérifiée — le contrôle a lieu
+//    dans le `lookup` de la connexion elle-même : un DNS qui changerait de
+//    réponse entre le contrôle et l'appel (rebinding) n'a pas de prise ;
+//  • les redirections sont suivies À LA MAIN, revérifiées, 5 au plus.
+
+const MAX_REDIRECTIONS = 5;
+const PORTS_PUBLICS = new Set(['', '80', '443']);
+
+const PLAGES_INTERDITES = (() => {
+  const b = new net.BlockList();
+  for (const [debut, prefixe] of [
+    ['0.0.0.0', 8], // « ce réseau »
+    ['10.0.0.0', 8], // privé
+    ['100.64.0.0', 10], // CGNAT
+    ['127.0.0.0', 8], // bouclage
+    ['169.254.0.0', 16], // lien-local, dont les métadonnées du nuage
+    ['172.16.0.0', 12], // privé
+    ['192.0.0.0', 24], // réservé IETF
+    ['192.0.2.0', 24], // documentation
+    ['192.88.99.0', 24], // relais 6to4
+    ['192.168.0.0', 16], // privé
+    ['198.18.0.0', 15], // bancs d'essai
+    ['198.51.100.0', 24], // documentation
+    ['203.0.113.0', 24], // documentation
+    ['224.0.0.0', 4], // multicast
+    ['240.0.0.0', 4], // réservé, et 255.255.255.255
+  ]) b.addSubnet(debut, prefixe, 'ipv4');
+  for (const [debut, prefixe] of [
+    ['::', 128], // non spécifiée
+    ['::1', 128], // bouclage
+    ['64:ff9b:1::', 48], // NAT64 local
+    ['100::', 64], // à jeter
+    ['2001:db8::', 32], // documentation
+    ['fc00::', 7], // privé (ULA)
+    ['fe80::', 10], // lien-local
+    ['fec0::', 10], // site-local (ancien)
+    ['ff00::', 8], // multicast
+  ]) b.addSubnet(debut, prefixe, 'ipv6');
+  return b;
+})();
+
+// Les 16 octets d'une adresse IPv6 (déjà validée par net.isIP).
+function octetsIPv6(ip) {
+  let texte = ip;
+  let queue = null;
+  const pointee = /^(.*:)(\d+\.\d+\.\d+\.\d+)$/.exec(texte);
+  if (pointee) {
+    if (net.isIP(pointee[2]) !== 4) return null;
+    queue = pointee[2].split('.').map(Number);
+    texte = `${pointee[1]}0:0`;
+  }
+  const moities = texte.split('::');
+  if (moities.length > 2) return null;
+  const groupes = (s) => (s ? s.split(':') : []);
+  const gauche = groupes(moities[0]);
+  const droite = moities.length === 2 ? groupes(moities[1]) : null;
+  const tous = droite === null
+    ? gauche
+    : [...gauche, ...Array(Math.max(0, 8 - gauche.length - droite.length)).fill('0'), ...droite];
+  if (tous.length !== 8 || !tous.every((g) => /^[0-9a-f]{1,4}$/i.test(g))) return null;
+  const octets = tous.flatMap((g) => { const n = parseInt(g, 16); return [n >> 8, n & 255]; });
+  if (queue) octets.splice(12, 4, ...queue);
+  return octets;
+}
+
+// Une adresse IP que le bot ne contacte jamais pour une photo. Une IPv6 qui
+// ENVELOPPE une IPv4 (::ffff:127.0.0.1, ::127.0.0.1, 64:ff9b::…, 6to4
+// 2002:…) est jugée sur l'IPv4 qu'elle contient. Ce qui n'est pas une
+// adresse du tout est refusé, par prudence.
+function adresseInterdite(adresse) {
+  const ip = String(adresse || '').trim().replace(/^\[|\]$/g, '').replace(/%.*$/, '');
+  const famille = net.isIP(ip);
+  if (famille === 4) return PLAGES_INTERDITES.check(ip, 'ipv4');
+  if (famille !== 6) return true;
+  if (PLAGES_INTERDITES.check(ip, 'ipv6')) return true;
+  const o = octetsIPv6(ip);
+  if (!o) return true;
+  const v4 = (i) => o.slice(i, i + 4).join('.');
+  const nuls = (a, b) => o.slice(a, b).every((x) => x === 0);
+  if (nuls(0, 10) && ((o[10] === 0xff && o[11] === 0xff) || (o[10] === 0 && o[11] === 0))) {
+    return PLAGES_INTERDITES.check(v4(12), 'ipv4');
+  }
+  if (o[0] === 0 && o[1] === 0x64 && o[2] === 0xff && o[3] === 0x9b && nuls(4, 12)) return PLAGES_INTERDITES.check(v4(12), 'ipv4');
+  if (o[0] === 0x20 && o[1] === 0x02) return PLAGES_INTERDITES.check(v4(2), 'ipv4');
+  return false;
+}
+
+// Un seul message pour tout refus : il ne dit rien de ce qui se trouve
+// derrière l'adresse (ouvert, fermé, quel service).
+const erreurCibleRefusee = () => Object.assign(new Error(
+  'ce lien ne mène pas à une adresse publique (réseau privé, adresse réservée ou port particulier) : '
+  + 'le bot ne le télécharge pas — utilisez un lien public (i.imgur.com…) ou envoyez le fichier depuis votre appareil'
+), { cibleRefusee: true });
+const erreurRedirections = () => Object.assign(new Error(
+  'ce lien redirige plus de 5 fois — utilisez le lien direct de l\'image, ou envoyez le fichier depuis votre appareil'
+), { cibleRefusee: true });
+
+// Le réseau, remplaçable par les tests (aucun accès réel) : `lookup` a la
+// signature de dns.lookup, `requete(url, { lookup, entetes, signal })` fait
+// UNE requête GET sans suivre les redirections.
+const reseau = {
+  lookup: (...args) => dns.lookup(...args),
+  requete: requeteHttp,
+};
+
+// 🔎 Le `lookup` de la connexion : résout TOUTES les adresses du nom et
+// refuse si une seule est interne. La connexion part ensuite vers l'une de
+// ces adresses vérifiées — jamais vers une seconde résolution.
+function lookupPublic(hote, options, rappel) {
+  if (typeof options === 'function') { rappel = options; options = {}; }
+  const opts = typeof options === 'number' ? { family: options } : (options || {});
+  reseau.lookup(hote, { all: true, family: opts.family || 0, hints: opts.hints }, (err, adresses) => {
+    if (err) return rappel(err);
+    const liste = Array.isArray(adresses) ? adresses : (adresses ? [{ address: adresses, family: net.isIP(adresses) }] : []);
+    if (!liste.length) return rappel(Object.assign(new Error('ENOTFOUND'), { code: 'ENOTFOUND', hostname: hote }));
+    if (liste.some((a) => adresseInterdite(a?.address))) return rappel(erreurCibleRefusee());
+    if (opts.all) return rappel(null, liste);
+    return rappel(null, liste[0].address, liste[0].family || net.isIP(liste[0].address));
+  });
+}
+
+// L'adresse peut-elle être demandée ? (schéma, port, IP écrite en clair —
+// Node ne passe pas par `lookup` pour une IP littérale : on la juge ici.)
+function cibleAutorisee(adresse, reseauLocal) {
+  let u;
+  try { u = new URL(adresse); } catch { throw erreurCibleRefusee(); }
+  if (!/^https?:$/.test(u.protocol)) throw erreurCibleRefusee();
+  if (reseauLocal) return u;
+  if (!PORTS_PUBLICS.has(u.port)) throw erreurCibleRefusee();
+  const hote = u.hostname.replace(/^\[|\]$/g, '');
+  if (!hote || (net.isIP(hote) && adresseInterdite(hote))) throw erreurCibleRefusee();
+  return u;
+}
+
+// Une requête GET avec http/https, sans redirection automatique, le
+// `lookup` imposé. La réponse garde son corps en flux, décompressé.
+function requeteHttp(u, { lookup, entetes, signal } = {}) {
+  const module = u.protocol === 'https:' ? https : http;
+  return new Promise((resolve, reject) => {
+    let req;
+    try {
+      req = module.request(u, { method: 'GET', headers: entetes, lookup, signal, agent: false }, (res) => {
+        res.on('error', () => {}); // l'erreur remonte à la lecture
+        const codage = String(res.headers['content-encoding'] || '').trim().toLowerCase();
+        const decodeur = codage === 'gzip' || codage === 'x-gzip' ? zlib.createGunzip()
+          : codage === 'deflate' ? zlib.createInflate()
+            : codage === 'br' ? zlib.createBrotliDecompress() : null;
+        // `pipeline` et non `pipe` : une réponse coupée (délai dépassé) doit
+        // faire échouer la lecture du décodeur, pas la laisser pendre.
+        if (decodeur) stream.pipeline(res, decodeur, () => {});
+        resolve({
+          status: res.statusCode,
+          entetes: res.headers,
+          corps: decodeur || res,
+          fermer: () => { res.destroy(); decodeur?.destroy(); },
+        });
+      });
+    } catch (err) {
+      reject(err);
+      return;
+    }
+    req.on('error', reject);
+    req.end();
+  });
+}
+
+const enTete = (res, nom) => {
+  const v = res?.entetes?.[nom];
+  return Array.isArray(v) ? v[0] : v;
+};
+// Une réponse dont on ne lira pas le corps : on coupe.
+function abandonner(res) {
+  try {
+    if (typeof res?.fermer === 'function') res.fermer();
+    else if (typeof res?.corps?.destroy === 'function') res.corps.destroy();
+  } catch { /* déjà fermé */ }
+}
+
+// 🌐 Télécharge une adresse PUBLIQUE en suivant au plus 5 redirections,
+// chacune revérifiée. Renvoie { status, entetes, corps, url } — `url` est
+// l'adresse finale. `reseauLocal` lève le contrôle d'adresse et de port :
+// réservé aux photos de la liste du CRÉATEUR du bot (son site peut tourner
+// sur le réseau local), jamais à un lien saisi par un serveur.
+async function telechargerPublic(adresse, { signal, reseauLocal = false, entetes = {} } = {}) {
+  let courante = String(adresse || '');
+  for (let saut = 0; ; saut++) {
+    const u = cibleAutorisee(courante, reseauLocal);
+    const res = await reseau.requete(u, {
+      lookup: reseauLocal ? reseau.lookup : lookupPublic,
+      entetes: { 'User-Agent': AGENT_HTTP, Accept: ACCEPT_IMAGE, 'Accept-Encoding': 'identity', ...entetes },
+      signal,
+    });
+    const vers = enTete(res, 'location');
+    if ([301, 302, 303, 307, 308].includes(res.status) && vers) {
+      abandonner(res);
+      if (saut >= MAX_REDIRECTIONS) throw erreurRedirections();
+      try { courante = new URL(String(vers), u).toString(); } catch { throw erreurCibleRefusee(); }
+      continue;
+    }
+    return { ...res, url: u.toString() };
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════
 // 📥 TÉLÉCHARGER LA PHOTO
 // ══════════════════════════════════════════════════════════════════
 
@@ -332,27 +593,28 @@ const erreurFormat = (type, annonce = '') => new Error(type && type !== 'text/ht
 // Lit le corps sans jamais dépasser la limite : une vidéo de 200 Mo collée
 // par erreur ne doit pas remplir la mémoire du bot.
 async function lireCorpsBorne(res, max) {
-  const annonce = Number(res.headers?.get?.('content-length'));
-  if (Number.isFinite(annonce) && annonce > max) throw erreurTropLourde(annonce);
-  if (res.body && typeof res.body.getReader === 'function') {
-    const lecteur = res.body.getReader();
-    const morceaux = [];
-    let total = 0;
-    for (;;) {
-      const { done, value } = await lecteur.read();
-      if (done) break;
-      total += value.length;
-      if (total > max) {
-        lecteur.cancel().catch(() => {});
-        throw erreurTropLourde(total);
-      }
-      morceaux.push(Buffer.from(value));
-    }
-    return Buffer.concat(morceaux);
+  const annonce = Number(enTete(res, 'content-length'));
+  if (Number.isFinite(annonce) && annonce > max) {
+    abandonner(res);
+    throw erreurTropLourde(annonce);
   }
-  const tout = Buffer.from(await res.arrayBuffer());
-  if (tout.length > max) throw erreurTropLourde(tout.length);
-  return tout;
+  const corps = res.corps;
+  if (!corps) return Buffer.alloc(0);
+  if (corps instanceof Uint8Array) {
+    if (corps.length > max) throw erreurTropLourde(corps.length);
+    return Buffer.from(corps);
+  }
+  const morceaux = [];
+  let total = 0;
+  for await (const morceau of corps) {
+    total += morceau.length;
+    if (total > max) {
+      abandonner(res);
+      throw erreurTropLourde(total);
+    }
+    morceaux.push(Buffer.from(morceau));
+  }
+  return Buffer.concat(morceaux);
 }
 
 // Une adresse de pièce jointe Discord est SIGNÉE et expire en quelques
@@ -405,7 +667,9 @@ function erreurReseau(err) {
 // Dans l'ordre : le lien normalisé, puis le lien d'origine s'il différait
 // (Gyazo, imgur…). Une image webp essaie la variante non-webp connue de son
 // hébergeur ; une page web est lue UNE fois pour y trouver son image.
-async function dataUriDepuis(source) {
+// Chaque requête passe par `telechargerPublic` : adresses publiques
+// seulement, redirections revérifiées (voir plus haut).
+async function dataUriDepuis(source, { reseauLocal = false } = {}) {
   const brut = String(source ?? '').trim().replace(/^<([\s\S]+)>$/, '$1').trim();
   if (/^data:/i.test(brut)) return donneesEnDataUri(brut);
   const depart = normaliserUrlImage(brut);
@@ -418,6 +682,9 @@ async function dataUriDepuis(source) {
   const limite = Date.now() + BUDGET_TELECHARGEMENT;
   let pageLue = false;
   let erreur = null;
+  // Un lien refusé (adresse interne) est LA réponse, même si un autre essai
+  // a échoué autrement : c'est ce que l'utilisateur doit corriger.
+  let refus = null;
   while (file.length) {
     const adresse = file.shift();
     if (vus.has(adresse)) continue;
@@ -429,21 +696,19 @@ async function dataUriDepuis(source) {
     }
     let res;
     try {
-      res = await fetch(adresse, {
-        redirect: 'follow',
-        signal: AbortSignal.timeout(Math.min(DELAI_PAR_ESSAI, restant)),
-        headers: { 'User-Agent': AGENT_HTTP, Accept: ACCEPT_IMAGE },
-      });
+      res = await telechargerPublic(adresse, { reseauLocal, signal: AbortSignal.timeout(Math.min(DELAI_PAR_ESSAI, restant)) });
     } catch (err) {
-      erreur = erreur || erreurReseau(err);
+      if (err.cibleRefusee) refus = refus || err;
+      else erreur = erreur || erreurReseau(err);
       continue;
     }
-    if (!res.ok) {
+    if (!(res.status >= 200 && res.status < 300)) {
+      abandonner(res);
       erreur = erreur || new Error(`la photo n'a pas pu être téléchargée (HTTP ${res.status}) — `
         + 'vérifiez que le lien est public : il doit s\'ouvrir dans une fenêtre de navigation privée');
       continue;
     }
-    const annonce = String(res.headers?.get?.('content-type') || '').split(';')[0].trim().toLowerCase();
+    const annonce = String(enTete(res, 'content-type') || '').split(';')[0].trim().toLowerCase();
     let octets;
     try {
       octets = await lireCorpsBorne(res, MAX_AVATAR);
@@ -484,7 +749,7 @@ async function dataUriDepuis(source) {
     }
     erreur = erreurFormat(type, annonce);
   }
-  throw erreur || new Error('la photo n\'a pas pu être téléchargée');
+  throw refus || erreur || new Error('la photo n\'a pas pu être téléchargée');
 }
 
 // 📁 Une pièce jointe Discord (modal, `/config photo:`) : contrôle du type et
@@ -536,7 +801,9 @@ function lireErreurDiscord(err) {
 // `undefined` = ne pas toucher ; null/'' = retour au profil global.
 // `avatarDonnees` (Buffer ou data URI) : une photo reçue en FICHIER — elle
 // passe avant `avatarUrl`.
-async function appliquer(guild, { nom, avatarUrl, avatarDonnees, profil, raison = 'Identité du bot sur ce serveur' } = {}) {
+// `photoDuCreateur` : la photo vient de la liste du créateur (appliquerProfil)
+// — son site peut tourner sur le réseau local, voir telechargerPublic.
+async function appliquer(guild, { nom, avatarUrl, avatarDonnees, profil, photoDuCreateur = false, raison = 'Identité du bot sur ce serveur' } = {}) {
   const body = {};
   if (nom !== undefined) body.nick = String(nom || '').trim().slice(0, 32) || null;
   const fichier = avatarDonnees !== undefined && avatarDonnees !== null && avatarDonnees !== '';
@@ -548,7 +815,7 @@ async function appliquer(guild, { nom, avatarUrl, avatarDonnees, profil, raison 
     if (fichier || url) {
       const reste = ECART_AVATAR - (Date.now() - (dernierAvatar.get(guild.id) || 0));
       if (reste > 0) throw new Error(`Discord limite les changements de photo : réessayez dans ${Math.ceil(reste / 60000)} min`);
-      body.avatar = fichier ? donneesEnDataUri(avatarDonnees) : await dataUriDepuis(url);
+      body.avatar = fichier ? donneesEnDataUri(avatarDonnees) : await dataUriDepuis(url, { reseauLocal: photoDuCreateur === true });
       repli = fichier || /^data:/i.test(url) || estAdresseEphemere(url) ? null : url;
     } else {
       body.avatar = null;
@@ -562,6 +829,7 @@ async function appliquer(guild, { nom, avatarUrl, avatarDonnees, profil, raison 
       throw new Error(lireErreurDiscord(err));
     }
     if (body.avatar) dernierAvatar.set(guild.id, Date.now());
+    versLeCache(guild, membre);
   }
   if (nom !== undefined) setGuildConfig(guild.id, 'bot_nick', body.nick);
   if (body.avatar === null) setGuildConfig(guild.id, 'bot_avatar_url', null);
@@ -573,12 +841,31 @@ async function appliquer(guild, { nom, avatarUrl, avatarDonnees, profil, raison 
   return body;
 }
 
+// 🔄 La réponse du PATCH est le membre-bot À JOUR : on la verse dans le cache
+// sans attendre GUILD_MEMBER_UPDATE, qui peut arriver APRÈS. Sinon le panneau
+// rafraîchi juste derrière montrait encore l'ancien nom et l'ancienne photo.
+// (`editMe()` ne servirait à rien : il renvoie un clone, sans toucher au cache.)
+function versLeCache(guild, membre) {
+  if (!membre || typeof membre !== 'object') return;
+  try {
+    if (membre.user?.id && typeof guild.members?._add === 'function') guild.members._add(membre);
+    else if (typeof guild.members?.me?._patch === 'function') guild.members.me._patch(membre);
+  } catch { /* le cache suivra avec GUILD_MEMBER_UPDATE */ }
+}
+
 // Un profil de la liste du créateur — '' = retour au profil global.
+// Renvoie le profil posé (null pour le profil global).
 async function appliquerProfil(guild, id) {
-  if (!id) return appliquer(guild, { nom: null, avatarUrl: null, profil: null });
+  if (!id || id === VALEUR_GLOBALE) {
+    await appliquer(guild, { nom: null, avatarUrl: null, profil: null });
+    return null;
+  }
   const p = profils().find((x) => x.id === String(id));
-  if (!p) throw new Error('profil introuvable dans la liste du bot');
-  return appliquer(guild, { nom: p.nom, avatarUrl: p.avatar, profil: p.id });
+  // Un menu affiché AVANT que le créateur change sa liste : jamais un autre
+  // profil à la place de celui qu'on a cliqué.
+  if (!p) throw new Error('ce profil a été retiré de la liste par le créateur du bot — rouvrez `/config` pour voir la liste à jour');
+  await appliquer(guild, { nom: p.nom, avatarUrl: p.avatar, profil: p.id, photoDuCreateur: true });
+  return p;
 }
 
 // Le nom sous lequel le bot parle dans CE serveur : son pseudo, sinon son nom.
@@ -587,23 +874,31 @@ function nomDuBot(client, guild) {
 }
 
 // L'état lisible : ce qui est posé sur ce serveur.
+// `profil` est l'identifiant STABLE du profil posé, retrouvé dans la liste
+// du jour ; `profilRetire`, la valeur enregistrée d'un profil qui n'y est
+// plus (le serveur retombe alors sur « aucun profil »).
 function etat(guild) {
   const cfg = getGuildConfig(guild.id);
   const moi = guild.members?.me;
+  const choix = profilEnregistre(cfg);
   return {
     nom: moi?.displayName || guild.client?.user?.username || null,
     nomGlobal: guild.client?.user?.username || null,
     pseudo: moi?.nickname || null,
     avatar: moi?.avatarURL?.({ size: 128 }) || null, // l'avatar PROPRE à ce serveur, sinon null
-    profil: cfg.bot_profil || null,
+    profil: choix.profil?.id || null,
+    profilNom: choix.profil?.nom || null,
+    profilRetire: choix.retire,
     nomEnregistre: cfg.bot_nick || null,
     avatarEnregistre: cfg.bot_avatar_url || null,
   };
 }
 
 module.exports = {
-  profils, appliquer, appliquerProfil, nomDuBot, etat, dataUriDepuis, routeMembre,
+  profils, profilEnregistre, appliquer, appliquerProfil, nomDuBot, etat, dataUriDepuis, routeMembre,
   normaliserUrlImage, varianteSansWebp, typeImageDesOctets, imageDeLaPage, donneesEnDataUri,
   photoDepuisFichier, adresseAvatarMembre, estAdresseEphemere,
-  MIME_ACCEPTES, MAX_AVATAR, ECART_AVATAR, _dernierAvatar: dernierAvatar,
+  telechargerPublic, adresseInterdite, empreinteProfil,
+  MIME_ACCEPTES, MAX_AVATAR, ECART_AVATAR, MAX_REDIRECTIONS, VALEUR_GLOBALE,
+  _dernierAvatar: dernierAvatar, _reseau: reseau, _lookupPublic: lookupPublic,
 };

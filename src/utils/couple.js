@@ -361,6 +361,36 @@ function enregistrerBisou(a, b, userId, quand = new Date()) {
   return enregistrerBisouTx(x, y, uid, jourDeParis(quand));
 }
 
+// ── 💋 L'XP du bisou : une fois par PERSONNE et par jour de Paris ────────
+//
+// La flamme appartient au COUPLE et s'efface au divorce. L'XP, elle, ne
+// peut pas dépendre d'elle : divorcer puis se remarier (ou changer de
+// conjoint) dans la journée recréait une flamme vierge, donc un « bisou du
+// jour » neuf — et l'XP se gagnait sans limite, avec un second compte.
+// Le versement se note donc par personne, dans une table que le divorce ne
+// touche pas.
+const noterXpBisou = db.prepare('INSERT OR IGNORE INTO mariage_bisous_xp (user_id, jour) VALUES (?, ?)');
+const lireXpBisou = db.prepare('SELECT 1 AS ok FROM mariage_bisous_xp WHERE user_id = ? AND jour = ?');
+const purgerXpBisou = db.prepare('DELETE FROM mariage_bisous_xp WHERE jour < ?');
+let dernierePurgeXpBisou = '';
+
+// Ce membre a-t-il déjà reçu l'XP du bisou ce jour-là (heure de Paris) ?
+function xpBisouRecueCouple(userId, jour = jourDeParis()) {
+  return Boolean(lireXpBisou.get(String(userId), String(jour)));
+}
+
+// Réserve l'XP du bisou du jour pour ce membre : true la première fois,
+// false ensuite — quel que soit le couple. Synchrone : deux clics ne
+// peuvent pas réserver deux fois.
+function reserverXpBisouCouple(userId, jour = jourDeParis()) {
+  const j = String(jour);
+  if (dernierePurgeXpBisou !== j) {
+    dernierePurgeXpBisou = j;
+    try { purgerXpBisou.run(decalerJourCouple(j, -3)); } catch {}
+  }
+  return noterXpBisou.run(String(userId), j).changes === 1;
+}
+
 // ── 🎂 Mensiversaires et anniversaires ──────────────────────────────────
 //
 // Même quantième que le jour du mariage, à Paris ; un 31 tombe le dernier
@@ -437,6 +467,9 @@ function marquerMotDouxLu(a, b, pourId) {
 }
 
 // ── 💔 Divorce : tout ce qui appartenait au couple disparaît ────────────
+//
+// ⚠️ Sauf l'XP du bisou déjà reçue aujourd'hui (mariage_bisous_xp) : elle
+// appartient à chaque personne, pas au couple, et ne doit pas se regagner.
 
 const effacerFlamme = db.prepare('DELETE FROM mariage_flammes WHERE a = ? AND b = ?');
 const effacerMots = db.prepare('DELETE FROM mariage_mots_doux WHERE a = ? AND b = ?');
@@ -485,5 +518,6 @@ module.exports = {
   actifRecemmentCouple, allianceCouple, luneDeMielCouple, calculBonusCouple, raisonBonusCouple,
   nomDeCouple, jourDeParis, heureDeParis, decalerJourCouple,
   enregistrerBisou, etatFlammeCouple, prochaineFeteCouple, feteAnnonceeCouple, noterAnnonceCouple,
+  xpBisouRecueCouple, reserverXpBisouCouple,
   deposerMotDoux, lireMotDoux, marquerMotDouxLu, effacerCouple, verdictLcCouple,
 };

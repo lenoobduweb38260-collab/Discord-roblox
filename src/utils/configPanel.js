@@ -174,7 +174,7 @@ function mainView(guild) {
         value: (() => {
           const e = require('./identiteBot').etat(guild);
           return e.pseudo || e.avatar
-            ? `Sur ce serveur : **${e.nom}**${e.avatar ? ' · photo personnalisée' : ''}${e.profil ? ` · profil n°${e.profil}` : ''}`
+            ? `Sur ce serveur : **${e.nom}**${e.avatar ? ' · photo personnalisée' : ''}${e.profilNom ? ` · profil appliqué : « ${e.profilNom} »` : ''}`
             : `*Profil global du bot* (**${e.nomGlobal || 'bot'}**)`;
         })(),
         inline: false,
@@ -1003,7 +1003,12 @@ function identiteBotView(guild) {
       [
         `🤖 Nom affiché sur ce serveur : **${e.nom}**${e.pseudo ? '' : ' *(nom global du bot)*'}`,
         `🖼️ Photo sur ce serveur : ${e.avatar ? '**personnalisée**' : '*celle du bot*'}`,
-        `🎭 Profil choisi : ${e.profil ? `**n°${e.profil}**` : '*aucun*'}`,
+        // Un profil retiré de la liste par le créateur : le serveur retombe
+        // sur « aucun profil », et on le dit plutôt que d'en cocher un autre.
+        e.profilRetire
+          ? '🎭 Profil choisi : *retiré de la liste par le créateur du bot*\n'
+            + '-# Le bot garde son nom et sa photo actuels. Choisissez un autre profil, ou « Profil global » pour revenir à ceux d\'origine.'
+          : `🎭 Profil choisi : ${e.profilNom ? `**${e.profilNom}**` : '*aucun*'}`,
         '',
         liste.length
           ? `📚 ${liste.length} profil(s) proposé(s) par le créateur du bot — choisissez-en un dans le menu, ou saisissez un nom et une photo à vous.`
@@ -1023,7 +1028,7 @@ function identiteBotView(guild) {
         .setCustomId('cfgbotprofil')
         .setPlaceholder('🎭 Choisir un profil du bot pour ce serveur')
         .addOptions([
-          { label: 'Profil global du bot', value: '__global__', emoji: '🌐', description: 'Revenir au nom et à la photo d\'origine', default: !e.profil },
+          { label: 'Profil global du bot', value: I.VALEUR_GLOBALE, emoji: '🌐', description: 'Revenir au nom et à la photo d\'origine', default: !e.profil },
           ...liste.map((p) => ({ label: p.nom.slice(0, 100), value: p.id, emoji: '🪪', description: p.avatar ? 'Nom + photo' : 'Nom seul', default: e.profil === p.id })),
         ].slice(0, 25))
     ));
@@ -1737,8 +1742,8 @@ async function handleConfigInteraction(interaction) {
       const travail = (async () => {
         if (id === 'cfgbotprofil') {
           const choix = interaction.values?.[0];
-          await I.appliquerProfil(interaction.guild, choix === '__global__' ? '' : choix);
-          return choix === '__global__' ? 'profil global rétabli' : `profil n°${choix} appliqué`;
+          const pose = await I.appliquerProfil(interaction.guild, choix === I.VALEUR_GLOBALE ? '' : choix);
+          return pose ? `profil appliqué : « ${pose.nom} »` : 'profil global rétabli';
         }
         if (id === 'cfgbotreset') {
           await I.appliquer(interaction.guild, { nom: null, avatarUrl: null, profil: null });

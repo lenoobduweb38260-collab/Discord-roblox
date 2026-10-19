@@ -1,6 +1,6 @@
 const { db, getGuildConfig } = require('../database');
 const { COLORS } = require('./embeds');
-const { EmbedBuilder } = require('discord.js');
+const { EmbedBuilder, PermissionFlagsBits } = require('discord.js');
 const balises = require('./balises');
 
 // 📈 XP & NIVEAUX
@@ -78,24 +78,52 @@ const ecrireNiveau = db.prepare('UPDATE levels SET level = ? WHERE guild_id = ? 
 const signaturesCourbe = new Map();
 const signatureCourbe = ({ courbe, max }) => `${courbe}:${max}`;
 
+// 📉 Les baisses de niveau qu'une nouvelle règle a provoquées, en attente :
+// { userId: niveau le plus haut d'avant }. Le recalcul n'a pas de serveur
+// Discord sous la main (il tourne aussi depuis le tableau de bord, ou au
+// premier gain qui suit) : il note, et `realignerBaisses` reprend ensuite les
+// rôles des paliers perdus. Sans cette trace, plus rien ne savait qu'un
+// membre AVAIT eu le niveau 10 : son rôle restait pour toujours.
+const cleBaisses = (gid) => `xp_baisses:${gid}`;
+function lireBaisses(gid) {
+  try {
+    const brut = JSON.parse(lireEtat.get(cleBaisses(gid))?.value || '{}');
+    return brut && typeof brut === 'object' && !Array.isArray(brut) ? brut : {};
+  } catch {
+    return {};
+  }
+}
+
+// Rend le nombre de niveaux changés (comme avant). Les baisses sont notées.
 function recalculerNiveaux(guildId) {
   const gid = String(guildId);
   const reglage = courbeXpDe(gid);
   let changes = 0;
   db.transaction(() => {
+    const baisses = lireBaisses(gid);
+    let baisse = false;
     for (const l of lignesDuServeur.all(gid)) {
       const n = levelFromXp(l.xp || 0, reglage.courbe, reglage.max).level;
       if (n !== l.level) {
         ecrireNiveau.run(n, gid, l.user_id);
         changes++;
+        if (n < l.level) {
+          baisses[l.user_id] = Math.max(Number(baisses[l.user_id]) || 0, Number(l.level) || 0);
+          baisse = true;
+        }
       }
     }
+    if (baisse) ecrireEtat.run(cleBaisses(gid), JSON.stringify(baisses));
   })();
   const sig = signatureCourbe(reglage);
   ecrireEtat.run(`xp_courbe:${gid}`, sig);
   signaturesCourbe.set(gid, sig);
   return changes;
 }
+
+// Lu à chaque gain : la simple présence de la clé suffit (elle n'est écrite
+// que s'il y a eu une baisse, et effacée dès qu'on la traite).
+const baissesEnAttente = (guildId) => Boolean(lireEtat.get(cleBaisses(String(guildId))));
 
 function verifierCourbe(guildId) {
   const gid = String(guildId);
@@ -187,17 +215,27 @@ function listerExclusionsXp(guildId) {
   return listerExclusionsStmt.all(String(guildId));
 }
 
+// Une cible n'a qu'UNE portée (clé de la table). L'exclure dans une
+// deuxième portée ne doit pas effacer la première en silence : écrit +
+// vocal donnent « tout », et une cible déjà exclue de tout le reste.
+const porteeFusionnee = (avant, voulue) => (!avant || avant === voulue ? voulue : 'tout');
+
+// Rend { ok, portee, avant } : `portee` est celle RETENUE (elle peut être
+// « tout » après une fusion), `avant` celle qu'avait déjà la cible.
 function ajouterExclusionXp(guildId, type, cibleId, portee = 'tout') {
   const gid = String(guildId);
   if (!TYPES_EXCLUSION_XP.includes(type)) return { ok: false, erreur: 'Type inconnu : « salon » ou « role ».' };
   if (!estIdentifiant(cibleId)) return { ok: false, erreur: 'Identifiant de salon ou de rôle invalide.' };
   if (!PORTEES_XP.includes(portee)) return { ok: false, erreur: 'Portée inconnue : « tout », « texte » ou « vocal ».' };
-  const memes = listerExclusionsXp(gid).filter((e) => e.type === type && e.portee === portee && e.cible_id !== String(cibleId));
+  const toutes = listerExclusionsXp(gid);
+  const avant = toutes.find((e) => e.type === type && e.cible_id === String(cibleId))?.portee || null;
+  const retenue = porteeFusionnee(avant, portee);
+  const memes = toutes.filter((e) => e.type === type && e.portee === retenue && e.cible_id !== String(cibleId));
   if (memes.length >= MAX_EXCLUSIONS_PAR_PORTEE) {
     return { ok: false, erreur: `Déjà ${MAX_EXCLUSIONS_PAR_PORTEE} exclusions de ce genre : retirez-en une d'abord.` };
   }
-  poserExclusionStmt.run(gid, type, String(cibleId), portee);
-  return { ok: true };
+  poserExclusionStmt.run(gid, type, String(cibleId), retenue);
+  return { ok: true, portee: retenue, avant };
 }
 
 function retirerExclusionXp(guildId, type, cibleId) {
@@ -206,25 +244,45 @@ function retirerExclusionXp(guildId, type, cibleId) {
 
 // Remplace d'un coup la liste d'une portée (ce que donne un menu à choix
 // multiples) : ce qui n'est plus coché est retiré, le reste est posé.
+//
+// Une cible cochée ici mais déjà exclue AILLEURS n'est jamais déplacée en
+// silence : écrit + vocal deviennent « tout », une cible en « tout » y
+// reste. Chaque cas est rendu dans `fusions` ({ id, avant, apres }), pour que
+// le panneau et le journal le disent.
 function remplacerExclusionsXp(guildId, type, portee, ids) {
   const gid = String(guildId);
-  if (!TYPES_EXCLUSION_XP.includes(type) || !PORTEES_XP.includes(portee)) return { ajoutes: 0, retires: 0 };
+  if (!TYPES_EXCLUSION_XP.includes(type) || !PORTEES_XP.includes(portee)) return { ajoutes: 0, retires: 0, fusions: [] };
   const voulus = [...new Set((ids || []).map(String).filter(estIdentifiant))].slice(0, MAX_EXCLUSIONS_PAR_PORTEE);
-  const actuels = listerExclusionsXp(gid).filter((e) => e.type === type && e.portee === portee).map((e) => e.cible_id);
+  const duType = listerExclusionsXp(gid).filter((e) => e.type === type);
+  const actuels = duType.filter((e) => e.portee === portee).map((e) => e.cible_id);
+  const ailleurs = new Map(duType.filter((e) => e.portee !== portee).map((e) => [e.cible_id, e.portee]));
+  // « Tout » a, lui aussi, 25 places au plus (un menu n'en montre pas plus).
+  let placesTout = MAX_EXCLUSIONS_PAR_PORTEE - duType.filter((e) => e.portee === 'tout').length;
   let ajoutes = 0;
   let retires = 0;
+  const fusions = [];
   db.transaction(() => {
     for (const id of actuels) {
       if (!voulus.includes(id)) retires += retirerExclusionStmt.run(gid, type, id).changes;
     }
     for (const id of voulus) {
-      if (!actuels.includes(id)) {
+      if (actuels.includes(id)) continue;
+      const avant = ailleurs.get(id) || null;
+      if (!avant) {
         poserExclusionStmt.run(gid, type, id, portee);
         ajoutes++;
+        continue;
       }
+      let apres = porteeFusionnee(avant, portee);
+      if (apres !== avant && portee !== 'tout') {
+        if (placesTout <= 0) apres = avant; // pas de place : on ne touche à rien, et on le dit
+        else placesTout--;
+      }
+      if (apres !== avant) poserExclusionStmt.run(gid, type, id, apres);
+      fusions.push({ id, avant, apres });
     }
   })();
-  return { ajoutes, retires };
+  return { ajoutes, retires, fusions };
 }
 
 // Le salon, son parent (le salon d'un fil, la catégorie d'un salon) et la
@@ -235,11 +293,22 @@ function salonsConcernes(salon) {
   return [...new Set(ids)];
 }
 
+// Le membre d'un contexte, SEULEMENT s'il s'agit bien de celui qui gagne.
+// Un bouton cliqué par B qui fait gagner A (le duel SAO) porte le membre B :
+// ses rôles ne disent rien des droits de A.
+function membreDuContexte(contexte) {
+  const membre = contexte?.membre || null;
+  if (!membre) return null;
+  if (contexte.userId != null && String(membre.id) !== String(contexte.userId)) return null;
+  return membre;
+}
+
 function estExcluXp(guildId, source, contexte = {}) {
   if (source === 'admin') return false;
   const regles = listerExclusionsXp(guildId);
   if (!regles.length) return false;
-  const { membre = null, salon = null } = contexte || {};
+  const { salon = null } = contexte || {};
+  const membre = membreDuContexte(contexte);
   const portee = source === 'text' ? 'texte' : source === 'voice' ? 'vocal' : null;
   const salons = salonsConcernes(salon);
   const roles = membre?.roles?.cache;
@@ -330,7 +399,8 @@ function coupleXp() {
 function multiplicateursXp(guildId, source, contexte = {}, maintenant = new Date()) {
   const gid = String(guildId);
   if (source === 'admin') return { facteur: 1, details: [] };
-  const { membre = null, salon = null } = contexte || {};
+  const { salon = null } = contexte || {};
+  const membre = membreDuContexte(contexte);
   const cfg = getGuildConfig(gid);
   const details = [];
   let facteur = 1;
@@ -373,9 +443,12 @@ function multiplicateursXp(guildId, source, contexte = {}, maintenant = new Date
     const part = Number(cfg.xp_sao_pourcent ?? 100);
     if (Number.isFinite(part) && part !== 100) appliquer('Part de l\'XP SAO', part);
   }
-  if (membre?.id || contexte?.userId) {
+  // Le bonus de couple est celui de QUI GAGNE, jamais celui du membre
+  // qui a cliqué.
+  const pour = contexte?.userId ?? membre?.id;
+  if (pour != null) {
     try {
-      const b = coupleXp()?.bonusXpCouple?.(gid, String(membre?.id || contexte.userId), source);
+      const b = coupleXp()?.bonusXpCouple?.(gid, String(pour), source);
       if (b && Number(b.pourcent) > 0) appliquer(b.raison || 'Bonus de couple', 100 + Number(b.pourcent));
     } catch {}
   }
@@ -498,7 +571,7 @@ function getLeaderboard(guildId, limit = 10) {
 const marquerParti = db.prepare('UPDATE levels SET parti = ? WHERE guild_id = ? AND user_id = ?');
 function marquerDepartNiveau(guildId, userId) {
   const cfg = getGuildConfig(String(guildId));
-  if (Number(cfg.level_reset_depart ?? 0) === 1) return effacerXpMembre(guildId, userId) ? 'efface' : null;
+  if (Number(cfg.level_reset_depart ?? 0) === 1) return effacerXpMembre(guildId, userId, { garderRegistre: true }) ? 'efface' : null;
   return marquerParti.run(1, String(guildId), String(userId)).changes ? 'parti' : null;
 }
 // Un absent constaté après coup (le classement ne le trouve plus sur le
@@ -629,7 +702,9 @@ function ajouterRecompenseNiveau(guildId, { niveau, type, valeur = null, quantit
     return { ok: false, erreur: `Déjà ${MAX_RECOMPENSES} récompenses : retirez-en une d'abord.` };
   }
   let v = valeur == null ? null : String(valeur).trim();
-  let q = Number(quantite ?? 1);
+  // Une quantité ABSENTE vaut 1 ; une quantité fournie mais illisible
+  // (null, « 10k ») est refusée par les bornes — jamais changée en 1.
+  let q = Number(quantite);
   if (type === 'role' || type === 'role_retrait') {
     if (!estIdentifiant(v)) return { ok: false, erreur: 'Identifiant de rôle invalide.' };
     q = 1;
@@ -687,9 +762,16 @@ function prochaineRecompenseNiveau(guildId, niveau) {
 // retiré » ne le veut plus, le dernier mot l'emporte. En mode remplacement,
 // seuls les rôles du plus haut palier atteint sont voulus. À la baisse, les
 // rôles des paliers non atteints ne sont plus voulus.
-function planRolesNiveau(recompenses, niveau, { cumul = true, baisse = false } = {}) {
+//
+// `attribuable(roleId)` : en mode remplacement, le « plus haut palier » est
+// le plus haut dont le rôle peut VRAIMENT être donné. Un rôle supprimé, ou
+// passé au-dessus du mien, ne doit pas faire retirer celui d'en dessous :
+// le membre se retrouverait sans aucun rôle de palier.
+function planRolesNiveau(recompenses, niveau, { cumul = true, baisse = false, attribuable = null } = {}) {
   const atteintes = recompenses.filter((r) => r.niveau <= niveau);
-  const donnes = atteintes.filter((r) => r.type === 'role');
+  // (Le plus haut palier ne compte qu'en mode remplacement : en cumul, on
+  // ne demande rien à `attribuable`.)
+  const donnes = atteintes.filter((r) => r.type === 'role' && (cumul || !attribuable || attribuable(r.valeur)));
   const plusHaut = donnes.length ? Math.max(...donnes.map((r) => r.niveau)) : null;
   const voulu = new Map();
   for (const r of atteintes) {
@@ -704,9 +786,102 @@ function planRolesNiveau(recompenses, niveau, { cumul = true, baisse = false } =
   return voulu;
 }
 
-function roleAttribuable(guild, role) {
+// 🛡️ Les permissions qu'un palier de niveau ne distribue JAMAIS. Le bot a
+// presque toujours « Administrateur » : pour Discord, il peut donc donner
+// tout rôle placé sous le sien. Sans ce garde-fou, un rôle de modération (ou
+// l'administration elle-même) posé en récompense partait chez quiconque
+// atteignait le niveau — et « retrait » l'enlevait aux admins.
+const PERMISSIONS_SENSIBLES = [
+  ['Administrator', 'Administrateur'],
+  ['ManageGuild', 'Gérer le serveur'],
+  ['ManageRoles', 'Gérer les rôles'],
+  ['ManageChannels', 'Gérer les salons'],
+  ['ManageWebhooks', 'Gérer les webhooks'],
+  ['BanMembers', 'Bannir des membres'],
+  ['KickMembers', 'Expulser des membres'],
+  ['ModerateMembers', 'Exclure temporairement des membres'],
+  ['MentionEveryone', 'Mentionner @everyone, @here et tous les rôles'],
+  ['ManageMessages', 'Gérer les messages'],
+  ['ManageThreads', 'Gérer les fils'],
+  ['ManageNicknames', 'Gérer les pseudos'],
+  ['ManageGuildExpressions', 'Gérer les expressions'],
+  ['MuteMembers', 'Rendre les membres muets'],
+  ['DeafenMembers', 'Mettre en sourdine des membres'],
+  ['MoveMembers', 'Déplacer des membres'],
+];
+
+// Pourquoi ce rôle ne peut PAS être une récompense de niveau : une
+// permission sensible, ou un rôle staff / admin du bot (il ouvrirait /config
+// et /xp à quiconque atteint le palier). Rend la raison, ou null.
+function risqueRoleNiveau(guild, role) {
+  if (!role) return null;
+  const perms = role.permissions;
+  if (perms && typeof perms.has === 'function') {
+    for (const [cle, nom] of PERMISSIONS_SENSIBLES) {
+      const bit = PermissionFlagsBits[cle];
+      if (bit !== undefined && perms.has(bit, false)) return `il porte la permission « ${nom} »`;
+    }
+  }
+  try {
+    const P = require('./permissions');
+    const cfg = getGuildConfig(String(guild?.id));
+    if (P.adminRoleIds(cfg).includes(String(role.id))) return 'c\'est un rôle d\'administration du bot';
+    if (P.staffRoleIds(cfg).includes(String(role.id))) return 'c\'est un rôle staff du bot';
+  } catch {}
+  return null;
+}
+
+// Le bot peut-il gérer les rôles ? Un `me` sans permissions connues (cache
+// incomplet) ne bloque rien : Discord tranchera.
+function peutGererRoles(moi) {
+  return !moi?.permissions || typeof moi.permissions.has !== 'function' || moi.permissions.has(PermissionFlagsBits.ManageRoles);
+}
+
+// Pourquoi ce rôle ne bouge pas, ou null s'il peut être donné et retiré.
+function raisonInattribuable(guild, role) {
   const moi = guild?.members?.me;
-  return Boolean(role && !role.managed && moi && role.position < moi.roles.highest.position);
+  if (!role) return 'rôle disparu';
+  if (role.managed) return 'rôle géré par une intégration';
+  if (!moi) return 'je ne me vois pas sur ce serveur';
+  if (!peutGererRoles(moi)) return 'je n\'ai pas la permission « Gérer les rôles »';
+  if (!(role.position < (moi.roles?.highest?.position ?? -Infinity))) return 'rôle au-dessus du mien';
+  const risque = risqueRoleNiveau(guild, role);
+  if (risque) return `rôle sensible, jamais distribué : ${risque}`;
+  return null;
+}
+
+function roleAttribuable(guild, role) {
+  return !raisonInattribuable(guild, role);
+}
+
+// ⛔ Un rôle que Discord vient de refuser n'est pas redemandé à chaque gain
+// (chaque minute de vocal, chaque message) : 10 minutes de répit. La
+// synchronisation et un vrai passage de niveau, eux, réessaient.
+const REPIT_REFUS = 10 * 60 * 1000;
+const refusRecents = new Map();
+const cleRefus = (gid, roleId) => `${gid}:${roleId}`;
+function refusRecent(gid, roleId) {
+  const quand = refusRecents.get(cleRefus(gid, roleId));
+  if (!quand) return false;
+  if (Date.now() - quand < REPIT_REFUS) return true;
+  refusRecents.delete(cleRefus(gid, roleId));
+  return false;
+}
+
+// Le contrôle commun à /config et au tableau de bord, en plus de la position
+// et des intégrations : le bot doit pouvoir gérer les rôles, et le rôle ne
+// doit porter aucun pouvoir. Rend un message prêt à afficher, ou null.
+function refusRoleRecompense(guild, role) {
+  if (!peutGererRoles(guild?.members?.me)) {
+    return 'Je n\'ai pas la permission « Gérer les rôles » : je ne pourrais ni donner ni retirer ce rôle.\n'
+      + '➜ Donnez-la à mon rôle dans Paramètres du serveur → Rôles, puis réessayez.';
+  }
+  const risque = risqueRoleNiveau(guild, role);
+  if (risque) {
+    return `Le rôle ${role?.name || role?.id || ''} ne peut pas être une récompense de niveau : ${risque}.\n`
+      + '➜ Un palier ne distribue ni ne retire de pouvoirs : choisissez un rôle sans permission sensible.';
+  }
+  return null;
 }
 
 // Reste-t-il quelque chose à donner ? Sans réseau : la base et le cache des
@@ -718,9 +893,10 @@ function recompensesEnAttente(guild, membre, niveau) {
   const roles = membre?.roles?.cache;
   if (roles) {
     const cumul = Number(getGuildConfig(guild.id).level_rewards_stack ?? 1) !== 0;
-    for (const [roleId, v] of planRolesNiveau(recompenses, niveau, { cumul })) {
+    const attribuable = (id) => roleAttribuable(guild, guild.roles?.cache?.get(id));
+    for (const [roleId, v] of planRolesNiveau(recompenses, niveau, { cumul, attribuable })) {
       if (v.veut === Boolean(roles.has(roleId))) continue;
-      if (roleAttribuable(guild, guild.roles?.cache?.get(roleId))) return true;
+      if (attribuable(roleId) && !refusRecent(String(guild.id), roleId)) return true;
     }
   }
   const unique = recompenses.filter((r) => r.niveau <= niveau && (r.type === 'col' || r.type === 'objet'));
@@ -736,36 +912,54 @@ function recompensesEnAttente(guild, membre, niveau) {
 //
 // `ancien` : le niveau d'avant (une baisse reprend des rôles, un MP part pour
 // les paliers franchis). `synchro` : rattrapage, sans message privé.
-async function appliquerRecompenses(guild, userId, niveau, { ancien = null, membre = null, synchro = false } = {}) {
+// `realigner` : reprendre AUSSI les rôles des paliers au-dessus du niveau
+// (ce que fait /xp synchroniser) — un rattrapage ordinaire ne le fait pas :
+// un rôle donné à la main ne doit pas disparaître au premier message.
+async function appliquerRecompenses(guild, userId, niveau, { ancien = null, membre = null, synchro = false, realigner = false } = {}) {
   const bilan = { donnes: [], retires: [], ignores: [] };
   try {
     const gid = String(guild.id);
     const uid = String(userId);
     const recompenses = listerRecompensesNiveau(gid);
     if (!recompenses.length) return bilan;
-    const m = membre?.roles ? membre : await guild.members.fetch(uid).catch(() => null);
+    // Le membre fourni ne sert que s'il s'agit bien de `userId`.
+    const fourni = membre?.roles && String(membre.id) === uid ? membre : null;
+    const m = fourni || (await guild.members.fetch(uid).catch(() => null));
     if (!m) return bilan;
     const cfg = getGuildConfig(gid);
     const cumul = Number(cfg.level_rewards_stack ?? 1) !== 0;
-    const baisse = Number.isInteger(ancien) && ancien > niveau;
+    const baisse = realigner || (Number.isInteger(ancien) && ancien > niveau);
     const fiche = (r, extra = {}) => ({ id: r.id, niveau: r.niveau, level: r.niveau, type: r.type, libelle: libelleRecompenseNiveau(r), ...extra });
 
-    // 🎭 Rôles
-    for (const [roleId, v] of planRolesNiveau(recompenses, niveau, { cumul, baisse })) {
+    // 🎭 Rôles — d'abord ce qu'on donne, ensuite ce qu'on retire : en mode
+    // remplacement, l'ancien palier ne part que si le nouveau est bien posé.
+    const roleDe = async (id) => guild.roles.cache.get(id) || (await guild.roles.fetch(id).catch(() => null));
+    const attribuable = (id) => roleAttribuable(guild, guild.roles.cache.get(id));
+    const plan = [...planRolesNiveau(recompenses, niveau, { cumul, baisse, attribuable })];
+    let nouveauManque = false;
+    for (const [roleId, v] of [...plan.filter(([, x]) => x.veut), ...plan.filter(([, x]) => !x.veut)]) {
       const aDeja = m.roles.cache.has(roleId);
       if (v.veut === aDeja) continue;
-      const role = guild.roles.cache.get(roleId) || (await guild.roles.fetch(roleId).catch(() => null));
-      // Un rôle disparu, géré, ou plus haut que le mien ne bouge pas : le
-      // diagnostic de /config le dit, on passe au suivant sans bruit.
-      if (!roleAttribuable(guild, role)) {
-        bilan.ignores.push(fiche(v.r, { raison: role ? 'rôle inattribuable' : 'rôle disparu' }));
+      const role = await roleDe(roleId);
+      // Un rôle disparu, géré, sensible, ou plus haut que le mien ne bouge
+      // pas : le diagnostic de /config le dit, on passe au suivant sans bruit.
+      const raisonRole = raisonInattribuable(guild, role);
+      if (raisonRole) {
+        bilan.ignores.push(fiche(v.r, { raison: raisonRole }));
         continue;
       }
       if (v.veut) {
         if (await m.roles.add(role, `Récompense du niveau ${v.r.niveau}`).then(() => true).catch(() => false)) {
           bilan.donnes.push(fiche(v.r, { role }));
+        } else {
+          refusRecents.set(cleRefus(gid, roleId), Date.now());
+          bilan.ignores.push(fiche(v.r, { raison: 'Discord a refusé (permission manquante ?)' }));
+          if (v.r.type === 'role') nouveauManque = true;
         }
       } else {
+        // Le rôle du palier supérieur n'a pas pu être posé : on garde celui
+        // d'en dessous plutôt que de laisser le membre sans rien.
+        if (nouveauManque && v.r.type === 'role' && !v.perdu) continue;
         const raison = v.r.type === 'role_retrait'
           ? `Récompense du niveau ${v.r.niveau} : rôle retiré`
           : v.perdu ? 'Palier de niveau perdu' : 'Palier de niveau dépassé';
@@ -774,6 +968,9 @@ async function appliquerRecompenses(guild, userId, niveau, { ancien = null, memb
           // perdu, non.
           if (v.r.type === 'role_retrait') bilan.donnes.push(fiche(v.r, { role }));
           else bilan.retires.push(fiche(v.r, { role }));
+        } else {
+          refusRecents.set(cleRefus(gid, roleId), Date.now());
+          bilan.ignores.push(fiche(v.r, { raison: 'Discord a refusé (permission manquante ?)' }));
         }
       }
     }
@@ -848,7 +1045,12 @@ function diagnostiquerRecompenses(guild) {
       if (!role) souci = 'ce rôle n\'existe plus';
       else if (role.managed) souci = 'rôle géré par une intégration — inattribuable';
       else if (!moi) souci = 'je ne me vois pas sur ce serveur';
+      else if (!peutGererRoles(moi)) souci = 'je n\'ai pas la permission « Gérer les rôles » : aucun rôle ne peut être donné';
       else if (role.position >= moi.roles.highest.position) souci = 'ce rôle est au-dessus du mien';
+      else {
+        const risque = risqueRoleNiveau(guild, role);
+        if (risque) souci = `rôle sensible, jamais distribué : ${risque}`;
+      }
     } else if (r.type === 'col' || r.type === 'objet') {
       if (!sao.ok) souci = sao.raison;
       else if (r.type === 'objet' && objetDuCatalogue(r.valeur) === null) souci = 'objet inconnu du catalogue SAO';
@@ -971,23 +1173,69 @@ async function announceLevelUp(guild, userId, source, newLevel, fallbackChannel 
 
 // 🎁 Pour les autres modules (mini-jeux, comptage, mariage, SAO) : ajoute
 // l'XP, annonce, donne les récompenses. Ne lève JAMAIS.
+//
+// `contexte.membre` n'est cru que s'il s'agit bien de `userId` : un bouton
+// cliqué par B peut faire gagner A (le duel SAO), et les rôles de palier de
+// A partaient alors chez B. Sans membre fiable, on prend celui du cache du
+// serveur — sans appel réseau — pour que les exclusions et multiplicateurs
+// de rôle s'appliquent à TOUTES les sources (jeux, couple, raids…).
+function membreDuGain(guild, userId, membre) {
+  const uid = String(userId);
+  if (membre && String(membre.id) === uid) return membre;
+  return guild?.members?.cache?.get?.(uid) || null;
+}
+
 async function gagnerXpServeur(guild, userId, source, amount, contexte = {}) {
   const neutre = { leveledUp: false, leveledDown: false, newLevel: 0, oldLevel: 0, gagne: 0 };
   try {
     if (!guild?.id) return neutre;
-    const ctx = contexte || {};
+    const membre = membreDuGain(guild, userId, contexte?.membre);
+    const ctx = { ...(contexte || {}), membre };
     const res = addXp(guild.id, userId, source, amount, ctx);
+    // Une nouvelle courbe (ou un niveau maximum abaissé) a fait perdre des
+    // niveaux : les rôles des paliers perdus sont repris en arrière-plan.
+    if (baissesEnAttente(guild.id)) realignerBaisses(guild).catch(() => null);
     if (res.leveledUp) {
       await announceLevelUp(guild, userId, source, res.newLevel, ctx.salon || null, res.oldLevel);
     } else if (res.leveledDown) {
-      await appliquerRecompenses(guild, userId, res.newLevel, { ancien: res.oldLevel, membre: ctx.membre || null });
-    } else if (res.gagne > 0 && recompensesEnAttente(guild, ctx.membre || { id: String(userId) }, res.newLevel)) {
+      await appliquerRecompenses(guild, userId, res.newLevel, { ancien: res.oldLevel, membre });
+    } else if (res.gagne > 0 && recompensesEnAttente(guild, membre || { id: String(userId) }, res.newLevel)) {
       // Rattrapage : une récompense ajoutée après coup arrive au prochain gain.
-      await appliquerRecompenses(guild, userId, res.newLevel, { membre: ctx.membre || null, synchro: true });
+      await appliquerRecompenses(guild, userId, res.newLevel, { membre, synchro: true });
     }
     return res;
   } catch {
     return neutre;
+  }
+}
+
+// 📉 Reprend les rôles des paliers que les membres ont perdus quand la règle
+// a changé (courbe plus raide, niveau maximum abaissé). Un seul passage à la
+// fois par serveur ; la liste est vidée AVANT, pour qu'un nouveau
+// changement pendant le passage soit traité au suivant.
+const baissesEnCours = new Set();
+async function realignerBaisses(guild) {
+  const gid = String(guild?.id || '');
+  const bilan = { membres: 0, retires: 0 };
+  if (!gid || baissesEnCours.has(gid)) return bilan;
+  const baisses = lireBaisses(gid);
+  if (!Object.keys(baisses).length) return bilan;
+  baissesEnCours.add(gid);
+  try {
+    effacerEtat.run(cleBaisses(gid));
+    if (!listerRecompensesNiveau(gid).some((r) => r.type === 'role')) return bilan;
+    for (const [uid, ancien] of Object.entries(baisses)) {
+      const niveau = getStmt.get(gid, uid)?.level || 0;
+      if (!(Number(ancien) > niveau)) continue;
+      const membre = guild.members?.cache?.get?.(uid) || (await guild.members?.fetch?.(uid).catch(() => null)) || null;
+      if (!membre) continue;
+      const r = await appliquerRecompenses(guild, uid, niveau, { ancien: Number(ancien), membre, synchro: true });
+      bilan.membres++;
+      bilan.retires += r.retires.length;
+    }
+    return bilan;
+  } finally {
+    baissesEnCours.delete(gid);
   }
 }
 
@@ -1027,15 +1275,24 @@ async function distribuerXpVocale(guild) {
 const effacerMembreStmt = db.prepare('DELETE FROM levels WHERE guild_id = ? AND user_id = ?');
 const effacerRecuesMembreStmt = db.prepare('DELETE FROM niveau_recompenses_recues WHERE guild_id = ? AND user_id = ?');
 const lignesAvecNiveau = db.prepare('SELECT user_id, level, xp, parti FROM levels WHERE guild_id = ? AND level > 0 ORDER BY xp DESC');
+// La synchronisation visite aussi le niveau 0 qui a de l'XP : une courbe
+// plus raide peut y avoir ramené un membre qui porte encore ses rôles.
+const lignesASynchroniser = db.prepare(
+  'SELECT user_id, level, xp, parti FROM levels WHERE guild_id = ? AND (level > 0 OR xp > 0) ORDER BY xp DESC'
+);
 const effacerServeurStmt = db.prepare('DELETE FROM levels WHERE guild_id = ?');
 const effacerRecuesServeurStmt = db.prepare('DELETE FROM niveau_recompenses_recues WHERE guild_id = ?');
 
-// Remise à zéro d'un membre. Le registre des récompenses repart aussi de
-// zéro : celui qui recommence regagnera ses paliers. Rend l'ancienne ligne.
-function effacerXpMembre(guildId, userId) {
+// Remise à zéro d'un membre. Rend l'ancienne ligne.
+//
+// Décidée par un admin (/xp reset), elle vide aussi le registre des
+// récompenses : celui qui recommence regagnera ses paliers. Au DÉPART d'un
+// membre (`garderRegistre`), jamais : quitter puis revenir reversait le Col
+// et les objets à chaque aller-retour.
+function effacerXpMembre(guildId, userId, { garderRegistre = false } = {}) {
   const avant = getStmt.get(String(guildId), String(userId)) || null;
   effacerMembreStmt.run(String(guildId), String(userId));
-  effacerRecuesMembreStmt.run(String(guildId), String(userId));
+  if (!garderRegistre) effacerRecuesMembreStmt.run(String(guildId), String(userId));
   return avant;
 }
 
@@ -1050,9 +1307,11 @@ function effacerXpServeur(guildId) {
   return avaient;
 }
 
-// 🔁 Réapplique les récompenses à tous les membres qui ont un niveau. Peut
-// être long (un appel à Discord par rôle à poser) : l'appelant répond par
-// `repondreVite`. Un seul passage à la fois par serveur.
+// 🔁 Réapplique les récompenses à tous les membres qui ont de l'XP, et
+// RÉALIGNE : les rôles des paliers au-dessus de leur niveau sont repris (une
+// courbe plus raide, un niveau maximum abaissé). Peut être long (un appel à
+// Discord par rôle à poser) : l'appelant répond par `repondreVite`. Un seul
+// passage à la fois par serveur.
 const synchroEnCours = new Set();
 async function synchroniserNiveaux(guild) {
   const gid = String(guild.id);
@@ -1068,7 +1327,9 @@ async function synchroniserNiveaux(guild) {
       new Promise((r) => { minuteur = setTimeout(r, 8000); }),
     ]);
     clearTimeout(minuteur);
-    for (const l of lignesAvecNiveau.all(gid)) {
+    // Le réalignement de tous couvre les baisses en attente.
+    effacerEtat.run(cleBaisses(gid));
+    for (const l of lignesASynchroniser.all(gid)) {
       const membre = guild.members.cache.get(l.user_id) || (await guild.members.fetch(l.user_id).catch(() => null));
       if (!membre) {
         if (!l.parti) marquerParti.run(1, gid, l.user_id);
@@ -1077,7 +1338,7 @@ async function synchroniserNiveaux(guild) {
       }
       if (l.parti) marquerParti.run(0, gid, l.user_id);
       bilan.membres++;
-      const r = await appliquerRecompenses(guild, l.user_id, l.level, { membre, synchro: true });
+      const r = await appliquerRecompenses(guild, l.user_id, l.level, { membre, synchro: true, realigner: true });
       bilan.donnes += r.donnes.length;
       bilan.retires += r.retires.length;
       bilan.ignores += r.ignores.length;
@@ -1094,11 +1355,12 @@ module.exports = {
   recompensesDe, definirRecompense, effacerRecompense, appliquerRecompenses, diagnostiquerRecompenses,
   COURBES_XP, SOURCES_XP, PORTEES_XP, TYPES_RECOMPENSE_NIVEAU, NIVEAU_RECOMPENSE_MAX,
   MAX_EXCLUSIONS_PAR_PORTEE, MAX_MULTIPLICATEURS, MAX_RECOMPENSES,
-  courbeXpDe, recalculerNiveaux, gainTexteXp, estWeekEndParis, boostXpActif,
+  courbeXpDe, recalculerNiveaux, realignerBaisses, baissesEnAttente, gainTexteXp, estWeekEndParis, boostXpActif,
   listerExclusionsXp, ajouterExclusionXp, retirerExclusionXp, remplacerExclusionsXp, estExcluXp,
   listerMultiplicateursXp, definirMultiplicateurXp, retirerMultiplicateurXp, multiplicateursXp,
   listerRecompensesNiveau, ajouterRecompenseNiveau, supprimerRecompenseNiveau, libelleRecompenseNiveau,
   prochaineRecompenseNiveau, recompensesEnAttente, saoPretNiveau, objetsSaoNiveau, planRolesNiveau,
+  roleAttribuable, raisonInattribuable, risqueRoleNiveau, refusRoleRecompense, PERMISSIONS_SENSIBLES,
   modeAnnonceNiveau, variablesNiveau, rendreMessageNiveau, texteAnnonceNiveau,
   classementNiveaux, rangNiveau, marquerDepartNiveau, noterAbsenceNiveau,
   distribuerXpVocale, effacerXpMembre, effacerXpServeur, synchroniserNiveaux,

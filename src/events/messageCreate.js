@@ -22,16 +22,32 @@ module.exports = {
       return;
     }
 
+    const cfg = getGuildConfig(message.guild.id);
+    const salonComptage = Boolean(cfg.comptage_channel_id) && String(message.channelId) === String(cfg.comptage_channel_id);
+
+    // 🔢 Un nombre du salon de comptage prend sa place dans la file de son
+    // salon ICI, avant le premier `await` : les messages y sont jugés dans
+    // l'ordre d'ARRIVÉE. Un nombre accompagné d'une image (l'anti-scam la
+    // télécharge) passait sinon après les suivants, et la série cassait à
+    // tort. Sa place attend le verdict des filtres ci-dessous.
+    let placeComptage = null;
+    if (salonComptage) {
+      try {
+        placeComptage = require('../utils/comptage').reserverPlaceComptage(message, cfg);
+      } catch (err) {
+        console.error('Erreur salon de comptage :', err);
+      }
+    }
+    const abandonnerComptage = () => placeComptage?.liberer(false);
+
     // Anti-scam : vérifie les images jointes contre les échantillons enregistrés.
     if (message.attachments.size) {
       const handled = await scanMessage(message).catch((err) => {
         console.error('Erreur scan anti-scam :', err);
         return false;
       });
-      if (handled) return; // message supprimé + auteur banni : pas d'XP
+      if (handled) { abandonnerComptage(); return; } // message supprimé + auteur banni : pas d'XP
     }
-
-    const cfg = getGuildConfig(message.guild.id);
 
     // Anti-spam + filtre de contenu malveillant (si activé sur ce serveur).
     if (cfg.antispam_enabled) {
@@ -41,7 +57,7 @@ module.exports = {
           console.error('Erreur messageGuard :', err);
           return false;
         });
-      if (handled) return;
+      if (handled) { abandonnerComptage(); return; }
     }
 
     // ══ 🔢 SALON DE COMPTAGE ═══════════════════════════════════════════
@@ -49,9 +65,9 @@ module.exports = {
     // compte pas. Avant le délai d'XP, dont le `return` sauterait le jeu.
     // Un nombre compté continue ensuite son chemin normal (IA, XP) ; seul un
     // hors-jeu que le comptage vient d'EFFACER s'arrête ici.
-    if (cfg.comptage_channel_id && String(message.channelId) === String(cfg.comptage_channel_id)) {
+    if (salonComptage) {
       const compte = await require('../utils/comptage')
-        .traiterMessageComptage(message, cfg)
+        .traiterMessageComptage(message, cfg, placeComptage)
         .catch((err) => {
           console.error('Erreur salon de comptage :', err);
           return null;

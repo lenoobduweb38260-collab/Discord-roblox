@@ -484,6 +484,9 @@ function body(): array
 }
 
 // 🪪 Profils du bot : nom (≤ 32) + URL de photo http(s) (≤ 500), 25 maximum.
+// Un `id` explicite est CONSERVÉ : c'est ce que chaque serveur enregistre
+// pour dire quel profil il a choisi. Sans lui, le bot prend l'empreinte du
+// nom — jamais la position, qui changeait dès qu'on retirait un profil.
 function profils_propres($liste): array {
     if (!is_array($liste)) return [];
     $propres = [];
@@ -493,7 +496,10 @@ function profils_propres($liste): array {
         if ($nom === '') continue;
         $avatar = trim((string) ($p['avatar'] ?? $p['avatarUrl'] ?? ''));
         if (!preg_match('~^https?://~i', $avatar)) $avatar = '';
-        $propres[] = ['nom' => $nom, 'avatar' => mb_substr($avatar, 0, 500)];
+        $profil = ['nom' => $nom, 'avatar' => mb_substr($avatar, 0, 500)];
+        $id = trim((string) ($p['id'] ?? ''));
+        if ($id !== '__global__' && preg_match('/^[A-Za-z0-9_-]{1,32}$/', $id)) $profil['id'] = $id;
+        $propres[] = $profil;
         if (count($propres) >= 25) break;
     }
     return $propres;
@@ -1481,8 +1487,10 @@ if ($action === 'serveur.bot.photo') {
             // caractères, d'où la limite de 700 Ko (≈ 955 000 en base64).
             $valeur = 'data:' . $photo['mime'] . ';base64,' . base64_encode((string) file_get_contents($photo['fichier']));
         } else {
-            $note = "Ce site tourne sur une adresse privée (" . req_host() . ") : le bot risque de ne pas pouvoir télécharger la photo. "
-                . "Si l'envoi échoue, réduisez la photo sous 700 Ko ou collez plutôt un lien public (imgur…).";
+            // Le bot ne télécharge JAMAIS depuis une adresse privée (protection
+            // de son réseau interne) : au-delà de 700 Ko, l'envoi échouera.
+            $note = "Ce site tourne sur une adresse privée (" . req_host() . ") : le bot refuse de télécharger depuis une adresse privée. "
+                . "Réduisez la photo sous 700 Ko (elle voyagera alors avec la demande), ou collez plutôt un lien public (imgur…).";
         }
     }
     [$code, $data] = agent_post_json('/agent/bots/' . rawurlencode($bot) . '/proxy/config', [

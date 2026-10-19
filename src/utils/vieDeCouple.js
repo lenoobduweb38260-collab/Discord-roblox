@@ -131,14 +131,18 @@ async function xpDeCouple(guild, userId, montant) {
   }
 }
 
-// L'XP du jour, à chacun des deux — s'il est bien membre de ce serveur.
-async function accorderXpBisou(guild, union, cfg) {
+// L'XP du jour, à chacun des deux — s'il est bien membre de ce serveur, et
+// s'il ne l'a pas déjà reçue ce jour-là (`jour` : celui du bisou, à Paris).
+// Une fois par PERSONNE et par jour, quel que soit le couple : divorcer puis
+// se remarier dans la journée ne rouvre pas un second gain.
+async function accorderXpBisou(guild, union, cfg, jour = C.jourDeParis()) {
   const r = C.reglagesCouple(cfg);
   if (!guild || r.bisouXp <= 0 || cfg.levels_enabled === 0) return [];
   const gains = [];
   for (const id of [union.a, union.b]) {
     const membre = guild.members?.cache?.get(id) || await guild.members?.fetch?.(id)?.catch?.(() => null);
     if (!membre) continue;
+    if (!C.reserverXpBisouCouple(id, jour)) continue;
     gains.push({ id, resultat: await xpDeCouple(guild, id, r.bisouXp) });
   }
   return gains;
@@ -177,7 +181,20 @@ async function carteBisou(interaction, union, auteurId, res, cfg, { miseAJour = 
     `🔥 Flamme : **${M.pluriel(res.flamme, 'jour')}** de suite`,
     res.nouveauRecord && res.flamme > 1 ? '🏆 **Nouveau record** du couple !' : `🏆 Record : **${M.pluriel(res.record, 'jour')}**`,
   ];
-  if (r.bisouXp > 0 && cfg.levels_enabled !== 0) lignes.push(`✨ **+${r.bisouXp} XP** chacun`);
+  if (r.bisouXp > 0 && cfg.levels_enabled !== 0) {
+    // L'XP ne se gagne qu'une fois par jour et par personne : un couple
+    // formé dans la journée (remariage) ne la touche pas deux fois.
+    const recue = [union.a, union.b].filter((id) => C.xpBisouRecueCouple(id, res.jour));
+    if (!recue.length) lignes.push(`✨ **+${r.bisouXp} XP** chacun`);
+    else if (recue.length === 2) lignes.push('-# 💋 L\'XP du bisou ne se gagne qu\'une fois par jour et par personne : vous l\'avez déjà reçue aujourd\'hui.');
+    else {
+      const [gagnant] = [union.a, union.b].filter((id) => !recue.includes(id));
+      const nomGagnant = gagnant === auteurId ? nomAuteur : nomConjoint;
+      const nomRecue = gagnant === auteurId ? nomConjoint : nomAuteur;
+      lignes.push(`✨ **${nomGagnant}** : **+${r.bisouXp} XP**`);
+      lignes.push(`-# 💋 L'XP du bisou ne se gagne qu'une fois par jour et par personne : **${nomRecue}** l'a déjà reçue aujourd'hui.`);
+    }
+  }
   const mot = C.lireMotDoux(union.a, union.b, conjoint);
   if (mot && !mot.lu) lignes.push(`-# 💌 Un mot doux attend ${nomConjoint} : \`/mariage motdoux\``);
   embed.setColor(COULEUR_FLAMME).setTitle('🔥 La flamme grandit !').setDescription(lignes.join('\n'));
@@ -204,7 +221,7 @@ async function commandeBisou(interaction) {
   const res = C.enregistrerBisou(union.a, union.b, moi);
   if (res.deja) return prive(MESSAGE_DEJA(res, union.conjoint));
   await interaction.reply(await carteBisou(interaction, union, moi, res, cfg));
-  if (res.complet) await accorderXpBisou(interaction.guild, union, cfg);
+  if (res.complet) await accorderXpBisou(interaction.guild, union, cfg, res.jour);
 }
 
 // mar:bisou:<a>:<b> — le conjoint rend le bisou d'un clic.
@@ -223,7 +240,7 @@ async function boutonBisouCouple(interaction, x, y) {
   const res = C.enregistrerBisou(a, b, moi);
   if (res.deja) return prive(MESSAGE_DEJA(res, union.conjoint));
   await mettreAJour(interaction, await carteBisou(interaction, union, moi, res, cfg, { miseAJour: true }));
-  if (res.complet) await accorderXpBisou(interaction.guild, union, cfg);
+  if (res.complet) await accorderXpBisou(interaction.guild, union, cfg, res.jour);
 }
 
 // ── 💌 Mot doux ─────────────────────────────────────────────────────────

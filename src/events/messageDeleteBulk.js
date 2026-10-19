@@ -8,6 +8,17 @@ module.exports = {
   name: Events.MessageBulkDelete,
   async execute(messages, channel) {
     if (!channel.guild) return;
+
+    // ══ 🔢 SALON DE COMPTAGE : le dernier nombre emporté par la purge ═══
+    // Discord n'émet ici aucun messageDelete : sans ce relais, le salon
+    // affichait l'avant-dernier nombre et le joueur suivant cassait la
+    // série en écrivant le bon. Même alerte qu'une suppression simple.
+    try {
+      await require('../utils/comptage').surSuppressionEnMasseComptage(messages, channel);
+    } catch (err) {
+      console.warn(`⚠️ Salon de comptage (suppression en masse) : ${err.message}`);
+    }
+    // ══ fin du salon de comptage ═══════════════════════════════════════
     const auteurs = new Map();
     for (const m of messages.values()) {
       if (!m.author || m.author.bot) continue;

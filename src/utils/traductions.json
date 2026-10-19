@@ -111,6 +111,13 @@
     "pl": "\n-# 📌 Przypięcie niemożliwe: daj mi **Zarządzanie wiadomościami** na tym kanale i opublikuj ponownie.",
     "ru": "\n-# 📌 Закрепление невозможно: дайте мне **Управлять сообщениями** в этом канале и переопубликуйте."
   },
+  "\n-# 🛡️ Jamais un rôle qui porte une permission de modération ou d'administration, ni un rôle staff ou admin du bot.": {
+    "en": "\n-# 🛡️ Never a role that carries a moderation or administration permission, nor a staff or admin role of the bot.",
+    "de": "\n-# 🛡️ Niemals eine Rolle mit einer Moderations- oder Administrationsberechtigung und keine Staff- oder Admin-Rolle des Bots.",
+    "es": "\n-# 🛡️ Nunca un rol con un permiso de moderación o de administración, ni un rol de staff o de admin del bot.",
+    "pl": "\n-# 🛡️ Nigdy rola z uprawnieniem moderacji lub administracji ani rola staff lub admin bota.",
+    "ru": "\n-# 🛡️ Никогда не роль с правами модерации или администрирования и не роль персонала или админа бота."
+  },
   "\n-# 25 par passage — relancez la commande pour continuer.": {
     "en": "\n-# 25 per pass — run the command again to keep going.",
     "de": "\n-# 25 pro Durchgang — führe den Befehl erneut aus, um fortzufahren.",
@@ -956,6 +963,13 @@
     "es": " · foto personalizada",
     "pl": " · własne zdjęcie",
     "ru": " · своя фотография"
+  },
+  " · profil appliqué : « ": {
+    "en": " · profile applied: « ",
+    "de": " · angewendetes Profil: « ",
+    "es": " · perfil aplicado: « ",
+    "pl": " · zastosowany profil: « ",
+    "ru": " · применённый профиль: « "
   },
   " · récompenses au prorata des dégâts": {
     "en": " · rewards split by damage dealt",
@@ -1947,6 +1961,20 @@
     "pl": " jest powyżej mojej roli: przesuń moją rolę wyżej w Ustawieniach serwera → Role i spróbuj ponownie.",
     "ru": " выше моей роли: поднимите мою роль в Настройках сервера → Роли и повторите попытку."
   },
+  " est déjà exclu de **": {
+    "en": " is already excluded from **",
+    "de": " ist bereits ausgeschlossen von **",
+    "es": " ya está excluido de **",
+    "pl": " jest już wykluczony z **",
+    "ru": " уже исключён из **"
+  },
+  " est déjà pleine ": {
+    "en": " is already full ",
+    "de": " ist bereits voll ",
+    "es": " ya está lleno ",
+    "pl": " jest już pełny ",
+    "ru": " уже заполнена "
+  },
   " est étourdi et ne peut pas agir.": {
     "en": " is stunned and can't act.",
     "de": " ist betäubt und kann nicht handeln.",
@@ -2002,6 +2030,13 @@
     "es": " Piso **",
     "pl": " Piętro **",
     "ru": " Этаж **"
+  },
+  " était déjà exclu en **": {
+    "en": " was already excluded in **",
+    "de": " war bereits ausgeschlossen in **",
+    "es": " ya estaba excluido en **",
+    "pl": " był już wykluczony w **",
+    "ru": " уже был исключён в **"
   },
   " examiné(s)": {
     "en": " looked at",
@@ -2318,6 +2353,13 @@
     "pl": " nikomu nie pozwala streamować swojego dźwięku: gram ten sam utwór z YouTube.",
     "ru": " никому не разрешает транслировать свой звук: я играю тот же трек с YouTube."
   },
+  " ne peut pas être une récompense de niveau : ": {
+    "en": " cannot be a level reward: ",
+    "de": " kann keine Stufenbelohnung sein: ",
+    "es": " no puede ser una recompensa de nivel: ",
+    "pl": " nie może być nagrodą za poziom: ",
+    "ru": " не может быть наградой за уровень: "
+  },
   " ne peut plus whitelister ": {
     "en": " can no longer whitelist ",
     "de": " kann nicht mehr whitelisten: ",
@@ -2353,6 +2395,13 @@
     "pl": " poziom(ów) przeliczono. Role nagród wyrównają się przy następnym zdobyciu XP lub przez /xp synchroniser.",
     "ru": " уровн(ей) пересчитано. Роли-награды выровняются при следующем получении опыта или через /xp synchroniser."
   },
+  " niveau(x) recalculé(s). Les rôles des paliers perdus sont repris dans la foulée.": {
+    "en": " level(s) recalculated. Roles from tiers no longer reached are taken back right away.",
+    "de": " Level neu berechnet. Rollen nicht mehr erreichter Stufen werden sofort entzogen.",
+    "es": " nivel(es) recalculado(s). Los roles de los niveles perdidos se retiran de inmediato.",
+    "pl": " poziom(ów) przeliczono. Role z utraconych progów są od razu odbierane.",
+    "ru": " уровн(ей) пересчитано. Роли потерянных порогов сразу снимаются."
+  },
   " non créé : ": {
     "en": " not created: ",
     "de": " nicht erstellt: ",
@@ -2380,6 +2429,13 @@
     "es": " no actualizado (",
     "pl": " nie została zaktualizowana (",
     "ru": " не обновлено ("
+  },
+  " non rééditée par son interaction (": {
+    "en": " not re-edited through its interaction (",
+    "de": " nicht über ihre Interaktion neu bearbeitet (",
+    "es": " no reeditada mediante su interacción (",
+    "pl": " nie została ponownie edytowana przez swoją interakcję (",
+    "ru": " не отредактирована через своё взаимодействие ("
   },
   " note(s) en attente publiée(s) dans **": {
     "en": " pending note(s) published in **",
@@ -2451,12 +2507,33 @@
     "pl": " więcej załączników, nie zarchiwizowanych*",
     "ru": " ещё вложений, не заархивировано*"
   },
+  " pixels et 8 Mo au plus, ": {
+    "en": " pixels and 8 MB at most, ",
+    "de": " Pixel und höchstens 8 MB, ",
+    "es": " píxeles y 8 MB como máximo, ",
+    "pl": " pikseli i maksymalnie 8 MB, ",
+    "ru": " пикселей и не более 8 МБ, "
+  },
   " plus tôt*": {
     "en": " earlier*",
     "de": " zuvor*",
     "es": " antes*",
     "pl": " wcześniej*",
     "ru": " ранее*"
+  },
+  " porte des permissions sensibles — il n'est plus donné.": {
+    "en": " has sensitive permissions — it is no longer given.",
+    "de": " hat sensible Berechtigungen – sie wird nicht mehr vergeben.",
+    "es": " tiene permisos sensibles: ya no se da.",
+    "pl": " ma wrażliwe uprawnienia — nie jest już nadawana.",
+    "ru": " имеет опасные права — она больше не выдаётся."
+  },
+  " porte des permissions sensibles (": {
+    "en": " has sensitive permissions (",
+    "de": " hat sensible Berechtigungen (",
+    "es": " tiene permisos sensibles (",
+    "pl": " ma wrażliwe uprawnienia (",
+    "ru": " имеет опасные права ("
   },
   " porte le coup décisif (**": {
     "en": " lands the decisive blow (**",
@@ -2625,6 +2702,13 @@
     "es": " rescindido por <@",
     "pl": " rozwiązana przez <@",
     "ru": " расторгнут пользователем <@"
+  },
+  " reste exclu en **": {
+    "en": " stays excluded in **",
+    "de": " bleibt ausgeschlossen in **",
+    "es": " sigue excluido en **",
+    "pl": " pozostaje wykluczony w **",
+    "ru": " остаётся исключённым в **"
   },
   " résultat(s).": {
     "en": " result(s).",
@@ -3067,6 +3151,20 @@
     "pl": "-# 👮 staff · 🛡️ admin — bez odznaki komenda jest dostępna dla wszystkich.",
     "ru": "-# 👮 стафф · 🛡️ админ — без значка команда открыта всем."
   },
+  "-# 💋 L'XP du bisou ne se gagne qu'une fois par jour et par personne : **": {
+    "en": "-# 💋 Kiss XP can only be earned once per day per person: **",
+    "de": "-# 💋 Kuss-XP gibt es nur einmal pro Tag und Person: **",
+    "es": "-# 💋 La XP del beso solo se gana una vez al día por persona: **",
+    "pl": "-# 💋 XP za buziaka zdobywa się tylko raz dziennie na osobę: **",
+    "ru": "-# 💋 XP за поцелуй можно получить только раз в день на человека: **"
+  },
+  "-# 💋 L'XP du bisou ne se gagne qu'une fois par jour et par personne : vous l'avez déjà reçue aujourd'hui.": {
+    "en": "-# 💋 Kiss XP can only be earned once per day per person: you have both already received it today.",
+    "de": "-# 💋 Kuss-XP gibt es nur einmal pro Tag und Person: Ihr habt sie heute beide schon erhalten.",
+    "es": "-# 💋 La XP del beso solo se gana una vez al día por persona: ya la habéis recibido hoy.",
+    "pl": "-# 💋 XP za buziaka zdobywa się tylko raz dziennie na osobę: oboje już je dziś otrzymaliście.",
+    "ru": "-# 💋 XP за поцелуй можно получить только раз в день на человека: вы оба уже получили его сегодня."
+  },
   "-# 💌 Un mot doux attend ": {
     "en": "-# 💌 A sweet note is waiting for ",
     "de": "-# 💌 Eine liebe Nachricht wartet auf ",
@@ -3298,6 +3396,13 @@
     "pl": "-# Język źródłowy: wszystkie wiadomości są w nim pisane.",
     "ru": "-# Исходный язык: все сообщения написаны на нём."
   },
+  "-# Le bot garde son nom et sa photo actuels. Choisissez un autre profil, ou « Profil global » pour revenir à ceux d'origine.": {
+    "en": "-# The bot keeps its current name and picture. Choose another profile, or « Profil global » to go back to the original ones.",
+    "de": "-# Der Bot behält seinen aktuellen Namen und sein aktuelles Bild. Wähle ein anderes Profil oder « Profil global », um zu den ursprünglichen zurückzukehren.",
+    "es": "-# El bot conserva su nombre y su foto actuales. Elige otro perfil, o « Profil global » para volver a los originales.",
+    "pl": "-# Bot zachowuje obecną nazwę i zdjęcie. Wybierz inny profil albo « Profil global », aby wrócić do pierwotnych.",
+    "ru": "-# Бот сохраняет текущие имя и фото. Выберите другой профиль или « Profil global », чтобы вернуть исходные."
+  },
   "-# Le changement de photo est limité par Discord à une fois toutes les dix minutes environ. PNG, JPG ou GIF, 8 Mo maximum.": {
     "en": "-# Discord limits picture changes to about once every ten minutes. PNG, JPG or GIF, 8 MB maximum.",
     "de": "-# Discord erlaubt Bildwechsel nur etwa alle zehn Minuten. PNG, JPG oder GIF, maximal 8 MB.",
@@ -3318,6 +3423,13 @@
     "es": "-# El archivo ha sido rechazado por Discord: aquí está la conversación en claro.\n",
     "pl": "-# Plik został odrzucony przez Discorda: oto rozmowa w czystym tekście.\n",
     "ru": "-# Файл был отклонён Discord: вот переписка открытым текстом.\n"
+  },
+  "-# Le plafond atteint coupe aussi les Col, même sans XP versée : chaque victoire y compte pour son XP prévue, et 1 au moins. Une victoire par abandon ne rapporte rien.": {
+    "en": "-# Once the cap is reached, Col stop too, even when no XP is paid: each win counts for its planned XP, and at least 1. A win by forfeit earns nothing.",
+    "de": "-# Ist das Limit erreicht, gibt es auch keine Col mehr, selbst ohne ausgezahlte XP: Jeder Sieg zählt mit seiner vorgesehenen XP, mindestens 1. Ein Sieg durch Aufgabe bringt nichts.",
+    "es": "-# Al alcanzar el límite, tampoco se ganan Col, aunque no se pague XP: cada victoria cuenta por su XP prevista, y 1 como mínimo. Una victoria por abandono no da nada.",
+    "pl": "-# Po osiągnięciu limitu Col też przestają wpadać, nawet bez wypłaconego XP: każda wygrana liczy się według przewidzianego XP, co najmniej 1. Wygrana walkowerem nic nie daje.",
+    "ru": "-# После достижения лимита Кол тоже не начисляются, даже без выплаты XP: каждая победа засчитывается по своему XP, минимум 1. Победа из-за сдачи соперника ничего не приносит."
   },
   "-# Le plafond atteint coupe aussi les Col. Une victoire par abandon ne rapporte rien.": {
     "en": "-# Once the cap is reached, Col stop too. A win by forfeit earns nothing.",
@@ -3360,6 +3472,13 @@
     "es": "-# Los roles de recompensa se reajustan en la próxima ganancia de XP, o al instante con `/xp synchroniser`.",
     "pl": "-# Role nagród wyrównają się przy następnym zdobyciu XP lub od razu przez `/xp synchroniser`.",
     "ru": "-# Роли-награды выровняются при следующем начислении XP или сразу через `/xp synchroniser`."
+  },
+  "-# Les rôles des paliers perdus sont repris en arrière-plan ; ceux des paliers gagnés arrivent au ": {
+    "en": "-# Roles of lost milestones are taken back in the background; those of milestones gained arrive at the ",
+    "de": "-# Die Rollen verlorener Stufen werden im Hintergrund entzogen; die der erreichten Stufen kommen beim ",
+    "es": "-# Los roles de los niveles perdidos se retiran en segundo plano; los de los niveles alcanzados llegan con la ",
+    "pl": "-# Role utraconych progów są odbierane w tle; role osiągniętych progów przychodzą przy ",
+    "ru": "-# Роли потерянных порогов забираются в фоне; роли достигнутых порогов приходят при "
   },
   "-# Les rôles des paliers qui ne sont plus atteints ont été repris.": {
     "en": "-# Roles from milestones no longer reached have been removed.",
@@ -3489,6 +3608,13 @@
     "es": "-# Un staff puede añadirlas vía `/config` → 📈 XP y niveles.",
     "pl": "-# Zespół może je dodać przez `/config` → 📈 XP i poziomy.",
     "ru": "-# Команда может добавить их через `/config` → 📈 XP и уровни."
+  },
+  "-# Une cible n'a qu'une portée : exclue à l'écrit ET en vocal, elle passe en 🌐 Tout.\n\n": {
+    "en": "-# A target has only one scope: excluded from text AND voice, it moves to 🌐 Tout (all).\n\n",
+    "de": "-# Ein Ziel hat nur einen Bereich: Aus Text UND Sprache ausgeschlossen, wechselt es zu 🌐 Tout (alles).\n\n",
+    "es": "-# Un objetivo solo tiene un ámbito: excluido del texto Y de la voz, pasa a 🌐 Tout (todo).\n\n",
+    "pl": "-# Cel ma tylko jeden zakres: wykluczony z tekstu ORAZ głosu, przechodzi do 🌐 Tout (wszystko).\n\n",
+    "ru": "-# У цели только одна область: исключённая из текста И голоса, она переходит в 🌐 Tout (всё).\n\n"
   },
   "-# Vérifiez que j'ai la permission **Gérer les permissions** sur ce salon.": {
     "en": "-# Check that I have the **Manage Permissions** permission on this channel.",
@@ -3770,6 +3896,13 @@
     "pl": "): wybierz kolumnę.",
     "ru": "): выбери столбец."
   },
+  ") : les deux portées sont fusionnées en « tout ».": {
+    "en": "): both scopes are merged into « all ».",
+    "de": "): Beide Bereiche werden zu « alles » zusammengeführt.",
+    "es": "): los dos ámbitos se fusionan en « todo ».",
+    "pl": "): oba zakresy zostają scalone w « wszystko ».",
+    "ru": "): обе области объединены в « всё »."
+  },
   ") effacée.\nPar <@": {
     "en": ") erased.\nBy <@",
     "de": ") gelöscht.\nVon <@",
@@ -3804,6 +3937,13 @@
     "es": "). Vuelve a intentarlo en un momento.",
     "pl": "). Spróbuj za chwilę.",
     "ru": "). Попробуйте через мгновение."
+  },
+  "). Retirez-en une d'abord.": {
+    "en": "). Remove one first.",
+    "de": "). Entfernen Sie zuerst einen.",
+    "es": "). Quite uno primero.",
+    "pl": "). Najpierw usuń jeden.",
+    "ru": "). Сначала уберите одно."
   },
   "). Va chasser un peu !": {
     "en": "). Go hunt a little!",
@@ -4559,12 +4699,33 @@
     "pl": "**: podwójny bonus XP",
     "ru": "**: двойной бонус XP"
   },
+  "** : cochez les salons et les rôles concernés.\n": {
+    "en": "**: tick the channels and roles concerned.\n",
+    "de": "** — kreuzen Sie die betroffenen Kanäle und Rollen an.\n",
+    "es": "**: marca los canales y roles afectados.\n",
+    "pl": "**: zaznacz odpowiednie kanały i role.\n",
+    "ru": "**: отметьте нужные каналы и роли.\n"
+  },
   "** : cochez les salons et les rôles concernés.\n\n": {
     "en": "**: tick the channels and roles concerned.\n\n",
     "de": "** — kreuzen Sie die betroffenen Kanäle und Rollen an.\n\n",
     "es": "**: marca los canales y roles afectados.\n\n",
     "pl": "**: zaznacz odpowiednie kanały i role.\n\n",
     "ru": "**: отметьте нужные каналы и роли.\n\n"
+  },
+  "** : il passe en **": {
+    "en": "**: it moves to **",
+    "de": "**: Es wechselt zu **",
+    "es": "**: pasa a **",
+    "pl": "**: przechodzi do **",
+    "ru": "**: переходит в **"
+  },
+  "** : la portée ": {
+    "en": "**: the scope ",
+    "de": "**: Der Bereich ",
+    "es": "**: el ámbito ",
+    "pl": "**: zakres ",
+    "ru": "**: область "
   },
   "** : média ": {
     "en": "**: media ",
@@ -4586,6 +4747,13 @@
     "es": "**: devuelve el beso antes de medianoche para hacerla crecer.",
     "pl": "**: oddaj buziaka przed północą, żeby go podsycić.",
     "ru": "**: ответь на поцелуй до полуночи, чтобы оно разгорелось."
+  },
+  "** : rien à changer.": {
+    "en": "**: nothing to change.",
+    "de": "**: Es gibt nichts zu ändern.",
+    "es": "**: nada que cambiar.",
+    "pl": "**: nic do zmiany.",
+    "ru": "**: менять нечего."
   },
   "** : rôles support réinitialisés par <@": {
     "en": "**: support roles reset by <@",
@@ -4996,6 +5164,20 @@
     "pl": "** z kartami bez ramki",
     "ru": "** с карточками без рамки"
   },
+  "** est au niveau de votre plus haut rôle, ou au-dessus : vous ne pouvez pas en faire une récompense.": {
+    "en": "** is at the level of your highest role, or above it: you cannot make it a reward.",
+    "de": "** liegt auf der Höhe Ihrer höchsten Rolle oder darüber: Sie können sie nicht zur Belohnung machen.",
+    "es": "** está al nivel de su rol más alto, o por encima: no puede convertirlo en recompensa.",
+    "pl": "** jest na poziomie Twojej najwyższej roli lub wyżej: nie możesz uczynić jej nagrodą.",
+    "ru": "** находится на уровне вашей высшей роли или выше: вы не можете сделать её наградой."
+  },
+  "** est au niveau de votre rôle le plus haut, ou au-dessus : vous ne pouvez pas le faire distribuer par le bot.": {
+    "en": "** is level with or above your highest role: you cannot have the bot hand it out.",
+    "de": "** liegt auf Höhe Ihrer höchsten Rolle oder darüber: Sie können sie nicht vom Bot verteilen lassen.",
+    "es": "** está al nivel de su rol más alto o por encima: no puede hacer que el bot lo reparta.",
+    "pl": "** jest na poziomie Twojej najwyższej roli lub wyżej: nie możesz kazać botowi jej rozdawać.",
+    "ru": "** находится на уровне вашей высшей роли или выше: вы не можете поручить боту её выдавать."
+  },
   "** est au-dessus de mon rôle : je ne pourrai pas le ": {
     "en": "** is above my own role: I will not be able to ",
     "de": "** steht über meiner Rolle: Ich kann sie nicht ",
@@ -5135,6 +5317,13 @@
     "es": "** no encontrado. Elige un tipo existente.",
     "pl": "** nie znaleziono. Wybierz istniejący typ.",
     "ru": "** не найден. Выберите существующий тип."
+  },
+  "** l'a déjà reçue aujourd'hui.": {
+    "en": "** already received it today.",
+    "de": "** hat sie heute schon erhalten.",
+    "es": "** ya la recibió hoy.",
+    "pl": "** już je dziś otrzymał(a).",
+    "ru": "** уже получил(а) его сегодня."
   },
   "** loin du jeu": {
     "en": "** away from the game",
@@ -5373,6 +5562,13 @@
     "es": "** punto(s) quitado(s) a <@",
     "pl": "** punktów odebrano <@",
     "ru": "** баллов снято у <@"
+  },
+  "** porte des permissions sensibles : ": {
+    "en": "** has sensitive permissions: ",
+    "de": "** hat sensible Berechtigungen: ",
+    "es": "** tiene permisos sensibles: ",
+    "pl": "** ma wrażliwe uprawnienia: ",
+    "ru": "** имеет опасные права: "
   },
   "** poste(s) d'employé": {
     "en": "** employee position(s)",
@@ -5681,6 +5877,13 @@
     "es": "** XP por minuto en voz",
     "pl": "** XP za minutę na kanale głosowym",
     "ru": "** XP за минуту в голосовом канале"
+  },
+  "**, a été effacé avec d'autres messages (il était de <@": {
+    "en": "**, was deleted along with other messages (it was from <@",
+    "de": "**, wurde mit anderen Nachrichten gelöscht (sie war von <@",
+    "es": "**, se borró junto con otros mensajes (era de <@",
+    "pl": "**, została usunięta razem z innymi wiadomościami (pochodziła od <@",
+    "ru": "**, было удалено вместе с другими сообщениями (его написал <@"
   },
   "**, acceptes-tu ?\n-# La demande expire dans 10 minutes.": {
     "en": "**, do you accept?\n-# The proposal expires in 10 minutes.",
@@ -7792,6 +7995,13 @@
   ">) fermé par <@": {
     "en": ">) closed by <@"
   },
+  ">). Le prochain est **": {
+    "en": ">). Next up is **",
+    "de": ">). Als Nächstes kommt **",
+    "es": ">). El siguiente es el **",
+    "pl": ">). Następna to **",
+    "ru": ">). Следующее — **"
+  },
   "⌛ **Partie expirée.**": {
     "en": "⌛ **Game expired.**",
     "de": "⌛ **Partie abgelaufen.**",
@@ -8183,6 +8393,13 @@
     "es": "⏳ El barrido de `/esthetique` **continúa**: superó la vida de la respuesta del comando.\n",
     "pl": "⏳ Przegląd `/esthetique` **trwa dalej**: przekroczył czas życia odpowiedzi komendy.\n",
     "ru": "⏳ Обход `/esthetique` **продолжается**: он пережил срок ответа команды.\n"
+  },
+  "⏳ Pas encore vert : le bouton est en train de changer. Reclique dès qu'il passe au vert !": {
+    "en": "⏳ Not green yet: the button is changing right now. Click again as soon as it turns green!",
+    "de": "⏳ Noch nicht grün: Der Knopf wechselt gerade. Klick erneut, sobald er grün wird!",
+    "es": "⏳ Todavía no está verde: el botón está cambiando. ¡Vuelve a hacer clic en cuanto se ponga verde!",
+    "pl": "⏳ Jeszcze nie zielony: przycisk właśnie się zmienia. Kliknij ponownie, gdy tylko zrobi się zielony!",
+    "ru": "⏳ Ещё не зелёная: кнопка как раз меняется. Нажми снова, как только она станет зелёной!"
   },
   "⏳ Patientez quelques secondes avant de re-roll.": {
     "en": "⏳ Wait a few seconds before rolling again.",
@@ -8768,6 +8985,13 @@
     "pl": "⚠️ Nieobsłużony komponent: „",
     "ru": "⚠️ Несвязанный компонент: «"
   },
+  "⚠️ Comptage : le rôle d'erreur ": {
+    "en": "⚠️ Counting: the mistake role ",
+    "de": "⚠️ Zählen: Die Fehlerrolle ",
+    "es": "⚠️ Conteo: el rol de error ",
+    "pl": "⚠️ Liczenie: rola za błąd ",
+    "ru": "⚠️ Счёт: роль за ошибку "
+  },
   "⚠️ Comptage : XP non donnée (": {
     "en": "⚠️ Counting: XP not given (",
     "de": "⚠️ Zählen: XP nicht vergeben (",
@@ -8962,6 +9186,13 @@
     "es": "⚠️ La identidad visual está **desactivada** en este servidor: no se aplicaría nada.",
     "pl": "⚠️ Tożsamość wizualna jest **wyłączona** na tym serwerze: nic nie zostałoby zastosowane.",
     "ru": "⚠️ Визуальная идентичность **отключена** на этом сервере: ничего не применится."
+  },
+  "⚠️ Le dernier nombre, **": {
+    "en": "⚠️ The last number, **",
+    "de": "⚠️ Die letzte Zahl, **",
+    "es": "⚠️ El último número, **",
+    "pl": "⚠️ Ostatnia liczba, **",
+    "ru": "⚠️ Последнее число, **"
   },
   "⚠️ Le flux de **": {
     "en": "⚠️ The stream of **",
@@ -9284,6 +9515,13 @@
     "es": "⚠️ Canal de conteo (edición): ",
     "pl": "⚠️ Kanał liczenia (edycja): ",
     "ru": "⚠️ Канал счёта (изменение): "
+  },
+  "⚠️ Salon de comptage (suppression en masse) : ": {
+    "en": "⚠️ Counting channel (bulk deletion): ",
+    "de": "⚠️ Zählkanal (Massenlöschung): ",
+    "es": "⚠️ Canal de conteo (eliminación masiva): ",
+    "pl": "⚠️ Kanał liczenia (masowe usuwanie): ",
+    "ru": "⚠️ Канал счёта (массовое удаление): "
   },
   "⚠️ Salon de comptage (suppression) : ": {
     "en": "⚠️ Counting channel (deletion): ",
@@ -9771,6 +10009,13 @@
     "pl": "⛔ Moduł Interakcje został wyłączony na tym serwerze: ten przycisk już nic nie robi.",
     "ru": "⛔ Модуль «Взаимодействия» отключён на этом сервере: эта кнопка больше ничего не делает."
   },
+  "⛔ Le rôle d'erreur du comptage est réservé à l'**administration** : le bot le donne de lui-même à qui casse la série.\n➜ Demandez à un administrateur de le choisir.": {
+    "en": "⛔ The counting mistake role is reserved for the **administration**: the bot gives it on its own to whoever breaks the streak.\n➜ Ask an administrator to choose it.",
+    "de": "⛔ Die Fehlerrolle des Zählens ist der **Administration** vorbehalten: Der Bot vergibt sie von selbst an jeden, der die Serie bricht.\n➜ Bitten Sie einen Administrator, sie auszuwählen.",
+    "es": "⛔ El rol de error del conteo está reservado a la **administración**: el bot lo da por sí solo a quien rompe la racha.\n➜ Pida a un administrador que lo elija.",
+    "pl": "⛔ Rola za błąd w liczeniu jest zarezerwowana dla **administracji**: bot sam nadaje ją każdemu, kto przerwie serię.\n➜ Poproś administratora, aby ją wybrał.",
+    "ru": "⛔ Роль за ошибку в счёте доступна только **администрации**: бот сам выдаёт её тому, кто прервал серию.\n➜ Попросите администратора выбрать её."
+  },
   "⛔ Les **mini-jeux** sont désactivés sur ce serveur.\n➜ Un staff peut les activer via `/config` → 🎲 Mini-jeux.": {
     "en": "⛔ **Mini-games** are turned off on this server.\n➜ A staff member can turn them on in `/config` → 🎲 Mini-games.",
     "de": "⛔ **Minispiele** sind auf diesem Server deaktiviert.\n➜ Ein Staff-Mitglied kann sie über `/config` → 🎲 Minispiele aktivieren.",
@@ -9798,6 +10043,13 @@
     "es": "⛔ Los minijuegos se han desactivado en este servidor: este botón ya no hace nada.",
     "pl": "⛔ Minigry zostały wyłączone na tym serwerze: ten przycisk już nic nie robi.",
     "ru": "⛔ Мини-игры отключены на этом сервере: эта кнопка больше ничего не делает."
+  },
+  "⛔ Les récompenses de **rôle** sont réservées à l'**administration** : un rôle distribué à ": {
+    "en": "⛔ **Role** rewards are reserved for the **administration**: a role handed out to ",
+    "de": "⛔ **Rollen**-Belohnungen sind der **Administration** vorbehalten: Eine Rolle, die an ",
+    "es": "⛔ Las recompensas de **rol** están reservadas a la **administración**: un rol entregado a ",
+    "pl": "⛔ Nagrody w postaci **roli** są zarezerwowane dla **administracji**: rola przyznawana ",
+    "ru": "⛔ Награды-**роли** доступны только **администрации**: роль, выдаваемая "
   },
   "⛔ Les récompenses des mini-jeux (XP et Col) touchent à l'économie du serveur : seule l'**administration** peut les changer.": {
     "en": "⛔ Mini-game rewards (XP and Col) affect the server's economy: only the **administration** can change them.",
@@ -12287,6 +12539,13 @@
     "pl": "❌ Edycja odrzucona przez Discord — wiadomość mogła zostać w międzyczasie usunięta.",
     "ru": "❌ Discord отклонил правку — возможно, сообщение уже удалено."
   },
+  "❌ Montant illisible : écrivez un nombre entier seul, de 1 à 1 000 000 (par exemple `500` ou `1 000`, sans « Col » ni « k »).": {
+    "en": "❌ Unreadable amount: write a whole number on its own, from 1 to 1000000 (for example `500` or `1000`, without « Col » or « k »).",
+    "de": "❌ Unlesbarer Betrag: Schreiben Sie nur eine ganze Zahl, von 1 bis 1 000 000 (zum Beispiel `500` oder `1 000`, ohne « Col » oder « k »).",
+    "es": "❌ Importe ilegible: escriba solo un número entero, de 1 a 1 000 000 (por ejemplo `500` o `1 000`, sin « Col » ni « k »).",
+    "pl": "❌ Nieczytelna kwota: wpisz samą liczbę całkowitą, od 1 do 1 000 000 (na przykład `500` lub `1 000`, bez « Col » ani « k »).",
+    "ru": "❌ Непонятная сумма: напишите только целое число от 1 до 1 000 000 (например, `500` или `1 000`, без « Кол » и « k »)."
+  },
   "❌ Non": {
     "en": "❌ No",
     "de": "❌ Nein",
@@ -12384,6 +12643,13 @@
     "es": "❌ Publicación imposible en <#",
     "pl": "❌ Nie można opublikować na <#",
     "ru": "❌ Публикация невозможна в <#"
+  },
+  "❌ Quantité illisible : écrivez un nombre entier seul, de 1 à 999 (par exemple `3`).": {
+    "en": "❌ Unreadable quantity: write a whole number on its own, from 1 to 999 (for example `3`).",
+    "de": "❌ Unlesbare Menge: Schreiben Sie nur eine ganze Zahl, von 1 bis 999 (zum Beispiel `3`).",
+    "es": "❌ Cantidad ilegible: escriba solo un número entero, de 1 a 999 (por ejemplo `3`).",
+    "pl": "❌ Nieczytelna ilość: wpisz samą liczbę całkowitą, od 1 do 999 (na przykład `3`).",
+    "ru": "❌ Непонятное количество: напишите только целое число от 1 до 999 (например, `3`)."
   },
   "❌ Raison **": {
     "en": "❌ Reason **",
@@ -13342,6 +13608,13 @@
     "pl": "➜ Zmieniono opis",
     "ru": "➜ Описание изменено"
   },
+  "➜ Donnez-la à mon rôle dans Paramètres du serveur → Rôles, puis réessayez.": {
+    "en": "➜ Give it to my role in Server Settings → Roles, then try again.",
+    "de": "➜ Geben Sie sie meiner Rolle unter Servereinstellungen → Rollen und versuchen Sie es erneut.",
+    "es": "➜ Asígnelo a mi rol en Ajustes del servidor → Roles y vuelva a intentarlo.",
+    "pl": "➜ Nadaj je mojej roli w Ustawienia serwera → Role, a potem spróbuj ponownie.",
+    "ru": "➜ Выдайте его моей роли в Настройки сервера → Роли, затем попробуйте снова."
+  },
   "➜ En attendant : changez la **région du salon** (Modifier le salon → Région), cela change de serveur vocal.": {
     "en": "➜ In the meantime: change the **channel region** (Edit Channel → Region), which switches voice server."
   },
@@ -13400,6 +13673,13 @@
     "es": "➜ Icono del servidor modificado",
     "pl": "➜ Zmieniono ikonę serwera",
     "ru": "➜ Иконка сервера изменена"
+  },
+  "➜ Il faut une image PNG de ": {
+    "en": "➜ It must be a PNG image of at most ",
+    "de": "➜ Nötig ist ein PNG-Bild von höchstens ",
+    "es": "➜ Se necesita una imagen PNG de ",
+    "pl": "➜ Potrzebny jest obraz PNG o wymiarach do ",
+    "ru": "➜ Нужно изображение PNG размером не более "
   },
   "➜ Il reste deux causes possibles, toutes deux hors du bot :": {
     "en": "➜ Two possible causes remain, both outside the bot:",
@@ -13506,12 +13786,26 @@
     "pl": "➜ **Rekord** serwera i suma przerwanych serii zostaną usunięte.",
     "ru": "➜ **Рекорд** сервера и число сорванных серий будут обнулены."
   },
+  "➜ Le bot le donnerait à n'importe qui casse la série : choisissez un rôle sans aucun pouvoir de modération.": {
+    "en": "➜ The bot would give it to anyone who breaks the streak: choose a role without any moderation power.",
+    "de": "➜ Der Bot würde sie jedem geben, der die Serie bricht: Wählen Sie eine Rolle ganz ohne Moderationsrechte.",
+    "es": "➜ El bot se lo daría a cualquiera que rompa la racha: elija un rol sin ningún poder de moderación.",
+    "pl": "➜ Bot dałby ją każdemu, kto przerwie serię: wybierz rolę bez żadnych uprawnień moderacyjnych.",
+    "ru": "➜ Бот выдал бы её любому, кто прервёт серию: выберите роль без каких-либо прав модерации."
+  },
   "➜ Le classement des compteurs est **conservé**.": {
     "en": "➜ The counters leaderboard is **kept**.",
     "de": "➜ Die Rangliste der Zählenden bleibt **erhalten**.",
     "es": "➜ La clasificación de contadores se **conserva**.",
     "pl": "➜ Ranking liczących zostaje **zachowany**.",
     "ru": "➜ Рейтинг игроков **сохраняется**."
+  },
+  "➜ Le Col, les objets et les messages privés restent ouverts au staff.": {
+    "en": "➜ Col, items and private messages remain open to staff.",
+    "de": "➜ Col, Gegenstände und private Nachrichten bleiben dem Staff zugänglich.",
+    "es": "➜ El Col, los objetos y los mensajes privados siguen abiertos al staff.",
+    "pl": "➜ Col, przedmioty i wiadomości prywatne pozostają dostępne dla staffu.",
+    "ru": "➜ Кол, предметы и личные сообщения остаются доступны персоналу."
   },
   "➜ Le compte repart de **0** : le prochain nombre sera **1**.": {
     "en": "➜ The count starts again from **0**: the next number will be **1**.",
@@ -13952,6 +14246,13 @@
     "es": "➜ Tipo: ",
     "pl": "➜ Typ: ",
     "ru": "➜ Тип: "
+  },
+  "➜ Un palier ne distribue ni ne retire de pouvoirs : choisissez un rôle sans permission sensible.": {
+    "en": "➜ A milestone neither grants nor removes powers: choose a role without sensitive permissions.",
+    "de": "➜ Eine Stufe vergibt oder entzieht keine Befugnisse: Wählen Sie eine Rolle ohne sensible Berechtigung.",
+    "es": "➜ Un nivel no da ni quita poderes: elija un rol sin permisos sensibles.",
+    "pl": "➜ Próg nie nadaje ani nie odbiera uprawnień: wybierz rolę bez wrażliwych uprawnień.",
+    "ru": "➜ Порог не выдаёт и не снимает полномочия: выберите роль без чувствительных прав."
   },
   "➜ Un staff peut le réactiver via `/config` → 📈 XP & niveaux.": {
     "en": "➜ A staff member can switch it back on with `/config` → 📈 XP & levels.",
@@ -14987,6 +15288,13 @@
     "es": "🎭 Perfil elegido: ",
     "pl": "🎭 Wybrany profil: ",
     "ru": "🎭 Выбранный профиль: "
+  },
+  "🎭 Profil choisi : *retiré de la liste par le créateur du bot*\n": {
+    "en": "🎭 Chosen profile: *removed from the list by the bot's creator*\n",
+    "de": "🎭 Gewähltes Profil: *vom Ersteller des Bots aus der Liste entfernt*\n",
+    "es": "🎭 Perfil elegido: *retirado de la lista por el creador del bot*\n",
+    "pl": "🎭 Wybrany profil: *usunięty z listy przez twórcę bota*\n",
+    "ru": "🎭 Выбранный профиль: *удалён из списка создателем бота*\n"
   },
   "🎭 Quel rôle ?": {
     "en": "🎭 Which role?",
@@ -20587,6 +20895,13 @@
     "pl": "🚫 Wykluczenia · ✖️ Mnożniki",
     "ru": "🚫 Исключения · ✖️ Множители"
   },
+  "🚫 Jeu désactivé en pleine main : tu restes sur ta main.\n": {
+    "en": "🚫 Game disabled mid-hand: you stand on your hand.\n",
+    "de": "🚫 Spiel mitten in der Hand deaktiviert: Du bleibst bei deiner Hand.\n",
+    "es": "🚫 Juego desactivado en plena mano: te plantas con tu mano.\n",
+    "pl": "🚫 Gra wyłączona w trakcie rozdania: zostajesz przy swoich kartach.\n",
+    "ru": "🚫 Игра отключена посреди раздачи: ты остаёшься при своих картах.\n"
+  },
   "🚫 Le jeu **": {
     "en": "🚫 The game **",
     "de": "🚫 Das Spiel **",
@@ -22328,6 +22643,13 @@
     "pl": "baner",
     "ru": "баннер"
   },
+  "Bannir des membres": {
+    "en": "Ban Members",
+    "de": "Mitglieder bannen",
+    "es": "Banear miembros",
+    "pl": "Banowanie członków",
+    "ru": "Банить участников"
+  },
   "Bannissement du serveur": {
     "en": "Ban from the server",
     "de": "Server-Bann",
@@ -22569,6 +22891,20 @@
   "C'est la seule étape qui utilise l'**UDP**. Si les ports sortants sont ouverts, il manque alors une brique audio : voyez `/musique sources`.": {
     "en": "This is the only step that uses **UDP**. If outbound ports are open, then an audio component is missing: see `/musique sources`."
   },
+  "c'est un rôle d'administration du bot": {
+    "en": "it is an administration role of the bot",
+    "de": "es ist eine Administrationsrolle des Bots",
+    "es": "es un rol de administración del bot",
+    "pl": "to rola administracji bota",
+    "ru": "это роль администрации бота"
+  },
+  "c'est un rôle staff du bot": {
+    "en": "it is a staff role of the bot",
+    "de": "es ist eine Staff-Rolle des Bots",
+    "es": "es un rol de staff del bot",
+    "pl": "to rola staff bota",
+    "ru": "это роль персонала бота"
+  },
   "C'est une panne côté Discord, souvent liée à la **région du salon**. Changez-la (Modifier le salon → Région), puis réessayez.": {
     "en": "That's a Discord-side fault, often tied to the **channel region**. Change it (Edit Channel → Region), then try again.",
     "de": "Es ist eine Störung auf Discords Seite, oft mit der **Region des Kanals** verbunden. Ändern Sie sie (Kanal bearbeiten → Region) und versuchen Sie es erneut.",
@@ -22702,6 +23038,13 @@
     "pl": "Ten link nie jest obsługiwany.\n",
     "ru": "Эта ссылка не поддерживается.\n"
   },
+  "ce lien ne mène pas à une adresse publique (réseau privé, adresse réservée ou port particulier) : ": {
+    "en": "this link does not lead to a public address (private network, reserved address or unusual port): ",
+    "de": "dieser Link führt nicht zu einer öffentlichen Adresse (privates Netzwerk, reservierte Adresse oder ungewöhnlicher Port): ",
+    "es": "este enlace no lleva a una dirección pública (red privada, dirección reservada o puerto inusual): ",
+    "pl": "ten link nie prowadzi do publicznego adresu (sieć prywatna, adres zastrzeżony lub nietypowy port): ",
+    "ru": "эта ссылка не ведёт на публичный адрес (частная сеть, зарезервированный адрес или нестандартный порт): "
+  },
   "ce lien ne renvoie pas une image reconnue": {
     "en": "this link does not return a recognised image",
     "de": "dieser Link liefert kein erkanntes Bild",
@@ -22715,6 +23058,13 @@
     "es": "este enlace abre una página web, no una imagen — abra la imagen, clic derecho → ",
     "pl": "ten link otwiera stronę internetową, a nie obraz — otwórz obraz, kliknij prawym przyciskiem → ",
     "ru": "эта ссылка открывает веб-страницу, а не изображение — откройте изображение, правый клик → "
+  },
+  "ce lien redirige plus de 5 fois — utilisez le lien direct de l'image, ou envoyez le fichier depuis votre appareil": {
+    "en": "this link redirects more than 5 times — use the image's direct link, or send the file from your device",
+    "de": "dieser Link leitet mehr als 5 Mal weiter — nutze den direkten Link zum Bild oder sende die Datei von deinem Gerät",
+    "es": "este enlace redirige más de 5 veces — usa el enlace directo de la imagen o envía el archivo desde tu dispositivo",
+    "pl": "ten link przekierowuje więcej niż 5 razy — użyj bezpośredniego linku do obrazu albo wyślij plik ze swojego urządzenia",
+    "ru": "эта ссылка перенаправляет более 5 раз — используйте прямую ссылку на изображение или отправьте файл со своего устройства"
   },
   "Ce lien YouTube n'est ni une vidéo ni une playlist.": {
     "en": "This YouTube link is neither a video nor a playlist.",
@@ -22757,6 +23107,13 @@
     "es": "Este multiplicador ya no existe.",
     "pl": "Ten mnożnik już nie istnieje.",
     "ru": "Этого множителя уже нет."
+  },
+  "ce profil a été retiré de la liste par le créateur du bot — rouvrez `/config` pour voir la liste à jour": {
+    "en": "this profile was removed from the list by the bot's creator — reopen `/config` to see the updated list",
+    "de": "dieses Profil wurde vom Ersteller des Bots aus der Liste entfernt — öffne `/config` erneut, um die aktuelle Liste zu sehen",
+    "es": "el creador del bot retiró este perfil de la lista — vuelve a abrir `/config` para ver la lista actualizada",
+    "pl": "twórca bota usunął ten profil z listy — otwórz ponownie `/config`, aby zobaczyć aktualną listę",
+    "ru": "создатель бота удалил этот профиль из списка — снова откройте `/config`, чтобы увидеть обновлённый список"
   },
   "Ce que ça change": {
     "en": "What it changes",
@@ -22876,6 +23233,13 @@
     "es": "Esta acreditación la emite el propio bot: prueba de forma fiable ",
     "pl": "To poświadczenie wystawia sam bot: wiarygodnie dowodzi, ",
     "ru": "Это подтверждение выдаёт сам бот: оно надёжно доказывает, "
+  },
+  "Cette cible était déjà exclue (": {
+    "en": "This target was already excluded (",
+    "de": "Dieses Ziel war bereits ausgeschlossen (",
+    "es": "Este objetivo ya estaba excluido (",
+    "pl": "Ten cel był już wykluczony (",
+    "ru": "Эта цель уже была исключена ("
   },
   "Cette exclusion n'existe déjà plus.": {
     "en": "This exclusion no longer exists.",
@@ -23383,6 +23747,13 @@
     "es": "Conteo: rompió la racha",
     "pl": "Liczenie: przerwanie serii",
     "ru": "Счёт: оборвал(а) серию"
+  },
+  "Comptage : le rôle d'erreur a été changé ou retiré": {
+    "en": "Counting: the mistake role was changed or removed",
+    "de": "Zählen: Die Fehlerrolle wurde geändert oder entfernt",
+    "es": "Conteo: el rol de error se cambió o se quitó",
+    "pl": "Liczenie: rola za błąd została zmieniona lub usunięta",
+    "ru": "Счёт: роль за ошибку изменена или снята"
   },
   "Comptage : un autre membre a cassé la série": {
     "en": "Counting: another member broke the streak",
@@ -24052,6 +24423,13 @@
     "pl": "Przeniesienie niemożliwe",
     "ru": "Перемещение невозможно"
   },
+  "Déplacer des membres": {
+    "en": "Move Members",
+    "de": "Mitglieder verschieben",
+    "es": "Mover miembros",
+    "pl": "Przenoszenie członków",
+    "ru": "Перемещать участников"
+  },
   "Déplacer en assistance": {
     "en": "Move to assistance",
     "de": "In die Assistenz verschieben",
@@ -24292,6 +24670,13 @@
     "es": "Discord lo rechazó",
     "pl": "Discord odmówił",
     "ru": "Discord отказал"
+  },
+  "Discord a refusé (permission manquante ?)": {
+    "en": "Discord refused (missing permission?)",
+    "de": "Discord hat abgelehnt (fehlende Berechtigung?)",
+    "es": "Discord lo rechazó (¿falta un permiso?)",
+    "pl": "Discord odmówił (brak uprawnień?)",
+    "ru": "Discord отказал (не хватает прав?)"
   },
   "Discord a refusé le chiffrement de la voix.": {
     "en": "Discord refused the voice encryption.",
@@ -24947,6 +25332,13 @@
     "pl": "i czy intenty \"Server Members\" oraz \"Message Content\" są włączone\n",
     "ru": "и что интенты \"Server Members\" и \"Message Content\" включены\n"
   },
+  "et seront versés de nouveau aux paliers regagnés.": {
+    "en": "and will be paid out again when the milestones are reached again.",
+    "de": "und werden beim erneuten Erreichen der Stufen noch einmal ausgezahlt.",
+    "es": "y se entregarán de nuevo al volver a alcanzar los niveles.",
+    "pl": "i zostaną wypłacone ponownie po ponownym osiągnięciu progów.",
+    "ru": "и будут выданы снова при повторном достижении порогов."
+  },
   "établie": {
     "en": "established",
     "de": "hergestellt",
@@ -25052,6 +25444,13 @@
     "pl": "Wieczna",
     "ru": "Вечное"
   },
+  "Exclure temporairement des membres": {
+    "en": "Timeout Members",
+    "de": "Mitglieder in Timeout setzen",
+    "es": "Aislar temporalmente a miembros",
+    "pl": "Wysyłanie członków na przerwę",
+    "ru": "Временно отстранять участников"
+  },
   "exposant négatif": {
     "en": "negative exponent",
     "de": "negativer Exponent",
@@ -25072,6 +25471,13 @@
     "es": "Expulsado por",
     "pl": "Wyrzucony przez",
     "ru": "Выгнал"
+  },
+  "Expulser des membres": {
+    "en": "Kick Members",
+    "de": "Mitglieder kicken",
+    "es": "Expulsar miembros",
+    "pl": "Wyrzucanie członków",
+    "ru": "Выгонять участников"
   },
   "Faites un choix…": {
     "en": "Make a choice…",
@@ -25409,12 +25815,47 @@
     "pl": "Garry's Mod (DarkRP)",
     "ru": "Garry's Mod (DarkRP)"
   },
+  "Gérer le serveur": {
+    "en": "Manage Server",
+    "de": "Server verwalten",
+    "es": "Gestionar servidor",
+    "pl": "Zarządzanie serwerem",
+    "ru": "Управлять сервером"
+  },
+  "Gérer les évènements": {
+    "en": "Manage Events",
+    "de": "Events verwalten",
+    "es": "Gestionar eventos",
+    "pl": "Zarządzanie wydarzeniami",
+    "ru": "Управлять событиями"
+  },
+  "Gérer les expressions": {
+    "en": "Manage Expressions",
+    "de": "Ausdrücke verwalten",
+    "es": "Gestionar expresiones",
+    "pl": "Zarządzanie wyrażeniami",
+    "ru": "Управлять выражениями"
+  },
+  "Gérer les fils": {
+    "en": "Manage Threads",
+    "de": "Threads verwalten",
+    "es": "Gestionar hilos",
+    "pl": "Zarządzanie wątkami",
+    "ru": "Управлять ветками"
+  },
   "Gérer les messages": {
     "en": "Manage Messages",
     "de": "Nachrichten verwalten",
     "es": "Gestionar mensajes",
     "pl": "Zarządzanie wiadomościami",
     "ru": "Управлять сообщениями"
+  },
+  "Gérer les pseudos": {
+    "en": "Manage Nicknames",
+    "de": "Nicknames verwalten",
+    "es": "Gestionar apodos",
+    "pl": "Zarządzanie pseudonimami",
+    "ru": "Управлять никами"
   },
   "Gérer les réseaux suivis": {
     "en": "Manage the networks followed",
@@ -25429,6 +25870,20 @@
     "es": "Gestionar roles",
     "pl": "Zarządzanie rolami",
     "ru": "Управлять ролями"
+  },
+  "Gérer les salons": {
+    "en": "Manage Channels",
+    "de": "Kanäle verwalten",
+    "es": "Gestionar canales",
+    "pl": "Zarządzanie kanałami",
+    "ru": "Управлять каналами"
+  },
+  "Gérer les webhooks": {
+    "en": "Manage Webhooks",
+    "de": "Webhooks verwalten",
+    "es": "Gestionar webhooks",
+    "pl": "Zarządzanie webhookami",
+    "ru": "Управлять вебхуками"
   },
   "Gestion des entreprises RP": {
     "en": "RP company management",
@@ -25899,6 +26354,13 @@
     "pl": "Podobno ",
     "ru": "Говорят, "
   },
+  "il porte la permission « ": {
+    "en": "it carries the permission « ",
+    "de": "sie trägt die Berechtigung « ",
+    "es": "tiene el permiso « ",
+    "pl": "ma uprawnienie « ",
+    "ru": "у неё есть право « "
+  },
   "Illfang le Seigneur Kobold": {
     "en": "Illfang the Kobold Lord",
     "de": "Illfang der Kobold-Fürst",
@@ -26094,6 +26556,27 @@
     "es": "Así que leo la ficha del enlace y reproduzco la misma canción desde YouTube. Ningún bot de Discord hace otra cosa.",
     "pl": "Czytam więc dane linku i gram tę samą piosenkę z YouTube. Żaden bot Discorda nie robi inaczej.",
     "ru": "Поэтому я читаю данные ссылки и играю ту же песню с YouTube. Ни один бот Discord не делает иначе."
+  },
+  "je n'ai pas la permission « Gérer les rôles »": {
+    "en": "I do not have the « Manage Roles » permission",
+    "de": "ich habe die Berechtigung « Rollen verwalten » nicht",
+    "es": "no tengo el permiso « Gestionar roles »",
+    "pl": "nie mam uprawnienia « Zarządzanie rolami »",
+    "ru": "у меня нет права « Управлять ролями »"
+  },
+  "je n'ai pas la permission « Gérer les rôles » : aucun rôle ne peut être donné": {
+    "en": "I do not have the « Manage Roles » permission: no role can be given",
+    "de": "ich habe die Berechtigung « Rollen verwalten » nicht: Keine Rolle kann vergeben werden",
+    "es": "no tengo el permiso « Gestionar roles »: no se puede dar ningún rol",
+    "pl": "nie mam uprawnienia « Zarządzanie rolami »: nie można nadać żadnej roli",
+    "ru": "у меня нет права « Управлять ролями »: ни одну роль нельзя выдать"
+  },
+  "Je n'ai pas la permission « Gérer les rôles » : je ne pourrais ni donner ni retirer ce rôle.\n": {
+    "en": "I do not have the « Manage Roles » permission: I could neither give nor remove this role.\n",
+    "de": "Ich habe die Berechtigung « Rollen verwalten » nicht: Ich könnte diese Rolle weder vergeben noch entziehen.\n",
+    "es": "No tengo el permiso « Gestionar roles »: no podría ni dar ni quitar este rol.\n",
+    "pl": "Nie mam uprawnienia « Zarządzanie rolami »: nie mógłbym ani nadać, ani odebrać tej roli.\n",
+    "ru": "У меня нет права « Управлять ролями »: я не смогу ни выдать, ни снять эту роль.\n"
   },
   "Je n'ai trouvé aucun équivalent jouable pour ce lien ": {
     "en": "I found nothing playable matching this ",
@@ -26616,6 +27099,13 @@
     "pl": "Bot nie jest na żadnym serwerze",
     "ru": "Бот не находится ни на одном сервере"
   },
+  "le bot ne le télécharge pas — utilisez un lien public (i.imgur.com…) ou envoyez le fichier depuis votre appareil": {
+    "en": "the bot will not download it — use a public link (i.imgur.com…) or send the file from your device",
+    "de": "der Bot lädt ihn nicht herunter — nutze einen öffentlichen Link (i.imgur.com…) oder sende die Datei von deinem Gerät",
+    "es": "el bot no lo descarga — usa un enlace público (i.imgur.com…) o envía el archivo desde tu dispositivo",
+    "pl": "bot go nie pobierze — użyj publicznego linku (i.imgur.com…) lub wyślij plik ze swojego urządzenia",
+    "ru": "бот не будет её загружать — используйте публичную ссылку (i.imgur.com…) или отправьте файл со своего устройства"
+  },
   "Le bot ne peut pas créer d'invitation ici.": {
     "en": "The bot cannot create an invite here.",
     "de": "Der Bot kann hier keine Einladung erstellen.",
@@ -26973,6 +27463,13 @@
     "pl": "Rola ",
     "ru": "Роль "
   },
+  "le rôle d'erreur du comptage est donné automatiquement, il ne doit en porter aucune.": {
+    "en": "the counting mistake role is given automatically, so it must not have any.",
+    "de": "Die Fehlerrolle des Zählens wird automatisch vergeben, sie darf keine davon haben.",
+    "es": "el rol de error del conteo se da automáticamente, no debe tener ninguno.",
+    "pl": "rola za błąd w liczeniu jest nadawana automatycznie, nie może mieć żadnego z nich.",
+    "ru": "роль за ошибку в счёте выдаётся автоматически, у неё не должно быть ни одного из них."
+  },
   "Le rôle du plus haut palier atteint remplace les précédents.": {
     "en": "The role of the highest tier reached replaces the previous ones.",
     "de": "Die Rolle der höchsten erreichten Stufe ersetzt die vorherigen.",
@@ -27329,6 +27826,13 @@
     "es": "Los roles a desbloquear por nivel en este servidor",
     "pl": "Role do odblokowania za poziomy na tym serwerze",
     "ru": "Роли, открываемые за уровни на этом сервере"
+  },
+  "Les rôles de récompense sont repris ; le Col et les objets déjà versés restent acquis, ": {
+    "en": "Reward roles are taken back; Col and items already paid out are kept, ",
+    "de": "Belohnungsrollen werden entzogen; bereits ausgezahlte Col und Gegenstände bleiben erhalten ",
+    "es": "Los roles de recompensa se retiran; el Col y los objetos ya entregados se conservan, ",
+    "pl": "Role nagród są odbierane; już wypłacone Col i przedmioty pozostają, ",
+    "ru": "Роли-награды забираются; уже выданные Кол и предметы сохраняются, "
   },
   "Les rôles de récompense sont repris ; le Col et les objets déjà versés restent acquis.": {
     "en": "Reward roles are removed; Col and items already paid out are kept.",
@@ -27904,6 +28408,13 @@
     "pl": "w tym osoby, które odeszły",
     "ru": "включая ушедших участников"
   },
+  "Mentionner @everyone, @here et tous les rôles": {
+    "en": "Mention @everyone, @here and All Roles",
+    "de": "@everyone, @here und alle Rollen erwähnen",
+    "es": "Mencionar @everyone, @here y todos los roles",
+    "pl": "Wzmianka o @everyone, @here i wszystkich rolach",
+    "ru": "Упоминать @everyone, @here и все роли"
+  },
   "Message (vide = message par défaut)": {
     "en": "Message (empty = default message)",
     "de": "Nachricht (leer = Standardnachricht)",
@@ -28071,6 +28582,13 @@
     "es": "Pausar",
     "pl": "Wstrzymaj",
     "ru": "Пауза"
+  },
+  "Mettre en sourdine des membres": {
+    "en": "Deafen Members",
+    "de": "Mitglieder taub stellen",
+    "es": "Ensordecer miembros",
+    "pl": "Wyłączanie dźwięku członkom",
+    "ru": "Отключать участникам звук"
   },
   "Mettre fin à ton mariage 💔": {
     "en": "End your marriage 💔",
@@ -29303,6 +29821,13 @@
     "pl": "Dzienny limit: **",
     "ru": "Дневной лимит: **"
   },
+  "plafond du jour atteint": {
+    "en": "daily cap reached",
+    "de": "Tageslimit erreicht",
+    "es": "límite diario alcanzado",
+    "pl": "osiągnięto dzienny limit",
+    "ru": "дневной лимит достигнут"
+  },
   "Plafond par membre et par jour : **": {
     "en": "Daily cap per member: **",
     "de": "Tageslimit pro Mitglied: **",
@@ -29604,6 +30129,20 @@
     "pl": "Rzadki połów z jeziora na piętrze 22.",
     "ru": "Редкий улов из озера на 22-м этаже."
   },
+  "prochain gain, ou tout de suite avec `/xp synchroniser`.": {
+    "en": "next gain, or right away with `/xp synchroniser`.",
+    "de": "nächsten Gewinn, oder sofort mit `/xp synchroniser`.",
+    "es": "próxima ganancia, o de inmediato con `/xp synchroniser`.",
+    "pl": "następnym zdobyciu XP lub od razu przez `/xp synchroniser`.",
+    "ru": "следующем получении XP или сразу через `/xp synchroniser`."
+  },
+  "profil appliqué : « ": {
+    "en": "profile applied: « ",
+    "de": "Profil angewendet: « ",
+    "es": "perfil aplicado: « ",
+    "pl": "zastosowano profil: « ",
+    "ru": "применён профиль: « "
+  },
   "Profil global du bot": {
     "en": "Global bot profile",
     "de": "Globales Bot-Profil",
@@ -29845,6 +30384,13 @@
   "Qui manque": {
     "en": "Who is away"
   },
+  "qui se télécharge en moins d'une seconde et demie. D'ici là, les cartes gardent leur fond par défaut.": {
+    "en": "that downloads in under a second and a half. Until then, cards keep their default background.",
+    "de": "das in weniger als anderthalb Sekunden geladen wird. Bis dahin behalten die Karten ihren Standardhintergrund.",
+    "es": "que se descargue en menos de un segundo y medio. Mientras tanto, las tarjetas conservan su fondo predeterminado.",
+    "pl": "który pobiera się w mniej niż półtorej sekundy. Do tego czasu karty zachowują domyślne tło.",
+    "ru": "которое загружается быстрее чем за полторы секунды. До тех пор карточки сохраняют фон по умолчанию."
+  },
   "Qui veux-tu épouser ?": {
     "en": "Who do you want to marry?",
     "de": "Wen willst du heiraten?",
@@ -29865,6 +30411,13 @@
     "es": "¿A quién whitelistear en este canal?",
     "pl": "Kogo dodać do whitelisty tego kanału?",
     "ru": "Кого внести в вайтлист этого канала?"
+  },
+  "quiconque atteint un niveau touche aux droits du serveur.\n": {
+    "en": "anyone who reaches a level affects the server's permissions.\n",
+    "de": "jeden vergeben wird, der eine Stufe erreicht, berührt die Rechte des Servers.\n",
+    "es": "cualquiera que alcance un nivel afecta a los permisos del servidor.\n",
+    "pl": "każdemu, kto osiągnie poziom, wpływa na uprawnienia serwera.\n",
+    "ru": "любому, кто достиг уровня, затрагивает права сервера.\n"
   },
   "Quoi répéter": {
     "en": "What to repeat",
@@ -30454,6 +31007,13 @@
     "pl": "Oddaj buziaka",
     "ru": "Ответить на поцелуй"
   },
+  "Rendre les membres muets": {
+    "en": "Mute Members",
+    "de": "Mitglieder stummschalten",
+    "es": "Silenciar miembros",
+    "pl": "Wyciszanie mikrofonów członków",
+    "ru": "Отключать участникам микрофон"
+  },
   "Rendu muet par": {
     "en": "Muted by",
     "de": "Stummgeschaltet von",
@@ -30873,6 +31433,13 @@
     "pl": "Rola do nadania (nazwa lub identyfikator)",
     "ru": "Роль для выдачи (название или ID)"
   },
+  "rôle au-dessus du mien": {
+    "en": "role above mine",
+    "de": "Rolle über meiner",
+    "es": "rol por encima del mío",
+    "pl": "rola powyżej mojej",
+    "ru": "роль выше моей"
+  },
   "Rôle automatique": {
     "en": "Automatic role",
     "de": "Automatische Rolle",
@@ -30942,6 +31509,13 @@
     "es": "Rol de gerente autorizado (ej.: @Gérant Police)",
     "pl": "Upoważniona rola zarządcy (np. @Gérant Police)",
     "ru": "Уполномоченная роль управляющего (напр. @Gérant Police)"
+  },
+  "rôle géré par une intégration": {
+    "en": "role managed by an integration",
+    "de": "von einer Integration verwaltete Rolle",
+    "es": "rol gestionado por una integración",
+    "pl": "rola zarządzana przez integrację",
+    "ru": "роль управляется интеграцией"
   },
   "rôle géré par une intégration — inattribuable": {
     "en": "role managed by an integration — cannot be given",
@@ -31019,6 +31593,13 @@
     "es": "Rol retirado",
     "pl": "Odebrana rola",
     "ru": "Снятая роль"
+  },
+  "rôle sensible, jamais distribué : ": {
+    "en": "sensitive role, never handed out: ",
+    "de": "sensible Rolle, wird nie vergeben: ",
+    "es": "rol sensible, nunca se entrega: ",
+    "pl": "rola wrażliwa, nigdy nie jest przyznawana: ",
+    "ru": "чувствительная роль, никогда не выдаётся: "
   },
   "rôles": {
     "en": "roles",

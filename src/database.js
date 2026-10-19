@@ -1071,6 +1071,22 @@ CREATE TABLE IF NOT EXISTS jeux_gains (
   PRIMARY KEY (guild_id, user_id, jour)
 );
 `);
+// 🔢 Comptage : le rôle d'erreur RÉELLEMENT donné au dernier fautif. Retirer
+// celui du réglage du moment ratait l'ancien quand le staff changeait de
+// rôle : le fautif le gardait pour toujours.
+try {
+  db.exec('ALTER TABLE comptage ADD COLUMN role_fautif TEXT');
+} catch {}
+// 💋 XP du bisou déjà versée, par PERSONNE et par jour de Paris. Elle
+// survit au divorce (la flamme, elle, s'efface) : divorcer puis se remarier
+// le même jour ne rouvre pas un second gain.
+db.exec(`
+CREATE TABLE IF NOT EXISTS mariage_bisous_xp (
+  user_id TEXT NOT NULL,
+  jour    TEXT NOT NULL,
+  PRIMARY KEY (user_id, jour)
+);
+`);
 // ⚔️ Aventure SAO : inventaire, combats de boss PERSISTÉS (un bouton porte
 // l'id du combat et survit à un redémarrage), améliorations de forge,
 // quêtes du jour, raids du serveur, duels, coffres de couple et compétences

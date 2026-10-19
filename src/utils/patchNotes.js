@@ -1880,6 +1880,56 @@ const RELEASES = [
     ],
     amelioration: [],
     retrait: [],
+  },  {
+    id: 'xp-refonte-2026-10de',
+    title: 'Niveaux et XP : tout se regle, et les recompenses vont plus loin',
+    ajout: [
+      '🏅 **Plusieurs recompenses par niveau**, au choix : donner un role, retirer un role, des Col ou des objets de l\'Aventure SAO, un message prive. Un role ajoute apres coup est rattrape, et les roles des paliers perdus sont repris',
+      '🎲 **XP aleatoire** entre un minimum et un maximum, XP vocale reglee a part, longueur minimale d\'un message',
+      '🚫 **Exclusions** (salons, categories, roles ; ecrit, vocal ou tout) et **multiplicateurs** (roles, salons, bonus du serveur, boost date, bonus du week-end, part de l\'XP SAO)',
+      '📈 **Courbe au choix** (classique, douce, raide, lineaire) et niveau maximum',
+      '📣 **Annonces** dans le salon des niveaux, la ou le membre gagne, en message prive ou nulle part ; message personnalise avec variables ; tous les N niveaux ; mention ou non',
+      '🛠️ **`/xp`** pour le staff : donner, retirer, definir, remettre a zero un membre ou tout le serveur, resynchroniser les roles',
+      '🪪 **`/niveau voir`** dessine une vraie carte de rang (avatar, barre, rang, prochaine recompense) ; classement pagine (total, ecrit, vocal)',
+      '⚙️ Tout se regle dans **`/config` → 📈 XP & niveaux** et dans le **dashboard**',
+    ],
+    fix: [
+      '🎙️ Un membre muet, sourd ou seul en vocal ne gagne plus d\'XP (sauf reglage contraire)',
+      '🏅 Les recompenses des paliers sautes d\'un coup ne sont plus masquees dans l\'annonce',
+      '🔒 Un role a permission sensible (administrateur, bannir…) ne peut pas etre une recompense de niveau',
+    ],
+    amelioration: [],
+    retrait: [],
+  },
+  {
+    id: 'jeux-sao-comptage-2026-10df',
+    title: 'Aventure SAO complete, mini-jeux et salon de comptage',
+    ajout: [
+      '⚔️ **Aventure SAO, refonte complete** : inventaire et objets (cristaux, potions, materiaux, raretes), boutique d\'Agil, forge de Lisbeth (+1 a +10), renseignements d\'Argo, Sword Skills et garde en combat, Last Attack Bonus, recompense quotidienne et quetes du jour, voyage entre etages, peche et cuisine, raids de serveur, duels sur consentement, classements (dont le Monument of Life)',
+      '🎲 **`/jeu`** : morpion, puissance 4, pierre-feuille-ciseaux, pendu, plus ou moins, quiz (176 questions), demineur, reflexe et blackjack — contre un membre ou contre le bot, avec statistiques et classement. Recompenses en XP (plafond par jour) et en Col',
+      '🔢 **Salon de comptage** : chacun ecrit le nombre suivant ; une erreur, ou la meme personne deux fois de suite, et tout repart de 0. Record du serveur, calculs facultatifs, role d\'erreur, alerte si quelqu\'un efface son nombre. `/comptage` pour le score et le classement',
+      '⚙️ Chaque module a sa page dans **`/config`** (⚔️ Aventure SAO, 🎲 Mini-jeux, 🔢 Comptage) et dans le **dashboard**',
+    ],
+    fix: [
+      '⚔️ Un combat de boss survit a un redemarrage, et un ancien message ne pilote plus le combat suivant',
+    ],
+    amelioration: [],
+    retrait: [],
+  },
+  {
+    id: 'couples-photos-2026-10dg',
+    title: 'Avantages des maries, photos du bot depuis ton appareil',
+    ajout: [
+      '💍 **Avantages des maries** : bonus d\'XP quand les deux sont actifs ensemble (double pendant la lune de miel), alliance qui evolue avec l\'anciennete, 🔥 flamme du couple avec `/mariage bisou`, nom de couple, mot doux prive (`/mariage motdoux`), anniversaires annonces, /lc jamais sous 90 % entre conjoints, coffre commun et Lien du coeur dans SAO. Reglages dans `/config` → 💍 Mariage',
+      '🖼️ **Photo du bot depuis ton appareil** : envoi d\'un fichier dans `/config` → 🪪 Identite du bot (ou `/config photo:`), et sur le site. Les liens imgur, Discord, Dropbox, Google Drive, GitHub, Giphy… sont acceptes',
+    ],
+    fix: [
+      '💌 Confessions : filtre bien plus solide (detresse, menaces, insultes, mots deguises) et moins de fausses alertes ; publiees uniquement dans un salon du serveur ; aucune trace de l\'auteur dans les bannissements',
+      '💘 /lc : le pourcentage change vraiment d\'un jour a l\'autre, et l\'heure de remise a zero s\'affiche a l\'heure de chacun',
+      '🖥️ Dashboard : un salon ou un role d\'un autre serveur est refuse ; un choix fait sur un serveur ne part plus sur un autre',
+    ],
+    amelioration: [],
+    retrait: [],
   },
 ];
 

@@ -422,14 +422,24 @@ function startManagedApi(client, baseDir) {
     if (key === 'comptage_channel_id') {
       const C = require('./utils/comptage');
       C.changerSalonComptage(guild.id, value);
+      // Comptage coupé : le dernier fautif rend son rôle d'erreur, comme dans /config.
+      if (!value) await C.retirerRoleFautifComptage(guild);
       if (value) await C.annoncerComptage(guild, value, C.ANNONCE_SALON_COMPTAGE);
       await journal(`🔢 Salon de comptage → ${value ? `<#${value}>` : '*aucun (comptage coupé)*'}`);
       return value ? 'Compte remis à 0 dans le nouveau salon (record et classement conservés).' : null;
     }
+    if (key === 'comptage_role_erreur') {
+      // Rôle changé ou vidé : le dernier fautif rend l'ancien, comme dans /config.
+      await require('./utils/comptage').retirerRoleFautifComptage(guild, { garder: value });
+      return null;
+    }
     if (key === 'xp_courbe' || key === 'xp_niveau_max') {
-      const n = require('./utils/levels').recalculerNiveaux(guild.id);
+      const L = require('./utils/levels');
+      const n = L.recalculerNiveaux(guild.id);
+      // Les rôles des paliers perdus sont repris tout de suite, en arrière-plan.
+      L.realignerBaisses(guild).catch(() => null);
       await journal(`📈 ${key === 'xp_courbe' ? `Courbe d'XP → **${value || 'mee6'}**` : `Niveau maximum → ${value || 'aucun'}`} · ${n} niveau(x) recalculé(s).`);
-      return `${n} niveau(x) recalculé(s). Les rôles de récompense se réalignent au prochain gain, ou avec /xp synchroniser.`;
+      return `${n} niveau(x) recalculé(s). Les rôles des paliers perdus sont repris dans la foulée.`;
     }
     return null;
   }
@@ -470,6 +480,10 @@ function startManagedApi(client, baseDir) {
         if (!guild.roles?.cache?.has?.(valeur)) return refus(REFUS_REFERENCE.role(valeur));
         const souci = refusRoleDonne(guild, valeur);
         if (souci) return refus(souci);
+        // 🛡️ Jamais un rôle qui porte un pouvoir (Administrateur, Bannir…),
+        // ni un rôle staff ou admin du bot : le même refus que /config.
+        const sensible = L.refusRoleRecompense(guild, guild.roles.cache.get(valeur));
+        if (sensible) return refus(sensible.replace(/\n➜ /g, ' '));
       }
       if (type === 'objet') {
         const objets = L.objetsSaoNiveau();
@@ -497,8 +511,13 @@ function startManagedApi(client, baseDir) {
       const portee = d.portee ? String(d.portee) : 'tout';
       const r = L.ajouterExclusionXp(gid, typeCible, cible, portee);
       if (!r.ok) return refus(r.erreur);
-      await journal('⚙️ Configuration modifiée', `📈 Exclusion d'XP : ${mention(typeCible, cible)} (${portee}).`);
-      return { corps: {} };
+      // Déjà exclue ailleurs : les deux portées se fusionnent en « tout »,
+      // jamais l'une n'efface l'autre en silence.
+      const fusion = r.avant && r.avant !== portee
+        ? `Cette cible était déjà exclue (${r.avant}) : les deux portées sont fusionnées en « tout ».`
+        : null;
+      await journal('⚙️ Configuration modifiée', `📈 Exclusion d'XP : ${mention(typeCible, cible)} (${r.portee || portee}).${fusion ? `\n-# ${fusion}` : ''}`);
+      return { corps: fusion ? { note: fusion } : {} };
     }
 
     // /xp-multiplicateurs
@@ -720,9 +739,15 @@ function startManagedApi(client, baseDir) {
         // 🪪 Les profils du bot (nom + photo) définis par le créateur, et
         // l'identité effective sur CE serveur.
         const identite = require('./utils/identiteBot');
+        const etatIdentite = identite.etat(guild);
         return send(200, {
-          config: getGuildConfig(guild.id), roles, channels, categories, whitelist, tickets, bans, profils,
-          profilsBot: identite.profils(), identiteBot: identite.etat(guild),
+          // `bot_profil` : l'identifiant STABLE du profil retrouvé (un ancien
+          // numéro de position est traduit). Un profil retiré de la liste
+          // donne null : le menu du site retombe sur le profil global — sans
+          // en cocher un autre — et `identiteBot.profilRetire` le signale.
+          config: { ...getGuildConfig(guild.id), bot_profil: etatIdentite.profil },
+          roles, channels, categories, whitelist, tickets, bans, profils,
+          profilsBot: identite.profils(), identiteBot: etatIdentite,
           ...listesModules(guild),
         });
       }
@@ -784,10 +809,17 @@ function startManagedApi(client, baseDir) {
       // BOT_PROFILS dans le .env, le bot les prend sans redémarrer.
       if (req.method === 'POST' && url.pathname === '/profils-bot') {
         const body = await readBody(req);
+        // L'`id` explicite d'un profil est gardé : c'est lui que les serveurs
+        // enregistrent (sans lui, l'empreinte du nom en tient lieu).
         const liste = (Array.isArray(body.profils) ? body.profils : [])
           .map((p) => {
             const avatar = String(p?.avatar || '').trim();
-            return { nom: String(p?.nom || '').trim().slice(0, 32), avatar: /^https?:\/\//i.test(avatar) ? avatar.slice(0, 500) : '' };
+            const id = String(p?.id ?? '').trim();
+            return {
+              nom: String(p?.nom || '').trim().slice(0, 32),
+              avatar: /^https?:\/\//i.test(avatar) ? avatar.slice(0, 500) : '',
+              ...(/^[A-Za-z0-9_-]{1,32}$/.test(id) ? { id } : {}),
+            };
           })
           .filter((p) => p.nom)
           .slice(0, 25);
@@ -834,7 +866,10 @@ function startManagedApi(client, baseDir) {
             if (!channel.permissionsFor(me)?.has(require('discord.js').PermissionFlagsBits.ManageWebhooks)) {
               return send(400, { error: 'Le bot a besoin de la permission « Gérer les webhooks » dans ce salon pour envoyer sous un profil.' });
             }
-            const webhook = await channel.createWebhook({ name: profile.name.slice(0, 80), avatar: profile.avatar_url || undefined });
+            // 🛡️ Pas d'`avatar` au webhook : discord.js TÉLÉCHARGERAIT ce lien
+            // depuis la machine du bot, sans filtre (adresses internes
+            // comprises). `avatarURL`, lui, est lu par Discord, pas par nous.
+            const webhook = await channel.createWebhook({ name: profile.name.slice(0, 80) });
             const msg = await webhook.send({ ...payload, username: profile.name.slice(0, 80), avatarURL: profile.avatar_url || undefined });
             insertTicketPanel.run(guild.id, channel.id, msg.id, JSON.stringify(opts), webhook.id, webhook.token);
           } else {
@@ -1297,7 +1332,11 @@ function startManagedApi(client, baseDir) {
         value = reference.valeur;
         // 🎭 Un rôle que le bot donne lui-même : il doit pouvoir le donner.
         if (ROLES_DONNES.has(key) && value) {
-          const souci = refusRoleDonne(client.guilds.cache.get(body.guildId), value);
+          const serveurCible = client.guilds.cache.get(body.guildId);
+          // Le rôle d'erreur du comptage est donné à quiconque casse la
+          // série : jamais un rôle porteur de pouvoirs (Administrateur…).
+          const souci = refusRoleDonne(serveurCible, value)
+            || (key === 'comptage_role_erreur' ? require('./utils/comptage').refusRoleErreurComptage(serveurCible, value) : null);
           if (souci) return send(400, { error: souci });
         }
         // 🧭 Choix, date, liste de jeux, adresse d'image : formes contrôlées.
@@ -1560,7 +1599,8 @@ function startManagedApi(client, baseDir) {
             if (!channel.permissionsFor(me)?.has(PermissionFlagsBits.ManageWebhooks)) {
               return send(400, { error: 'Le bot a besoin de « Gérer les webhooks » dans ce salon pour envoyer sous un profil.' });
             }
-            const webhook = await channel.createWebhook({ name: profile.name.slice(0, 80), avatar: profile.avatar_url || undefined });
+            // 🛡️ Sans `avatar` : voir /ticket-panneau (Discord lit avatarURL lui-même).
+            const webhook = await channel.createWebhook({ name: profile.name.slice(0, 80) });
             const msg = await webhook.send({ ...payload, username: profile.name.slice(0, 80), avatarURL: profile.avatar_url || undefined });
             return send(200, { ok: true, messageId: msg.id, note: `Message publié dans #${channel.name}.` });
           }

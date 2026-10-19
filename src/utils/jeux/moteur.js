@@ -198,6 +198,7 @@ async function expirerJeuParId(client, id) {
     return false;
   }
   await P.editerMessageJeu(client, partie, conclusion.payload);
+  P.oublierJetonJeu(id);
   if (conclusion.xp?.montant) {
     const guild = client?.guilds?.cache?.get?.(partie.guild_id) || null;
     await P.verserXpJeu(guild, conclusion.xp.userId, conclusion.xp.montant);
@@ -210,22 +211,55 @@ async function expirerDepuisClicJeu(interaction, partie) {
   P.annulerMinuteurJeu(partie.id);
   if (!P.finirPartieJeu(partie.id)) return P.priveJeu(interaction, '⌛ Cette partie vient de se terminer.');
   const conclusion = conclusionExpireeJeu(partie, interaction.client);
+  // Une réédition encore en vol (le vert du réflexe) passe d'abord.
+  await P.attendreEditionJeu(partie.id);
   await mettreAJour(interaction, conclusion.payload);
   if (conclusion.xp?.montant) await P.verserXpJeu(interaction.guild, conclusion.xp.userId, conclusion.xp.montant, interaction.channel);
   return P.priveJeu(interaction, '⌛ Cette partie a expiré. Relance-en une avec `/jeu` !');
 }
 
-// 🚫 Le jeu a été coupé pendant la partie : on l'arrête proprement (mise
-// rendue au blackjack), sans rien compter.
+// 🚫 Le jeu a été coupé pendant la partie : on l'arrête proprement, sans
+// rien compter.
+//
+// ⚠️ Un jeu qui engage une mise (le blackjack) ne la REND pas : il solde la
+// main comme à l'expiration (`def.solderArret`). Rendre la mise faisait de
+// « couper le jeu » un joker sans risque : un modo voyait sa main, coupait
+// le jeu si elle était mauvaise, récupérait sa mise, rallumait — et ne
+// jouait que les bonnes mains. Couper ne vaut jamais mieux que « Rester ».
 async function arreterPartieJeu(interaction, partie, def) {
   P.annulerMinuteurJeu(partie.id);
   if (!P.finirPartieJeu(partie.id)) return P.priveJeu(interaction, '⌛ Cette partie vient de se terminer.');
-  def.annuler?.(partie);
+  await P.attendreEditionJeu(partie.id);
+  const enCours = partie.etat?.phase !== 'invitation';
+  const solde = enCours ? def.solderArret?.(partie, interaction.client) : null;
+  if (solde?.payload) {
+    await mettreAJour(interaction, solde.payload);
+    if (solde.xp?.montant) await P.verserXpJeu(interaction.guild, solde.xp.userId, solde.xp.montant, interaction.channel);
+    return null;
+  }
   const texte = `🚫 **Partie arrêtée** : le jeu ${P.infoJeu(partie.jeu).nom} a été désactivé sur ce serveur.`;
-  const payload = partie.etat?.phase === 'invitation' || !def.vue
+  const payload = !enCours || !def.vue
     ? vueInvitationJeu(partie, interaction.client, texte)
     : def.vue(partie, interaction.client, { texte, couleur: COLORS.WARNING });
   return mettreAJour(interaction, payload);
+}
+
+// 👂 Le clic a-t-il été répondu par une MISE À JOUR du message de la
+// partie (update / deferUpdate) ? Alors son jeton réédite ce message pendant
+// 15 minutes (voir retenirJetonJeu). Une réponse privée, un formulaire ou un
+// nouveau message, eux, ne désignent pas le message de la partie.
+function observerMiseAJourJeu(interaction) {
+  let fait = false;
+  for (const nom of ['update', 'deferUpdate']) {
+    const original = interaction[nom];
+    if (typeof original !== 'function') continue;
+    interaction[nom] = function miseAJourObservee(...args) {
+      const r = original.apply(this, args);
+      Promise.resolve(r).then(() => { fait = true; }, () => null);
+      return r;
+    };
+  }
+  return () => fait;
 }
 
 // ── Aiguillage des composants « jeu:… » ────────────────────────────────
@@ -251,9 +285,9 @@ async function gererComposantJeu(interaction) {
     partie.message_id = String(interaction.message.id);
     P.sauverPartieJeu(partie);
   }
-  if (!P.jeuOuvert(cfg, partie.jeu)) return arreterPartieJeu(interaction, partie, def);
-  if (Number(partie.expire_le) <= Date.now()) return expirerDepuisClicJeu(interaction, partie);
-
+  // Seuls les joueurs touchent à la partie — y compris pour l'arrêter : un
+  // intrus ne doit pas pouvoir clore la main d'un autre parce que le jeu
+  // vient d'être coupé.
   const moi = interaction.user.id;
   if (!def.ouvert && !partie.joueurs.includes(moi)) {
     const humains = partie.joueurs.filter((j) => j !== 'bot');
@@ -262,8 +296,20 @@ async function gererComposantJeu(interaction) {
       : `C'est la partie de <@${humains[0]}>.`;
     return P.priveJeu(interaction, `⛔ ${qui}\n➜ Lance la tienne avec \`/jeu ${partie.jeu}\`.`);
   }
-  if (partie.etat?.phase === 'invitation') return repondreDefiJeu(interaction, partie, def, action);
-  return def.agir(interaction, partie, action, arg);
+  if (!P.jeuOuvert(cfg, partie.jeu)) return arreterPartieJeu(interaction, partie, def);
+  if (Number(partie.expire_le) <= Date.now()) return expirerDepuisClicJeu(interaction, partie);
+
+  const aMisAJour = observerMiseAJourJeu(interaction);
+  const resultat = partie.etat?.phase === 'invitation'
+    ? await repondreDefiJeu(interaction, partie, def, action)
+    : await def.agir(interaction, partie, action, arg);
+  // Ce clic a réédité le message d'une partie qui continue : son jeton,
+  // tout neuf, servira à l'expiration.
+  const encore = aMisAJour() && interaction.message ? P.lirePartieJeu(partie.id) : null;
+  if (encore && String(encore.message_id) === String(interaction.message.id)) {
+    P.retenirJetonJeu(partie.id, interaction, interaction.message);
+  }
+  return resultat;
 }
 
 // ── Balayage périodique ────────────────────────────────────────────────

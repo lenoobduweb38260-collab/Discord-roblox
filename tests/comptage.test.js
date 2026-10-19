@@ -45,11 +45,18 @@ const personne = (id, nom, bot = false) => ({
 const USERS = {
   u1: personne('u1', 'Alice'), u2: personne('u2', 'Bob'), u3: personne('u3', 'Chloé'),
   staff: personne('staff', 'Modo'), b1: personne('b1', 'RoboBot', true), bot: personne('bot', 'Bot', true),
+  modo: personne('modo', 'Modérateur'),
 };
 const ROLES = new Map([
   ['RERR', { id: 'RERR', name: 'Boulet', position: 1, managed: false }],
   ['HAUT', { id: 'HAUT', name: 'Tout en haut', position: 99, managed: false }],
   ['GERE', { id: 'GERE', name: 'Intégration', position: 1, managed: true }],
+  // Sous le rôle du bot (50) et sous celui du modo (20) : seule la
+  // permission les rend dangereux.
+  ['ADMINROLE', { id: 'ADMINROLE', name: 'Administrateurs', position: 10, managed: false, permissions: { bitfield: 1n << 3n } }],
+  ['BANROLE', { id: 'BANROLE', name: 'Videurs', position: 9, managed: false, permissions: '4' }],
+  ['R2', { id: 'R2', name: 'Maladroit', position: 2, managed: false, permissions: { bitfield: 0n } }],
+  ['ENTRE', { id: 'ENTRE', name: 'Entre deux', position: 35, managed: false }],
 ]);
 
 let seq = 0;
@@ -81,17 +88,21 @@ const guild = {
   fetchAuditLogs: async () => ({ entries: new Map() }),
 };
 Object.values(SALONS).forEach((s) => { s.guild = guild; });
+// La place du rôle le plus haut de chacun (l'admin est haut placé).
+const RANGS = { staff: 30, modo: 20, admin2: 30 };
 function membre(id) {
   if (!MEMBRES.has(id)) {
     const roles = new Map();
     MEMBRES.set(id, {
       id, user: USERS[id], guild, displayName: USERS[id]?.displayName,
       roles: {
-        cache: roles, highest: { position: 0 },
+        cache: roles, highest: { position: RANGS[id] ?? 0 },
         async add(r) { roles.set(String(r), true); return this; },
         async remove(r) { roles.delete(String(r)); return this; },
       },
-      permissions: { has: () => id === 'staff' },
+      // staff : tous les droits (administration) ; modo : « Modérer les
+      // membres » seulement, donc le grade staff.
+      permissions: { has: (bit) => id === 'staff' || (id === 'modo' && bit === (1n << 40n)) },
     });
   }
   return MEMBRES.get(id);
@@ -600,6 +611,157 @@ const titreLog = () => embedDe(SALONS.LOGS.envois[SALONS.LOGS.envois.length - 1]
     V('… et rien quand tout y est', !/Il me manque/.test(embedDe(CC.vueConfigComptage(guild)).description));
     delete guild.members.me.permissionsIn;
     setGuildConfig('G1', 'comptage_role_erreur', null);
+  }
+
+  console.log('\n17) Rôle d\'erreur : jamais une porte vers un rôle à pouvoirs');
+  {
+    const role = (valeurs, user) => fausse({ type: 'role', customId: 'cfgcpt:role', valeurs, user });
+    let it = role(['ADMINROLE'], 'modo');
+    await IC.execute(it);
+    V('un modo (grade staff) ouvre bien le panneau, mais le rôle d\'erreur lui est refusé', !getGuildConfig('G1').comptage_role_erreur
+      && /réservé à l'\*\*administration\*\*/.test(texte(it.suivis)) && it.mises.length === 1, texte(it.suivis).slice(0, 200));
+    it = role(['RERR'], 'modo');
+    await IC.execute(it);
+    V('… même un rôle anodin : l\'administration seulement', !getGuildConfig('G1').comptage_role_erreur);
+    it = role(['ADMINROLE'], 'staff');
+    await IC.execute(it);
+    V('administration : un rôle « Administrateur » est refusé, et l\'explication nomme la permission', !getGuildConfig('G1').comptage_role_erreur
+      && /permissions sensibles : Administrateur/.test(texte(it.suivis)) && /sans aucun pouvoir/.test(texte(it.suivis)), texte(it.suivis).slice(0, 300));
+    it = role(['BANROLE'], 'staff');
+    await IC.execute(it);
+    V('… un rôle qui peut bannir aussi', !getGuildConfig('G1').comptage_role_erreur && /Bannir des membres/.test(texte(it.suivis)));
+    it = role(['ENTRE'], 'staff');
+    await IC.execute(it);
+    V('… un rôle au-dessus de celui qui règle aussi', !getGuildConfig('G1').comptage_role_erreur && /votre rôle le plus haut/.test(texte(it.suivis)));
+    it = role(['R2'], 'staff');
+    await IC.execute(it);
+    V('… un rôle sans pouvoir, sous les deux : accepté', getGuildConfig('G1').comptage_role_erreur === 'R2');
+    V('le contrôle du site refuse les mêmes rôles', /permissions sensibles \(Administrateur\)/.test(C.refusRoleErreurComptage(guild, 'ADMINROLE') || '')
+      && /Bannir des membres/.test(C.refusRoleErreurComptage(guild, 'BANROLE') || '') && C.refusRoleErreurComptage(guild, 'R2') === null);
+    V('… branché sur la validation de comptage_role_erreur (managedApi)', /key === 'comptage_role_erreur' \? require\('\.\/utils\/comptage'\)\.refusRoleErreurComptage/.test(fs.readFileSync(path.join(SRC, 'managedApi.js'), 'utf8')));
+
+    // Le rôle réglé AVANT ce verrou (ou dont les permissions ont changé
+    // depuis) : il n'est plus donné. Le scénario de la revue : un modo
+    // compte « 1 » puis « 2 » et repartait Administrateur.
+    setGuildConfig('G1', 'comptage_role_erreur', 'ADMINROLE');
+    C.definirNombreComptage('G1', 0, 'CPT');
+    await poster('modo', '1');
+    const deux = await poster('modo', '2');
+    V('le modo casse la série exprès : il ne reçoit PAS le rôle « Administrateur »', deux.reactions[0] === '❌' && !membre('modo').roles.cache.has('ADMINROLE'));
+    setGuildConfig('G1', 'comptage_role_erreur', null);
+  }
+
+  console.log('\n18) Rôle d\'erreur retiré quand le staff le change, le vide ou coupe le comptage');
+  {
+    const casser = async (u) => { C.definirNombreComptage('G1', 3, 'CPT'); return poster(u, '9'); };
+    const roleA = (u, r) => membre(u).roles.cache.has(r);
+    await IC.execute(fausse({ type: 'role', customId: 'cfgcpt:role', valeurs: ['RERR'], user: 'staff' }));
+    await casser('u1');
+    V('u1 casse : il porte RERR, noté en base', roleA('u1', 'RERR') && etat().role_fautif === 'RERR' && etat().dernier_fautif === 'u1');
+    await IC.execute(fausse({ type: 'role', customId: 'cfgcpt:role', valeurs: ['R2'], user: 'staff' }));
+    V('le staff passe à R2 : u1 perd RERR tout de suite', !roleA('u1', 'RERR') && getGuildConfig('G1').comptage_role_erreur === 'R2' && !etat().dernier_fautif);
+    await casser('u2');
+    V('u2 casse : il reçoit R2', roleA('u2', 'R2') && etat().role_fautif === 'R2');
+    await IC.execute(fausse({ type: 'role', customId: 'cfgcpt:role', valeurs: ['R2'], user: 'staff' }));
+    V('re-choisir le même rôle ne retire rien', roleA('u2', 'R2'));
+    await IC.execute(fausse({ type: 'role', customId: 'cfgcpt:role', valeurs: [], user: 'staff' }));
+    V('le staff vide le rôle : u2 perd R2', !roleA('u2', 'R2') && getGuildConfig('G1').comptage_role_erreur === null);
+    await casser('u3');
+    V('sans rôle d\'erreur : rien n\'est donné, rien n\'est noté', !roleA('u3', 'R2') && etat().role_fautif === '' && etat().dernier_fautif === 'u3');
+
+    // Changé hors /config (le site) : au prochain fautif, l'ancien perd le
+    // rôle qu'il a VRAIMENT reçu, pas celui du réglage du jour.
+    setGuildConfig('G1', 'comptage_role_erreur', 'RERR');
+    await casser('u1');
+    setGuildConfig('G1', 'comptage_role_erreur', 'R2');
+    await casser('u2');
+    V('rôle changé depuis le site : au fautif suivant, u1 perd RERR et u2 reçoit R2', !roleA('u1', 'RERR') && roleA('u2', 'R2') && !roleA('u1', 'R2'));
+    setGuildConfig('G1', 'comptage_role_erreur', null);
+    await casser('u3');
+    V('… et vidé depuis le site : au fautif suivant, u2 perd R2', !roleA('u2', 'R2') && !roleA('u3', 'R2'));
+
+    // Comptage coupé dans /config : le dernier fautif est libéré.
+    setGuildConfig('G1', 'comptage_role_erreur', 'RERR');
+    await casser('u1');
+    V('u1 porte RERR', roleA('u1', 'RERR'));
+    await IC.execute(fausse({ type: 'salon', customId: 'cfgcpt:salon', valeurs: [], user: 'staff' }));
+    V('le staff coupe le comptage : u1 perd RERR', !roleA('u1', 'RERR') && getGuildConfig('G1').comptage_channel_id === null);
+    await IC.execute(fausse({ type: 'salon', customId: 'cfgcpt:salon', valeurs: ['CPT'], user: 'staff' }));
+    setGuildConfig('G1', 'comptage_role_erreur', null);
+  }
+
+  console.log('\n19) « 1 000 » : les milliers à la française');
+  {
+    const L = (t) => C.lireNombreComptage(t);
+    V('« 1 000 », insécable, fine insécable → 1000', L('1 000').valeur === 1000 && L('1 000').valeur === 1000 && L('1 000').valeur === 1000);
+    V('« 12 345 » → 12345, « 12 345 678 » → 12345678', L('12 345').valeur === 12345 && L('12 345 678').valeur === 12345678);
+    V('« 5 6 », « 1 0000 » → hors-jeu (ambigu), jamais un 5 ou un 1', L('5 6').raison === 'ambigu' && L('1 0000').raison === 'ambigu');
+    V('« 1 000,5 » → décimal ; « 5 xD » et « 5⏎6 » → 5', L('1 000,5').raison === 'decimal' && L('5 xD').valeur === 5 && L('5\n6').valeur === 5);
+    V('calcul : « 2 × 1 000 » → 2000', C.lireNombreComptage('2 × 1 000', { maths: true }).valeur === 2000);
+    C.definirNombreComptage('G1', 999, 'CPT');
+    const mille = await poster('u1', '1 000');
+    V('à 999, « 1 000 » est juste (✅, compte à 1000), sans casser la série', ['✅', '💯', '🏆'].includes(mille.reactions[0]) && etat().courant === 1000 && etat().erreurs !== undefined, texte(mille.reactions));
+    const fine = await poster('u2', '1 001');
+    V('… « 1 001 » avec une fine insécable aussi', ['✅', '🏆'].includes(fine.reactions[0]) && etat().courant === 1001);
+    const ambigu = await poster('u1', '1 0 0 2');
+    V('« 1 0 0 2 » : hors-jeu, le compte ne bouge pas', !ambigu.reactions.length && etat().courant === 1001);
+  }
+
+  console.log('\n20) Un nombre avec une image garde sa place dans la file');
+  {
+    // L'anti-scam télécharge l'image : 80 ms, pendant lesquelles un autre
+    // message arrive.
+    const SI = require('../src/utils/scamImages');
+    const scanOrig = SI.scanMessage;
+    let arnaque = null;
+    SI.scanMessage = async (m) => { await attendre(80); return m.id === arnaque; };
+    delete require.cache[require.resolve('../src/events/messageCreate')];
+    const MC3 = require('../src/events/messageCreate');
+    const avecImage = (user, contenu) => {
+      const m = fauxMessage({ user, contenu });
+      m.attachments = { size: 1, values: () => [{ url: 'https://cdn.test/x.png', contentType: 'image/png' }][Symbol.iterator]() };
+      return m;
+    };
+    C.definirNombreComptage('G1', 5, 'CPT');
+    const six = avecImage('u1', '6');
+    const sept = fauxMessage({ user: 'u2', contenu: '7' });
+    await Promise.all([MC3.execute(six), (async () => { await attendre(10); return MC3.execute(sept); })()]);
+    V('« 6 » + image puis « 7 » : jugés dans l\'ordre d\'arrivée, deux ✅', six.reactions[0] === '✅' && sept.reactions[0] === '✅' && etat().courant === 7,
+      texte([six.reactions, sept.reactions, etat().courant]));
+    V('… et personne n\'a « cassé la série »', !/a cassé la série à \*\*5\*\*/.test(dernierEnvoi().content || ''));
+
+    // L'anti-scam efface le nombre : sa place est rendue, rien n'est jugé.
+    const huitArnaque = avecImage('u3', '8');
+    arnaque = huitArnaque.id;
+    const huit = fauxMessage({ user: 'u1', contenu: '8' });
+    await Promise.all([MC3.execute(huitArnaque), (async () => { await attendre(10); return MC3.execute(huit); })()]);
+    V('un nombre effacé par l\'anti-scam ne compte pas ; le suivant est jugé normalement', !huitArnaque.reactions.length && huit.reactions[0] === '✅' && etat().courant === 8,
+      texte([huitArnaque.reactions, huit.reactions, etat().courant]));
+    SI.scanMessage = scanOrig;
+    delete require.cache[require.resolve('../src/events/messageCreate')];
+    MC = require('../src/events/messageCreate');
+  }
+
+  console.log('\n21) Purge (suppression en masse) du dernier nombre');
+  {
+    const MDB = require('../src/events/messageDeleteBulk');
+    C.definirNombreComptage('G1', 0, 'CPT');
+    await poster('u1', '1');
+    const m2 = await poster('u2', '2');
+    const avant = SALONS.CPT.envois.length;
+    const lot = new Map([[m2.id, { id: m2.id, partial: true, author: null }], ['AUTRE1', { id: 'AUTRE1', partial: true, author: null }]]);
+    await MDB.execute(lot, SALONS.CPT);
+    V('le dernier nombre emporté par une purge → alerte, comme une suppression simple', SALONS.CPT.envois.length === avant + 1
+      && dernierEnvoi().content === '⚠️ Le dernier nombre, **2**, a été effacé avec d\'autres messages (il était de <@u2>). Le prochain est **3**.', dernierEnvoi().content);
+    V('… le compte ne bouge pas, le message est oublié', etat().courant === 2 && etat().dernier_message_id === null);
+    await MDB.execute(lot, SALONS.CPT);
+    V('… une seule alerte', SALONS.CPT.envois.length === avant + 1);
+    const m3 = await poster('u1', '3');
+    await MDB.execute(new Map([['VIEUX', { id: 'VIEUX' }]]), SALONS.CPT);
+    V('une purge qui n\'emporte pas le dernier nombre ne dit rien', SALONS.CPT.envois.length === avant + 1 && etat().dernier_message_id === m3.id);
+    await MDB.execute(new Map([[m3.id, { id: m3.id }]]), SALONS.GEN);
+    V('… ni une purge dans un autre salon', etat().dernier_message_id === m3.id);
+    V('le journal de la purge suit son cours', titreLog() === '🧹 Suppression en masse');
   }
 
   console.warn = warnOrig;

@@ -47,22 +47,39 @@ function vueReflexe(partie, client, fin = null) {
   };
 }
 
-// 🟢 Le signal : le bouton passe au vert. On note l'heure AVANT de rééditer,
-// pour que les clics qui arrivent pendant l'envoi comptent.
+// 🟢 Le signal : le bouton passe au vert.
+//
+// La partie ne passe en phase « go » qu'une fois la réédition CONFIRMÉE.
+// Pendant l'envoi (phase « envoi »), l'écran montre encore le bouton gris :
+// un clic reçoit « pas encore vert », sans victoire ni élimination. Avant,
+// la phase « go » était posée d'abord — un clic sur le bouton encore gris
+// gagnait, puis le vert, arrivé en retard, réaffichait « CLIQUE ! » sur une
+// partie déjà finie.
 async function signalReflexe(client, id) {
   const partie = P.lirePartieJeu(id);
   if (!partie || partie.etat.phase !== 'attente') return false;
-  partie.etat.phase = 'go';
-  partie.etat.go_le = Date.now();
-  partie.expire_le = Date.now() + P.DUREES_JEUX.reflexeFenetre;
+  partie.etat.phase = 'envoi';
   P.sauverPartieJeu(partie);
+  const vert = { ...partie, etat: { ...partie.etat, phase: 'go' } };
+  const affiche = await P.editerMessageJeu(client, partie, vueReflexe(vert, client));
+  // Relue : la partie a pu finir pendant l'envoi (jeu coupé, expiration).
+  // Sa conclusion a été rééditée APRÈS le vert (les rééditions d'une partie
+  // se suivent) : on ne touche plus à rien.
+  const fraiche = P.lirePartieJeu(id);
+  if (!fraiche || fraiche.etat.phase !== 'envoi') return false;
+  if (!affiche) {
+    // Message introuvable ou non modifiable : personne ne verrait le vert.
+    // On arrête plutôt que de laisser gagner un clic « à l'aveugle ».
+    P.annulerMinuteurJeu(id);
+    P.finirPartieJeu(id);
+    return false;
+  }
+  fraiche.etat.phase = 'go';
+  fraiche.etat.go_le = Date.now();
+  fraiche.expire_le = Date.now() + P.DUREES_JEUX.reflexeFenetre;
+  P.sauverPartieJeu(fraiche);
   P.programmerJeu(id, P.DUREES_JEUX.reflexeFenetre, () => require('./moteur').expirerJeuParId(client, id));
-  if (await P.editerMessageJeu(client, partie, vueReflexe(partie, client))) return true;
-  // Message introuvable ou non modifiable : personne ne verrait le vert.
-  // On arrête plutôt que de laisser gagner un clic « à l'aveugle ».
-  P.annulerMinuteurJeu(id);
-  P.finirPartieJeu(id);
-  return false;
+  return true;
 }
 
 const REFLEXE = {
@@ -99,6 +116,9 @@ const REFLEXE = {
     const e = partie.etat;
     if (action !== 'clic') return P.priveJeu(interaction, '❓ Ce bouton ne correspond à rien.');
     if (e.elimines.includes(moi)) return P.priveJeu(interaction, '🚫 Tu es éliminé·e de cette manche : patience pour la prochaine !');
+    // Le vert est en route mais pas encore affiché : ni victoire (le
+    // bouton était gris sous ses yeux) ni élimination (il passe au vert).
+    if (e.phase === 'envoi') return P.priveJeu(interaction, '⏳ Pas encore vert : le bouton est en train de changer. Reclique dès qu\'il passe au vert !');
     if (!e.participants.includes(moi)) e.participants.push(moi);
 
     if (e.phase !== 'go') {
@@ -135,6 +155,12 @@ const REFLEXE = {
   },
 
   rearmer(client, partie) {
+    // Coupé en plein envoi du vert : la partie n'a jamais été « go », on
+    // retente le signal.
+    if (partie.etat.phase === 'envoi') {
+      partie.etat.phase = 'attente';
+      P.sauverPartieJeu(partie);
+    }
     if (partie.etat.phase === 'attente') {
       P.programmerJeu(partie.id, Number(partie.etat.go_prevu) - Date.now(), () => signalReflexe(client, partie.id));
     } else {

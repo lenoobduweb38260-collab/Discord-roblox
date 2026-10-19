@@ -108,7 +108,16 @@ function fausse({ type = 'commande', user = 'u1', sub = null, options = {}, cust
     async update(p) { this.replied = true; this.mises.push(p); if (this.message) Object.assign(this.message, p); return p; },
     async deferUpdate() { this.deferred = true; },
     async deferReply() { this.deferred = true; },
-    async editReply(p) { this.reponses.push(p); return p; },
+    // Comme chez Discord : le jeton réédite la réponse de la commande, ou le
+    // message du bouton quand le clic a été répondu par une mise à jour.
+    async editReply(p) {
+      if (this.jetonMort) throw new Error('Invalid Webhook Token');
+      this.reponses.push(p);
+      this.edits = (this.edits || 0) + 1;
+      const cible = this.message || this.dernier;
+      if (cible?.edit) await cible.edit(p);
+      return p;
+    },
     async showModal(m) { this.replied = true; this.modales.push(m.toJSON ? m.toJSON() : m); },
   };
 }
@@ -424,12 +433,71 @@ const recharger = () => P.oublierLancementsJeu();
     it = await commande('u4', 'nombre');
     const id3 = idPartieDe(premiere(it));
     it.dernier.flags = 1 << 15;
+    P.retenirJetonJeu(id3, it, it.dernier); // le message est parti en carte
     const p3 = P.lirePartieJeu(id3);
     p3.expire_le = Date.now() - 1;
     P.sauverPartieJeu(p3);
     await MOTEUR.expirerJeuParId(client, id3);
     const edC = it.dernier.editions[it.dernier.editions.length - 1];
     V('carte : réédition en composants (aucun champ « embeds »)', edC && !('embeds' in edC) && Array.isArray(edC.components) && edC.components.length > 0, texte(edC).slice(0, 160));
+    V('… par le jeton de l\'interaction (aucune permission de salon requise)', it.edits === 1);
+
+    // Même chose par le salon, quand le jeton n'est plus là (redémarrage).
+    recharger();
+    it = await commande('u4', 'nombre');
+    const id4 = idPartieDe(premiere(it));
+    it.dernier.flags = 1 << 15;
+    P.oublierJetonJeu(id4);
+    const p4 = P.lirePartieJeu(id4);
+    p4.expire_le = Date.now() - 1;
+    P.sauverPartieJeu(p4);
+    await MOTEUR.expirerJeuParId(client, id4);
+    const edS = it.dernier.editions[it.dernier.editions.length - 1];
+    V('sans jeton : réédition par le salon, en composants aussi', !it.edits && edS && !('embeds' in edS) && Array.isArray(edS.components) && edS.components.length > 0);
+  }
+
+  console.log('\n9 bis) Rééditer sans voir le salon : le jeton de l\'interaction');
+  {
+    // Le bot ne voit pas le salon : GET /channels/…/messages refusé (403).
+    const lectureOrig = SALONS.JEUX.messages.fetch;
+    SALONS.JEUX.messages.fetch = async () => { throw new Error('Missing Access'); };
+    recharger();
+    let it = await commande('u5', 'puissance4', { adversaire: 'u6' }, 'JEUX');
+    const id = idPartieDe(premiere(it));
+    const p = P.lirePartieJeu(id);
+    p.expire_le = Date.now() - 1;
+    P.sauverPartieJeu(p);
+    await MOTEUR.balayerJeux(client);
+    const ed = it.dernier.editions[it.dernier.editions.length - 1];
+    V('expiration sans « Voir les anciens messages » : le défi est quand même clos', ed && /pas répondu à temps/.test(embedDe(ed).description) && it.edits === 1);
+
+    // Un clic répondu par une mise à jour fournit un jeton neuf : celui de
+    // la commande est mort depuis longtemps, l'expiration passe quand même.
+    recharger();
+    it = await commande('u5', 'morpion', {}, 'JEUX');
+    const id2 = idPartieDe(premiere(it));
+    it.jetonMort = true;
+    const coup = await clic('u5', `jeu:${id2}:c:4`, it.dernier, { salonId: 'JEUX' });
+    const p2 = P.lirePartieJeu(id2);
+    p2.expire_le = Date.now() - 1;
+    P.sauverPartieJeu(p2);
+    await MOTEUR.balayerJeux(client);
+    const ed2 = it.dernier.editions[it.dernier.editions.length - 1];
+    V('… et après 15 min : le jeton du dernier clic réédite (cases grisées)', coup.edits === 1 && ed2 && /expirée/i.test(embedDe(ed2).description) && tousDesactives(ed2), texte(ed2).slice(0, 160));
+
+    // Un clic répondu en privé (intrus) ne fournit PAS de jeton : il
+    // rééditerait sa réponse privée, pas la partie.
+    recharger();
+    it = await commande('u6', 'morpion', {}, 'JEUX');
+    const id3 = idPartieDe(premiere(it));
+    it.jetonMort = true;
+    const intrus = await clic('u1', `jeu:${id3}:c:4`, it.dernier, { salonId: 'JEUX' });
+    const p3 = P.lirePartieJeu(id3);
+    p3.expire_le = Date.now() - 1;
+    P.sauverPartieJeu(p3);
+    await MOTEUR.balayerJeux(client);
+    V('… un clic répondu en privé ne sert jamais de jeton', !intrus.edits && !P.lirePartieJeu(id3));
+    SALONS.JEUX.messages.fetch = lectureOrig;
   }
 
   console.log('\n10) Persistance : un redémarrage n\'abîme pas la partie');
@@ -497,6 +565,48 @@ const recharger = () => P.oublierLancementsJeu();
     setGuildConfig('G1', 'levels_enabled', 0);
     V('niveaux coupés : aucune XP', P.preparerRecompenseJeu('G1', 'u2').xp === 0);
     setGuildConfig('G1', 'levels_enabled', 1);
+
+    // 💰 Le plafond tient les Col même quand la victoire ne rapporte pas
+    // d'XP. Scénario de la revue : 100 Col par victoire, plafond 200, des
+    // dizaines de « /jeu nombre » gagnés contre le bot.
+    setGuildConfig('G1', 'sao_enabled', 1);
+    setGuildConfig('G1', 'jeux_col_victoire', 100);
+    setGuildConfig('G1', 'jeux_xp_plafond', 200);
+    setGuildConfig('G1', 'jeux_xp_bot', 5);
+    const farmer = (u, n) => {
+      S.ensurePlayer('G1', u);
+      const avant = S.getPlayer('G1', u).col;
+      let payees = 0;
+      let derniere = null;
+      for (let k = 0; k < n; k++) {
+        derniere = P.preparerRecompenseJeu('G1', u, { contreBot: true });
+        if (derniere.col > 0) payees += 1;
+      }
+      return { gagne: S.getPlayer('G1', u).col - avant, payees, derniere };
+    };
+    const normal = farmer('f1', 80);
+    V('réglage par défaut (5 XP contre le bot) : 40 victoires payées en Col, pas une de plus', normal.payees === 40 && normal.gagne === 4000, texte(normal));
+    setGuildConfig('G1', 'levels_enabled', 0);
+    const sansNiveaux = farmer('f2', 80);
+    V('niveaux coupés : toujours 40 victoires payées (le plafond se mesure sans XP)', sansNiveaux.payees === 40 && sansNiveaux.gagne === 4000, texte(sansNiveaux));
+    V('… et le joueur lit « plafond du jour atteint »', sansNiveaux.derniere.plafonne && /plafond du jour atteint/.test(P.ligneRecompenseJeu(sansNiveaux.derniere))
+      && !/d'XP/.test(P.ligneRecompenseJeu(sansNiveaux.derniere)));
+    setGuildConfig('G1', 'levels_enabled', 1);
+    setGuildConfig('G1', 'jeux_xp_bot', 0);
+    const sansXp = farmer('f3', 260);
+    V('XP de victoire à 0 : le plafond compte les victoires (200), puis plus un Col', sansXp.payees === 200 && sansXp.gagne === 20000 && sansXp.derniere.col === 0, texte(sansXp));
+    const lendemain = (() => {
+      const ligne = db.prepare('SELECT xp FROM jeux_gains WHERE guild_id = ? AND user_id = ? AND jour = ?').get('G1', 'f3', P.jourJeux());
+      return ligne?.xp;
+    })();
+    V('… la mesure vit dans jeux_gains (remise à zéro au jour suivant)', lendemain === 200);
+    setGuildConfig('G1', 'jeux_col_victoire', 0);
+    V('ni XP ni Col à verser : rien ne s\'inscrit au plafond', (() => {
+      const r = P.preparerRecompenseJeu('G1', 'f4', { contreBot: true });
+      return r.xp === 0 && r.col === 0 && !db.prepare('SELECT 1 FROM jeux_gains WHERE user_id = ?').get('f4');
+    })());
+    setGuildConfig('G1', 'jeux_xp_bot', 5);
+    setGuildConfig('G1', 'sao_enabled', 0);
     setGuildConfig('G1', 'jeux_col_victoire', 0);
     setGuildConfig('G1', 'jeux_xp_plafond', 200);
     V('jour de Paris au format AAAA-MM-JJ', /^\d{4}-\d{2}-\d{2}$/.test(P.jourJeux()));
@@ -547,16 +657,43 @@ const recharger = () => P.oublierLancementsJeu();
     const ed = it.dernier.editions[it.dernier.editions.length - 1];
     V('expiration : la main reste et se solde (19 contre 17 → gagné)', /restes sur ta main/.test(embedDe(ed).description) && /Gagné/.test(embedDe(ed).description) && S.getPlayer('G1', 'u1').col === 750, `${S.getPlayer('G1', 'u1').col}`);
 
-    // Jeu coupé en pleine main : la mise est rendue.
+    // Jeu coupé en pleine main : la main se SOLDE (comme à l'expiration),
+    // la mise n'est jamais rendue d'office. Le scénario de la revue : 16
+    // contre 19, le modo coupe le jeu, clique, rallume… et perd sa mise.
     recharger();
     Math.random = () => 0;
     it = await commande('u1', 'blackjack', { mise: 100 });
     Math.random = aleaOrig;
     const id3 = idPartieDe(premiere(it));
     V('nouvelle mise retirée', S.getPlayer('G1', 'u1').col === 650);
-    setGuildConfig('G1', 'jeux_desactives', 'blackjack');
-    await clic('u1', `jeu:${id3}:tirer`, it.dernier);
-    V('jeu coupé en pleine main → mise rendue', S.getPlayer('G1', 'u1').col === 750 && !P.lirePartieJeu(id3));
+    const p3 = P.lirePartieJeu(id3);
+    p3.etat.joueur = ['10♠', '6♥'];
+    p3.etat.croupier = ['10♦', '9♣'];
+    P.sauverPartieJeu(p3);
+    const defaitesAvant = (P.statsMembreJeux('G1', 'u1').find((x) => x.jeu === 'blackjack') || {}).defaites || 0;
+    await clic('staff', 'cfgjeux:jeu:blackjack', { id: 'CFG', flags: 0 });
+    V('le staff coupe le blackjack', /blackjack/.test(getGuildConfig('G1').jeux_desactives || ''));
+    const intrusCoupe = await clic('u2', `jeu:${id3}:rester`, it.dernier);
+    V('jeu coupé : un intrus ne peut pas arrêter la main d\'un autre', /partie de <@u1>/.test(prive(intrusCoupe)?.content || '') && Boolean(P.lirePartieJeu(id3)) && !intrusCoupe.mises.length);
+    const coupe = await clic('u1', `jeu:${id3}:rester`, it.dernier);
+    noter(coupe);
+    await clic('staff', 'cfgjeux:jeu:blackjack', { id: 'CFG', flags: 0 });
+    const vueCoupe = embedDe(derniereMise(coupe)).description || '';
+    V('jeu coupé en pleine main (16 contre 19) → la main se solde : mise PERDUE, pas rendue',
+      S.getPlayer('G1', 'u1').col === 650 && !P.lirePartieJeu(id3) && /Jeu désactivé en pleine main/.test(vueCoupe) && /Perdu/.test(vueCoupe), `${S.getPlayer('G1', 'u1').col} · ${vueCoupe.slice(0, 120)}`);
+    V('… et la défaite est comptée', ((P.statsMembreJeux('G1', 'u1').find((x) => x.jeu === 'blackjack') || {}).defaites || 0) === defaitesAvant + 1);
+    V('… couper puis rallumer ne rend rien', !getGuildConfig('G1').jeux_desactives && S.getPlayer('G1', 'u1').col === 650);
+
+    // La réponse de lancement échoue (interaction expirée) : mise rendue.
+    recharger();
+    const soldeAvant = S.getPlayer('G1', 'u1').col;
+    const rate = fausse({ user: 'u1', sub: 'blackjack', options: { mise: 300 } });
+    rate.reply = async () => { throw new Error('Unknown interaction'); };
+    Math.random = () => 0;
+    await IC.execute(rate).catch(() => null);
+    Math.random = aleaOrig;
+    V('réponse de lancement en échec → mise rendue, aucune partie orpheline', S.getPlayer('G1', 'u1').col === soldeAvant
+      && !P.partieDuJoueurJeu('G1', 'blackjack', 'u1'), `${soldeAvant} → ${S.getPlayer('G1', 'u1').col}`);
     setGuildConfig('G1', 'jeux_desactives', null);
 
     S.getPlayer('G1', 'u1');
@@ -710,8 +847,73 @@ const recharger = () => P.oublierLancementsJeu();
     const p2 = P.lirePartieJeu(id2);
     p2.message_id = 'DISPARU';
     P.sauverPartieJeu(p2);
+    P.oublierJetonJeu(id2); // redémarrage : plus de jeton, seul le salon reste
     const vert = await signalReflexe(client, id2);
     V('message introuvable au signal : partie arrêtée, aucun clic « à l\'aveugle »', vert === false && !P.lirePartieJeu(id2));
+
+    // Le bot ne voit pas le salon : le vert passe par le jeton de /jeu.
+    const lectureOrig = SALONS.AUTRE.messages.fetch;
+    SALONS.AUTRE.messages.fetch = async () => { throw new Error('Missing Access'); };
+    recharger();
+    const it3 = await commande('u4', 'reflexe', {}, 'AUTRE');
+    const id3 = idPartieDe(premiere(it3));
+    P.annulerMinuteurJeu(id3);
+    const vert3 = await signalReflexe(client, id3);
+    P.annulerMinuteurJeu(id3);
+    const ed3 = it3.dernier.editions[it3.dernier.editions.length - 1];
+    V('sans « Voir les anciens messages » : le bouton passe quand même au vert', vert3 === true && P.lirePartieJeu(id3)?.etat.phase === 'go'
+      && composantsDe(ed3)[0]?.style === 3 && it3.edits === 1);
+    const g3 = await clic('u5', `jeu:${id3}:clic`, it3.dernier, { salonId: 'AUTRE' });
+    V('… et le premier clic gagne', /gagne en/.test(embedDe(derniereMise(g3)).description) && !P.lirePartieJeu(id3));
+    SALONS.AUTRE.messages.fetch = lectureOrig;
+
+    // ⏳ Un clic PENDANT l'envoi du vert : ni victoire ni élimination ; et
+    // jamais de « CLIQUE ! » réaffiché sur une partie finie.
+    recharger();
+    const it4 = await commande('u1', 'reflexe', {}, 'AUTRE');
+    const id4 = idPartieDe(premiere(it4));
+    P.annulerMinuteurJeu(id4);
+    let lacher;
+    const retenue = new Promise((r) => { lacher = r; });
+    const editOrig = it4.editReply.bind(it4);
+    it4.editReply = async (p) => { await retenue; return editOrig(p); };
+    const signal = signalReflexe(client, id4);
+    await new Promise((r) => setImmediate(r));
+    V('pendant l\'envoi : phase « envoi », toujours pas « go »', P.lirePartieJeu(id4)?.etat.phase === 'envoi');
+    const pendant = await clic('u2', `jeu:${id4}:clic`, it4.dernier, { salonId: 'AUTRE' });
+    const pe = P.lirePartieJeu(id4);
+    V('… un clic reçoit « pas encore vert » : ni victoire ni élimination', /Pas encore vert/.test(prive(pendant)?.content || '')
+      && !pendant.mises.length && pe && !pe.etat.elimines.includes('u2'));
+    lacher();
+    V('… le vert confirmé, la partie passe en « go »', (await signal) === true && P.lirePartieJeu(id4)?.etat.phase === 'go');
+    P.annulerMinuteurJeu(id4);
+    const gagne4 = await clic('u2', `jeu:${id4}:clic`, it4.dernier, { salonId: 'AUTRE' });
+    V('… u2 peut alors gagner', /gagne en/.test(embedDe(derniereMise(gagne4)).description));
+
+    // Le jeu est coupé PENDANT l'envoi : la conclusion passe APRÈS le vert.
+    recharger();
+    const it5 = await commande('u1', 'reflexe', {}, 'AUTRE');
+    const id5 = idPartieDe(premiere(it5));
+    P.annulerMinuteurJeu(id5);
+    let lacher5;
+    const retenue5 = new Promise((r) => { lacher5 = r; });
+    const editOrig5 = it5.editReply.bind(it5);
+    const ordre = [];
+    it5.editReply = async (p) => { await retenue5; ordre.push('vert'); return editOrig5(p); };
+    const signal5 = signalReflexe(client, id5);
+    await new Promise((r) => setImmediate(r));
+    setGuildConfig('G1', 'jeux_desactives', 'reflexe');
+    const arret = fausse({ type: 'bouton', user: 'u3', customId: `jeu:${id5}:clic`, message: it5.dernier, salonId: 'AUTRE' });
+    const updateOrig = arret.update.bind(arret);
+    arret.update = async (p) => { ordre.push('arret'); return updateOrig(p); };
+    const fini = IC.execute(arret);
+    await new Promise((r) => setTimeout(r, 20));
+    lacher5();
+    await fini;
+    const v5 = await signal5;
+    setGuildConfig('G1', 'jeux_desactives', null);
+    V('jeu coupé pendant l\'envoi : le vert part d\'abord, l\'arrêt ensuite (jamais l\'inverse)', texte(ordre) === '["vert","arret"]' && v5 === false && !P.lirePartieJeu(id5), texte(ordre));
+    V('… et le signal ne réédite plus rien après', it5.dernier.editions.length === 1 && !/MAINTENANT/.test(embedDe(arret.mises[0]).description || ''));
   }
 
   console.log('\n18) Pierre-feuille-ciseaux : choix secrets, manches');

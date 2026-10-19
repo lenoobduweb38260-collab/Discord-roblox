@@ -278,14 +278,17 @@ module.exports = {
       setGuildConfig(interaction.guildId, 'level_image_url', url);
       if (!url) return interaction.reply({ content: '🧹 Image des cartes de niveau retirée.', flags: MessageFlags.Ephemeral });
       // On vérifie tout de suite que la carte saura la dessiner : seul le
-      // PNG est lu par le moteur d'images du bot.
+      // PNG est lu par le moteur d'images du bot, et dans des bornes (poids,
+      // dimensions) qui protègent le bot d'une image piégée. Le fond lu est
+      // gardé prêt : les fiches suivantes ne le retéléchargent pas.
       return repondreVite(interaction, async () => {
-        const image = await CARTE.telechargerPngNiveau(url, 2000);
+        const image = await CARTE.fondNiveau(url, { rafraichir: true });
         return {
           content: image
             ? '✅ Image enregistrée : elle sert de fond aux cartes de niveau.'
             : '✅ Image enregistrée, mais je n\'ai pas pu la lire comme **PNG**.\n'
-              + '➜ Les cartes gardent leur fond par défaut tant que l\'adresse ne mène pas à une image PNG.',
+              + `➜ Il faut une image PNG de ${CARTE.MAX_COTE_IMAGE} × ${CARTE.MAX_COTE_IMAGE} pixels et 8 Mo au plus, `
+              + 'qui se télécharge en moins d\'une seconde et demie. D\'ici là, les cartes gardent leur fond par défaut.',
           flags: MessageFlags.Ephemeral,
         };
       }, { ephemere: true });

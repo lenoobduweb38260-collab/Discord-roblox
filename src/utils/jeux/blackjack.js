@@ -4,7 +4,8 @@
 // retirée du solde AU LANCEMENT (impossible de miser deux fois les mêmes
 // Col), puis rendue selon l'issue — 2× sur une victoire, 2,5× sur un
 // blackjack servi, la mise sur un nul. Sans action, la main « reste » toute
-// seule : laisser filer le temps ne rembourse pas une main perdue.
+// seule : laisser filer le temps ne rembourse pas une main perdue — couper
+// le jeu en pleine main non plus (elle se solde de même).
 const { ActionRowBuilder, ButtonStyle } = require('discord.js');
 const { COLORS } = require('../embeds');
 const { mettreAJour } = require('../reponse');
@@ -145,7 +146,15 @@ const BLACKJACK = {
       if (s.fin.recompense?.xp) await P.verserXpJeu(interaction.guild, moi, s.fin.recompense.xp, interaction.channel);
       return null;
     }
-    return P.envoyerPartieJeu(interaction, partie, vueBlackjack(partie, client));
+    // La mise est déjà retirée : si la main ne peut pas s'afficher
+    // (interaction expirée, Discord indisponible), envoyerPartieJeu efface
+    // la partie — personne ne la soldera plus. On rend donc la mise ici.
+    try {
+      return await P.envoyerPartieJeu(interaction, partie, vueBlackjack(partie, client));
+    } catch (err) {
+      if (mise) P.crediterColJeu(interaction.guildId, moi, mise);
+      throw err;
+    }
   },
 
   vue: vueBlackjack,
@@ -194,9 +203,16 @@ const BLACKJACK = {
     };
   },
 
-  // Le jeu est coupé en pleine main : la mise est rendue, rien n'est compté.
-  annuler(partie) {
-    if (partie.etat.mise) P.crediterColJeu(partie.guild_id, partie.joueurs[0], partie.etat.mise);
+  // Le jeu est coupé en pleine main : elle se solde comme à l'expiration —
+  // le joueur reste sur sa main, le croupier joue, la mise suit l'issue.
+  // ⚠️ Ne JAMAIS rendre la mise ici : la main est déjà vue, et couper le jeu
+  // deviendrait un moyen d'annuler les seules mains perdantes.
+  solderArret(partie, client) {
+    const s = solderBlackjack(partie, { avance: '🚫 Jeu désactivé en pleine main : tu restes sur ta main.\n' });
+    return {
+      payload: vueBlackjack(partie, client, s.fin),
+      xp: s.fin.recompense?.xp ? { userId: partie.joueurs[0], montant: s.fin.recompense.xp } : null,
+    };
   },
 };
 
