@@ -774,6 +774,14 @@ for (const column of [
   'level_annonce_pas INTEGER',          // n'annoncer que tous les N niveaux (1)
   'level_mention INTEGER',              // 1 = l'annonce mentionne le membre (1)
   'level_reset_depart INTEGER',         // 1 = effacer l'XP d'un membre qui quitte (0)
+  // 🎲 Mini-jeux (/jeu) : interrupteur, jeux coupés un par un (liste de clés
+  // séparées par des virgules), récompenses d'une victoire et plafond du jour.
+  'jeux_enabled INTEGER',
+  'jeux_desactives TEXT',
+  'jeux_xp_victoire INTEGER',
+  'jeux_xp_bot INTEGER',
+  'jeux_xp_plafond INTEGER',
+  'jeux_col_victoire INTEGER',
 ]) {
   try {
     db.exec(`ALTER TABLE guild_config ADD COLUMN ${column}`);
@@ -1014,6 +1022,47 @@ db.exec(`CREATE TABLE IF NOT EXISTS invitations (
 )`);
 db.exec('CREATE INDEX IF NOT EXISTS idx_invitations_guild ON invitations (guild_id, inviter_id)');
 
+// 🎲 Mini-jeux (/jeu).
+//  • jeux_parties : chaque partie en cours. Les boutons portent son id
+//    (« jeu:<id>:<action> ») et tout l'état vit ici : une partie survit à un
+//    redémarrage du bot. joueurs et etat sont du JSON ; « bot » désigne le
+//    bot comme adversaire. Une partie finie est effacée.
+//  • jeux_stats : victoires, défaites et nuls par membre et par jeu.
+//  • jeux_gains : l'XP de jeux déjà versée aujourd'hui, pour le plafond
+//    quotidien (jour = date de Paris, AAAA-MM-JJ).
+db.exec(`
+CREATE TABLE IF NOT EXISTS jeux_parties (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  guild_id   TEXT NOT NULL,
+  channel_id TEXT NOT NULL,
+  message_id TEXT,
+  jeu        TEXT NOT NULL,
+  joueurs    TEXT NOT NULL,
+  etat       TEXT NOT NULL,
+  tour       TEXT,
+  expire_le  INTEGER NOT NULL,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_jeux_parties_expire ON jeux_parties (expire_le);
+CREATE INDEX IF NOT EXISTS idx_jeux_parties_jeu ON jeux_parties (guild_id, jeu);
+CREATE TABLE IF NOT EXISTS jeux_stats (
+  guild_id  TEXT NOT NULL,
+  user_id   TEXT NOT NULL,
+  jeu       TEXT NOT NULL,
+  victoires INTEGER NOT NULL DEFAULT 0,
+  defaites  INTEGER NOT NULL DEFAULT 0,
+  nuls      INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (guild_id, user_id, jeu)
+);
+CREATE TABLE IF NOT EXISTS jeux_gains (
+  guild_id TEXT NOT NULL,
+  user_id  TEXT NOT NULL,
+  jour     TEXT NOT NULL,
+  xp       INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (guild_id, user_id, jour)
+);
+`);
+
 try {
   const done = db.prepare("SELECT value FROM app_state WHERE key = 'rp_global_migrated'").get();
   if (!done) {
@@ -1151,6 +1200,13 @@ const DEFAULT_CONFIG = {
   bot_profil: null,
   confession_enabled: 0,
   confession_channel_id: null,
+  // 🎲 Mini-jeux — une ligne existante lit NULL : toujours `cfg.x ?? défaut`.
+  jeux_enabled: 0,
+  jeux_desactives: null,
+  jeux_xp_victoire: 20,
+  jeux_xp_bot: 5,
+  jeux_xp_plafond: 200,
+  jeux_col_victoire: 0,
   xp_text: 20,
   xp_voice: 20,
   xp_cooldown: 60,

@@ -23,6 +23,7 @@ const LG = require('./langues');
 const { lien: lienCommunaute, demanderLiaison, delier } = require('./communaute');
 const M = require('./miseEnPage');
 const { mariageView, gererConfigMariage } = require('./configMariage');
+const { vueConfigJeux, gererConfigJeux } = require('./jeux/reglagesJeux');
 
 // Panneau central de configuration : /config ouvre une vue d'ensemble avec un
 // menu de catégories ; chaque catégorie se règle via des sélecteurs de rôles,
@@ -235,7 +236,8 @@ function mainView(guild) {
         { label: 'Identité du bot', value: 'identitebot', emoji: '🪪', description: 'Nom et photo du bot sur ce serveur, profils' },
         { label: 'Absences', value: 'absences', emoji: '📅', description: 'Les salons où partent les annonces d\'absence' },
         { label: 'Réseaux sociaux', value: 'reseaux', emoji: '📡', description: 'Annonces des lives et nouvelles vidéos' },
-        { label: 'Comptage', value: 'comptage', emoji: '🔢', description: 'Salon de comptage : règles, rôle d\'erreur, XP, remise à zéro' }
+        { label: 'Comptage', value: 'comptage', emoji: '🔢', description: 'Salon de comptage : règles, rôle d\'erreur, XP, remise à zéro' },
+        { label: 'Mini-jeux', value: 'jeux', emoji: '🎲', description: 'Les jeux de /jeu, un par un, et leurs récompenses' }
       )
   );
   return { embeds: [embed], components: [categoryRow] };
@@ -1247,7 +1249,10 @@ function absencesView(guild) {
   };
 }
 
-const CATEGORY_VIEWS = { communaute: communauteView, rp: rpView, roles: rolesView, arrivees: arriveesView, salons: salonsView, xp: xpView, securite: securiteView, whitelist: whitelistView, tickets: ticketsView, vocal: vocalView, musique: musiqueView, identitebot: identiteBotView, absences: absencesView, reseaux: reseauxView, mariage: mariageView, comptage: (g) => require('./comptageConfig').vueConfigComptage(g) };
+// 🎲 Mini-jeux : la vue vit avec les jeux (src/utils/jeux/reglagesJeux.js).
+const jeuxView = (guild) => vueConfigJeux(guild);
+
+const CATEGORY_VIEWS = { communaute: communauteView, rp: rpView, roles: rolesView, arrivees: arriveesView, salons: salonsView, xp: xpView, securite: securiteView, whitelist: whitelistView, tickets: ticketsView, vocal: vocalView, musique: musiqueView, identitebot: identiteBotView, absences: absencesView, reseaux: reseauxView, mariage: mariageView, comptage: (g) => require('./comptageConfig').vueConfigComptage(g), jeux: jeuxView };
 const SECURITY_TOGGLES = new Set(['antispam_enabled', 'antinuke_enabled', 'captcha_enabled']);
 
 // ----- Routeur des interactions du panneau (customId commençant par "cfg") -----
@@ -1278,6 +1283,10 @@ async function handleConfigInteraction(interaction) {
     // identifiants compris (cfgxp, cfglvlon/off, cfgrec…).
     const niveaux = require('./configNiveaux');
     if (niveaux.estIdConfigNiveaux(id)) return await niveaux.gererConfigNiveaux(interaction, grade);
+    // 🎲 Mini-jeux : module, jeux un par un, récompenses (modal).
+    if (id.startsWith('cfgjeux:')) {
+      return await gererConfigJeux(interaction, grade);
+    }
 
     // Sécurité : bascule anti-spam / anti-nuke / captcha.
     if (id.startsWith('cfgsec:')) {

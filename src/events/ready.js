@@ -63,6 +63,14 @@ module.exports = {
       console.warn(`⚠️ Annonces des anniversaires de mariage non démarrées : ${err.message}`);
     }
 
+    // 🎲 Mini-jeux : les parties en cours reprennent (minuteurs du quiz et
+    // du réflexe), celles qui ont expiré pendant le sommeil se concluent.
+    try {
+      require('../utils/jeux/moteur').demarrerJeux(client);
+    } catch (err) {
+      console.warn(`⚠️ Mini-jeux non démarrés : ${err.message}`);
+    }
+
     // 🎙️ XP vocale : chaque minute, chaque membre en vocal gagne l'XP
     // vocale du serveur — hors salon AFK et bots, et (sauf réglage contraire)
     // ni muet ni sourd, ni seul humain dans son salon. Le détail vit dans

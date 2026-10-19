@@ -1,0 +1,56 @@
+{
+  "Animaux": [
+    "éléphant", "girafe", "crocodile", "kangourou", "dauphin", "papillon", "hérisson", "écureuil",
+    "pingouin", "tortue", "panthère", "rhinocéros", "hippopotame", "chameau", "perroquet", "baleine",
+    "grenouille", "araignée", "coccinelle", "chouette", "gorille", "lézard", "flamant", "renard",
+    "écrevisse", "libellule", "marmotte", "méduse"
+  ],
+  "Cuisine": [
+    "croissant", "baguette", "fromage", "chocolat", "framboise", "ratatouille", "omelette", "brioche",
+    "confiture", "pistache", "abricot", "artichaut", "aubergine", "courgette", "champignon", "cornichon",
+    "tartiflette", "madeleine", "clafoutis", "vinaigrette", "camembert", "noisette", "mandarine", "spaghetti",
+    "profiterole", "bouillabaisse", "cassoulet"
+  ],
+  "Pays": [
+    "argentine", "australie", "belgique", "cameroun", "danemark", "égypte", "finlande", "groenland",
+    "hongrie", "indonésie", "islande", "jamaïque", "madagascar", "mexique", "norvège", "portugal",
+    "roumanie", "sénégal", "thaïlande", "ukraine", "vietnam", "colombie", "pérou", "irlande",
+    "tunisie", "mongolie", "nicaragua"
+  ],
+  "Métiers": [
+    "boulanger", "pompier", "infirmier", "architecte", "astronaute", "journaliste", "plombier", "vétérinaire",
+    "jardinier", "pharmacien", "électricien", "menuisier", "professeur", "chirurgien", "photographe", "facteur",
+    "bibliothécaire", "cuisinier", "dentiste", "avocat", "pilote", "mécanicien", "coiffeur", "fleuriste",
+    "traducteur", "forgeron", "horloger"
+  ],
+  "Maison et objets": [
+    "parapluie", "ordinateur", "téléphone", "bibliothèque", "réfrigérateur", "aspirateur", "lampadaire", "tabouret",
+    "oreiller", "couverture", "casserole", "fourchette", "trousseau", "horloge", "miroir", "escalier",
+    "fenêtre", "cheminée", "étagère", "chaussette", "cartable", "trottinette", "boussole", "lanterne",
+    "tournevis", "arrosoir", "sablier"
+  ],
+  "Nature": [
+    "montagne", "cascade", "volcan", "glacier", "désert", "forêt", "prairie", "tempête",
+    "tournesol", "coquelicot", "marguerite", "orchidée", "bambou", "cactus", "océan", "rivière",
+    "falaise", "colline", "tonnerre", "brouillard", "aurore", "marécage", "archipel", "lagune",
+    "séquoia", "avalanche", "geyser"
+  ],
+  "Sports et loisirs": [
+    "football", "basketball", "escalade", "natation", "équitation", "badminton", "handball", "marathon",
+    "trampoline", "patinage", "parapente", "escrime", "skateboard", "cyclisme", "plongée", "randonnée",
+    "volleyball", "billard", "bowling", "pétanque", "aviron", "triathlon", "gymnastique", "karaté",
+    "sudoku", "origami", "jonglage"
+  ],
+  "Espace et sciences": [
+    "astéroïde", "galaxie", "planète", "satellite", "télescope", "comète", "nébuleuse", "gravité",
+    "molécule", "électron", "microscope", "laboratoire", "magnétisme", "atmosphère", "météorite", "constellation",
+    "éclipse", "fusée", "jupiter", "saturne", "mercure", "neptune", "photosynthèse", "dinosaure",
+    "algorithme", "volcanologie", "aimant"
+  ],
+  "Musique": [
+    "guitare", "violon", "batterie", "trompette", "saxophone", "harmonica", "accordéon", "clarinette",
+    "violoncelle", "xylophone", "tambourin", "mélodie", "partition", "orchestre", "symphonie", "refrain",
+    "chorale", "concert", "harpe", "contrebasse", "synthétiseur", "métronome", "flûte", "ukulélé",
+    "trombone", "maracas"
+  ]
+}

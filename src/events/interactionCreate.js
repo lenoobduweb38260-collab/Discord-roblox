@@ -211,6 +211,19 @@ module.exports = {
       return require('../commands/niveau').gererBoutonNiveau(interaction);
     }
 
+    // ----- Mini-jeux (/jeu) : boutons, menus de lettres et formulaires -----
+    // L'id porte la partie (« jeu:<id>:<action> ») : tout l'état est en base,
+    // le clic marche encore après un redémarrage. Le module est revérifié
+    // ici, et le jeu lui-même dans le gestionnaire.
+    if ((interaction.isButton() || interaction.isStringSelectMenu() || interaction.isModalSubmit())
+      && interaction.customId?.startsWith('jeu:')) {
+      if (!interaction.inGuild()) return horsServeur(interaction);
+      if (!getGuildConfig(interaction.guildId).jeux_enabled) {
+        return interaction.reply({ content: '⛔ Les mini-jeux ont été désactivés sur ce serveur : ce bouton ne fait plus rien.', flags: MessageFlags.Ephemeral });
+      }
+      return require('../commands/jeu').handleComposant(interaction);
+    }
+
     // ----- Relecture des confessions signalées (salon QG du staff du bot) -----
     if (interaction.isButton() && interaction.customId.startsWith('cfs:')) {
       if (!interaction.inGuild()) return horsServeur(interaction);
@@ -486,9 +499,11 @@ module.exports = {
     // Modules par serveur (désactivés par défaut, activables via /config) :
     // chaque commande déclare `guildModule` et la config porte `<module>_enabled`.
     if (command.guildModule && interaction.inGuild() && !cfg[`${command.guildModule}_enabled`]) {
-      const labels = { interact: 'Interactions', sao: 'Aventure SAO', confession: 'Confessions' };
+      const labels = { interact: 'Interactions', sao: 'Aventure SAO', confession: 'Confessions', jeux: 'Mini-jeux' };
+      // La catégorie de /config où se trouve l'interrupteur de ce module.
+      const categories = { jeux: '🎲 Mini-jeux' };
       return interaction.reply({
-        content: `⛔ Le **module ${labels[command.guildModule] || command.guildModule}** n'est pas activé sur ce serveur. Un staff peut l'activer via \`/config\` → 🎉 Communauté.`,
+        content: `⛔ Le **module ${labels[command.guildModule] || command.guildModule}** n'est pas activé sur ce serveur. Un staff peut l'activer via \`/config\` → ${categories[command.guildModule] || '🎉 Communauté'}.`,
         flags: MessageFlags.Ephemeral,
       });
     }
