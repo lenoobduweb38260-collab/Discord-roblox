@@ -203,6 +203,14 @@ module.exports = {
       return require('../commands/mariage').handleButton(interaction);
     }
 
+    // ----- Niveaux : pages du classement et des récompenses, confirmation
+    // de /xp reset-serveur. L'interrupteur du module est revérifié dans le
+    // gestionnaire : un vieux bouton ne doit pas le contourner.
+    if (interaction.isButton() && interaction.customId?.startsWith('niv:')) {
+      if (!interaction.inGuild()) return horsServeur(interaction);
+      return require('../commands/niveau').gererBoutonNiveau(interaction);
+    }
+
     // ----- Relecture des confessions signalées (salon QG du staff du bot) -----
     if (interaction.isButton() && interaction.customId.startsWith('cfs:')) {
       if (!interaction.inGuild()) return horsServeur(interaction);

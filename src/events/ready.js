@@ -1,6 +1,5 @@
 const { Events } = require('discord.js');
-const { getGuildConfig } = require('../database');
-const { addXp, announceLevelUp } = require('../utils/levels');
+const { distribuerXpVocale } = require('../utils/levels');
 
 module.exports = {
   name: Events.ClientReady,
@@ -64,17 +63,13 @@ module.exports = {
       console.warn(`⚠️ Annonces des anniversaires de mariage non démarrées : ${err.message}`);
     }
 
-    // XP vocal : chaque minute, chaque membre connecté en vocal (non muet
-    // serveur, hors salon AFK, hors bots) gagne l'XP vocal configuré.
+    // 🎙️ XP vocale : chaque minute, chaque membre en vocal gagne l'XP
+    // vocale du serveur — hors salon AFK et bots, et (sauf réglage contraire)
+    // ni muet ni sourd, ni seul humain dans son salon. Le détail vit dans
+    // levels.distribuerXpVocale.
     setInterval(() => {
       for (const guild of client.guilds.cache.values()) {
-        const cfg = getGuildConfig(guild.id);
-        for (const vs of guild.voiceStates.cache.values()) {
-          if (!vs.channelId || vs.channelId === guild.afkChannelId) continue;
-          if (!vs.member || vs.member.user.bot || vs.deaf) continue;
-          const { leveledUp, newLevel } = addXp(guild.id, vs.member.id, 'voice', cfg.xp_voice);
-          if (leveledUp) announceLevelUp(guild, vs.member.id, 'voice', newLevel);
-        }
+        distribuerXpVocale(guild).catch((err) => console.warn(`⚠️ XP vocale (${guild.id}) : ${err.message}`));
       }
     }, 60_000);
   },

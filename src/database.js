@@ -754,6 +754,26 @@ for (const column of [
   'mariage_bisou_xp INTEGER',
   'mariage_actif_minutes INTEGER',
   'mariage_salon_id TEXT',
+  // 📈 XP & niveaux : gains, anti-AFK, multiplicateurs, courbe, annonces.
+  // NULL partout = le comportement d'avant (lire avec `cfg.x ?? défaut`).
+  'xp_text_min INTEGER',                // XP texte aléatoire : borne basse (NULL = xp_text)
+  'xp_text_max INTEGER',                // … borne haute (NULL = xp_text)
+  'xp_longueur_min INTEGER',            // signes minimum d'un message pour gagner (0)
+  'xp_vocal_seul INTEGER',              // 1 = XP même seul humain dans le salon (0)
+  'xp_vocal_muet INTEGER',              // 1 = XP même muet ou sourd (0)
+  'xp_mult_cumul INTEGER',              // 1 = multiplicateurs de rôles cumulés, 0 = le plus haut rôle
+  'xp_mult_global INTEGER',             // multiplicateur global en % (100)
+  'xp_boost_pourcent INTEGER',          // bonus temporaire en % (0)
+  'xp_boost_fin TEXT',                  // fin du bonus temporaire (ISO, vide = sans fin)
+  'xp_weekend_pourcent INTEGER',        // bonus du samedi et du dimanche, heure de Paris (0)
+  'xp_sao_pourcent INTEGER',            // part de l'XP SAO versée au niveau du serveur (100)
+  'xp_courbe TEXT',                     // 'mee6' (défaut) | 'douce' | 'raide' | 'lineaire'
+  'xp_niveau_max INTEGER',              // niveau maximum (0 = aucun)
+  'level_annonce TEXT',                 // 'salon' | 'ici' | 'mp' | 'off' (NULL = salon s'il existe)
+  'level_message TEXT',                 // modèle de l'annonce, avec balises et variables
+  'level_annonce_pas INTEGER',          // n'annoncer que tous les N niveaux (1)
+  'level_mention INTEGER',              // 1 = l'annonce mentionne le membre (1)
+  'level_reset_depart INTEGER',         // 1 = effacer l'XP d'un membre qui quitte (0)
 ]) {
   try {
     db.exec(`ALTER TABLE guild_config ADD COLUMN ${column}`);
@@ -848,29 +868,94 @@ try {
   }
   if (nouvelleColonne) {
     try {
-      // Le total des deux compteurs devient l'XP unique. Le niveau qui en
-      // découle est recalculé juste après, à la même courbe.
+      // Le total des deux compteurs devient l'XP unique.
+      //
+      // Le niveau qui en découle n'est PAS calculé ici : la courbe vit dans
+      // src/utils/levels.js, et elle est réglable par serveur. Une deuxième
+      // copie de la formule finirait par diverger de la vraie. On laisse donc
+      // une consigne, que levels.js exécute à son chargement — avec la courbe
+      // de chaque serveur.
       db.exec('UPDATE levels SET xp = COALESCE(text_xp, 0) + COALESCE(voice_xp, 0)');
-      const xpForLevel = (n) => 5 * n * n + 50 * n + 100;
-      const niveauDe = (xp) => {
-        let level = 0;
-        let reste = xp;
-        while (reste >= xpForLevel(level)) {
-          reste -= xpForLevel(level);
-          level++;
-        }
-        return level;
-      };
-      const maj = db.prepare('UPDATE levels SET level = ? WHERE guild_id = ? AND user_id = ?');
-      const tous = db.prepare('SELECT guild_id, user_id, xp FROM levels').all();
-      const lot = db.transaction((lignes) => {
-        for (const l of lignes) maj.run(niveauDe(l.xp || 0), l.guild_id, l.user_id);
-      });
-      lot(tous);
-      if (tous.length) console.log(`📊 Niveaux fusionnés : ${tous.length} membre(s) repris (écrit + vocal → un seul niveau).`);
+      db.prepare("INSERT OR REPLACE INTO app_state (key, value) VALUES ('xp_niveaux_a_recalculer', '1')").run();
+      const n = db.prepare('SELECT COUNT(*) AS n FROM levels').get().n;
+      if (n) console.log(`📊 Niveaux fusionnés : ${n} membre(s) repris (écrit + vocal → un seul niveau).`);
     } catch (err) {
       console.warn(`⚠️ Fusion des niveaux : reprise impossible (${err.message}).`);
     }
+  }
+}
+
+// 📈 XP & niveaux, deuxième génération.
+//
+//  • xp_exclusions : salons (catégories et fils compris) et rôles qui ne
+//    rapportent rien — partout, ou seulement à l'écrit, ou seulement en vocal.
+//  • xp_multiplicateurs : un rôle ou un salon qui rapporte plus (ou moins).
+//    100 = normal, 150 = ×1,5, 0 = rien du tout.
+//  • niveau_recompenses : PLUSIEURS récompenses par niveau, de plusieurs
+//    sortes (rôle donné ou retiré, Col et objets SAO, message privé).
+//  • niveau_recompenses_recues : le registre de ce qui a déjà été versé.
+//    Sans lui, l'argent et les objets seraient redonnés à chaque montée de
+//    niveau — le rattrapage rejoue TOUS les paliers atteints.
+db.exec(`
+CREATE TABLE IF NOT EXISTS xp_exclusions (
+  guild_id TEXT NOT NULL,
+  type     TEXT NOT NULL,
+  cible_id TEXT NOT NULL,
+  portee   TEXT NOT NULL DEFAULT 'tout',
+  PRIMARY KEY (guild_id, type, cible_id)
+);
+CREATE TABLE IF NOT EXISTS xp_multiplicateurs (
+  guild_id TEXT NOT NULL,
+  type     TEXT NOT NULL,
+  cible_id TEXT NOT NULL,
+  pourcent INTEGER NOT NULL,
+  PRIMARY KEY (guild_id, type, cible_id)
+);
+CREATE TABLE IF NOT EXISTS niveau_recompenses (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  guild_id   TEXT NOT NULL,
+  niveau     INTEGER NOT NULL,
+  type       TEXT NOT NULL,
+  valeur     TEXT,
+  quantite   INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_niveau_recompenses ON niveau_recompenses (guild_id, niveau);
+CREATE TABLE IF NOT EXISTS niveau_recompenses_recues (
+  guild_id      TEXT NOT NULL,
+  user_id       TEXT NOT NULL,
+  recompense_id INTEGER NOT NULL,
+  at            TEXT,
+  PRIMARY KEY (guild_id, user_id, recompense_id)
+);
+CREATE INDEX IF NOT EXISTS idx_levels_classement ON levels (guild_id, xp DESC);
+`);
+
+// 🚪 Membre parti : il reste dans la table (son XP n'est pas perdue s'il
+// revient), mais le classement ne le montre plus.
+try {
+  db.exec('ALTER TABLE levels ADD COLUMN parti INTEGER NOT NULL DEFAULT 0');
+} catch {}
+
+// 🏅 Reprise UNIQUE des anciennes récompenses (un rôle par niveau) dans la
+// nouvelle table. L'ancienne table reste en place : une migration ne
+// supprime jamais.
+{
+  try {
+    const fait = db.prepare("SELECT value FROM app_state WHERE key = 'niveau_recompenses_v2'").get();
+    if (!fait) {
+      let reprises = 0;
+      db.transaction(() => {
+        reprises = db.prepare(
+          `INSERT INTO niveau_recompenses (guild_id, niveau, type, valeur, quantite, created_at)
+           SELECT guild_id, level, 'role', role_id, 1, COALESCE(created_at, ?) FROM level_rewards ORDER BY guild_id, level`
+        ).run(new Date().toISOString()).changes;
+        db.prepare("INSERT OR REPLACE INTO app_state (key, value) VALUES ('niveau_recompenses_v2', '1')").run();
+      })();
+      if (reprises) console.log(`🏅 ${reprises} récompense(s) de niveau reprise(s) dans le nouveau format.`);
+    }
+  } catch (err) {
+    console.warn(`⚠️ Reprise des récompenses de niveau impossible (${err.message}).`);
   }
 }
 
@@ -1075,6 +1160,24 @@ const DEFAULT_CONFIG = {
   mariage_bisou_xp: 30,
   mariage_actif_minutes: 10,
   mariage_salon_id: null,
+  xp_text_min: null,
+  xp_text_max: null,
+  xp_longueur_min: 0,
+  xp_vocal_seul: 0,
+  xp_vocal_muet: 0,
+  xp_mult_cumul: 0,
+  xp_mult_global: 100,
+  xp_boost_pourcent: 0,
+  xp_boost_fin: null,
+  xp_weekend_pourcent: 0,
+  xp_sao_pourcent: 100,
+  xp_courbe: 'mee6',
+  xp_niveau_max: 0,
+  level_annonce: null,
+  level_message: null,
+  level_annonce_pas: 1,
+  level_mention: 1,
+  level_reset_depart: 0,
 };
 
 const getConfigStmt = db.prepare('SELECT * FROM guild_config WHERE guild_id = ?');
