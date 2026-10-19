@@ -43,6 +43,7 @@
     notesTout: false,    // « Tout le journal » sur la page d'accueil
     pickerOuvert: null,  // sélecteur de rôles dont la liste est dépliée
     pickerRecherche: "", // texte tapé dans ce sélecteur
+    brouillons: {},      // réglages modifiés, pas encore enregistrés, PAR SERVEUR (voir brouillonModule)
     blocks: null,        // blocs en cours d'édition dans le constructeur de page
     previewGrade: null,  // grade simulé (aperçu « qui voit quoi »)
     agentBots: null,     // bots vus chez l'agent (null = pas encore interrogé)
@@ -1244,7 +1245,29 @@
   // On ne touche PAS à p.config : c'est lui qui sert de référence pour savoir
   // ce qui a réellement changé au moment d'enregistrer.
   function cfgCourant() {
-    return { ...(srvParams()?.config || {}), ...(ui.brouillonModule || {}) };
+    return { ...(srvParams()?.config || {}), ...(ui.brouillons[ui.selectedServerId] || {}) };
+  }
+
+  // ✏️ Brouillon d'un module : ce qui est modifié à l'écran mais pas encore
+  // enregistré dans le bot. Il est rangé PAR SERVEUR, et jamais partagé : un
+  // salon ou un rôle choisi sur le serveur A n'existe pas sur le serveur B.
+  // Un brouillon unique survivait au passage par « 📊 Stats » ou par la barre
+  // latérale, et « Enregistrer » écrivait alors chez B les rôles de A.
+  function brouillonModule(serveur = ui.selectedServerId) {
+    return ui.brouillons[serveur] || (ui.brouillons[serveur] = {});
+  }
+  // Oublie le brouillon d'un serveur et referme le sélecteur déplié.
+  function oublierBrouillon(serveur = ui.selectedServerId) {
+    delete ui.brouillons[serveur];
+    ui.pickerOuvert = null;
+    ui.pickerRecherche = "";
+  }
+  // Change de serveur : le brouillon et le sélecteur déplié du précédent ne
+  // le suivent pas.
+  function choisirServeur(id) {
+    if (id !== ui.selectedServerId) oublierBrouillon(ui.selectedServerId);
+    ui.selectedServerId = id;
+    if (id) storage.setItem("aincrad.server", id);
   }
 
   // La couleur d'affichage d'un rôle : la sienne, sauf le #000000 de Discord
@@ -1893,6 +1916,9 @@
   // Chaque clé part séparément : le bot valide chacune, et un refus isolé
   // n'annule pas les autres.
   async function enregistrerModule(form) {
+    // Le serveur est figé au départ : changer de serveur pendant l'envoi ne
+    // doit pas faire partir la suite des réglages chez un autre.
+    const serveur = ui.selectedServerId;
     const p = srvParams();
     if (!p) return;
     const aEnvoyer = [];
@@ -1920,7 +1946,7 @@
     // vit que dans le brouillon, aucun champ du formulaire ne le porte.
     // Sans ce passage, choisir un salon puis « Enregistrer » répondait
     // « rien à enregistrer » et le choix était perdu.
-    const choixBrouillon = ui.brouillonModule || {};
+    const choixBrouillon = ui.brouillons[serveur] || {};
     form.querySelectorAll("[data-picker]").forEach(pk => {
       const cle = pk.dataset.picker;
       if (!(cle in choixBrouillon) || aEnvoyer.some(e => e.cle === cle)) return;
@@ -1938,11 +1964,11 @@
     const echecs = [];
     for (const { cle, valeur } of aEnvoyer) {
       try {
-        await api("serveur.config", { serveur: ui.selectedServerId, cle, valeur });
+        await api("serveur.config", { serveur, cle, valeur });
         p.config[cle] = Array.isArray(valeur) ? JSON.stringify(valeur) : valeur;
       } catch (e) { echecs.push(`${cle} : ${e.message}`); }
     }
-    ui.brouillonModule = {};   // enregistré : le brouillon n'a plus lieu d'être
+    oublierBrouillon(serveur);   // enregistré : le brouillon n'a plus lieu d'être
     render();
     if (echecs.length) toast("ENREGISTREMENT PARTIEL", echecs[0], "error");
     else toast("ENREGISTRÉ DANS LE BOT", `${aEnvoyer.length} réglage(s) appliqué(s) sur Discord.`);
@@ -4103,8 +4129,7 @@ Oy Bot? | https://…/oy.png">${esc(profilsEnTexte(bot.profils))}</textarea>
       bascule.classList.toggle("on");
       // L'aperçu doit suivre l'interrupteur, lui aussi (voir brouillonModule).
       if (bascule.closest('form[data-form="module-bot"]')) {
-        ui.brouillonModule = ui.brouillonModule || {};
-        ui.brouillonModule[bascule.dataset.cfgToggle] = bascule.classList.contains("on") ? 1 : 0;
+        brouillonModule()[bascule.dataset.cfgToggle] = bascule.classList.contains("on") ? 1 : 0;
         render();
       }
       return;
@@ -4170,16 +4195,19 @@ Oy Bot? | https://…/oy.png">${esc(profilsEnTexte(bot.profils))}</textarea>
           navigate(target.dataset.route || "dashboard");
           break;
         case "open-server-stats":
-          ui.selectedServerId = target.dataset.serverId;
-          storage.setItem("aincrad.server", ui.selectedServerId);
+          choisirServeur(target.dataset.serverId);
           ui.module = "overview";
+          oublierBrouillon();
           navigate("server");
           break;
-        case "nav-serveur":
-          if (!ui.selectedServerId) ui.selectedServerId = state.servers?.[0]?.id || null;
-          ui.module = target.dataset.module || "overview";
+        case "nav-serveur": {
+          if (!ui.selectedServerId) choisirServeur(state.servers?.[0]?.id || null);
+          const vers = target.dataset.module || "overview";
+          if (vers !== ui.module) oublierBrouillon();   // autre module : brouillon oublié
+          ui.module = vers;
           navigate("server");
           break;
+        }
         case "activite-tout":
           ui.activiteTout = !ui.activiteTout;
           render();
@@ -4193,15 +4221,15 @@ Oy Bot? | https://…/oy.png">${esc(profilsEnTexte(bot.profils))}</textarea>
         // En simple : le clic sélectionne et referme.
         case "picker-choisir": {
           const cle = target.dataset.cle, id = String(target.dataset.id);
-          ui.brouillonModule = ui.brouillonModule || {};
+          const enCours = brouillonModule();
           if (target.dataset.mode === "multi") {
             const ids = choixCourants(cfgCourant()[cle], true);
             const deja = ids.indexOf(id);
             if (deja >= 0) ids.splice(deja, 1); else ids.push(id);
-            ui.brouillonModule[cle] = JSON.stringify(ids);
+            enCours[cle] = JSON.stringify(ids);
             ui.pickerOuvert = cle;
           } else {
-            ui.brouillonModule[cle] = id;
+            enCours[cle] = id;
             ui.pickerOuvert = null;
             ui.pickerRecherche = "";
           }
@@ -4210,8 +4238,7 @@ Oy Bot? | https://…/oy.png">${esc(profilsEnTexte(bot.profils))}</textarea>
         }
         case "picker-retirer": {
           const cle = target.dataset.cle, id = String(target.dataset.id);
-          ui.brouillonModule = ui.brouillonModule || {};
-          ui.brouillonModule[cle] = target.dataset.mode === "multi"
+          brouillonModule()[cle] = target.dataset.mode === "multi"
             ? JSON.stringify(choixCourants(cfgCourant()[cle], true).filter(x => x !== id))
             : "";
           render();
@@ -4226,15 +4253,14 @@ Oy Bot? | https://…/oy.png">${esc(profilsEnTexte(bot.profils))}</textarea>
           document.querySelector(".sidebar")?.classList.toggle("open", ui.mobileOpen);
           break;
         case "open-server":
-          ui.selectedServerId = target.dataset.serverId;
-          storage.setItem("aincrad.server", ui.selectedServerId);
+          choisirServeur(target.dataset.serverId);
           ui.module = "overview";
-          ui.brouillonModule = {};
+          oublierBrouillon();
           navigate("server");
           break;
         case "select-module":
           ui.module = target.dataset.module || "overview";
-          ui.brouillonModule = {};   // on change de module : brouillon oublié
+          oublierBrouillon();   // on change de module : brouillon oublié
           render();
           break;
         case "toggle-input": {
@@ -5229,8 +5255,7 @@ Oy Bot? | https://…/oy.png">${esc(profilsEnTexte(bot.profils))}</textarea>
     // « ancien » et « nouveau » au moment d'enregistrer ne verrait plus rien
     // changer, et plus rien ne partirait dans le bot.
     if (target.matches("[data-cfg]") && target.closest('form[data-form="module-bot"]')) {
-      ui.brouillonModule = ui.brouillonModule || {};
-      ui.brouillonModule[target.dataset.cfg] = target.multiple
+      brouillonModule()[target.dataset.cfg] = target.multiple
         ? JSON.stringify([...target.selectedOptions].map(o => o.value).filter(Boolean))
         : target.value;
       render();

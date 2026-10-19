@@ -1,32 +1,49 @@
 const { SlashCommandBuilder, EmbedBuilder, AttachmentBuilder, MessageFlags } = require('discord.js');
 const { GRADES } = require('../utils/permissions');
 const { repondreVite } = require('../utils/reponse');
-const { planAmour, fabriquer } = require('../utils/imageAmour');
+const { planAmour, fabriquer, nomDessinable } = require('../utils/imageAmour');
 
 // 💘 /lc — le calculateur d'amour.
 //
 // Le pourcentage est tiré au hasard, mais FIGÉ pour un même duo jusqu'à
-// minuit : relancer la commande dix fois de suite pour obtenir 100 % ne
+// minuit UTC : relancer la commande dix fois de suite pour obtenir 100 % ne
 // marche pas, et deux personnes qui comparent voient le même chiffre. Sans
 // membre choisi, le partenaire est tiré au sort parmi les membres humains.
 
 const COULEUR = 0xff6b81;
 
-// Hachage FNV-1a : rapide, stable, assez bien réparti pour un jeu.
+// Hachage FNV-1a, puis le brassage final de murmur3.
+//
+// ⚠️ Le brassage n'est pas décoratif. Le jour est haché EN DERNIER, et le
+// multiplicateur FNV vaut 4 modulo 101 : sans ce mélange, le score d'un duo
+// ne bougeait que de ±4, ±12, ±20 ou ±28 d'un jour à l'autre (±4 six fois
+// sur dix). Un couple devinait son score du lendemain.
 function hacher(texte) {
   let h = 0x811c9dc5;
   for (let i = 0; i < texte.length; i++) {
     h ^= texte.charCodeAt(i);
     h = Math.imul(h, 0x01000193) >>> 0;
   }
+  h ^= h >>> 16;
+  h = Math.imul(h, 0x85ebca6b);
+  h ^= h >>> 13;
+  h = Math.imul(h, 0xc2b2ae35);
+  h ^= h >>> 16;
   return h >>> 0;
 }
 
-// 0 à 100, identique pour (A, B) et (B, A) le même jour.
+// 0 à 100, identique pour (A, B) et (B, A) le même jour (UTC).
 function pourcentageDuJour(idA, idB, date = new Date()) {
   const jour = date.toISOString().slice(0, 10);
   const [x, y] = [String(idA), String(idB)].sort();
   return hacher(`${x}:${y}:${jour}`) % 101;
+}
+
+// Fin du tirage : minuit UTC suivant, en secondes pour un horodatage Discord.
+// Écrire « jusqu'à minuit » mentait d'une à deux heures en France (et dans
+// toute langue hors UTC) : `<t:…:t>` affiche l'heure exacte à chaque lecteur.
+function finDuJour(date = new Date()) {
+  return Math.floor(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate() + 1) / 1000);
 }
 
 const VERDICTS = [
@@ -45,15 +62,33 @@ function nom(interaction, user) {
   return membre?.displayName || user.displayName || user.globalName || user.username;
 }
 
-// Un membre humain au hasard, autre que l'auteur. On complète le cache par
-// un chargement des membres si le serveur paraît vide (cache froid).
+// Serveurs dont la liste complète des membres a déjà été demandée depuis le
+// démarrage. Une fois suffit : ensuite, les arrivées et les départs tiennent
+// le cache à jour (intention GuildMembers). La redemander à chaque /lc
+// renverrait la même requête lourde à Discord pour rien.
+const membresCharges = new Set();
+
+// Un membre humain au hasard, autre que l'auteur, parmi TOUS les membres.
+//
+// Après un redémarrage, le cache ne contient que les membres vus depuis
+// (messages, interactions, vocal). Tirer dedans ne sortait que les deux ou
+// trois mêmes personnes, alors que la carte annonce « parmi les membres du
+// serveur ». Un cache nettement plus petit que le serveur est donc complété,
+// une fois par serveur, et jamais plus de 1,2 s d'attente : Discord n'accorde
+// que trois secondes pour répondre. Un chargement plus long se termine en
+// arrière-plan et profite au tirage suivant.
 async function membreAuHasard(interaction) {
-  const humains = () => [...(interaction.guild?.members?.cache?.values?.() || [])]
+  const guild = interaction.guild;
+  const cache = guild?.members?.cache;
+  const humains = () => [...(cache?.values?.() || [])]
     .filter((m) => !m.user?.bot && m.id !== interaction.user.id);
   let candidats = humains();
-  if (candidats.length < 2 && interaction.guild?.members?.fetch) {
+  const incomplet = (cache?.size || 0) < (Number(guild?.memberCount) || 0) * 0.9;
+  if ((incomplet || candidats.length < 2) && guild?.members?.fetch && !membresCharges.has(guild.id)) {
+    membresCharges.add(guild.id);
     await Promise.race([
-      interaction.guild.members.fetch().catch(() => null),
+      // Échec (intention absente, coupure) : on pourra réessayer plus tard.
+      Promise.resolve().then(() => guild.members.fetch()).catch(() => { membresCharges.delete(guild.id); }),
       new Promise((r) => setTimeout(r, 1200)),
     ]);
     candidats = humains();
@@ -62,18 +97,21 @@ async function membreAuHasard(interaction) {
   return candidats[Math.floor(Math.random() * candidats.length)].user;
 }
 
-async function carteLc(interaction, auteur, cible, auHasard) {
-  const pourcentage = pourcentageDuJour(auteur.id, cible.id);
+async function carteLc(interaction, auteur, cible, auHasard, maintenant = new Date()) {
+  const pourcentage = pourcentageDuJour(auteur.id, cible.id, maintenant);
   const nomA = nom(interaction, auteur);
   const nomB = nom(interaction, cible);
-  const png = await fabriquer(planAmour({ pourcentage, nomA, nomB }), [auteur, cible]).catch(() => null);
+  // Dans l'image, un nom que la police ne sait pas écrire (cyrillique,
+  // idéogrammes…) laisse la place à l'identifiant du compte.
+  const plan = planAmour({ pourcentage, nomA: nomDessinable(nomA, auteur), nomB: nomDessinable(nomB, cible) });
+  const png = await fabriquer(plan, [auteur, cible]).catch(() => null);
   const lignes = [
     `**${nomA}** 💞 **${nomB}**`,
     `## ${pourcentage} %`,
     verdict(pourcentage),
   ];
   if (auHasard) lignes.push('-# 🎲 Partenaire tiré au sort parmi les membres du serveur');
-  lignes.push('-# 📅 Même duo, même résultat jusqu\'à minuit');
+  lignes.push(`-# 📅 Même duo, même résultat jusqu'à <t:${finDuJour(maintenant)}:t>`);
   const embed = new EmbedBuilder().setColor(COULEUR).setTitle('💘 Calculateur d\'amour').setDescription(lignes.join('\n'));
   const payload = { embeds: [embed] };
   if (png) {
@@ -90,7 +128,7 @@ module.exports = {
   grade: GRADES.EVERYONE,
   public: true,
   guildModule: 'interact', // comme /interact : activable dans /config → 🎉 Communauté
-  pourcentageDuJour, verdict, membreAuHasard, carteLc,
+  pourcentageDuJour, finDuJour, verdict, membreAuHasard, carteLc,
   data: new SlashCommandBuilder()
     .setName('lc')
     .setDescription('Calculateur d\'amour : votre compatibilité avec un membre 💘')

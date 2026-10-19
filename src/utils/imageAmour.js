@@ -190,11 +190,30 @@ const POLICE = {
 const LARGEUR_GLYPHE = 6; // 5 colonnes + 1 d'espace
 const HAUTEUR_GLYPHE = 7;
 
+// Lettres qu'aucune décomposition Unicode ne ramène à l'ASCII : sans cette
+// table, « Łukasz » devenait « UKASZ », « Æsir » « SIR », et un pseudo
+// cyrillique tout entier « MEMBRE ». Clés en MAJUSCULES : la table passe
+// après toUpperCase().
+const TRANSLITTERATION = {
+  Ł: 'L', Ø: 'O', Æ: 'AE', Œ: 'OE', Đ: 'D', Ð: 'D', Þ: 'TH', ß: 'SS', ẞ: 'SS', Ħ: 'H', Ŧ: 'T', Ŋ: 'NG',
+  // Cyrillique, translittération courante (russe, ukrainien, serbe…).
+  А: 'A', Б: 'B', В: 'V', Г: 'G', Ґ: 'G', Д: 'D', Ђ: 'DJ', Е: 'E', Ё: 'E', Є: 'YE', Ж: 'ZH', З: 'Z',
+  И: 'I', І: 'I', Ї: 'YI', Й: 'Y', Ј: 'J', К: 'K', Л: 'L', Љ: 'LJ', М: 'M', Н: 'N', Њ: 'NJ', О: 'O',
+  П: 'P', Р: 'R', С: 'S', Т: 'T', Ћ: 'C', У: 'U', Ў: 'U', Ф: 'F', Х: 'KH', Ц: 'TS', Ч: 'CH', Џ: 'DZ',
+  Ш: 'SH', Щ: 'SHCH', Ъ: '', Ы: 'Y', Ь: '', Э: 'E', Ю: 'YU', Я: 'YA',
+};
+
 // Le texte que la police sait écrire : ASCII majuscule, le reste retiré.
+//
+// NFKD et non NFD : seule la décomposition « de compatibilité » ramène les
+// lettres décorées des pseudos (𝓐𝓵𝓲𝓬𝓮, Ａｌｉｃｅ, ⓐⓛⓘⓒⓔ) à « ALICE ». Avec NFD,
+// elles disparaissaient et l'image affichait « MEMBRE ».
 function texteDessinable(brut) {
-  return String(brut || '')
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
+  return [...String(brut || '').toUpperCase()]
+    .map((c) => TRANSLITTERATION[c] ?? c)
+    .join('')
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
     .toUpperCase()
     .split('')
     .filter((c) => POLICE[c])
@@ -202,6 +221,16 @@ function texteDessinable(brut) {
     .replace(/\s+/g, ' ')
     .trim();
 }
+
+// Le nom à écrire sous un avatar : le nom affiché s'il en reste quelque
+// chose une fois ramené à l'ASCII, sinon l'identifiant du compte (en
+// [a-z0-9_.] depuis la refonte des pseudos Discord). Si même lui ne donne
+// rien, le plan écrit « MEMBRE ».
+function nomDessinable(nomAffiche, user) {
+  if (texteDessinable(nomAffiche)) return nomAffiche;
+  return texteDessinable(user?.username) ? user.username : nomAffiche;
+}
+
 const largeurTexte = (texte, echelle) => Math.max(0, texte.length * LARGEUR_GLYPHE * echelle - echelle);
 function tronquer(texte, echelle, largeurMax) {
   const max = Math.max(1, Math.floor((largeurMax + echelle) / (LARGEUR_GLYPHE * echelle)));
@@ -550,5 +579,5 @@ async function fabriquer(plan, users = []) {
 
 module.exports = {
   planAmour, planMariage, dessiner, fabriquer, encoderPng, decoderPng,
-  texteDessinable, tronquer, Toile, POLICE, LARGEUR, HAUTEUR,
+  texteDessinable, nomDessinable, tronquer, Toile, POLICE, LARGEUR, HAUTEUR,
 };

@@ -7,6 +7,160 @@ const path = require('path');
 // dashboard et le créateur d'embed de l'interface développeur. Le port est
 // écrit dans api.port à côté de l'exécutable pour que le gestionnaire le trouve.
 
+// Clés de configuration modifiables depuis le dashboard
+// ('s' = id, 'n' = nombre, 'b' = booléen, 't' = texte, 'j' = liste d'IDs).
+const CONFIG_KEYS = {
+  staff_role_id: 's',
+  admin_role_id: 's',
+  staff_role_ids: 'j',
+  admin_role_ids: 'j',
+  service_role_id: 's',
+  log_channel_id: 's',
+  level_channel_id: 's',
+  service_channel_id: 's',
+  staff_channel_id: 's',
+  member_channel_id: 's',
+  update_channel_id: 's',
+  proof_channel_id: 's',
+  welcome_message: 't',
+  goodbye_message: 't',
+  welcome_mention: 'b',
+  rp_enabled: 'b',
+  rp_locked: 'b',
+  xp_text: 'n',
+  xp_voice: 'n',
+  xp_cooldown: 'n',
+  // ----- Réglables depuis le site : TOUS les modules -----
+  // Salons
+  goodbye_channel_id: 's',
+  patch_channel_id: 's',
+  patch_mention: 's',
+  partner_channel_id: 's',
+  captcha_channel_id: 's',
+  ticket_transcript_channel_id: 's',
+  // Rôles
+  police_role_ids: 'j',
+  wlrp_role_id: 's',
+  verified_role_id: 's',
+  captcha_role_remove: 's',
+  autorole_role_ids: 'j',
+  // Captcha : nombre d'erreurs tolérées, puis expulsion
+  captcha_max_essais: 'n',
+  captcha_kick: 'b',
+  // Interrupteurs de module
+  levels_enabled: 'b',
+  antispam_enabled: 'b',
+  antispam_exempt_channels: 'j',
+  antispam_exempt_categories: 'j',
+  antispam_exempt_filtre: 'b',
+  antinuke_enabled: 'b',
+  captcha_enabled: 'b',
+  interact_enabled: 'b',
+  confession_enabled: 'b',
+  confession_channel_id: 's',
+  sao_enabled: 'b',
+  // Apparence des arrivées / départs
+  welcome_color: 's',
+  welcome_image: 's',
+  welcome_avatar: 's',
+  welcome_title: 't',
+  // Identité visuelle des embeds
+  embed_style: 'b',
+  embed_accent: 's',
+  embed_footer: 'b',
+  embed_author: 'b',
+  embed_ligne: 'b',
+  embed_filet_taille: 'n',
+  embed_fusion: 'b',
+  embed_cartes: 'b',
+  embed_bordure: 's',
+  embed_titre: 's',
+  embed_banniere: 's',
+  embed_timestamp: 'b',
+  embed_force_color: 'b',
+  welcome_style: 's',
+  welcome_rules_channel_id: 's',
+  welcome_help_channel_id: 's',
+  welcome_banner: 'b',
+  welcome_banner_color: 's',
+  welcome_fields: 'b',
+  goodbye_color: 's',
+  goodbye_image: 's',
+  goodbye_avatar: 's',
+  goodbye_title: 't',
+  goodbye_fields: 'b',
+  level_image_url: 's',
+  // 🪪 Identité du bot par serveur — appliquées à Discord à l'écriture
+  // (voir plus bas), pas seulement enregistrées.
+  bot_nick: 's',
+  bot_avatar_url: 's',
+  bot_profil: 's',
+};
+
+// 🔒 Les réglages qui désignent un salon, une catégorie ou un rôle.
+//
+// Le dashboard ne propose que ceux du serveur, mais l'API ne doit pas le
+// croire sur parole : le site sert plusieurs serveurs, et quiconque gère le
+// serveur B peut lui envoyer n'importe quelle valeur. Un salon du serveur A
+// enregistré chez B faisait écrire le bot chez A — confessions anonymes
+// comprises, que tout membre de B peut envoyer.
+//
+// Le genre se lit dans le NOM de la clé : une clé ajoutée demain est couverte
+// sans y penser, et un test vérifie qu'aucune n'échappe à la règle.
+function genreReference(cle) {
+  if (/_category_id$|_categories$/.test(cle)) return 'categorie';
+  if (/_channel_id$|_channels$/.test(cle)) return 'salon';
+  if (/_role_ids?$|_role_remove$/.test(cle) || cle === 'patch_mention') return 'role';
+  return null;
+}
+// `patch_mention` accepte aussi ces valeurs, qui ne sont pas des rôles.
+const MENTIONS_SPECIALES = new Set(['everyone', 'here', 'aucune']);
+// Sans identifiant lisible (un objet à la place d'un texte), « demandé ».
+const REFUS_REFERENCE = {
+  salon: (id) => `Le salon ${id || 'demandé'} n'est pas un salon de ce serveur (supprimé, ou d'un autre serveur) : choisissez-en un dans la liste.`,
+  categorie: (id) => `La catégorie ${id || 'demandée'} n'est pas une catégorie de ce serveur (supprimée, ou d'un autre serveur) : choisissez-en une dans la liste.`,
+  role: (id) => `Le rôle ${id || 'demandé'} n'est pas un rôle de ce serveur (supprimé, ou d'un autre serveur) : choisissez-en un dans la liste.`,
+};
+
+const idsDe = (v) => {
+  if (v === null || v === undefined || v === '') return [];
+  if (Array.isArray(v)) return v.map(String);
+  try {
+    const l = JSON.parse(v);
+    if (Array.isArray(l)) return l.map(String);
+  } catch {}
+  return [String(v)];
+};
+
+// Vérifie qu'un réglage désigne bien un salon, une catégorie ou un rôle DU
+// serveur visé. Rend `{ valeur }` (la valeur à enregistrer) ou `{ erreur }`.
+//
+// - null (retrait du réglage) passe toujours ;
+// - une clé simple étrangère au serveur est refusée ;
+// - dans une liste, un identifiant NOUVEAU étranger au serveur est refusé.
+//   Celui qui y figurait déjà mais a disparu depuis (salon ou rôle supprimé)
+//   n'est pas une erreur de la personne : il est retiré sans bloquer
+//   l'enregistrement — sinon un rôle supprimé interdirait de toucher à la
+//   liste tant qu'on ne l'a pas repéré.
+function verifierReference(guild, cle, valeur, avant = null) {
+  const genre = genreReference(cle);
+  if (!genre || valeur === null || valeur === undefined || valeur === '') return { valeur };
+  const cache = genre === 'role' ? guild?.roles?.cache : guild?.channels?.cache;
+  const existe = (id) => Boolean(cache?.has?.(id));
+  if (CONFIG_KEYS[cle] === 'j') {
+    const ids = idsDe(valeur);
+    const anciens = new Set(idsDe(avant));
+    const intrus = ids.find((id) => !existe(id) && !anciens.has(id));
+    if (intrus) return { erreur: REFUS_REFERENCE[genre](intrus) };
+    const gardes = ids.filter(existe);
+    return { valeur: gardes.length ? JSON.stringify(gardes) : null };
+  }
+  const id = ['string', 'number'].includes(typeof valeur) ? String(valeur).trim() : '';
+  if (cle === 'patch_mention' && MENTIONS_SPECIALES.has(id)) return { valeur: id };
+  if (!existe(id)) return { erreur: REFUS_REFERENCE[genre](id) };
+  return { valeur: id };
+}
+
 function startManagedApi(client, baseDir) {
   const { EmbedBuilder, ChannelType } = require('discord.js');
   const { db, getGuildConfig, setGuildConfig, RP_SCOPE } = require('./database');
@@ -49,95 +203,6 @@ function startManagedApi(client, baseDir) {
     'INSERT INTO ticket_panels (guild_id, channel_id, message_id, options, webhook_id, webhook_token) VALUES (?, ?, ?, ?, ?, ?)'
   );
 
-  // Clés de configuration modifiables depuis le dashboard
-  // ('s' = id, 'n' = nombre, 'b' = booléen, 't' = texte, 'j' = liste d'IDs).
-  const CONFIG_KEYS = {
-    staff_role_id: 's',
-    admin_role_id: 's',
-    staff_role_ids: 'j',
-    admin_role_ids: 'j',
-    service_role_id: 's',
-    log_channel_id: 's',
-    level_channel_id: 's',
-    service_channel_id: 's',
-    staff_channel_id: 's',
-    member_channel_id: 's',
-    update_channel_id: 's',
-    proof_channel_id: 's',
-    welcome_message: 't',
-    goodbye_message: 't',
-    welcome_mention: 'b',
-    rp_enabled: 'b',
-    rp_locked: 'b',
-    xp_text: 'n',
-    xp_voice: 'n',
-    xp_cooldown: 'n',
-    // ----- Réglables depuis le site : TOUS les modules -----
-    // Salons
-    goodbye_channel_id: 's',
-    patch_channel_id: 's',
-    patch_mention: 's',
-    partner_channel_id: 's',
-    captcha_channel_id: 's',
-    ticket_transcript_channel_id: 's',
-    // Rôles
-    police_role_ids: 'j',
-    wlrp_role_id: 's',
-    verified_role_id: 's',
-    captcha_role_remove: 's',
-    autorole_role_ids: 'j',
-    // Captcha : nombre d'erreurs tolérées, puis expulsion
-    captcha_max_essais: 'n',
-    captcha_kick: 'b',
-    // Interrupteurs de module
-    levels_enabled: 'b',
-    antispam_enabled: 'b',
-    antispam_exempt_channels: 'j',
-    antispam_exempt_categories: 'j',
-    antispam_exempt_filtre: 'b',
-    antinuke_enabled: 'b',
-    captcha_enabled: 'b',
-    interact_enabled: 'b',
-    confession_enabled: 'b',
-    confession_channel_id: 's',
-    sao_enabled: 'b',
-    // Apparence des arrivées / départs
-    welcome_color: 's',
-    welcome_image: 's',
-    welcome_avatar: 's',
-    welcome_title: 't',
-    // Identité visuelle des embeds
-    embed_style: 'b',
-    embed_accent: 's',
-    embed_footer: 'b',
-    embed_author: 'b',
-    embed_ligne: 'b',
-    embed_filet_taille: 'n',
-    embed_fusion: 'b',
-    embed_cartes: 'b',
-    embed_bordure: 's',
-    embed_titre: 's',
-    embed_banniere: 's',
-    embed_timestamp: 'b',
-    embed_force_color: 'b',
-    welcome_style: 's',
-    welcome_rules_channel_id: 's',
-    welcome_help_channel_id: 's',
-    welcome_banner: 'b',
-    welcome_banner_color: 's',
-    welcome_fields: 'b',
-    goodbye_color: 's',
-    goodbye_image: 's',
-    goodbye_avatar: 's',
-    goodbye_title: 't',
-    goodbye_fields: 'b',
-    level_image_url: 's',
-    // 🪪 Identité du bot par serveur — appliquées à Discord à l'écriture
-    // (voir plus bas), pas seulement enregistrées.
-    bot_nick: 's',
-    bot_avatar_url: 's',
-    bot_profil: 's',
-  };
   const NUM_LIMITS = {
     xp_text: [1, 1000], xp_voice: [1, 1000], xp_cooldown: [5, 3600],
     captcha_max_essais: [1, 10],
@@ -432,7 +497,10 @@ function startManagedApi(client, baseDir) {
         const rawRoleIds = Array.isArray(body.supportRoleIds)
           ? body.supportRoleIds
           : (body.supportRoleId ? [body.supportRoleId] : []);
-        const roleIds = [...new Set(rawRoleIds.map(String).filter((id) => guild.roles.cache.has(id)))];
+        const demandes = rawRoleIds.map((v) => String(v ?? '').trim()).filter(Boolean);
+        const etranger = demandes.find((id) => !guild.roles.cache.has(id));
+        if (etranger) return send(400, { error: REFUS_REFERENCE.role(etranger) });
+        const roleIds = [...new Set(demandes)];
         const description = String(body.description || '').trim().slice(0, 100) || null;
         insertTicketType.run(
           guild.id, label, String(body.emoji || '').trim() || null, category.id,
@@ -851,6 +919,12 @@ function startManagedApi(client, baseDir) {
           // tout un serveur, d'où un plafond plus large sur ces clés-là.
           value = ids.length ? JSON.stringify(ids.slice(0, LIST_LIMITS[key] || 10)) : null;
         }
+        // 🔒 Un salon, une catégorie ou un rôle : de CE serveur, rien d'autre.
+        const reference = verifierReference(
+          client.guilds.cache.get(body.guildId), key, value, getGuildConfig(body.guildId)[key]
+        );
+        if (reference.erreur) return send(400, { error: reference.erreur });
+        value = reference.valeur;
         // 🪪 Nom / photo / profil du bot : on l'applique à Discord d'abord —
         // enregistrer une photo que Discord refuse mentirait au dashboard.
         if (key === 'bot_nick' || key === 'bot_avatar_url' || key === 'bot_profil') {
@@ -1029,7 +1103,14 @@ function startManagedApi(client, baseDir) {
             } else if (/^\d{15,25}$/.test(String(b.role || '').trim())) {
               // 🎭 Bouton qui donne un rôle. L'identifiant du composant PORTE
               // le rôle : le clic est traité sans rien relire en base, donc
-              // sans rien à perdre si le bot redémarre.
+              // sans rien à perdre si le bot redémarre. Un rôle d'un autre
+              // serveur ne pourrait jamais être donné ici : refusé.
+              if (!guild.roles.cache.has(String(b.role).trim())) {
+                return send(400, {
+                  error: `Le bouton « ${String(b.label).slice(0, 40)} » donne un rôle qui n'existe pas sur ce serveur : `
+                    + 'choisissez un rôle de ce serveur dans la liste.',
+                });
+              }
               bouton.setStyle(STYLES[b.style] || ButtonStyle.Secondary)
                 .setCustomId(`rr:${String(b.role).trim()}`);
             } else {
@@ -1056,6 +1137,13 @@ function startManagedApi(client, baseDir) {
             return send(400, {
               error: `L'option « ${String(sansRole.label).slice(0, 40)} » du menu ne fait rien : choisissez le rôle `
                 + 'qu\'elle doit donner. Une option sans action affiche « Échec de l\'interaction ».',
+            });
+          }
+          const etrangere = options.find((o) => !guild.roles.cache.has(String(o.role).trim()));
+          if (etrangere) {
+            return send(400, {
+              error: `L'option « ${String(etrangere.label).slice(0, 40)} » du menu donne un rôle qui n'existe pas sur ce serveur : `
+                + 'choisissez un rôle de ce serveur dans la liste.',
             });
           }
           const menu = new StringSelectMenuBuilder()
@@ -1111,4 +1199,4 @@ function startManagedApi(client, baseDir) {
   });
 }
 
-module.exports = { startManagedApi };
+module.exports = { startManagedApi, CONFIG_KEYS, genreReference, verifierReference };

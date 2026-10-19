@@ -4,7 +4,7 @@ const {
 const { db } = require('../database');
 const { GRADES } = require('../utils/permissions');
 const { mettreAJour, suivre } = require('../utils/reponse');
-const { planMariage, fabriquer } = require('../utils/imageAmour');
+const { planMariage, fabriquer, nomDessinable } = require('../utils/imageAmour');
 
 // 💍 /mariage — demander, accepter, divorcer.
 //
@@ -80,6 +80,25 @@ async function gifMariage() {
   return r?.url ? { url: r.url, giphy: true } : null;
 }
 
+// La date écrite DANS l'image des alliances. Des pixels ne suivent pas le
+// fuseau de chaque lecteur, contrairement au `<t:…:D>` de la description :
+// on l'écrit à l'heure du bot (TZ) ou, à défaut, à l'heure de Paris. En UTC,
+// une union conclue entre minuit et 2 h (heure de Paris) portait dans
+// l'image la date de la veille, et la carte affichait deux dates.
+const FUSEAU_DEFAUT = 'Europe/Paris';
+function dateDuMariage(depuis) {
+  const options = { day: '2-digit', month: '2-digit', year: 'numeric' };
+  let format;
+  try {
+    format = new Intl.DateTimeFormat('fr-FR', { ...options, timeZone: process.env.TZ || FUSEAU_DEFAUT });
+  } catch {
+    // TZ au format POSIX (« UTC0 », « :/etc/localtime ») : Intl le refuse.
+    format = new Intl.DateTimeFormat('fr-FR', { ...options, timeZone: FUSEAU_DEFAUT });
+  }
+  const p = Object.fromEntries(format.formatToParts(new Date(depuis)).map((x) => [x.type, x.value]));
+  return `${p.day}.${p.month}.${p.year}`;
+}
+
 // La carte des jeunes mariés : GIF si possible, sinon l'image des alliances.
 async function carteMariage(interaction, userA, userB, depuis) {
   const nomA = nom(interaction, userA.id, userA);
@@ -96,9 +115,10 @@ async function carteMariage(interaction, userA, userB, depuis) {
     if (gif.giphy) embed.setFooter({ text: 'Powered by GIPHY' });
     return payload;
   }
-  const date = new Date(depuis);
-  const jour = `${String(date.getUTCDate()).padStart(2, '0')}.${String(date.getUTCMonth() + 1).padStart(2, '0')}.${date.getUTCFullYear()}`;
-  const png = await fabriquer(planMariage({ nomA, nomB, date: jour }), [userA, userB]).catch(() => null);
+  // Un nom que la police de l'image ne sait pas écrire laisse la place à
+  // l'identifiant du compte.
+  const plan = planMariage({ nomA: nomDessinable(nomA, userA), nomB: nomDessinable(nomB, userB), date: dateDuMariage(depuis) });
+  const png = await fabriquer(plan, [userA, userB]).catch(() => null);
   if (png) {
     embed.setImage('attachment://mariage.png');
     payload.files = [new AttachmentBuilder(png, { name: 'mariage.png' })];
@@ -117,7 +137,7 @@ module.exports = {
   grade: GRADES.EVERYONE,
   public: true,
   guildModule: 'interact', // comme /interact : activable dans /config → 🎉 Communauté
-  mariageDe, gifMariage, carteMariage, EXPIRATION,
+  mariageDe, gifMariage, carteMariage, dateDuMariage, EXPIRATION,
   data: new SlashCommandBuilder()
     .setName('mariage')
     .setDescription('Demander quelqu\'un en mariage, voir un couple, divorcer 💍')
