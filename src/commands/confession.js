@@ -1,6 +1,7 @@
 const { SlashCommandBuilder } = require('discord.js');
 const { GRADES } = require('../utils/permissions');
 const C = require('../utils/confessions');
+const { repondreVite } = require('../utils/reponse');
 
 // 💌 /confession — une confession anonyme.
 //
@@ -40,35 +41,44 @@ module.exports = {
     if (!texte) return interaction.reply({ content: '✍️ Ta confession est vide : écris quelque chose.' });
     derniere.set(cle, Date.now());
 
-    const { categories } = C.detecter(texte);
-    const aide = categories.includes('suicide') ? AIDE_COURTE : '';
-
-    // Propre : publiée tout de suite, sans auteur.
-    if (!categories.length) {
-      const confession = C.enregistrer({ guild: interaction.guild, salonId, auteur: interaction.user, texte, categories, statut: 'en_revue' });
-      const r = await C.publier(interaction.client, confession);
-      if (!r.ok) {
-        derniere.delete(cle);
-        C.oublier(confession.id);
-        return interaction.reply({
-          content: r.raison === 'salon'
-            ? '📭 Le salon des confessions n\'existe plus ou m\'est fermé : prévenez un administrateur (`/config` → 🎉 Communauté).'
-            : '❌ Je n\'arrive pas à écrire dans le salon des confessions : un administrateur doit me donner la permission d\'y envoyer des messages.',
-        });
-      }
-      return interaction.reply({ content: `💌 Ta confession n°${r.numero} est publiée anonymement : ${r.url}` });
-    }
-
-    // Signalée : relue par le staff du bot avant toute publication.
-    const confession = C.enregistrer({ guild: interaction.guild, salonId, auteur: interaction.user, texte, categories, statut: 'en_revue' });
-    const parti = await C.signaler(interaction.client, confession, interaction.user);
-    if (!parti) {
-      return interaction.reply({
-        content: `🕊️ Ta confession contient des mots qui demandent une relecture, mais l'équipe de relecture est injoignable pour le moment : elle n'est **pas** publiée. Tu peux la reformuler et la renvoyer.${aide}`,
-      });
-    }
-    return interaction.reply({
-      content: `🕊️ Ta confession sera relue par l'équipe du bot avant d'être publiée. Tu n'as rien d'autre à faire.${aide}`,
-    });
+    // L'envoi au salon (ou au QG) peut traîner : file d'attente de Discord,
+    // API lente. Répondre seulement APRÈS laissait passer les 3 secondes —
+    // la confession partait, mais l'auteur lisait « L'application ne répond
+    // pas » et la renvoyait. `repondreVite` ne diffère qu'au dernier moment,
+    // et en éphémère : la réponse ne dit qu'à l'auteur ce qu'il a écrit.
+    return repondreVite(interaction, () => traiter(interaction, { salonId, texte, cle }), { ephemere: true });
   },
 };
+
+async function traiter(interaction, { salonId, texte, cle }) {
+  const { categories } = C.detecter(texte);
+  const aide = categories.includes('suicide') ? AIDE_COURTE : '';
+
+  // Propre : publiée tout de suite, sans auteur.
+  if (!categories.length) {
+    const confession = C.enregistrer({ guild: interaction.guild, salonId, auteur: interaction.user, texte, categories, statut: 'en_revue' });
+    const r = await C.publier(interaction.client, confession);
+    if (!r.ok) {
+      derniere.delete(cle);
+      C.oublier(confession.id);
+      return {
+        content: r.raison === 'salon'
+          ? '📭 Le salon des confessions n\'existe plus ou m\'est fermé : prévenez un administrateur (`/config` → 🎉 Communauté).'
+          : '❌ Je n\'arrive pas à écrire dans le salon des confessions : un administrateur doit me donner la permission d\'y envoyer des messages.',
+      };
+    }
+    return { content: `💌 Ta confession n°${r.numero} est publiée anonymement : ${r.url}` };
+  }
+
+  // Signalée : relue par le staff du bot avant toute publication.
+  const confession = C.enregistrer({ guild: interaction.guild, salonId, auteur: interaction.user, texte, categories, statut: 'en_revue' });
+  const parti = await C.signaler(interaction.client, confession, interaction.user);
+  if (!parti) {
+    return {
+      content: `🕊️ Ta confession contient des mots qui demandent une relecture, mais l'équipe de relecture est injoignable pour le moment : elle n'est **pas** publiée. Tu peux la reformuler et la renvoyer.${aide}`,
+    };
+  }
+  return {
+    content: `🕊️ Ta confession sera relue par l'équipe du bot avant d'être publiée. Tu n'as rien d'autre à faire.${aide}`,
+  };
+}
