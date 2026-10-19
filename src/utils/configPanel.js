@@ -232,7 +232,8 @@ function mainView(guild) {
         { label: 'Musique', value: 'musique', emoji: '🎵', description: 'Salons des commandes, carte de lecture' },
         { label: 'Identité du bot', value: 'identitebot', emoji: '🪪', description: 'Nom et photo du bot sur ce serveur, profils' },
         { label: 'Absences', value: 'absences', emoji: '📅', description: 'Les salons où partent les annonces d\'absence' },
-        { label: 'Réseaux sociaux', value: 'reseaux', emoji: '📡', description: 'Annonces des lives et nouvelles vidéos' }
+        { label: 'Réseaux sociaux', value: 'reseaux', emoji: '📡', description: 'Annonces des lives et nouvelles vidéos' },
+        { label: 'Comptage', value: 'comptage', emoji: '🔢', description: 'Salon de comptage : règles, rôle d\'erreur, XP, remise à zéro' }
       )
   );
   return { embeds: [embed], components: [categoryRow] };
@@ -1133,7 +1134,7 @@ function absencesView(guild) {
   };
 }
 
-const CATEGORY_VIEWS = { communaute: communauteView, rp: rpView, roles: rolesView, arrivees: arriveesView, salons: salonsView, xp: xpView, securite: securiteView, whitelist: whitelistView, tickets: ticketsView, vocal: vocalView, musique: musiqueView, identitebot: identiteBotView, absences: absencesView, reseaux: reseauxView, mariage: mariageView };
+const CATEGORY_VIEWS = { communaute: communauteView, rp: rpView, roles: rolesView, arrivees: arriveesView, salons: salonsView, xp: xpView, securite: securiteView, whitelist: whitelistView, tickets: ticketsView, vocal: vocalView, musique: musiqueView, identitebot: identiteBotView, absences: absencesView, reseaux: reseauxView, mariage: mariageView, comptage: (g) => require('./comptageConfig').vueConfigComptage(g) };
 const SECURITY_TOGGLES = new Set(['antispam_enabled', 'antinuke_enabled', 'captcha_enabled']);
 
 function xpModal(cfg) {
@@ -1651,6 +1652,12 @@ async function handleConfigInteraction(interaction) {
         logEmbed('⚙️ Configuration modifiée', `🎛️ Salon de la carte de lecture → ${channelId ? `<#${channelId}>` : '*le salon de la commande*'}\nPar <@${interaction.user.id}>`, COLORS.INFO)
       );
       return;
+    }
+
+    // 🔢 Comptage : salon, bascules, rôle d'erreur, XP, remise à zéro.
+    // Vue et gestionnaires dans utils/comptageConfig.js (préfixe `cfgcpt:`).
+    if (id.startsWith('cfgcpt:')) {
+      return await require('./comptageConfig').gererConfigComptage(interaction);
     }
 
     // 🪪 Identité du bot sur ce serveur — administration uniquement.

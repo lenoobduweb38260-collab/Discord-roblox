@@ -43,6 +43,7 @@ class SelectBase {
   addChannelTypes(...v) { this.d.channel_types = v.flat(); return this; }
   setChannelTypes(...v) { this.d.channel_types = v.flat(); return this; }
   setDefaultChannels(...v) { this.d.default_values = v.flat().map((id) => ({ id, type: 'channel' })); return this; }
+  setDefaultRoles(...v) { this.d.default_values = v.flat().map((id) => ({ id, type: 'role' })); return this; }
   addOptions(...v) { this.d.options = [...(this.d.options || []), ...v.flat()]; return this; }
   toJSON() { return { ...this.d }; }
 }
